@@ -108,3 +108,11 @@ impl Default for EnemyTurnTimer {
         }
     }
 }
+
+// ===== GAME OVER STATE =====
+
+/// Outcome of the most recently finished round; read by the game-over screen.
+#[derive(Resource, Default, Debug)]
+pub struct GameOverInfo {
+    pub player_won: bool,
+}

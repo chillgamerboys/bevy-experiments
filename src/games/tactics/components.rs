@@ -109,6 +109,15 @@ pub struct Hoverable;
 #[derive(Component, Debug)]
 pub struct AIControlled;
 
+/// Marker component: tag for every entity spawned during gameplay so a single
+/// `OnExit(GamePlay)` system can despawn the lot in one query.
+#[derive(Component, Debug)]
+pub struct GameplayEntity;
+
+/// Marker component: tag for the game-over overlay's entities.
+#[derive(Component, Debug)]
+pub struct GameOverUI;
+
 // ===== COMBAT COMPONENTS (for Phase 6) =====
 
 /// Stats for units in combat
