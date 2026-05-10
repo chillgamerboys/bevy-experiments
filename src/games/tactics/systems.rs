@@ -396,17 +396,20 @@ pub struct MovementHighlight;
 /// Shows green overlay on adjacent tiles that are unoccupied
 pub fn highlight_movement_system(
     mut commands: Commands,
-    selected_query: Query<(&GridPosition, &Unit), With<Selected>>,
+    selected_query: Query<(&GridPosition, &Unit, &TurnStatus), With<Selected>>,
     highlight_query: Query<Entity, With<MovementHighlight>>,
     // Query all units to check for collisions
     all_player_units: Query<&GridPosition, (With<Unit>, Without<AIControlled>)>,
     ai_units: Query<&GridPosition, (With<Unit>, With<AIControlled>)>,
+    // Refresh whenever any unit moves so highlights track the selected unit and
+    // pick up enemies entering/leaving adjacency.
+    moved_units: Query<(), (With<Unit>, Changed<GridPosition>)>,
     selection_state: Res<SelectionState>,
     grid_map: Res<GridMap>,
     turn_state: Res<State<TurnState>>,
 ) {
-    // Only update if selection changed
-    if !selection_state.is_changed() {
+    let any_unit_moved = !moved_units.is_empty();
+    if !selection_state.is_changed() && !turn_state.is_changed() && !any_unit_moved {
         return;
     }
 
@@ -422,7 +425,12 @@ pub fn highlight_movement_system(
 
     // Highlight valid moves for selected unit
     if let Some(selected_entity) = selection_state.selected_unit {
-        if let Ok((grid_pos, _)) = selected_query.get(selected_entity) {
+        if let Ok((grid_pos, _, turn_status)) = selected_query.get(selected_entity) {
+            // Unit already acted this turn — nothing to highlight.
+            if turn_status.has_acted {
+                return;
+            }
+
             // Get adjacent tiles (4-directional movement)
             let adjacent_positions = grid_pos.adjacent();
 
