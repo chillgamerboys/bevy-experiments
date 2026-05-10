@@ -2,10 +2,10 @@
 //! These tests run multiple systems together to catch interaction bugs
 
 use bevy::prelude::*;
-use bevy_game::components::*;
-use bevy_game::resources::*;
-use bevy_game::systems::*;
-use bevy_game::{AppState, TurnState};
+use bevy_experiments::games::tactics::components::*;
+use bevy_experiments::games::tactics::resources::*;
+use bevy_experiments::games::tactics::systems::*;
+use bevy_experiments::games::tactics::{AppState, TurnState};
 
 /// Helper function to create a test app with all game systems
 fn create_test_app() -> App {
