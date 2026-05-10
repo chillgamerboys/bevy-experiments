@@ -17,6 +17,7 @@ pub const PLAYER_COLOR: Color = Color::srgb(0.2, 0.5, 0.9);      // Blue
 pub const ENEMY_COLOR: Color = Color::srgb(0.9, 0.2, 0.2);       // Red
 pub const SELECTED_COLOR: Color = Color::srgb(1.0, 0.9, 0.2);    // Yellow
 pub const MOVEMENT_HIGHLIGHT: Color = Color::srgba(0.2, 0.9, 0.2, 0.5); // Semi-transparent green
+pub const ATTACK_HIGHLIGHT: Color = Color::srgba(0.9, 0.2, 0.2, 0.5);   // Semi-transparent red
 
 // Z-layers for rendering order
 pub const Z_TILE: f32 = 0.0;

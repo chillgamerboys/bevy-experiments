@@ -3,9 +3,12 @@
 
 use bevy::prelude::*;
 
-use super::components::{AIControlled, Faction, GridPosition, Hoverable, Selected, Tile, TurnStatus, Unit};
+use super::components::{
+    AIControlled, Faction, GameOverUI, GameplayEntity, GridPosition, Hoverable, Selected, Tile,
+    TurnStatus, Unit,
+};
 use super::constants::*;
-use super::resources::{EnemyTurnTimer, GridMap, SelectionState};
+use super::resources::{EnemyTurnTimer, GameOverInfo, GridMap, SelectionState};
 use super::{AppState, TurnState};
 
 // ===== SETUP SYSTEMS =====
@@ -53,6 +56,7 @@ pub fn setup_grid(mut commands: Commands, mut grid_map: ResMut<GridMap>) {
                         ..default()
                     },
                     Transform::from_xyz(world_pos.x, world_pos.y, Z_TILE),
+                    GameplayEntity,
                 ))
                 .id();
 
@@ -144,46 +148,44 @@ pub fn setup_main_menu(mut commands: Commands) {
             MainMenuUI,
         ))
         .with_children(|parent| {
-            // Title text
+            // Title
             parent.spawn((
                 Text::new("Turn-Based Tactics"),
-                TextFont {
-                    font_size: 60.0,
-                    ..default()
-                },
+                TextFont { font_size: 60.0, ..default() },
                 TextColor(Color::WHITE),
-                Node {
-                    margin: UiRect::all(Val::Px(20.0)),
-                    ..default()
-                },
+                Node { margin: UiRect::all(Val::Px(20.0)), ..default() },
             ));
 
-            // Instruction text
+            // Goal
             parent.spawn((
-                Text::new("Press ENTER to start"),
-                TextFont {
-                    font_size: 30.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.7, 0.7, 0.7)),
-                Node {
-                    margin: UiRect::all(Val::Px(10.0)),
-                    ..default()
-                },
+                Text::new("Move your blue units onto the red ones to destroy them."),
+                TextFont { font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+                Node { margin: UiRect::all(Val::Px(6.0)), ..default() },
             ));
 
-            // Phase info text
+            // Controls
             parent.spawn((
-                Text::new("Phase 5: Simple AI"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
+                Text::new("Click a unit, then click a green tile to move. Red tile = attack."),
+                TextFont { font_size: 22.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+                Node { margin: UiRect::all(Val::Px(6.0)), ..default() },
+            ));
+
+            // Camera hint
+            parent.spawn((
+                Text::new("WASD or arrow keys pan the camera."),
+                TextFont { font_size: 18.0, ..default() },
+                TextColor(Color::srgb(0.65, 0.65, 0.65)),
+                Node { margin: UiRect::all(Val::Px(6.0)), ..default() },
+            ));
+
+            // Action prompt
+            parent.spawn((
+                Text::new("Press ENTER to start."),
+                TextFont { font_size: 28.0, ..default() },
                 TextColor(Color::srgb(0.5, 0.8, 0.5)),
-                Node {
-                    margin: UiRect::top(Val::Px(40.0)),
-                    ..default()
-                },
+                Node { margin: UiRect::top(Val::Px(32.0)), ..default() },
             ));
         });
 }
@@ -237,6 +239,7 @@ pub fn spawn_units(mut commands: Commands, grid_map: Res<GridMap>) {
             },
             Transform::from_xyz(world_pos.x, world_pos.y, Z_UNIT),
             Hoverable, // Can be hovered over with mouse
+            GameplayEntity,
         ));
     }
 
@@ -260,6 +263,7 @@ pub fn spawn_units(mut commands: Commands, grid_map: Res<GridMap>) {
             },
             Transform::from_xyz(world_pos.x, world_pos.y, Z_UNIT),
             Hoverable,
+            GameplayEntity,
         ));
     }
 
@@ -428,29 +432,31 @@ pub fn highlight_movement_system(
                     continue;
                 }
 
-                // **COLLISION DETECTION:** Only highlight unoccupied tiles
                 let occupied_by_player = all_player_units.iter()
                     .any(|unit_pos| unit_pos.x == adj_pos.x && unit_pos.y == adj_pos.y);
+
+                // Skip tiles occupied by friendlies — can't move through allies.
+                if occupied_by_player {
+                    continue;
+                }
 
                 let occupied_by_ai = ai_units.iter()
                     .any(|unit_pos| unit_pos.x == adj_pos.x && unit_pos.y == adj_pos.y);
 
-                // Skip occupied tiles - don't highlight them
-                if occupied_by_player || occupied_by_ai {
-                    continue;
-                }
+                // Enemy-occupied tiles are attack targets; everything else is a regular move.
+                let color = if occupied_by_ai { ATTACK_HIGHLIGHT } else { MOVEMENT_HIGHLIGHT };
 
                 let world_pos = grid_map.grid_to_world(&adj_pos);
 
-                // Spawn highlight overlay
                 commands.spawn((
                     Sprite {
-                        color: MOVEMENT_HIGHLIGHT,
+                        color,
                         custom_size: Some(Vec2::new(TILE_SIZE, TILE_SIZE)),
                         ..default()
                     },
                     Transform::from_xyz(world_pos.x, world_pos.y, Z_OVERLAY),
                     MovementHighlight,
+                    GameplayEntity,
                 ));
             }
         }
@@ -468,6 +474,7 @@ pub fn highlight_movement_system(
 /// - Tiles must be within grid bounds
 /// - After moving, unit is marked as "has_acted" for turn management
 pub fn movement_system(
+    mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
@@ -479,8 +486,8 @@ pub fn movement_system(
     >,
     // Query for other player units (to check collisions)
     other_player_units: Query<&GridPosition, (With<Unit>, Without<Selected>, Without<AIControlled>)>,
-    // Query for AI units (to check collisions)
-    ai_units: Query<&GridPosition, (With<Unit>, With<AIControlled>)>,
+    // Query for AI units (entity + position; needed for bump-to-kill despawn)
+    ai_units: Query<(Entity, &GridPosition), (With<Unit>, With<AIControlled>)>,
     selection_state: Res<SelectionState>,
     turn_state: Res<State<TurnState>>,
 ) {
@@ -529,17 +536,25 @@ pub fn movement_system(
 
                     // Execute movement if valid
                     if is_adjacent && grid_map.is_in_bounds(&clicked_grid_pos) {
-                        // **COLLISION DETECTION:** Check if destination is occupied by any other unit
+                        // Friendly units block movement entirely.
                         let occupied_by_player = other_player_units.iter()
                             .any(|unit_pos| unit_pos.x == clicked_grid_pos.x && unit_pos.y == clicked_grid_pos.y);
 
-                        let occupied_by_ai = ai_units.iter()
-                            .any(|unit_pos| unit_pos.x == clicked_grid_pos.x && unit_pos.y == clicked_grid_pos.y);
-
-                        if occupied_by_player || occupied_by_ai {
-                            info!("Cannot move to ({}, {}) - tile occupied by another unit",
+                        if occupied_by_player {
+                            info!("Cannot move to ({}, {}) - tile occupied by friendly unit",
                                 clicked_grid_pos.x, clicked_grid_pos.y);
                             return;
+                        }
+
+                        // Enemy unit on the target tile? Bump-to-kill: despawn it, then move.
+                        let target_enemy = ai_units.iter().find_map(|(entity, unit_pos)| {
+                            (unit_pos.x == clicked_grid_pos.x && unit_pos.y == clicked_grid_pos.y)
+                                .then_some(entity)
+                        });
+                        if let Some(enemy_entity) = target_enemy {
+                            info!("Player destroyed enemy at ({}, {})",
+                                clicked_grid_pos.x, clicked_grid_pos.y);
+                            commands.entity(enemy_entity).despawn();
                         }
 
                         // Calculate new world position for rendering
@@ -660,6 +675,7 @@ pub fn setup_turn_ui(mut commands: Commands) {
             ..default()
         },
         TurnIndicatorUI,
+        GameplayEntity,
     ));
 }
 
@@ -705,13 +721,14 @@ pub fn update_turn_ui_system(
 /// - Demonstrates pathfinding using "greedy" algorithm (always move closer)
 /// - Manhattan distance: sum of horizontal + vertical distance (no diagonals)
 pub fn ai_movement_system(
+    mut commands: Commands,
     // Query for AI units - get mutable access to position, transform, and turn status
     mut ai_query: Query<
         (Entity, &mut GridPosition, &mut Transform, &mut TurnStatus),
         (With<AIControlled>, With<Unit>),
     >,
-    // Query for player units - only need to read their positions for targeting
-    player_query: Query<&GridPosition, (With<Unit>, Without<AIControlled>)>,
+    // Query for player units - need entity (to despawn on kill) and position (for targeting/collisions)
+    player_query: Query<(Entity, &GridPosition), (With<Unit>, Without<AIControlled>)>,
     grid_map: Res<GridMap>,
     turn_state: Res<State<TurnState>>,
 ) {
@@ -737,7 +754,7 @@ pub fn ai_movement_system(
         let mut nearest_player_pos: Option<GridPosition> = None;
         let mut min_distance = u32::MAX;
 
-        for player_pos in &player_query {
+        for (_, player_pos) in &player_query {
             // Calculate Manhattan distance (sum of x and y distances)
             let distance = ai_pos.distance_to(player_pos);
             if distance < min_distance {
@@ -762,18 +779,15 @@ pub fn ai_movement_system(
                     continue;
                 }
 
-                // **COLLISION DETECTION:** Check if position is occupied by any unit
-                // Check player positions
-                let occupied_by_player = player_query.iter()
-                    .any(|player_pos| player_pos.x == adj_pos.x && player_pos.y == adj_pos.y);
-
-                // Check other AI unit positions (not the current unit)
+                // Friendly AI in the way? Skip — can't move through allies.
                 let occupied_by_other_ai = ai_positions.iter()
                     .any(|(entity, ai_pos_check)| *entity != ai_entity && ai_pos_check.x == adj_pos.x && ai_pos_check.y == adj_pos.y);
 
-                if occupied_by_player || occupied_by_other_ai {
-                    continue;  // Skip occupied tiles - can't move through units
+                if occupied_by_other_ai {
+                    continue;
                 }
+
+                // Player-occupied tiles are valid (attack moves), not blocked.
 
                 // Check if this move gets us closer to target
                 let distance_from_adj = adj_pos.distance_to(&target_pos);
@@ -786,6 +800,15 @@ pub fn ai_movement_system(
             // === STEP 3: Execute the move ===
             if let Some(new_pos) = best_move {
                 let new_world_pos = grid_map.grid_to_world(&new_pos);
+
+                // If a player unit is sitting on the chosen tile, bump-kill it.
+                if let Some(target_entity) = player_query
+                    .iter()
+                    .find_map(|(entity, pos)| (*pos == new_pos).then_some(entity))
+                {
+                    info!("AI destroyed player unit at ({}, {})", new_pos.x, new_pos.y);
+                    commands.entity(target_entity).despawn();
+                }
 
                 info!(
                     "AI moving from ({}, {}) to ({}, {}) - approaching target at ({}, {})",
@@ -810,5 +833,102 @@ pub fn ai_movement_system(
             // No player units found (shouldn't happen in normal gameplay)
             turn_status.has_acted = true;
         }
+    }
+}
+
+// ===== GAME OVER =====
+
+/// Watches faction counts; flips into `AppState::GameOver` when one side wipes.
+pub fn check_game_over_system(
+    units: Query<&Unit>,
+    mut info: ResMut<GameOverInfo>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    let mut players = 0u32;
+    let mut enemies = 0u32;
+    for unit in &units {
+        match unit.faction {
+            Faction::Player => players += 1,
+            Faction::Enemy => enemies += 1,
+        }
+    }
+
+    if enemies == 0 {
+        info.player_won = true;
+        next_state.set(AppState::GameOver);
+    } else if players == 0 {
+        info.player_won = false;
+        next_state.set(AppState::GameOver);
+    }
+}
+
+/// Despawns every entity tagged `GameplayEntity` and clears stale selection state.
+/// Runs on `OnExit(AppState::GamePlay)` so the next round starts fresh.
+pub fn cleanup_gameplay(
+    mut commands: Commands,
+    entities: Query<Entity, With<GameplayEntity>>,
+    mut selection: ResMut<SelectionState>,
+    mut grid_map: ResMut<GridMap>,
+) {
+    for entity in &entities {
+        commands.entity(entity).despawn();
+    }
+    *selection = SelectionState::default();
+    grid_map.tiles.clear();
+}
+
+/// Builds the game-over overlay (full-screen, semi-transparent) with result text.
+pub fn setup_game_over_ui(mut commands: Commands, info: Res<GameOverInfo>) {
+    let (headline, headline_color) = if info.player_won {
+        ("You Win!", Color::srgb(1.0, 0.85, 0.2))
+    } else {
+        ("You Lose!", Color::srgb(0.95, 0.25, 0.25))
+    };
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+            GameOverUI,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new(headline),
+                TextFont { font_size: 72.0, ..default() },
+                TextColor(headline_color),
+                Node { margin: UiRect::all(Val::Px(16.0)), ..default() },
+            ));
+            parent.spawn((
+                Text::new("Press R to play again — ESC for main menu"),
+                TextFont { font_size: 26.0, ..default() },
+                TextColor(Color::srgb(0.85, 0.85, 0.85)),
+                Node { margin: UiRect::all(Val::Px(8.0)), ..default() },
+            ));
+        });
+}
+
+pub fn cleanup_game_over_ui(mut commands: Commands, q: Query<Entity, With<GameOverUI>>) {
+    for entity in &q {
+        commands.entity(entity).despawn();
+    }
+}
+
+/// Handles input on the game-over screen.
+pub fn gameover_input_system(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if keyboard.just_pressed(KeyCode::KeyR) {
+        next_state.set(AppState::GamePlay);
+    } else if keyboard.just_pressed(KeyCode::Escape) {
+        next_state.set(AppState::MainMenu);
     }
 }
