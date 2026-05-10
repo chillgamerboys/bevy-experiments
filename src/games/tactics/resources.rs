@@ -4,8 +4,8 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::components::{Faction, GridPosition};
-use crate::constants::{GRID_HEIGHT, GRID_WIDTH, TILE_SIZE};
+use super::components::{Faction, GridPosition};
+use super::constants::{GRID_HEIGHT, GRID_WIDTH, TILE_SIZE};
 
 // ===== GRID MANAGEMENT RESOURCE =====
 

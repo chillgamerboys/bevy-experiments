@@ -3,9 +3,9 @@
 //! https://github.com/bevyengine/bevy/blob/main/tests/how_to_test_systems.rs
 
 use bevy::prelude::*;
-use bevy_game::components::*;
-use bevy_game::resources::*;
-use bevy_game::TurnState;
+use bevy_experiments::games::tactics::components::*;
+use bevy_experiments::games::tactics::resources::*;
+use bevy_experiments::games::tactics::TurnState;
 
 /// Test that player units cannot move onto tiles occupied by other units
 #[test]

@@ -1,7 +1,16 @@
 [package]
-name = "bevy-game"
+name = "bevy-experiments"
 version = "0.1.0"
 edition = "2021"
+default-run = "tactics"
+
+[lib]
+name = "bevy_experiments"
+path = "src/lib.rs"
+
+[[test]]
+name = "tactics"
+path = "tests/tactics/main.rs"
 
 [dependencies]
 bevy = "0.18"
