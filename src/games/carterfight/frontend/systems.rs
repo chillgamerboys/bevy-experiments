@@ -14,6 +14,57 @@ use super::resources::{BattleStateRes, PendingMove};
 pub fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((Camera2d, CarterfightEntity));
 
+    commands.spawn((
+        Sprite::from_image(asset_server.load(CARTER_SPRITE_PATH)),
+        Transform::from_xyz(CARTER_SPRITE_X, CARTER_SPRITE_Y, 0.0)
+            .with_scale(Vec3::splat(CARTER_SPRITE_SCALE)),
+        CarterfightEntity,
+    ));
+
+    // Health bar + label, anchored to the left edge so the fill shrinks
+    // rightward as Carter takes damage.
+    let half_sprite_h = CARTER_SPRITE_NATIVE_SIZE * CARTER_SPRITE_SCALE / 2.0;
+    let bar_y = CARTER_SPRITE_Y - half_sprite_h - CARTER_HEALTHBAR_GAP - CARTER_HEALTHBAR_H / 2.0;
+    let bar_left = CARTER_SPRITE_X - CARTER_HEALTHBAR_W / 2.0;
+    let text_y =
+        bar_y - CARTER_HEALTHBAR_H / 2.0 - CARTER_HEALTHBAR_TEXT_GAP - CARTER_HEALTH_TEXT_SIZE / 2.0;
+
+    commands.spawn((
+        Sprite {
+            color: CARTER_HEALTHBAR_BG_COLOR,
+            custom_size: Some(Vec2::new(CARTER_HEALTHBAR_W, CARTER_HEALTHBAR_H)),
+            ..default()
+        },
+        bevy::sprite::Anchor::CENTER_LEFT,
+        Transform::from_xyz(bar_left, bar_y, 0.1),
+        CarterfightEntity,
+    ));
+
+    commands.spawn((
+        Sprite {
+            color: CARTER_HEALTHBAR_FILL_COLOR,
+            custom_size: Some(Vec2::new(CARTER_HEALTHBAR_W, CARTER_HEALTHBAR_H)),
+            ..default()
+        },
+        bevy::sprite::Anchor::CENTER_LEFT,
+        Transform::from_xyz(bar_left, bar_y, 0.2),
+        CarterHealthBarFill,
+        CarterfightEntity,
+    ));
+
+    commands.spawn((
+        Text2d::new(""),
+        TextFont {
+            font: asset_server.load(FONT_PATH),
+            font_size: CARTER_HEALTH_TEXT_SIZE,
+            ..default()
+        },
+        TextColor(CARTER_HEALTH_TEXT_COLOR),
+        Transform::from_xyz(CARTER_SPRITE_X, text_y, 0.3),
+        CarterHealthText,
+        CarterfightEntity,
+    ));
+
     // HUD line at the top — HP + move list. The dialogue box itself is owned
     // and rendered by `super::dialogue::DialoguePlugin`.
     commands.spawn((
@@ -110,11 +161,10 @@ pub fn update_battle_hud(
         return;
     };
     let p = &state.0.player;
-    let o = &state.0.opponent;
 
     let mut s = format!(
-        "{}: {}/{} HP    {}: {}/{} HP\n\nTurn {}\n\nMoves:",
-        p.name, p.current_hp, p.max_hp, o.name, o.current_hp, o.max_hp, state.0.turn_count
+        "{}: {}/{} HP\n\nTurn {}\n\nMoves:",
+        p.name, p.current_hp, p.max_hp, state.0.turn_count
     );
     for (i, move_id) in p.moves.iter().enumerate() {
         let name = move_def(move_id).map(|m| m.name).unwrap_or("?");
@@ -219,5 +269,31 @@ pub fn battle_input(
     // Prompt the next turn only when the battle is still going.
     if !matches!(state.0.phase, BattlePhase::Ended { .. }) {
         queue.push("What will you do?");
+    }
+}
+
+/// Drives the world-space health bar + label under Carter. Runs every frame
+/// in every state so the display reflects HP through intro/battle/outro.
+pub fn update_carter_health_display(
+    state: Res<BattleStateRes>,
+    mut fill_q: Query<&mut Sprite, With<CarterHealthBarFill>>,
+    mut text_q: Query<&mut Text2d, With<CarterHealthText>>,
+) {
+    let c = &state.0.opponent;
+    let ratio = if c.max_hp > 0 {
+        (c.current_hp as f32 / c.max_hp as f32).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    if let Ok(mut sprite) = fill_q.single_mut() {
+        sprite.custom_size = Some(Vec2::new(
+            CARTER_HEALTHBAR_W * ratio,
+            CARTER_HEALTHBAR_H,
+        ));
+    }
+
+    if let Ok(mut text) = text_q.single_mut() {
+        **text = format!("{}/{}", c.current_hp, c.max_hp);
     }
 }

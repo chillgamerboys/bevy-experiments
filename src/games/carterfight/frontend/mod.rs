@@ -23,6 +23,7 @@ pub fn install(app: &mut App) {
         .add_systems(Startup, (setup_scene, spawn_battle_state))
         .add_systems(OnEnter(AppState::IntroDialogue), enqueue_intro_script)
         .add_systems(OnEnter(AppState::OutroDialogue), enqueue_outro_script)
+        .add_systems(Update, update_carter_health_display)
         .add_systems(
             Update,
             intro_to_battle_when_empty.run_if(in_state(AppState::IntroDialogue)),
