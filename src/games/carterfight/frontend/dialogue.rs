@@ -1,3 +1,4 @@
+use super::constants::*;
 use bevy::prelude::*;
 use std::collections::VecDeque;
 
@@ -8,7 +9,7 @@ impl Plugin for DialoguePlugin {
         app.init_resource::<DialogueQueue>()
             .init_resource::<DialogueState>()
             .add_systems(Startup, setup_dialogue_box)
-            .add_systems(Update, (tick_dialogue, dialogue_input).chain());
+            .add_systems(Update, (tick_dialogue, dialogue_input, update_cursor).chain());
     }
 }
 
@@ -37,7 +38,7 @@ impl Default for DialogueState {
             full_text: String::new(),
             chars_shown: 0,
             char_timer: 0.0,
-            secs_per_char: 1.0 / 20.0,
+            secs_per_char: 1.0 / DIALOGUE_CHARS_PER_SEC,
             is_done: true,
             chime: Handle::default(),
         }
@@ -47,37 +48,54 @@ impl Default for DialogueState {
 #[derive(Component)]
 struct DialogueText;
 
+#[derive(Component)]
+struct DialogueCursor;
+
 fn setup_dialogue_box(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut state: ResMut<DialogueState>,
 ) {
     state.chime = asset_server.load("sounds/dialogue_chime.wav");
-
+    let cursor_image: Handle<Image> = asset_server.load("images/dialogue_cursor.png");
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                bottom: Val::Px(16.0),
-                left: Val::Px(16.0),
-                right: Val::Px(16.0),
-                height: Val::Px(160.0),
-                border: UiRect::all(Val::Px(4.0)),
-                padding: UiRect::all(Val::Px(16.0)),
+                bottom: Val::Px(DIALOGUE_BOX_MARGIN),
+                left: Val::Px(DIALOGUE_BOX_MARGIN),
+                right: Val::Px(DIALOGUE_BOX_MARGIN),
+                height: Val::Px(DIALOGUE_BOX_HEIGHT),
+                border: UiRect::all(Val::Px(DIALOGUE_BOX_BORDER)),
+                padding: UiRect::all(Val::Px(DIALOGUE_BOX_PADDING)),
+                border_radius: bevy::ui::BorderRadius::all(Val::Px(DIALOGUE_BOX_RADIUS)),
                 ..default()
             },
-            BackgroundColor(Color::WHITE),
-            BorderColor::all(Color::BLACK),
+            BackgroundColor(DIALOGUE_BOX_BG),
+            BorderColor::all(DIALOGUE_BOX_BORDER_COLOR),
         ))
         .with_children(|parent| {
             parent.spawn((
                 Text::new(""),
                 TextFont {
-                    font_size: 26.0,
+                    font_size: DIALOGUE_BOX_FONT_SIZE,
                     ..default()
                 },
-                TextColor(Color::BLACK),
+                TextColor(DIALOGUE_BOX_TEXT_COLOR),
                 DialogueText,
+            ));
+
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(DIALOGUE_CURSOR_OFFSET),
+                    right: Val::Px(DIALOGUE_CURSOR_OFFSET),
+                    width: Val::Px(DIALOGUE_CURSOR_W),
+                    height: Val::Px(DIALOGUE_CURSOR_H),
+                    ..default()
+                },
+                ImageNode::new(cursor_image),
+                DialogueCursor,
             ));
         });
 }
@@ -123,14 +141,21 @@ fn tick_dialogue(
         state.is_done = true;
     }
 
-    let display = if state.is_done {
-        format!("{shown} ▼")
-    } else {
-        shown
-    };
-
     if let Ok(mut text) = text_q.single_mut() {
-        **text = display;
+        **text = shown;
+    }
+}
+
+fn update_cursor(
+    state: Res<DialogueState>,
+    mut cursor_q: Query<&mut Visibility, With<DialogueCursor>>,
+) {
+    if let Ok(mut vis) = cursor_q.single_mut() {
+        *vis = if state.is_done && !state.full_text.is_empty() {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 }
 
@@ -140,18 +165,17 @@ fn dialogue_input(
     queue: Res<DialogueQueue>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
 ) {
-    let pressed =   
+    let pressed =
         keyboard.just_pressed(KeyCode::Space) || keyboard.just_pressed(KeyCode::KeyZ);
     if !pressed {
         return;
     }
     if !state.is_done {
-        // Skip typewriter — jump to end of current message
         state.chars_shown = state.full_text.chars().count();
         state.is_done = true;
-        let display = format!("{} ▼", state.full_text);
+        let shown = state.full_text.clone();
         if let Ok(mut text) = text_q.single_mut() {
-            **text = display;
+            **text = shown;
         }
     } else if !state.full_text.is_empty() && !queue.0.is_empty() {
         // Advance — clear current message so tick_dialogue can load the next.
