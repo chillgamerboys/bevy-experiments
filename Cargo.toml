@@ -12,8 +12,17 @@ path = "src/lib.rs"
 name = "tactics"
 path = "tests/tactics/main.rs"
 
+[[test]]
+name = "carterfight"
+path = "tests/carterfight/main.rs"
+
 [dependencies]
 bevy = { version = "0.18", features = ["wav"] }
+rand = "0.8"
+rand_chacha = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
 
 # Optimize debug builds for better performance
 # Bevy projects are notoriously slow in debug mode without these settings
