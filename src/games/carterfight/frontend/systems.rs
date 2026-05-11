@@ -7,7 +7,7 @@ use super::super::AppState;
 use super::components::*;
 use super::constants::*;
 use super::dialogue::{DialogueQueue, DialogueState};
-use super::resources::*;
+use super::resources::{BattleStateRes, PendingMove};
 
 // ===== STARTUP =====
 
@@ -37,8 +37,8 @@ pub fn setup_scene(mut commands: Commands) {
 /// Build the initial battle state and stash it as a resource. Runs once at
 /// startup.
 pub fn spawn_battle_state(mut commands: Commands) {
-    let player = character_template("Carter").expect("Carter template exists");
-    let opponent = character_template("Rival").expect("Rival template exists");
+    let player = character_template("Player").expect("Player template exists");
+    let opponent = character_template("Carter").expect("Carter template exists");
     let state = BattleState::new(player, opponent, BATTLE_RNG_SEED);
     commands.insert_resource(BattleStateRes(state));
 }
@@ -58,8 +58,8 @@ pub fn enqueue_outro_script(mut queue: ResMut<DialogueQueue>, state: Res<BattleS
     queue.0.clear();
     let winner_text = match &state.0.phase {
         BattlePhase::Ended { winner } => match winner {
-            Side::Player => "Carter wins the fight!",
-            Side::Opponent => "Carter is defeated...",
+            Side::Player => "You beat Carter!",
+            Side::Opponent => "Carter wins the fight...",
         },
         _ => "The fight is over.",
     };
@@ -102,6 +102,7 @@ pub fn outro_exit_when_empty(
 
 pub fn update_battle_hud(
     state: Res<BattleStateRes>,
+    pending: Res<PendingMove>,
     mut hud: Query<&mut Text, With<BattleHudText>>,
 ) {
     let Ok(mut text) = hud.single_mut() else {
@@ -116,20 +117,36 @@ pub fn update_battle_hud(
     );
     for (i, move_id) in p.moves.iter().enumerate() {
         let name = move_def(move_id).map(|m| m.name).unwrap_or("?");
-        s.push_str(&format!("\n  [{}] {}", i + 1, name));
+        let marker = if pending.0 == Some(*move_id) { "→ " } else { "  " };
+        s.push_str(&format!("\n{}[{}] {}", marker, i + 1, name));
+    }
+    match pending.0 {
+        Some(move_id) => {
+            let name = move_def(move_id).map(|m| m.name).unwrap_or("?");
+            s.push_str(&format!(
+                "\n\nUse {}? Press SPACE to confirm — or press another number to change.",
+                name
+            ));
+        }
+        None => {
+            s.push_str("\n\n(Press 1-3 to choose a move.)");
+        }
     }
     *text = Text::new(s);
 }
 
-/// Reads number-key input, resolves a turn, drains events into the dialogue
-/// queue as plain strings (via `BattleEvent::dialogue_text()`). Only runs
-/// when the dialogue plugin is idle — otherwise the player is still reading
-/// the previous turn's events.
+/// Two-stage move flow:
+///   * number keys 1/2/3 set the pending move (no commit, no engine call)
+///   * SPACE confirms the pending move and runs the turn
+///   * pressing another number replaces the pending move
+/// All input is gated on the dialogue plugin being idle so we never step on
+/// the typewriter mid-line.
 pub fn battle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     dialogue_state: Res<DialogueState>,
     mut state: ResMut<BattleStateRes>,
     mut queue: ResMut<DialogueQueue>,
+    mut pending: ResMut<PendingMove>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     if !dialogue_idle(&queue, &dialogue_state) {
@@ -148,6 +165,7 @@ pub fn battle_input(
         return;
     }
 
+    // === Selection: number key sets (or replaces) the pending move ===
     let slot = if keyboard.just_pressed(KeyCode::Digit1) {
         Some(0)
     } else if keyboard.just_pressed(KeyCode::Digit2) {
@@ -157,11 +175,21 @@ pub fn battle_input(
     } else {
         None
     };
-    let Some(slot) = slot else { return };
-
-    let Some(player_move) = state.0.player.moves.get(slot).copied() else {
+    if let Some(slot) = slot {
+        if let Some(move_id) = state.0.player.moves.get(slot).copied() {
+            pending.0 = Some(move_id);
+        }
         return;
+    }
+
+    // === Confirmation: SPACE commits the pending move ===
+    if !keyboard.just_pressed(KeyCode::Space) {
+        return;
+    }
+    let Some(player_move) = pending.0 else {
+        return; // nothing selected yet — no-op
     };
+    pending.0 = None;
 
     // v1 AI: always pick the first move. Deterministic; swap in a real picker
     // later without changing any plumbing.
@@ -176,10 +204,19 @@ pub fn battle_input(
         Action::UseMove(opponent_move),
     );
     for ev in events {
-        queue.push(ev.dialogue_text());
+        queue.push(ev.dialogue_text(&state.0));
     }
 
-    // Drop the backend out of Animating once events are queued; the dialogue
-    // plugin owns the player's pacing from here.
-    state.0.phase = BattlePhase::WaitingForPlayerAction;
+    // Only step out of Animating. If the engine wrote `Ended { winner }`,
+    // keep it — the existing phase-check at the top of this function fires
+    // next frame (after the queue drains) and triggers the OutroDialogue
+    // transition.
+    if matches!(state.0.phase, BattlePhase::Animating) {
+        state.0.phase = BattlePhase::WaitingForPlayerAction;
+    }
+
+    // Prompt the next turn only when the battle is still going.
+    if !matches!(state.0.phase, BattlePhase::Ended { .. }) {
+        queue.push("What will you do?");
+    }
 }

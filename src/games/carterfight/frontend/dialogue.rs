@@ -89,8 +89,11 @@ fn tick_dialogue(
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    // Idle: pull the next message off the queue when ready
-    if state.is_done && state.full_text.is_empty() {
+    // When the current message is fully typed, advance to the next queued one
+    // (if any). This also handles the "sticky last message" case: the previous
+    // message stays visible until something new gets pushed, at which point we
+    // swap to the new content.
+    if state.is_done {
         if let Some(msg) = queue.0.pop_front() {
             state.full_text = msg;
             state.chars_shown = 0;
@@ -101,10 +104,6 @@ fn tick_dialogue(
             }
         }
         return;
-    }
-
-    if state.is_done {
-        return; // waiting for player to press advance
     }
 
     let total = state.full_text.chars().count();
@@ -138,6 +137,7 @@ fn tick_dialogue(
 fn dialogue_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<DialogueState>,
+    queue: Res<DialogueQueue>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
 ) {
     let pressed =   
@@ -153,8 +153,10 @@ fn dialogue_input(
         if let Ok(mut text) = text_q.single_mut() {
             **text = display;
         }
-    } else if !state.full_text.is_empty() {
-        // Advance — clear current message; tick_dialogue will load the next one
+    } else if !state.full_text.is_empty() && !queue.0.is_empty() {
+        // Advance — clear current message so tick_dialogue can load the next.
+        // If the queue is empty, this is the final queued message — keep it on
+        // screen as a sticky prompt until something new gets pushed.
         state.full_text.clear();
         if let Ok(mut text) = text_q.single_mut() {
             **text = String::new();

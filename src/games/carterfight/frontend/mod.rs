@@ -18,6 +18,7 @@ use systems::*;
 /// game's `run()` after `DefaultPlugins`.
 pub fn install(app: &mut App) {
     app.init_state::<AppState>()
+        .init_resource::<resources::PendingMove>()
         .add_plugins(DialoguePlugin)
         .add_systems(Startup, (setup_scene, spawn_battle_state))
         .add_systems(OnEnter(AppState::IntroDialogue), enqueue_intro_script)

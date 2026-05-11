@@ -39,14 +39,14 @@ fn moves() -> Vec<MoveDef> {
 fn characters() -> Vec<Character> {
     vec![
         Character {
-            name: "Carter".to_string(),
+            name: "Player".to_string(),
             max_hp: 60,
             current_hp: 60,
             moves: vec!["jab", "haymaker", "headbutt"],
             abilities: vec![],
         },
         Character {
-            name: "Rival".to_string(),
+            name: "Carter".to_string(),
             max_hp: 60,
             current_hp: 60,
             moves: vec!["jab", "haymaker"],
