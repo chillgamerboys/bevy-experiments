@@ -9,8 +9,8 @@ use bevy_experiments::games::carterfight::backend::{
 const SEED: u64 = 42;
 
 fn fresh_battle() -> BattleState {
-    let player = character_template("Carter").expect("Carter template exists");
-    let opponent = character_template("Rival").expect("Rival template exists");
+    let player = character_template("Player").expect("Player template exists");
+    let opponent = character_template("Carter").expect("Carter template exists");
     BattleState::new(player, opponent, SEED)
 }
 
@@ -157,7 +157,7 @@ fn every_event_has_non_empty_dialogue_text() {
     );
 
     for event in &events {
-        let text = event.dialogue_text();
+        let text = event.dialogue_text(&state);
         assert!(!text.is_empty(), "event {event:?} produced empty dialogue text");
     }
 }
