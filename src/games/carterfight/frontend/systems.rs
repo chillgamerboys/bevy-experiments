@@ -47,9 +47,11 @@ pub fn spawn_battle_state(mut commands: Commands) {
 
 pub fn enqueue_intro_script(mut queue: ResMut<DialogueQueue>) {
     queue.0.clear();
-    queue.push("Carter steps into the ring.");
-    queue.push("His Rival cracks his knuckles.");
-    queue.push("FIGHT!");
+    // Authored by the dialogue-box PR; preserved verbatim. The third placeholder
+    // line ("CARTER used SICK BEAT! ...") was dropped because the engine now
+    // emits real combat narration via `BattleEvent::dialogue_text()` during play.
+    queue.push("A wild CARTER appeared!");
+    queue.push("What will you do?");
 }
 
 pub fn enqueue_outro_script(mut queue: ResMut<DialogueQueue>, state: Res<BattleStateRes>) {
