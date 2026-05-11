@@ -78,6 +78,7 @@ fn setup_dialogue_box(
             parent.spawn((
                 Text::new(""),
                 TextFont {
+                    font: asset_server.load(FONT_PATH),
                     font_size: DIALOGUE_BOX_FONT_SIZE,
                     ..default()
                 },

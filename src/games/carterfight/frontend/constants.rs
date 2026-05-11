@@ -5,6 +5,8 @@ pub const WINDOW_SIZE: (u32, u32) = (1280, 720);
 
 pub const BATTLE_RNG_SEED: u64 = 0xCA47_E12F_1234_5678;
 
+pub const FONT_PATH: &str = "fonts/PressStart2P-Regular.ttf";
+
 pub const HUD_FONT_SIZE: f32 = 28.0;
 pub const DIALOGUE_FONT_SIZE: f32 = 24.0;
 pub const DIALOGUE_BG: Color = Color::srgba(0.05, 0.05, 0.1, 0.92);

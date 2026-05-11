@@ -11,7 +11,7 @@ use super::resources::{BattleStateRes, PendingMove};
 
 // ===== STARTUP =====
 
-pub fn setup_scene(mut commands: Commands) {
+pub fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((Camera2d, CarterfightEntity));
 
     // HUD line at the top — HP + move list. The dialogue box itself is owned
@@ -19,6 +19,7 @@ pub fn setup_scene(mut commands: Commands) {
     commands.spawn((
         Text::new(""),
         TextFont {
+            font: asset_server.load(FONT_PATH),
             font_size: HUD_FONT_SIZE,
             ..default()
         },
