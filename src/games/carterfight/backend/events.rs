@@ -1,5 +1,5 @@
 use super::moves::{AbilityId, MoveId};
-use super::state::Side;
+use super::state::{BattleState, Side};
 
 /// One thing that happened during a turn. The frontend drains a `Vec<BattleEvent>`
 /// into its dialogue queue / HUD updates. Every variant carries enough
@@ -32,35 +32,30 @@ pub enum BattleEvent {
 }
 
 impl BattleEvent {
-    /// Canonical one-line phrasing for the dialogue box. The dialogue box can
-    /// always just render this string; it doesn't have to know which variant
-    /// it's looking at unless it wants to do something fancier (HP-bar
-    /// animation tied to `Damage`, screen flash on `Fainted`, etc.).
-    pub fn dialogue_text(&self) -> String {
+    /// Canonical one-line phrasing for the dialogue box. Pulls character
+    /// names from the battle state so narration reads "Carter used jab!"
+    /// rather than "Opponent used jab!". The dialogue box can always just
+    /// render this string; it doesn't have to know which variant it's
+    /// looking at unless it wants to do something fancier.
+    pub fn dialogue_text(&self, state: &BattleState) -> String {
+        let name = |side: Side| state.character(side).name.as_str();
         match self {
             BattleEvent::UseMove { side, move_id } => {
-                format!("{} used {}!", side_name(*side), move_id)
+                format!("{} used {}!", name(*side), move_id)
             }
             BattleEvent::Damage { target, amount, .. } => {
-                format!("{} took {} damage.", side_name(*target), amount)
+                format!("{} took {} damage.", name(*target), amount)
             }
             BattleEvent::Dialogue(line) => line.clone(),
             BattleEvent::AbilityTriggered { side, ability, message } => {
-                format!("{}'s {}: {}", side_name(*side), ability, message)
+                format!("{}'s {}: {}", name(*side), ability, message)
             }
             BattleEvent::Fainted { side } => {
-                format!("{} fainted!", side_name(*side))
+                format!("{} fainted!", name(*side))
             }
             BattleEvent::BattleEnded { winner } => {
-                format!("{} wins the battle!", side_name(*winner))
+                format!("{} wins the battle!", name(*winner))
             }
         }
-    }
-}
-
-fn side_name(side: Side) -> &'static str {
-    match side {
-        Side::Player => "Player",
-        Side::Opponent => "Opponent",
     }
 }
