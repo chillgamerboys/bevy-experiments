@@ -28,6 +28,33 @@
 </head>
 <body>
     <canvas id="bevy"></canvas>
+    <script>
+      (function () {
+        const audioContextList = [];
+        const userInputEventNames = [
+          'click', 'contextmenu', 'auxclick', 'dblclick',
+          'mousedown', 'mouseup', 'pointerup', 'touchend', 'keydown', 'keyup',
+        ];
+        self.AudioContext = new Proxy(self.AudioContext, {
+          construct(target, args) {
+            const result = new target(...args);
+            audioContextList.push(result);
+            return result;
+          },
+        });
+        function resumeAllContexts() {
+          let count = 0;
+          audioContextList.forEach(context => {
+            if (context.state !== 'running') context.resume();
+            else count++;
+          });
+          if (count === audioContextList.length) {
+            userInputEventNames.forEach(e => document.removeEventListener(e, resumeAllContexts));
+          }
+        }
+        userInputEventNames.forEach(e => document.addEventListener(e, resumeAllContexts));
+      })();
+    </script>
     <script type="module">
         import init from './game.js';
         await init();
