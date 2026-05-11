@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 
+mod dialogue;
+use dialogue::{DialoguePlugin, DialogueQueue};
+
 pub fn run() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -10,29 +13,17 @@ pub fn run() {
             }),
             ..default()
         }))
-        .add_systems(Startup, setup)
+        .add_plugins(DialoguePlugin)
+        .add_systems(Startup, (setup, queue_test_lines).chain())
         .run();
 }
 
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
 
-    commands.spawn((
-        Text::new("CARTERFIGHT WIP"),
-        TextFont {
-            font_size: 96.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(0.0),
-            left: Val::Px(0.0),
-            right: Val::Px(0.0),
-            bottom: Val::Px(0.0),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-    ));
+fn queue_test_lines(mut queue: ResMut<DialogueQueue>) {
+    queue.push("A wild CARTER appeared!");
+    queue.push("What will you do?");
+    queue.push("CARTER used SICK BEAT! It's super effective!");
 }
