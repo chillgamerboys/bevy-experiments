@@ -28,14 +28,21 @@ pub enum AppState {
 
 pub fn run() {
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: frontend::constants::WINDOW_TITLE.to_string(),
-            resolution: frontend::constants::WINDOW_SIZE.into(),
-            ..default()
-        }),
-        ..default()
-    }));
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: frontend::constants::WINDOW_TITLE.to_string(),
+                    resolution: frontend::constants::WINDOW_SIZE.into(),
+                    ..default()
+                }),
+                ..default()
+            })
+            .set(AssetPlugin {
+                meta_check: bevy::asset::AssetMetaCheck::Never,
+                ..default()
+            }),
+    );
     frontend::install(&mut app);
     app.run();
 }

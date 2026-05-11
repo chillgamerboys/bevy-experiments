@@ -29,7 +29,6 @@ pub struct DialogueState {
     secs_per_char: f32,
     pub is_done: bool,
     chime: Handle<AudioSource>,
-    audio_ready: bool, // browsers block audio until first user gesture
 }
 
 impl Default for DialogueState {
@@ -41,7 +40,6 @@ impl Default for DialogueState {
             secs_per_char: 1.0 / 20.0,
             is_done: true,
             chime: Handle::default(),
-            audio_ready: false,
         }
     }
 }
@@ -88,6 +86,7 @@ fn tick_dialogue(
     mut queue: ResMut<DialogueQueue>,
     mut state: ResMut<DialogueState>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
+    mut commands: Commands,
     time: Res<Time>,
 ) {
     // When the current message is fully typed, advance to the next queued one
@@ -113,15 +112,10 @@ fn tick_dialogue(
     while state.char_timer >= state.secs_per_char && state.chars_shown < total {
         state.char_timer -= state.secs_per_char;
         state.chars_shown += 1;
-        // TODO: re-enable audio once WASM audio context timing is sorted
-        // if state.audio_ready
-        //     && matches!(asset_server.load_state(&state.chime), bevy::asset::LoadState::Loaded)
-        // {
-        //     commands.spawn((
-        //         AudioPlayer::new(state.chime.clone()),
-        //         PlaybackSettings::DESPAWN,
-        //     ));
-        // }
+        commands.spawn((
+            AudioPlayer::new(state.chime.clone()),
+            PlaybackSettings::DESPAWN,
+        ));
     }
 
     let shown: String = state.full_text.chars().take(state.chars_shown).collect();
@@ -146,13 +140,11 @@ fn dialogue_input(
     queue: Res<DialogueQueue>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
 ) {
-    let pressed =
+    let pressed =   
         keyboard.just_pressed(KeyCode::Space) || keyboard.just_pressed(KeyCode::KeyZ);
     if !pressed {
         return;
     }
-    state.audio_ready = true;
-
     if !state.is_done {
         // Skip typewriter — jump to end of current message
         state.chars_shown = state.full_text.chars().count();
