@@ -107,18 +107,19 @@ fn tick_dialogue(
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    // When the current message is fully typed, advance to the next queued one
-    // (if any). This also handles the "sticky last message" case: the previous
-    // message stays visible until something new gets pushed, at which point we
-    // swap to the new content.
+    // Only load the next queued message when the box is empty. A finished
+    // message stays on screen as a prompt until the user presses space (see
+    // `dialogue_input`), which clears `full_text` and lets us advance here.
     if state.is_done {
-        if let Some(msg) = queue.0.pop_front() {
-            state.full_text = msg;
-            state.chars_shown = 0;
-            state.char_timer = 0.0;
-            state.is_done = false;
-            if let Ok(mut text) = text_q.single_mut() {
-                **text = String::new();
+        if state.full_text.is_empty() {
+            if let Some(msg) = queue.0.pop_front() {
+                state.full_text = msg;
+                state.chars_shown = 0;
+                state.char_timer = 0.0;
+                state.is_done = false;
+                if let Ok(mut text) = text_q.single_mut() {
+                    **text = String::new();
+                }
             }
         }
         return;
