@@ -1,24 +1,62 @@
 use super::constants::*;
+use super::super::backend::BattleEvent;
+use super::sequencer::{advance_sequencer, AdvanceMode, Sequencer, SequencerPhase};
 use bevy::prelude::*;
 use std::collections::VecDeque;
+
+/// One queued presentation step: an event and how its line advances after
+/// typing finishes. Stored in [`BattleEventQueue`].
+#[derive(Clone)]
+pub struct QueuedEvent {
+    pub event: BattleEvent,
+    pub advance: AdvanceMode,
+}
 
 pub struct DialoguePlugin;
 
 impl Plugin for DialoguePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DialogueQueue>()
+        app.init_resource::<BattleEventQueue>()
             .init_resource::<DialogueState>()
+            .init_resource::<Sequencer>()
             .add_systems(Startup, setup_dialogue_box)
-            .add_systems(Update, (tick_dialogue, dialogue_input, update_cursor).chain());
+            .add_systems(
+                Update,
+                (advance_sequencer, tick_dialogue, dialogue_input, update_cursor).chain(),
+            );
     }
 }
 
+/// Events waiting to be presented (visual side-effect + dialogue line). The
+/// sequencer drains this one at a time.
 #[derive(Resource, Default)]
-pub struct DialogueQueue(pub VecDeque<String>);
+pub struct BattleEventQueue(pub VecDeque<QueuedEvent>);
 
-impl DialogueQueue {
-    pub fn push(&mut self, msg: impl Into<String>) {
-        self.0.push_back(msg.into());
+impl BattleEventQueue {
+    /// Narration that the player should read — waits for Space after typing.
+    pub fn push(&mut self, event: BattleEvent) {
+        self.push_with(event, AdvanceMode::WaitForInput);
+    }
+
+    /// Prompt-style line — once typing finishes, auto-releases so the next
+    /// system (input, state transition) can act without an extra ack press.
+    pub fn push_auto(&mut self, event: BattleEvent) {
+        self.push_with(event, AdvanceMode::AutoAfterTypewriter);
+    }
+
+    pub fn push_with(&mut self, event: BattleEvent, advance: AdvanceMode) {
+        self.0.push_back(QueuedEvent { event, advance });
+    }
+
+    /// Convenience for non-combat scripted narration (intro/outro). Wraps the
+    /// string as a `BattleEvent::Dialogue` so it flows through the same queue.
+    pub fn push_line(&mut self, line: impl Into<String>) {
+        self.push(BattleEvent::Dialogue(line.into()));
+    }
+
+    /// Same, but for prompt lines like "What will you do?".
+    pub fn push_auto_line(&mut self, line: impl Into<String>) {
+        self.push_auto(BattleEvent::Dialogue(line.into()));
     }
 }
 
@@ -42,6 +80,21 @@ impl Default for DialogueState {
             is_done: true,
             chime: Handle::default(),
         }
+    }
+}
+
+impl DialogueState {
+    pub fn full_text_is_empty(&self) -> bool {
+        self.full_text.is_empty()
+    }
+
+    /// Called by the sequencer when it pops a new event. Resets the typewriter
+    /// to the start of the new line.
+    pub fn start(&mut self, text: String) {
+        self.full_text = text;
+        self.chars_shown = 0;
+        self.char_timer = 0.0;
+        self.is_done = false;
     }
 }
 
@@ -101,28 +154,15 @@ fn setup_dialogue_box(
         });
 }
 
+/// Pure typewriter: types out whatever `DialogueState` currently holds.
+/// Popping the next message off the queue is `advance_sequencer`'s job.
 fn tick_dialogue(
-    mut queue: ResMut<DialogueQueue>,
     mut state: ResMut<DialogueState>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    // Only load the next queued message when the box is empty. A finished
-    // message stays on screen as a prompt until the user presses space (see
-    // `dialogue_input`), which clears `full_text` and lets us advance here.
     if state.is_done {
-        if state.full_text.is_empty() {
-            if let Some(msg) = queue.0.pop_front() {
-                state.full_text = msg;
-                state.chars_shown = 0;
-                state.char_timer = 0.0;
-                state.is_done = false;
-                if let Ok(mut text) = text_q.single_mut() {
-                    **text = String::new();
-                }
-            }
-        }
         return;
     }
 
@@ -150,10 +190,18 @@ fn tick_dialogue(
 
 fn update_cursor(
     state: Res<DialogueState>,
+    sequencer: Res<Sequencer>,
     mut cursor_q: Query<&mut Visibility, With<DialogueCursor>>,
 ) {
     if let Ok(mut vis) = cursor_q.single_mut() {
-        *vis = if state.is_done && !state.full_text.is_empty() {
+        // Show the "press space" cursor only when the typewriter is finished
+        // *and* the sequencer is actually waiting on input. Otherwise the
+        // sticky final-line state would flash the cursor between events.
+        let waiting_for_space = matches!(
+            sequencer.phase,
+            SequencerPhase::Presenting { advance: AdvanceMode::WaitForInput }
+        );
+        *vis = if state.is_done && !state.full_text.is_empty() && waiting_for_space {
             Visibility::Visible
         } else {
             Visibility::Hidden
@@ -164,7 +212,7 @@ fn update_cursor(
 fn dialogue_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut state: ResMut<DialogueState>,
-    queue: Res<DialogueQueue>,
+    mut sequencer: ResMut<Sequencer>,
     mut text_q: Query<&mut Text, With<DialogueText>>,
 ) {
     let pressed =
@@ -173,19 +221,20 @@ fn dialogue_input(
         return;
     }
     if !state.is_done {
+        // Mid-typing: skip to the end of the current line.
         state.chars_shown = state.full_text.chars().count();
         state.is_done = true;
         let shown = state.full_text.clone();
         if let Ok(mut text) = text_q.single_mut() {
             **text = shown;
         }
-    } else if !state.full_text.is_empty() && !queue.0.is_empty() {
-        // Advance — clear current message so tick_dialogue can load the next.
-        // If the queue is empty, this is the final queued message — keep it on
-        // screen as a sticky prompt until something new gets pushed.
-        state.full_text.clear();
-        if let Ok(mut text) = text_q.single_mut() {
-            **text = String::new();
-        }
+        return;
+    }
+    // Typing finished. If the sequencer is gated on input, release it so the
+    // next event can pop on the following frame. Otherwise (Idle, or
+    // AutoAfterTypewriter) ignore — the press belongs to another system
+    // (e.g. `battle_input`'s move-confirm).
+    if let SequencerPhase::Presenting { advance: AdvanceMode::WaitForInput } = sequencer.phase {
+        sequencer.phase = SequencerPhase::Idle;
     }
 }

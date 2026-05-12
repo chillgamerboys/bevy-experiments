@@ -13,3 +13,14 @@ pub struct BattleStateRes(pub BattleState);
 /// press starts a new selection.
 #[derive(Resource, Default)]
 pub struct PendingMove(pub Option<MoveId>);
+
+/// Frontend mirror of the parts of `BattleState` that the HUD renders.
+/// The sequencer writes into this as it processes each `BattleEvent`, so the
+/// health bar only updates in sync with its corresponding dialogue line
+/// instead of snapping to the authoritative state the moment `resolve_turn`
+/// runs. Max HP is read from `BattleStateRes` since it never changes.
+#[derive(Resource, Default)]
+pub struct DisplayedCombatants {
+    pub player_hp: u16,
+    pub opponent_hp: u16,
+}

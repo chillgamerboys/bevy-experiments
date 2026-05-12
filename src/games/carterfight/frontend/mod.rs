@@ -7,9 +7,10 @@ pub mod components;
 pub mod constants;
 pub mod dialogue;
 pub mod resources;
+pub mod sequencer;
 pub mod systems;
 
-pub use dialogue::{DialoguePlugin, DialogueQueue, DialogueState};
+pub use dialogue::{BattleEventQueue, DialoguePlugin, DialogueState};
 
 use super::AppState;
 use systems::*;
