@@ -6,8 +6,9 @@ use super::super::backend::{
 use super::super::AppState;
 use super::components::*;
 use super::constants::*;
-use super::dialogue::{DialogueQueue, DialogueState};
-use super::resources::{BattleStateRes, PendingMove};
+use super::dialogue::{BattleEventQueue, DialogueState};
+use super::resources::{BattleStateRes, DisplayedCombatants, PendingMove};
+use super::sequencer::Sequencer;
 
 // ===== STARTUP =====
 
@@ -87,26 +88,34 @@ pub fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 /// Build the initial battle state and stash it as a resource. Runs once at
-/// startup.
+/// startup. The `DisplayedCombatants` mirror is seeded from the same template
+/// HPs so the HUD starts in sync; the sequencer keeps them in sync from then on.
 pub fn spawn_battle_state(mut commands: Commands) {
     let player = character_template("Player").expect("Player template exists");
     let opponent = character_template("Carter").expect("Carter template exists");
+    let displayed = DisplayedCombatants {
+        player_hp: player.current_hp,
+        opponent_hp: opponent.current_hp,
+    };
     let state = BattleState::new(player, opponent, BATTLE_RNG_SEED);
     commands.insert_resource(BattleStateRes(state));
+    commands.insert_resource(displayed);
 }
 
 // ===== INTRO / OUTRO SCRIPTS =====
 
-pub fn enqueue_intro_script(mut queue: ResMut<DialogueQueue>) {
+pub fn enqueue_intro_script(mut queue: ResMut<BattleEventQueue>) {
     queue.0.clear();
     // Authored by the dialogue-box PR; preserved verbatim. The third placeholder
     // line ("CARTER used SICK BEAT! ...") was dropped because the engine now
     // emits real combat narration via `BattleEvent::dialogue_text()` during play.
-    queue.push("A wild CARTER appeared!");
-    queue.push("What will you do?");
+    queue.push_line("A wild CARTER appeared!");
+    // Prompt — auto-advances after typing so `intro_to_battle_when_empty` can
+    // transition without requiring an extra Space ack.
+    queue.push_auto_line("What will you do?");
 }
 
-pub fn enqueue_outro_script(mut queue: ResMut<DialogueQueue>, state: Res<BattleStateRes>) {
+pub fn enqueue_outro_script(mut queue: ResMut<BattleEventQueue>, state: Res<BattleStateRes>) {
     queue.0.clear();
     let winner_text = match &state.0.phase {
         BattlePhase::Ended { winner } => match winner {
@@ -115,37 +124,47 @@ pub fn enqueue_outro_script(mut queue: ResMut<DialogueQueue>, state: Res<BattleS
         },
         _ => "The fight is over.",
     };
-    queue.push(winner_text);
-    queue.push("Press SPACE to close.");
+    queue.push_line(winner_text);
+    // Auto-advance so `outro_exit_when_empty` doesn't need a separate ack
+    // press before the exit press.
+    queue.push_auto_line("Press SPACE to close.");
 }
 
 // ===== INTRO/OUTRO STATE TRANSITIONS =====
 
-/// "Dialogue is fully drained" means both the queue is empty AND the typewriter
-/// has finished rendering its current line. Their plugin pops from the queue
-/// the instant a new message is pulled into `DialogueState`, so checking the
-/// queue alone would skip past the final line mid-typewriter.
-fn dialogue_idle(queue: &DialogueQueue, state: &DialogueState) -> bool {
-    queue.0.is_empty() && state.is_done
+/// "Dialogue is fully drained" means the queue is empty, the typewriter has
+/// finished its current line, AND the sequencer isn't still gating on player
+/// input. The sequencer pops the next event the moment it goes Idle, so
+/// checking the queue alone would skip past the final line mid-typewriter.
+fn dialogue_idle(
+    queue: &BattleEventQueue,
+    state: &DialogueState,
+    sequencer: &Sequencer,
+) -> bool {
+    queue.0.is_empty() && state.is_done && sequencer.is_idle()
 }
 
 pub fn intro_to_battle_when_empty(
-    queue: Res<DialogueQueue>,
+    queue: Res<BattleEventQueue>,
     dialogue_state: Res<DialogueState>,
+    sequencer: Res<Sequencer>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    if dialogue_idle(&queue, &dialogue_state) {
+    if dialogue_idle(&queue, &dialogue_state, &sequencer) {
         next_state.set(AppState::Battle);
     }
 }
 
 pub fn outro_exit_when_empty(
-    queue: Res<DialogueQueue>,
+    queue: Res<BattleEventQueue>,
     dialogue_state: Res<DialogueState>,
+    sequencer: Res<Sequencer>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    if dialogue_idle(&queue, &dialogue_state) && keyboard.just_pressed(KeyCode::Space) {
+    if dialogue_idle(&queue, &dialogue_state, &sequencer)
+        && keyboard.just_pressed(KeyCode::Space)
+    {
         exit.write(AppExit::Success);
     }
 }
@@ -154,6 +173,7 @@ pub fn outro_exit_when_empty(
 
 pub fn update_battle_hud(
     state: Res<BattleStateRes>,
+    displayed: Res<DisplayedCombatants>,
     pending: Res<PendingMove>,
     mut hud: Query<&mut Text, With<BattleHudText>>,
 ) {
@@ -164,7 +184,7 @@ pub fn update_battle_hud(
 
     let mut s = format!(
         "{}: {}/{} HP\n\nTurn {}\n\nMoves:",
-        p.name, p.current_hp, p.max_hp, state.0.turn_count
+        p.name, displayed.player_hp, p.max_hp, state.0.turn_count
     );
     for (i, move_id) in p.moves.iter().enumerate() {
         let name = move_def(move_id).map(|m| m.name).unwrap_or("?");
@@ -195,12 +215,13 @@ pub fn update_battle_hud(
 pub fn battle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     dialogue_state: Res<DialogueState>,
+    sequencer: Res<Sequencer>,
     mut state: ResMut<BattleStateRes>,
-    mut queue: ResMut<DialogueQueue>,
+    mut queue: ResMut<BattleEventQueue>,
     mut pending: ResMut<PendingMove>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    if !dialogue_idle(&queue, &dialogue_state) {
+    if !dialogue_idle(&queue, &dialogue_state, &sequencer) {
         return;
     }
 
@@ -255,7 +276,9 @@ pub fn battle_input(
         Action::UseMove(opponent_move),
     );
     for ev in events {
-        queue.push(ev.dialogue_text(&state.0));
+        // Narration: each line waits for Space so its visual side-effect
+        // (HP drop, etc.) stays in sync with the dialogue.
+        queue.push(ev);
     }
 
     // Only step out of Animating. If the engine wrote `Ended { winner }`,
@@ -266,22 +289,27 @@ pub fn battle_input(
         state.0.phase = BattlePhase::WaitingForPlayerAction;
     }
 
-    // Prompt the next turn only when the battle is still going.
+    // Prompt the next turn only when the battle is still going. Auto-advance
+    // so the player can pick a move without an extra ack press.
     if !matches!(state.0.phase, BattlePhase::Ended { .. }) {
-        queue.push("What will you do?");
+        queue.push_auto_line("What will you do?");
     }
 }
 
-/// Drives the world-space health bar + label under Carter. Runs every frame
-/// in every state so the display reflects HP through intro/battle/outro.
+/// Drives the world-space health bar + label under Carter. Reads from the
+/// `DisplayedCombatants` mirror, which the sequencer updates only when a
+/// `Damage` event is popped — so the bar shrinks together with the matching
+/// dialogue line rather than the moment `resolve_turn` runs.
 pub fn update_carter_health_display(
     state: Res<BattleStateRes>,
+    displayed: Res<DisplayedCombatants>,
     mut fill_q: Query<&mut Sprite, With<CarterHealthBarFill>>,
     mut text_q: Query<&mut Text2d, With<CarterHealthText>>,
 ) {
-    let c = &state.0.opponent;
-    let ratio = if c.max_hp > 0 {
-        (c.current_hp as f32 / c.max_hp as f32).clamp(0.0, 1.0)
+    let max_hp = state.0.opponent.max_hp;
+    let current_hp = displayed.opponent_hp;
+    let ratio = if max_hp > 0 {
+        (current_hp as f32 / max_hp as f32).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -294,6 +322,6 @@ pub fn update_carter_health_display(
     }
 
     if let Ok(mut text) = text_q.single_mut() {
-        **text = format!("{}/{}", c.current_hp, c.max_hp);
+        **text = format!("{}/{}", current_hp, max_hp);
     }
 }
