@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debug Bevy Runtime"
+  short_description: "Diagnose Bevy runtime-only failures"
+  default_prompt: "Use $debug-bevy-runtime to diagnose this Bevy runtime failure from authoritative evidence."

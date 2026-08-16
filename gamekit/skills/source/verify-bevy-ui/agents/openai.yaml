@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Bevy UI"
+  short_description: "Verify Bevy UI structure and feel"
+  default_prompt: "Use $verify-bevy-ui to verify this interface with structural, static, and interactive evidence."

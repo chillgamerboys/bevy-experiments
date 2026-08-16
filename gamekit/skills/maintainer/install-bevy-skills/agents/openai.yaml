@@ -1,0 +1,4 @@
+interface:
+  display_name: "Install Bevy Skills"
+  short_description: "Install the pinned Bevy skill pack"
+  default_prompt: "Use $install-bevy-skills to audit and install this pinned Bevy skill pack into a game repository."

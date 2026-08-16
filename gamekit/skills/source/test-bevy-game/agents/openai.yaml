@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Bevy Game"
+  short_description: "Test Bevy behavior deterministically"
+  default_prompt: "Use $test-bevy-game to add deterministic tests at the correct evidence layer."
