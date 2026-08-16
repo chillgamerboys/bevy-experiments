@@ -26,6 +26,10 @@ Read `.bevy-gamekit/overlays/test-bevy-game.md` first when it exists; treat it a
 6. Test edge values, rejection without mutation, round trips, repeatability, and schedule boundaries.
 7. Keep a focused quick gate for iteration and a workspace-wide all-feature gate for integration.
 
+For multiplayer, use fake providers and in-memory links in ordinary CI. Prove listing,
+route selection, authentication, authority, disclosure, disconnect, and reconnect as
+separate claims. Reserve real multicast and Tailscale for explicit integration jobs.
+
 If `bevy_game_test` is present, read `../../references/gamekit-apis.md`. Always apply `../../references/evidence.md`; a structural snapshot cannot prove gameplay and a screenshot cannot prove interaction.
 
 Read `../../references/bevy-0.19.md` before assembling plugins or schedules.

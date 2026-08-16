@@ -3,6 +3,9 @@ ignore = [
     # Bevy 0.19's winit stack still reaches ttf-parser through sctk-adwaita.
     # The advisory has no safe upgrade; remove this when Bevy's graph moves.
     "RUSTSEC-2026-0192",
+    # wtransport 0.6 still uses the archived thin PEM wrapper. There is no safe
+    # compatible upgrade; remove when the Aeronet transport graph migrates.
+    "RUSTSEC-2025-0134",
 ]
 
 [bans]
@@ -16,10 +19,12 @@ allow = [
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "BSL-1.0",
     "CC0-1.0",
     "ISC",
     "MIT",
     "MIT-0",
+    "MPL-2.0",
     "Unicode-3.0",
     "Zlib",
 ]

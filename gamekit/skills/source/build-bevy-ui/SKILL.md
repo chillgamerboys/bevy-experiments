@@ -19,6 +19,7 @@ Read `.bevy-gamekit/overlays/build-bevy-ui.md` first when it exists; treat it as
 6. Give every control a stable `Name`, accessible label, logical tab position, pointer activation, and Enter/Space activation.
 7. Remove hidden or disabled controls from focus. Trap focus in the highest blocking modal, restore prior focus on close, and keep focused scroll content visible.
 8. Validate structure, rendered frames, and interaction separately using `../../references/evidence.md`.
+9. Treat multiplayer listings as untrusted presentation input. Keep provider endpoints internal, label compatibility/lock/freshness, clear password/code buffers after attempts, and preserve Direct joining when discovery fails.
 
 ## Gamekit Awareness
 

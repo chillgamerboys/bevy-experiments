@@ -15,3 +15,8 @@
   launched binary's environment, not the source file that names an asset.
 - A successful build and clean log do not prove schedules ran, assets rendered, focus
   moved, or the intended application binary launched.
+- Register network messages and custom protocol hashes before opening endpoints. Do
+  not infer authentication from a connected transport entity; authorize the peer
+  before accepting game commands.
+- Network and discovery polling must be bounded. Optional provider failure should
+  become typed state while a secure direct route remains usable.

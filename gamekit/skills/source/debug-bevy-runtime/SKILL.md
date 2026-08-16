@@ -19,4 +19,9 @@ Read `.bevy-gamekit/overlays/debug-bevy-runtime.md` first when it exists; treat 
 6. Add temporary observation at owner boundaries, then encode the reproduced failure at the narrowest deterministic test altitude.
 7. Remove diagnostic-only changes after the permanent assertion exists.
 
+For multiplayer, locate the failing layer before changing code: provider discovery,
+route/firewall, encrypted transport, admission, game authority, or targeted snapshot.
+Do not diagnose mDNS across a tailnet; inspect the explicit tailnet provider and its
+fixed CLI status input instead.
+
 Read `../../references/bevy-0.19.md` for common version-specific traps and `../../references/evidence.md` before treating clean logs, screenshots, or tests as proof. If Gamekit crates are present, read `../../references/gamekit-apis.md` for their ownership seams.

@@ -1,6 +1,6 @@
 ---
 name: architect-bevy-game
-description: Design or refactor Bevy 0.19 game architecture, crate boundaries, plugins, schedules, resources, and composition roots. Use for new game structure, deciding whether code belongs in a reusable crate, untangling gameplay authority, or preventing a shared library from becoming a mandatory engine. Do not use for a narrow implementation whose ownership and scheduling are already settled.
+description: Design or refactor Bevy 0.19 game architecture, crate boundaries, plugins, schedules, resources, composition roots, or multiplayer ownership. Use for new game structure, deciding whether code belongs in a reusable crate, separating discovery/transport/admission/gameplay, untangling authority, or preventing a shared library from becoming a mandatory engine. Do not use for a narrow implementation whose ownership and scheduling are already settled.
 ---
 
 # Architect Bevy Game
@@ -21,7 +21,7 @@ Read `.bevy-gamekit/overlays/architect-bevy-game.md` first when it exists; treat
 
 ## Gamekit Awareness
 
-If `bevy_game_turns`, `bevy_game_ui`, or `bevy_game_test` appears in manifests, read `../../references/gamekit-apis.md`. Treat them as optional capabilities, not required architecture.
+If any `bevy_game_*` crate appears in manifests, read `../../references/gamekit-apis.md`. Treat Gamekit as optional capabilities, not required architecture. For multiplayer, map discovery, encrypted transport, admission, game authority, disclosure, and presentation to distinct owners.
 
 Read `../../references/bevy-0.19.md` before naming Bevy APIs. Apply the evidence boundaries in `../../references/evidence.md` when defining acceptance criteria.
 

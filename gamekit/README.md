@@ -13,6 +13,11 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo run -p deckbuilder_ui
 ```
 
+The deckbuilder now demonstrates a listen host, a two-seat ready lobby, secure
+`BGN1` direct codes, rotating reconnect credentials, automatic LAN discovery,
+and opt-in development tailnet discovery. See [Multiplayer development and
+testing](docs/multiplayer.md) before testing across machines.
+
 Capture a deterministic rendered review frame at an exact logical size:
 
 ```sh
@@ -20,9 +25,12 @@ cargo run -p deckbuilder_ui --example review_capture -- \
   target/deckbuilder-review.png 1920 1080
 ```
 
-Pass `200` as the final argument to review 200% semantic scaling. The capture
+Pass `200` as the scale argument to review 200% semantic scaling. The capture
 uses an offscreen target, so its dimensions are not constrained by the host
 desktop.
+
+Append `match`, `multiplayer`, `host`, or `browser` after the scale argument to
+capture that route; `match` is the default.
 
 ## Skill pack
 

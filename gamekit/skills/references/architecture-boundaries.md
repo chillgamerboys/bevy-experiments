@@ -24,3 +24,17 @@ capability crate       -X-> consuming game
 
 Prefer pure data and returned transitions at the lowest layer. Add Bevy adapters only
 where ECS integration is itself the reusable capability.
+
+## Multiplayer and discovery
+
+Keep transport, discovery, admission, and gameplay authority separate. Transport may
+own encrypted connectivity, identities, certificate pins, and opaque credentials.
+Discovery may publish sanitized availability and resolve provider routes. The game
+still owns seats, capacity enforcement, lobby transitions, commands, disclosure, and
+rejection policy.
+
+Discovery providers must share one lifecycle rather than leaking mDNS, Tailscale, or
+service-specific endpoints into game UI. Treat external routing such as Tailscale as
+an adapter dependency, not a shared engine or player identity system. Never place
+passwords, bearer invitations, reconnect credentials, or full connection codes in a
+discovery record.
