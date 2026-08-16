@@ -12,3 +12,9 @@
 Choose evidence from the claim. For merge-bound UI work, combine structural tests,
 static frames, and an interactive walk. Never derive gameplay acceptance from text
 that the UI rendered about itself.
+
+For multiplayer, keep these claims separate: a discovery observation proves listing;
+an authenticated connection proves transport/admission; targeted snapshots prove
+disclosure only when inspected per recipient; and two-app gameplay tests prove
+authority/lifecycle behavior. Real mDNS and tailnet walks are integration evidence,
+not replacements for deterministic fake-provider and in-memory transport tests.

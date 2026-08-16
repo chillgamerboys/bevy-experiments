@@ -1,0 +1,58 @@
+name: Gamekit
+
+on:
+  pull_request:
+    paths:
+      - "gamekit/**"
+      - ".github/workflows/gamekit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "gamekit/**"
+      - ".github/workflows/gamekit.yml"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: gamekit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gamekit
+      - run: cargo test --workspace --all-features --profile ci
+      - run: cargo test --workspace --doc --all-features --profile ci
+
+  policy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gamekit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gamekit
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
+      - run: cargo install cargo-deny --locked
+      - run: cargo deny check
+      - run: python3 skills/scripts/validate_skills.py
+      - run: python3 -m unittest discover -s skills/tests -v

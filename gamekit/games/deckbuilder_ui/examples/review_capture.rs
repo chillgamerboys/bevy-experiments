@@ -23,6 +23,7 @@ struct CapturePlan {
     size: UVec2,
     scale: UiScaleMode,
     target: Option<Handle<Image>>,
+    route: String,
 }
 
 fn main() {
@@ -44,6 +45,10 @@ fn main() {
     } else {
         UiScaleMode::Auto
     };
+    let route = arguments
+        .get(5)
+        .cloned()
+        .unwrap_or_else(|| "match".to_owned());
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -64,6 +69,7 @@ fn main() {
             size: UVec2::new(width, height),
             scale,
             target: None,
+            route,
         })
         .add_plugins((GameUiPlugin, DeckbuilderPlugin))
         .add_systems(Startup, setup_capture_target)
@@ -125,9 +131,12 @@ fn drive_capture(
         }
     }
 
-    let click = match plan.frame {
-        3 => Some("Start Match"),
-        7 => Some("Card Spark"),
+    let click = match (plan.route.as_str(), plan.frame) {
+        ("match", 3) => Some("Start Solo"),
+        ("match", 7) => Some("Card Spark"),
+        ("multiplayer" | "host" | "browser", 3) => Some("Multiplayer"),
+        ("host", 7) => Some("Host Session"),
+        ("browser", 7) => Some("Find Sessions"),
         _ => None,
     };
     if let Some(click) = click {

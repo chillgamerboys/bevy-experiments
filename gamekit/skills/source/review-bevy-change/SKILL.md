@@ -23,6 +23,7 @@ Read `.bevy-gamekit/overlays/review-bevy-change.md` first when it exists; apply 
    - test altitude and evidence boundaries.
 4. Run focused tests first, then the full all-feature gate if the change is merge-bound.
 5. For UI changes, require the structural/static/interactive split in `../../references/evidence.md`.
-6. Report only actionable findings with severity, file/line, failure scenario, and missing evidence. If no findings remain, say so and list residual validation gaps.
+6. For multiplayer, audit secret redaction, endpoint trust, certificate pinning, authorization-before-command, target-specific disclosure, bounded polling, provider fallback, and reconnect rotation.
+7. Report only actionable findings with severity, file/line, failure scenario, and missing evidence. If no findings remain, say so and list residual validation gaps.
 
 Read `../../references/bevy-0.19.md` for API traps and `../../references/architecture-boundaries.md` for extraction or ownership changes. Read `../../references/gamekit-apis.md` when Gamekit crates are in the dependency graph.

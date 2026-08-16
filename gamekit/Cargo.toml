@@ -10,7 +10,9 @@ publish = false
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-bevy = "0.19"
+bevy = { version = "0.19", default-features = false, features = ["ui", "system_clipboard", "png"] }
+bevy_game_discovery = { path = "crates/bevy_game_discovery" }
+bevy_game_multiplayer = { path = "crates/bevy_game_multiplayer" }
 bevy_game_test = { path = "crates/bevy_game_test" }
 bevy_game_turns = { path = "crates/bevy_game_turns" }
 bevy_game_ui = { path = "crates/bevy_game_ui" }

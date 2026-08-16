@@ -4,11 +4,13 @@
 //! gameplay authority. Consumers attach their own typed action components to
 //! [`UiAction`] entities and map [`UiActivated`] messages into local intents.
 
+use bevy::input::keyboard::Key;
 use bevy::input_focus::{
     tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin},
     FocusCause, InputFocus, InputFocusVisible,
 };
 use bevy::prelude::*;
+use bevy::text::{EditableText, TextCursorStyle};
 use bevy::ui::InteractionDisabled;
 use bevy::ui_widgets::ScrollIntoView;
 
@@ -36,6 +38,8 @@ impl Plugin for GameUiPlugin {
             .init_resource::<ModalFocusState>()
             .init_resource::<NamedFocusMemory>()
             .add_message::<UiActivated>()
+            .add_message::<UiTextChanged>()
+            .add_message::<UiTextSubmitted>()
             .configure_sets(
                 Update,
                 (
@@ -56,6 +60,7 @@ impl Plugin for GameUiPlugin {
                 (
                     emit_pointer_activation,
                     emit_keyboard_activation,
+                    emit_text_field_messages,
                     paint_interactions,
                 )
                     .chain()
@@ -70,6 +75,7 @@ impl Plugin for GameUiPlugin {
                     scroll_focused_into_view,
                     paint_keyboard_focus,
                     apply_semantic_style,
+                    apply_text_field_style,
                 )
                     .chain()
                     .in_set(GameUiSystems::Present)
@@ -281,6 +287,10 @@ pub struct UiCard;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct UiAction;
 
+/// Marks a native editable single-line text field.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct UiTextField;
+
 /// Disables pointer and keyboard activation for a [`UiAction`].
 #[derive(Component, Debug, Clone, Copy)]
 pub struct UiDisabled;
@@ -307,6 +317,24 @@ pub enum UiRegionRole {
 pub struct UiActivated {
     /// Activated entity carrying the game's typed action component.
     pub entity: Entity,
+}
+
+/// Current value of a changed native text field.
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
+pub struct UiTextChanged {
+    /// Changed field entity carrying the game's typed marker component.
+    pub entity: Entity,
+    /// Current committed text, excluding an active IME pre-edit range.
+    pub value: String,
+}
+
+/// Enter submission from a focused native text field.
+#[derive(Message, Debug, Clone, PartialEq, Eq)]
+pub struct UiTextSubmitted {
+    /// Submitted field entity carrying the game's typed marker component.
+    pub entity: Entity,
+    /// Current committed text.
+    pub value: String,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -408,6 +436,54 @@ pub fn button(name: impl Into<String>) -> impl Bundle {
             padding: UiRect::axes(Val::Px(18.0), Val::Px(10.0)),
             border: UiRect::all(Val::Px(1.0)),
             border_radius: BorderRadius::all(Val::Px(7.0)),
+            ..default()
+        },
+        BorderColor::default(),
+        BackgroundColor::default(),
+    )
+}
+
+/// Creates a native single-line field with bounded input, focus, IME, and clipboard editing.
+#[must_use]
+pub fn text_field(
+    fonts: &UiFonts,
+    name: impl Into<String>,
+    initial_value: impl AsRef<str>,
+    max_characters: usize,
+) -> impl Bundle {
+    let name = name.into();
+    let mut editable = EditableText::new(initial_value);
+    editable.max_characters = Some(max_characters);
+    editable.visible_lines = Some(1.0);
+    editable.visible_width = Some(32.0);
+    (
+        Name::new(name.clone()),
+        AccessibleLabel::new(name),
+        UiTextField,
+        editable,
+        TextCursorStyle::default(),
+        TextLayout::no_wrap(),
+        TextFont {
+            font: fonts.body.clone().into(),
+            font_size: FontSize::Px(20.0),
+            ..default()
+        },
+        TextColor::default(),
+        TabIndex(0),
+        LogicalTabIndex(0),
+        ResponsiveControl { applied_scale: 1.0 },
+        Node {
+            width: Val::Percent(100.0),
+            min_width: Val::Px(220.0),
+            min_height: Val::Px(48.0),
+            padding: UiRect::axes(Val::Px(14.0), Val::Px(10.0)),
+            border: UiRect::all(Val::Px(1.0)),
+            border_radius: BorderRadius::all(Val::Px(7.0)),
+            overflow: Overflow::clip_x(),
+            overflow_clip_margin: OverflowClipMargin {
+                visual_box: VisualBox::ContentBox,
+                ..default()
+            },
             ..default()
         },
         BorderColor::default(),
@@ -533,6 +609,44 @@ fn emit_keyboard_activation(
     }
 }
 
+fn editable_value(editable: &EditableText) -> String {
+    let mut value = String::new();
+    value.reserve(editable.value().into_iter().map(str::len).sum());
+    for part in editable.value() {
+        value.push_str(part);
+    }
+    value
+}
+
+fn emit_text_field_messages(
+    keys: Res<ButtonInput<Key>>,
+    focus: Res<InputFocus>,
+    changed: Query<(Entity, &EditableText), (With<UiTextField>, Changed<EditableText>)>,
+    fields: Query<&EditableText, With<UiTextField>>,
+    mut changed_messages: MessageWriter<UiTextChanged>,
+    mut submitted_messages: MessageWriter<UiTextSubmitted>,
+) {
+    for (entity, editable) in &changed {
+        changed_messages.write(UiTextChanged {
+            entity,
+            value: editable_value(editable),
+        });
+    }
+    if !keys.just_pressed(Key::Enter) {
+        return;
+    }
+    let Some(entity) = focus.get() else { return };
+    let Ok(editable) = fields.get(entity) else {
+        return;
+    };
+    if !editable.is_composing() {
+        submitted_messages.write(UiTextSubmitted {
+            entity,
+            value: editable_value(editable),
+        });
+    }
+}
+
 fn prepare_actions(
     added: Query<(Entity, Option<&Name>, Option<&TabIndex>), Added<UiAction>>,
     mut commands: Commands,
@@ -549,7 +663,9 @@ fn prepare_actions(
 
 fn sync_action_reachability(world: &mut World) {
     let actions = {
-        let mut query = world.query_filtered::<(Entity, &LogicalTabIndex), With<UiAction>>();
+        let mut query = world
+            .query_filtered::<(Entity, &LogicalTabIndex), Or<(With<UiAction>, With<UiTextField>)>>(
+            );
         query
             .iter(world)
             .map(|(entity, index)| (entity, index.0, world.get::<UiDisabled>(entity).is_some()))
@@ -640,7 +756,9 @@ fn retain_modal_focus(world: &mut World) {
 fn first_reachable_action(world: &World, root: Entity) -> Option<Entity> {
     let mut stack = vec![root];
     while let Some(entity) = stack.pop() {
-        if world.get::<UiAction>(entity).is_some() && is_reachable(world, entity) {
+        if (world.get::<UiAction>(entity).is_some() || world.get::<UiTextField>(entity).is_some())
+            && is_reachable(world, entity)
+        {
             return Some(entity);
         }
         if let Some(children) = world.get::<Children>(entity) {
@@ -696,7 +814,7 @@ fn paint_keyboard_focus(
     focus: Res<InputFocus>,
     visible: Res<InputFocusVisible>,
     theme: Res<UiTheme>,
-    actions: Query<Entity, With<UiAction>>,
+    actions: Query<Entity, Or<(With<UiAction>, With<UiTextField>)>>,
     mut commands: Commands,
 ) {
     if !focus.is_changed() && !visible.is_changed() && !theme.is_changed() {
@@ -755,7 +873,14 @@ fn apply_semantic_style(
         (&mut BackgroundColor, &mut BorderColor),
         (With<UiCard>, Without<UiPanel>, Without<UiAction>),
     >,
-    mut actions: Query<&mut BorderColor, (With<UiAction>, Without<UiPanel>, Without<UiCard>)>,
+    mut actions: Query<
+        &mut BorderColor,
+        (
+            Or<(With<UiAction>, With<UiTextField>)>,
+            Without<UiPanel>,
+            Without<UiCard>,
+        ),
+    >,
     mut text_query: Query<(&UiTextRole, &mut TextFont, &mut TextColor)>,
     mut controls: Query<(&mut Node, &mut ResponsiveControl)>,
 ) {
@@ -803,6 +928,18 @@ fn apply_semantic_style(
             node.min_height = Val::Px((height * ratio).max(44.0 * next_scale));
         }
         control.applied_scale = next_scale;
+    }
+}
+
+fn apply_text_field_style(
+    theme: Res<UiTheme>,
+    metrics: Res<ResolvedUiMetrics>,
+    mut fields: Query<(&mut BackgroundColor, &mut TextColor, &mut TextFont), With<UiTextField>>,
+) {
+    for (mut background, mut color, mut font) in &mut fields {
+        background.0 = theme.control;
+        color.0 = theme.text;
+        font.font_size = FontSize::Px((theme.body_size * metrics.content_scale).max(18.0));
     }
 }
 
