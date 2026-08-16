@@ -1,0 +1,13 @@
+[package]
+name = "bevy_game_test"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+bevy.workspace = true
+bevy_game_ui.workspace = true
+
+[lints]
+workspace = true

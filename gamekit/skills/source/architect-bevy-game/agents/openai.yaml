@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architect Bevy Game"
+  short_description: "Design reusable Bevy game boundaries"
+  default_prompt: "Use $architect-bevy-game to design the crate and plugin boundaries for this Bevy game."

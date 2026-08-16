@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sync Bevy Skills"
+  short_description: "Safely sync pinned Bevy skills"
+  default_prompt: "Use $sync-bevy-skills to audit and synchronize this game repository to a specified Bevy skill-pack revision."

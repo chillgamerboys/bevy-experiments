@@ -1,0 +1,17 @@
+[package]
+name = "deckbuilder_ui"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+bevy.workspace = true
+bevy_game_turns.workspace = true
+bevy_game_ui.workspace = true
+
+[dev-dependencies]
+bevy_game_test.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Turn-Based Game"
+  short_description: "Model deterministic turn-based rules"
+  default_prompt: "Use $model-turn-based-game to model the turn flow and game-owned rules for this feature."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Bevy UI"
+  short_description: "Build accessible responsive Bevy UI"
+  default_prompt: "Use $build-bevy-ui to implement this native Bevy UI with responsive layout and typed actions."

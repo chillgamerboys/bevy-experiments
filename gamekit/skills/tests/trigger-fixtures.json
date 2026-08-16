@@ -1,0 +1,30 @@
+{
+  "architect-bevy-game": {
+    "should_trigger": ["Design plugin and crate boundaries for a new Bevy FPS", "Should this shared system become a reusable crate?"],
+    "should_not_trigger": ["Rename this already-owned private helper"]
+  },
+  "model-turn-based-game": {
+    "should_trigger": ["Implement rounds and legal card actions", "Review initiative removal behavior"],
+    "should_not_trigger": ["Tune continuous mouse-look acceleration"]
+  },
+  "build-bevy-ui": {
+    "should_trigger": ["Build an accessible Bevy card hand and pause modal", "Make this native HUD responsive"],
+    "should_not_trigger": ["Build an egui inspector panel"]
+  },
+  "test-bevy-game": {
+    "should_trigger": ["Add deterministic tests for these Bevy systems", "Test deferred commands and state transitions"],
+    "should_not_trigger": ["Give visual feedback on this screenshot only"]
+  },
+  "verify-bevy-ui": {
+    "should_trigger": ["Verify focus and clipping at three viewports", "Run a visual walk of this Bevy menu"],
+    "should_not_trigger": ["Prove the combat damage formula from a screenshot"]
+  },
+  "debug-bevy-runtime": {
+    "should_trigger": ["The Bevy app compiles but never leaves loading", "An asset exists but is invisible at runtime"],
+    "should_not_trigger": ["Fix this direct Rust type mismatch"]
+  },
+  "review-bevy-change": {
+    "should_trigger": ["Audit this Bevy branch before merge", "Review this UI diff for schedule and evidence gaps"],
+    "should_not_trigger": ["Implement the requested Bevy feature"]
+  }
+}

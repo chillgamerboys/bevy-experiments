@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Bevy Change"
+  short_description: "Review Bevy changes with evidence"
+  default_prompt: "Use $review-bevy-change to audit this Bevy diff and report revision-specific findings."
