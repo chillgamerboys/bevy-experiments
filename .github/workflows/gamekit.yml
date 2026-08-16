@@ -31,6 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux window-system dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libwayland-dev libxkbcommon-dev
+        working-directory: .
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: gamekit
@@ -47,6 +51,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy,rustfmt
+      - name: Install Linux window-system dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libwayland-dev libxkbcommon-dev
+        working-directory: .
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: gamekit
