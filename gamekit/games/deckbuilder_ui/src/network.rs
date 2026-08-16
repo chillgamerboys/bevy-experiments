@@ -15,12 +15,13 @@ use bevy_game_discovery::{
     DiscoveryJoinRoute, DiscoveryObservation, DiscoveryPlugin, ExpectedSession, MdnsAdvertiser,
     MdnsBrowser, MdnsSessionAdvertisement, SessionMetadata, SessionPassword,
     SessionPasswordVerifier, TailnetBrowser, TailnetResponder, TailscaleCli,
+    TAILNET_DISCOVERY_PORT,
 };
 use bevy_game_multiplayer::{
-    AdmissionCredential, AtomicFileReconnectCredentialStore, DirectConnectionCode, DirectEndpoint,
-    DiscoveredDirectTarget, EncodedConnectionCode, GameMultiplayerPlugin, InviteToken,
-    MemoryReconnectCredentialStore, PeerId, PreparedDirectHost, PreparedDirectJoin,
-    PreparedDirectReconnect, ReconnectCredential, ReconnectCredentialStorage,
+    local_network_addresses, AdmissionCredential, AtomicFileReconnectCredentialStore,
+    DirectConnectionCode, DirectEndpoint, DiscoveredDirectTarget, EncodedConnectionCode,
+    GameMultiplayerPlugin, InviteToken, MemoryReconnectCredentialStore, PeerId, PreparedDirectHost,
+    PreparedDirectJoin, PreparedDirectReconnect, ReconnectCredential, ReconnectCredentialStorage,
     ReconnectEndpointBinding, SessionId, SessionSecurityAuthority, StoredReconnectCredential,
 };
 use bevy_replicon::prelude::{
@@ -277,8 +278,22 @@ pub(crate) fn start_solo(world: &mut World) {
 }
 
 pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result<(), String> {
-    let endpoint = DirectEndpoint::new(config.advertised_host, config.port)
-        .map_err(|error| error.to_string())?;
+    let advertised_host = if config.advertised_host.trim().is_empty() {
+        default_advertised_host().ok_or_else(|| {
+            "No reachable local address was detected; enter an advertised address explicitly."
+                .to_owned()
+        })?
+    } else {
+        config.advertised_host.trim().to_owned()
+    };
+    let endpoint =
+        DirectEndpoint::new(advertised_host, config.port).map_err(|error| error.to_string())?;
+    if (config.discover_lan || config.discover_tailnet) && endpoint_is_loopback(&endpoint) {
+        return Err(
+            "127.0.0.1 and ::1 are local-only; choose a LAN or Tailscale address for discovery."
+                .to_owned(),
+        );
+    }
     let password = SessionPassword::new(config.password).map_err(|error| error.to_string())?;
     let verifier = SessionPasswordVerifier::new(&password).map_err(|error| error.to_string())?;
     let security = SessionSecurityAuthority::new();
@@ -304,12 +319,34 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
     .map_err(|error| error.to_string())?;
     let server_entity = prepared.open(world);
 
-    let mut notices = Vec::new();
+    let mut notices = vec![format!(
+        "Direct BGN1 route: {}:{}.",
+        target.endpoint.host(),
+        target.endpoint.port()
+    )];
     let mdns = if config.discover_lan {
-        match MdnsSessionAdvertisement::new(metadata.clone(), target.clone())
-            .and_then(MdnsAdvertiser::start)
-        {
-            Ok(advertiser) => Some(advertiser),
+        let result = preferred_lan_address_for(&target.endpoint)
+            .ok_or_else(|| "no active LAN address was detected".to_owned())
+            .and_then(|address| retarget(&target, address).map_err(|error| error.to_string()))
+            .and_then(|target| {
+                MdnsSessionAdvertisement::new(metadata.clone(), target)
+                    .map_err(|error| error.to_string())
+            })
+            .and_then(|advertisement| {
+                let endpoint = advertisement.target.endpoint.clone();
+                MdnsAdvertiser::start(advertisement)
+                    .map(|advertiser| (advertiser, endpoint))
+                    .map_err(|error| error.to_string())
+            });
+        match result {
+            Ok((advertiser, endpoint)) => {
+                notices.push(format!(
+                    "LAN discovery active at {}:{}.",
+                    endpoint.host(),
+                    endpoint.port()
+                ));
+                Some(advertiser)
+            }
             Err(error) => {
                 notices.push(format!("LAN discovery unavailable: {error}"));
                 None
@@ -328,9 +365,23 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
                     .copied()
                     .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)
             })
-            .and_then(|address| TailnetResponder::bind(address, metadata.clone(), target.clone()))
-        {
-            Ok(responder) => Some(responder),
+            .and_then(|address| {
+                retarget(&target, address)
+                    .map_err(|_error| {
+                        bevy_game_discovery::TailnetDiscoveryError::MalformedAnnouncement
+                    })
+                    .and_then(|target| {
+                        TailnetResponder::bind(address, metadata.clone(), target)
+                            .map(|responder| (responder, address))
+                    })
+            }) {
+            Ok((responder, address)) => {
+                notices.push(format!(
+                    "Tailnet discovery active at {address}:{TAILNET_DISCOVERY_PORT}; game route uses UDP {}.",
+                    target.endpoint.port(),
+                ));
+                Some(responder)
+            }
             Err(error) => {
                 notices.push(format!("Tailnet discovery unavailable: {error}"));
                 None
@@ -362,6 +413,51 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
     state.session_id = Some(session_id);
     state.notice = (!notices.is_empty()).then(|| notices.join(" "));
     Ok(())
+}
+
+pub(crate) fn default_advertised_host() -> Option<String> {
+    preferred_lan_address().map(|address| address.to_string())
+}
+
+fn preferred_lan_address() -> Option<IpAddr> {
+    local_network_addresses().ok()?.into_iter().next()
+}
+
+fn preferred_lan_address_for(endpoint: &DirectEndpoint) -> Option<IpAddr> {
+    let addresses = local_network_addresses().ok()?;
+    let requested = endpoint
+        .host()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<IpAddr>()
+        .ok();
+    requested
+        .filter(|address| addresses.contains(address))
+        .or_else(|| addresses.into_iter().next())
+}
+
+fn endpoint_is_loopback(endpoint: &DirectEndpoint) -> bool {
+    let host = endpoint
+        .host()
+        .trim_start_matches('[')
+        .trim_end_matches(']');
+    host.eq_ignore_ascii_case("localhost")
+        || host.ends_with(".localhost")
+        || host
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
+
+fn retarget(
+    target: &DiscoveredDirectTarget,
+    address: IpAddr,
+) -> Result<DiscoveredDirectTarget, bevy_game_multiplayer::ConnectionCodeError> {
+    Ok(DiscoveredDirectTarget {
+        session_id: target.session_id,
+        endpoint: DirectEndpoint::new(address.to_string(), target.endpoint.port())?,
+        certificate_fingerprint: target.certificate_fingerprint,
+        certificate_expires_unix_seconds: target.certificate_expires_unix_seconds,
+    })
 }
 
 pub(crate) fn hosted_code(world: &World) -> Option<String> {
@@ -787,11 +883,21 @@ fn on_connected_client_removed(
     }
 }
 
-fn on_transport_disconnected(_trigger: On<Disconnected>, mut state: ResMut<DeckNetworkState>) {
+fn on_transport_disconnected(
+    _trigger: On<Disconnected>,
+    mut state: ResMut<DeckNetworkState>,
+    mut commands: Commands,
+) {
     if state.role == NetworkRole::Guest {
+        let was_admitted = state.admitted;
         state.admitted = false;
-        state.notice =
-            Some("Connection lost. Your reserved seat can be reclaimed with Reconnect.".to_owned());
+        state.notice = Some(if was_admitted {
+            "Connection lost. Your reserved seat can be reclaimed with Reconnect.".to_owned()
+        } else {
+            "Connection failed. Verify the host's advertised address, UDP game port, firewall, and that the session is still open."
+                .to_owned()
+        });
+        commands.remove_resource::<PendingHello>();
     }
 }
 
@@ -944,6 +1050,7 @@ fn current_unix_seconds() -> u64 {
 mod tests {
     use super::*;
     use bevy_game_multiplayer::{InMemorySessionLink, ReconnectCredentialStore as _};
+    use bevy_game_test::TestAppBuilder;
 
     #[test]
     fn wire_snapshots_are_target_specific() {
@@ -958,7 +1065,7 @@ mod tests {
     }
 
     #[test]
-    fn two_app_link_carries_commands_and_fresh_snapshot_without_ids() {
+    fn in_memory_link_carries_commands_and_fresh_snapshot_without_ids() {
         let (host_link, guest_link) = InMemorySessionLink::pair(8, 4096);
         let request = GameRequest {
             request_id: RequestId::fixture(1),
@@ -988,6 +1095,199 @@ mod tests {
         )
         .expect("snapshot decodes");
         assert_eq!(received.recipient, Seat::Guest);
+    }
+
+    fn socket_app() -> App {
+        let mut builder = TestAppBuilder::new().with_minimal_plugins();
+        builder
+            .app_mut()
+            .insert_resource(ReconnectCredentialStorage::new(
+                MemoryReconnectCredentialStore::default(),
+            ))
+            .add_plugins(DeckNetworkPlugin);
+        builder.build()
+    }
+
+    #[test]
+    fn discovery_host_rejects_a_loopback_advertised_route() {
+        let mut world = World::new();
+        let error = start_host(
+            &mut world,
+            HostConfiguration {
+                session_name: "Loopback Table".to_owned(),
+                password: "temporary-passphrase".to_owned(),
+                advertised_host: std::net::Ipv4Addr::LOCALHOST.to_string(),
+                port: 7777,
+                discover_lan: true,
+                discover_tailnet: false,
+            },
+        )
+        .expect_err("a LAN listing must never publish loopback");
+        assert!(error.contains("local-only"));
+    }
+
+    #[test]
+    fn loopback_detection_covers_ip_and_localhost_names() {
+        for host in ["127.0.0.1", "::1", "localhost", "game.localhost"] {
+            let endpoint = DirectEndpoint::new(host, 7777).expect("loopback fixture endpoint");
+            assert!(endpoint_is_loopback(&endpoint), "missed {host}");
+        }
+        let lan = DirectEndpoint::new("192.168.1.20", 7777).expect("LAN fixture endpoint");
+        assert!(!endpoint_is_loopback(&lan));
+    }
+
+    #[test]
+    fn provider_retarget_preserves_session_and_certificate_identity() {
+        let target = DiscoveredDirectTarget {
+            session_id: SessionId::from_bytes([1; 16]),
+            endpoint: DirectEndpoint::new("192.168.1.20", 7777).expect("fixture endpoint"),
+            certificate_fingerprint: bevy_game_multiplayer::CertificateFingerprint::from_bytes(
+                [2; 32],
+            ),
+            certificate_expires_unix_seconds: 2_000_000_000,
+        };
+        let route = retarget(
+            &target,
+            "100.64.0.8".parse().expect("tailnet fixture address"),
+        )
+        .expect("provider route");
+        assert_eq!(route.session_id, target.session_id);
+        assert_eq!(route.endpoint.host(), "100.64.0.8");
+        assert_eq!(route.endpoint.port(), 7777);
+        assert_eq!(
+            route.certificate_fingerprint,
+            target.certificate_fingerprint
+        );
+        assert_eq!(
+            route.certificate_expires_unix_seconds,
+            target.certificate_expires_unix_seconds
+        );
+    }
+
+    fn pump_until(
+        host: &mut App,
+        guest: &mut App,
+        timeout: Duration,
+        condition: impl Fn(&App, &App) -> bool,
+    ) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        while std::time::Instant::now() < deadline {
+            host.update();
+            guest.update();
+            if condition(host, guest) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        false
+    }
+
+    #[test]
+    fn real_udp_direct_join_admits_guest_and_exchanges_turns() {
+        let advertised_address =
+            preferred_lan_address().unwrap_or(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+        let probe = std::net::UdpSocket::bind((advertised_address, 0))
+            .expect("reserve an available UDP port");
+        let port = probe.local_addr().expect("probe address").port();
+        drop(probe);
+
+        let mut host = socket_app();
+        let mut guest = socket_app();
+        start_host(
+            host.world_mut(),
+            HostConfiguration {
+                session_name: "Socket Table".to_owned(),
+                password: "temporary-passphrase".to_owned(),
+                advertised_host: advertised_address.to_string(),
+                port,
+                discover_lan: false,
+                discover_tailnet: false,
+            },
+        )
+        .expect("host opens a real UDP socket");
+        let code = hosted_code(host.world()).expect("host exposes a private code");
+        let decoded = DirectConnectionCode::parse(&code).expect("host emits a valid BGN1 code");
+        assert_eq!(decoded.endpoint.host(), advertised_address.to_string());
+        start_direct_join(guest.world_mut(), &code).expect("guest starts a real direct join");
+
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(10),
+            |_host, guest| guest.world().resource::<DeckNetworkState>().admitted
+        ));
+
+        submit_command(host.world_mut(), GameCommand::SetReady(true));
+        submit_command(guest.world_mut(), GameCommand::SetReady(true));
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |host, guest| {
+                let host_ready = host
+                    .world()
+                    .resource::<DeckNetworkState>()
+                    .latest
+                    .as_ref()
+                    .is_some_and(|snapshot| snapshot.seats.iter().all(|seat| seat.ready));
+                let guest_ready = guest
+                    .world()
+                    .resource::<DeckNetworkState>()
+                    .latest
+                    .as_ref()
+                    .is_some_and(|snapshot| snapshot.seats.iter().all(|seat| seat.ready));
+                host_ready && guest_ready
+            }
+        ));
+
+        submit_command(host.world_mut(), GameCommand::StartMatch);
+        submit_command(
+            host.world_mut(),
+            GameCommand::PlayCard(crate::domain::CardKind::Spark),
+        );
+        submit_command(host.world_mut(), GameCommand::EndTurn);
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |_host, guest| {
+                guest
+                    .world()
+                    .resource::<DeckNetworkState>()
+                    .latest
+                    .as_ref()
+                    .is_some_and(|snapshot| {
+                        snapshot.phase == crate::domain::MatchPhase::Playing
+                            && snapshot.current_turn == Seat::Guest
+                            && snapshot
+                                .activity
+                                .iter()
+                                .any(|line| line == "Host played Spark.")
+                    })
+            }
+        ));
+
+        submit_command(
+            guest.world_mut(),
+            GameCommand::PlayCard(crate::domain::CardKind::Ward),
+        );
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |host, _guest| {
+                host.world()
+                    .resource::<DeckNetworkState>()
+                    .latest
+                    .as_ref()
+                    .is_some_and(|snapshot| {
+                        snapshot
+                            .activity
+                            .iter()
+                            .any(|line| line == "Guest played Ward.")
+                    })
+            }
+        ));
     }
 
     #[test]

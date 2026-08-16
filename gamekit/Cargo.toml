@@ -16,6 +16,7 @@ bevy_game_multiplayer = { path = "crates/bevy_game_multiplayer" }
 bevy_game_test = { path = "crates/bevy_game_test" }
 bevy_game_turns = { path = "crates/bevy_game_turns" }
 bevy_game_ui = { path = "crates/bevy_game_ui" }
+if-addrs = "=0.15.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [workspace.lints.rust]

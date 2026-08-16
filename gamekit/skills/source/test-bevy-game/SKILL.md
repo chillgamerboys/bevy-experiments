@@ -26,9 +26,12 @@ Read `.bevy-gamekit/overlays/test-bevy-game.md` first when it exists; treat it a
 6. Test edge values, rejection without mutation, round trips, repeatability, and schedule boundaries.
 7. Keep a focused quick gate for iteration and a workspace-wide all-feature gate for integration.
 
-For multiplayer, use fake providers and in-memory links in ordinary CI. Prove listing,
-route selection, authentication, authority, disclosure, disconnect, and reconnect as
-separate claims. Reserve real multicast and Tailscale for explicit integration jobs.
+For multiplayer, use fake providers for deterministic discovery logic, but do not
+describe an in-memory link as transport evidence. Add a real bounded socket test for
+connection-code handoff and authenticated gameplay. Prove listing, route selection,
+authentication, authority, disclosure, disconnect, and reconnect as separate claims.
+A same-machine socket test cannot prove cross-machine firewall or multicast behavior;
+reserve real multicast and Tailscale for explicit integration jobs.
 
 If `bevy_game_test` is present, read `../../references/gamekit-apis.md`. Always apply `../../references/evidence.md`; a structural snapshot cannot prove gameplay and a screenshot cannot prove interaction.
 

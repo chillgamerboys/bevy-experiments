@@ -48,6 +48,10 @@ impl MdnsSessionAdvertisement {
         if !metadata.password_required() || !target.session_id.is_valid() {
             return Err(MdnsDiscoveryError::MalformedAnnouncement("session policy"));
         }
+        let address = advertised_address(&target)?;
+        if !usable_address(address) || address.is_loopback() {
+            return Err(MdnsDiscoveryError::MalformedAnnouncement("LAN address"));
+        }
         Ok(Self { metadata, target })
     }
 }
@@ -257,16 +261,26 @@ fn service_info(
     let short = session.chars().take(8).collect::<String>();
     let instance = format!("{} {short}", advertisement.metadata.display_name());
     let hostname = format!("bevy-gamekit-{session}.local.");
+    let address = advertised_address(&advertisement.target)?;
     ServiceInfo::new(
         MDNS_SERVICE_TYPE,
         &instance,
         &hostname,
-        "",
+        address,
         advertisement.target.endpoint.port(),
         properties(advertisement).as_slice(),
     )
-    .map(ServiceInfo::enable_addr_auto)
     .map_err(MdnsDiscoveryError::daemon)
+}
+
+fn advertised_address(target: &DiscoveredDirectTarget) -> Result<IpAddr, MdnsDiscoveryError> {
+    target
+        .endpoint
+        .host()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse()
+        .map_err(|_error| MdnsDiscoveryError::MalformedAnnouncement("LAN address"))
 }
 
 fn properties(advertisement: &MdnsSessionAdvertisement) -> Vec<(String, String)> {
@@ -464,7 +478,7 @@ mod tests {
                 .expect("valid metadata"),
             DiscoveredDirectTarget {
                 session_id: SessionId::from_bytes([7; 16]),
-                endpoint: DirectEndpoint::new("127.0.0.1", 7777).expect("valid endpoint"),
+                endpoint: DirectEndpoint::new("192.168.1.20", 7777).expect("valid endpoint"),
                 certificate_fingerprint: CertificateFingerprint::from_bytes([3; 32]),
                 certificate_expires_unix_seconds: 2_000_000_000,
             },
@@ -519,26 +533,69 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires real local multicast sockets"]
-    fn advertiser_and_browser_exchange_on_local_link() {
-        let _advertiser = MdnsAdvertiser::start(advertisement()).expect("advertiser starts");
-        let mut browser = MdnsBrowser::start().expect("browser starts");
+    fn advertisement_publishes_only_its_explicit_lan_address() {
+        let resolved = service_info(&advertisement())
+            .expect("service info")
+            .as_resolved_service();
+        let addresses = resolved
+            .get_addresses()
+            .iter()
+            .map(mdns_sd::ScopedIp::to_ip_addr)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            addresses,
+            vec!["192.168.1.20".parse::<IpAddr>().expect("LAN fixture")]
+        );
+    }
+
+    #[test]
+    fn loopback_advertisement_is_rejected() {
+        let mut advertisement = advertisement();
+        advertisement.target.endpoint =
+            DirectEndpoint::new("127.0.0.1", 7777).expect("syntactically valid endpoint");
+        let error = MdnsSessionAdvertisement::new(advertisement.metadata, advertisement.target)
+            .expect_err("loopback cannot represent a LAN route");
+        assert!(matches!(
+            error,
+            MdnsDiscoveryError::MalformedAnnouncement("LAN address")
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires a real non-loopback LAN interface"]
+    fn advertiser_announces_on_selected_lan_interface() {
+        let Some(address) = bevy_game_multiplayer::local_network_addresses()
+            .expect("local interfaces")
+            .into_iter()
+            .next()
+        else {
+            return;
+        };
+        let mut advertisement = advertisement();
+        advertisement.target.session_id =
+            bevy_game_multiplayer::SessionSecurityAuthority::new().session_id();
+        advertisement.target.endpoint =
+            DirectEndpoint::new(address.to_string(), 7777).expect("detected LAN endpoint");
+        let advertiser = MdnsAdvertiser::start(advertisement).expect("advertiser starts");
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        let mut resolved = false;
+        let mut announced = false;
+        let mut daemon_events = Vec::new();
         while std::time::Instant::now() < deadline {
-            if !browser
-                .poll(Duration::ZERO, 1_900_000_000)
-                .expect("poll succeeds")
-                .is_empty()
-            {
-                resolved = true;
+            while let Ok(event) = advertiser.monitor.try_recv() {
+                if matches!(&event, DaemonEvent::Announce(_, interface) if !interface.ends_with(":lo0"))
+                {
+                    announced = true;
+                }
+                daemon_events.push(format!("{event:?}"));
+            }
+            if announced {
                 break;
             }
             std::thread::sleep(Duration::from_millis(50));
         }
         assert!(
-            resolved,
-            "local browser did not resolve the advertised session"
+            announced,
+            "advertiser did not publish on a LAN interface; events: {daemon_events:?}"
         );
     }
 }

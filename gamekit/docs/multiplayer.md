@@ -27,11 +27,16 @@ development—it does not prove Steam identity, invitations, relay, or NAT trave
 
 ## Host setup
 
-Choose an advertised address reachable over the selected route. For LAN testing,
-use the host's LAN address or resolvable hostname. For tailnet testing, use the host's
-Tailscale address. Set an 8–64 character printable temporary passphrase and do not
-reuse an account or important password. The host retains only a salted Argon2id
-verifier; clients clear plaintext UI buffers after each attempt.
+The host form preselects an active non-loopback LAN address for the private `BGN1`
+route. Verify the address shown in the lobby before sharing the code; override it
+with the host's Tailscale address when the direct-code recipient is remote over the
+tailnet. LAN and Tailscale discovery publish their own provider-specific addresses,
+so enabling both does not force one route onto the other. Loopback addresses are
+rejected whenever discovery is enabled.
+
+Set an 8–64 character printable temporary passphrase and do not reuse an account or
+important password. The host retains only a salted Argon2id verifier; clients clear
+plaintext UI buffers after each attempt.
 
 Allow inbound UDP `7777` for gameplay. For tailnet discovery also allow inbound UDP
 `7778` on the Tailscale interface. LAN discovery additionally requires multicast DNS
@@ -71,6 +76,10 @@ the advertised address, certificate expiry/pinning, protocol/build compatibility
 and game-owned admission separately.
 
 A listing proves only that discovery metadata reached the browser. A successful
-encrypted connection proves transport. Ready/start, private hands, authoritative
-turns, duplicate-command handling, disconnect, and reconnection require their own
-domain or two-app evidence.
+encrypted connection proves transport. An in-memory link does not prove either.
+A same-machine UDP test proves socket setup, BGN1 handoff, admission, and gameplay on
+the selected non-loopback address when one is available, but it still cannot prove a
+second machine's firewall or multicast path. Ready/start, private hands,
+authoritative turns, duplicate-command handling, disconnect, and reconnection
+require their own domain or multi-app evidence. Cross-machine LAN and tailnet walks
+remain required release evidence for those routes.

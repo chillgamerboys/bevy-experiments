@@ -956,6 +956,7 @@ dependencies = [
  "base64",
  "bevy",
  "bevy_replicon",
+ "if-addrs",
  "rand 0.8.7",
  "rcgen",
  "serde",
