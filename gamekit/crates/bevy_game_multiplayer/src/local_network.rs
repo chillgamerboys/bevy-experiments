@@ -1,6 +1,6 @@
 //! Cross-platform enumeration of addresses suitable for an advertised local route.
 
-use std::{fmt, io, net::IpAddr};
+use std::{fmt, io, net::IpAddr, num::NonZeroU32};
 
 /// Returns active, non-loopback, non-point-to-point addresses in deterministic preference order.
 ///
@@ -24,6 +24,21 @@ pub fn local_network_addresses() -> Result<Vec<IpAddr>, LocalNetworkAddressError
     addresses.sort_by_key(|address| (address_rank(*address), address_bytes(*address)));
     addresses.dedup();
     Ok(addresses)
+}
+
+/// Returns the operating-system interface index owning a concrete local address.
+///
+/// Native DNS-SD implementations use this index to keep a LAN advertisement on
+/// the same interface as its advertised game route.
+pub fn local_network_interface_index(
+    address: IpAddr,
+) -> Result<Option<NonZeroU32>, LocalNetworkAddressError> {
+    Ok(if_addrs::get_if_addrs()
+        .map_err(LocalNetworkAddressError::Enumerate)?
+        .into_iter()
+        .find(|interface| interface.ip() == address)
+        .and_then(|interface| interface.index)
+        .and_then(NonZeroU32::new))
 }
 
 fn address_rank(address: IpAddr) -> u8 {

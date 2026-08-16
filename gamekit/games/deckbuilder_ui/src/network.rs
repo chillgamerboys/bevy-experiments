@@ -340,6 +340,11 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
             });
         match result {
             Ok((advertiser, endpoint)) => {
+                bevy::log::info!(
+                    "LAN discovery registered on {}:{}",
+                    endpoint.host(),
+                    endpoint.port()
+                );
                 notices.push(format!(
                     "LAN discovery active at {}:{}.",
                     endpoint.host(),
@@ -348,6 +353,7 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
                 Some(advertiser)
             }
             Err(error) => {
+                bevy::log::warn!("LAN discovery registration failed: {error}");
                 notices.push(format!("LAN discovery unavailable: {error}"));
                 None
             }
@@ -469,9 +475,13 @@ pub(crate) fn hosted_code(world: &World) -> Option<String> {
 pub(crate) fn start_browser(world: &mut World, discover_tailnet: bool) {
     let mut notices = Vec::new();
     let mdns = match MdnsBrowser::start() {
-        Ok(browser) => Some(browser),
+        Ok(browser) => {
+            bevy::log::info!("LAN discovery browser started");
+            Some(browser)
+        }
         Err(error) => {
             let reason = format!("LAN discovery unavailable: {error}");
+            bevy::log::warn!("{reason}");
             world.write_message(DiscoveryObservation::Unavailable {
                 provider: bevy_game_discovery::DiscoveryProviderId::MDNS,
                 reason: reason.clone(),
@@ -973,6 +983,9 @@ fn poll_discovery(
     if let Some(mdns) = browser.mdns.as_mut() {
         match mdns.poll(time.elapsed(), current_unix_seconds()) {
             Ok(found) => {
+                if !found.is_empty() {
+                    bevy::log::info!("LAN discovery received {} change(s)", found.len());
+                }
                 for observation in found {
                     observations.write(observation);
                 }
@@ -980,6 +993,7 @@ fn poll_discovery(
             Err(error) => {
                 browser.mdns = None;
                 let reason = format!("LAN discovery stopped: {error}");
+                bevy::log::warn!("{reason}");
                 observations.write(DiscoveryObservation::Failed {
                     provider: bevy_game_discovery::DiscoveryProviderId::MDNS,
                     reason: reason.clone(),

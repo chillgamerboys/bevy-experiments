@@ -832,9 +832,8 @@ fn spawn_lobby(
                 root.spawn(text(
                     fonts,
                     UiTextRole::Supporting,
-                    "Private fallback code (share out of band):",
+                    "Private fallback code — copy and share it out of band:",
                 ));
-                root.spawn(text(fonts, UiTextRole::Metadata, code.clone()));
                 spawn_action(
                     root,
                     fonts,
@@ -842,6 +841,7 @@ fn spawn_lobby(
                     DeckbuilderAction::CopyShareCode,
                     false,
                 );
+                root.spawn(text(fonts, UiTextRole::Metadata, code.clone()));
             }
             spawn_action(
                 root,
