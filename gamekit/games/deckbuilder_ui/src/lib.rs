@@ -85,7 +85,7 @@ impl Default for DeckbuilderUi {
             previous: Screen::Menu,
             session_name: "Tavern Table".to_owned(),
             passphrase: String::new(),
-            advertised_host: "127.0.0.1".to_owned(),
+            advertised_host: network::default_advertised_host().unwrap_or_default(),
             port: "7777".to_owned(),
             direct_code: String::new(),
             discover_lan: true,
@@ -127,6 +127,7 @@ enum DeckbuilderAction {
     ToggleLan,
     ToggleTailnet,
     HostSession,
+    CopyShareCode,
     JoinDirect,
     SelectSession(SessionId),
     JoinSelected,
@@ -229,6 +230,7 @@ fn apply_action(world: &mut World, action: DeckbuilderAction) {
             if let Err(error) = network::reconnect(world) {
                 set_notice(world, error);
             } else {
+                world.resource_mut::<DeckbuilderUi>().local_notice = None;
                 set_screen(world, Screen::Lobby);
             }
         }
@@ -248,6 +250,7 @@ fn apply_action(world: &mut World, action: DeckbuilderAction) {
             world.resource_mut::<DeckbuilderUi>().discover_tailnet = !enabled;
         }
         DeckbuilderAction::HostSession => host_session(world),
+        DeckbuilderAction::CopyShareCode => copy_share_code(world),
         DeckbuilderAction::JoinDirect => join_direct(world),
         DeckbuilderAction::SelectSession(session_id) => select_session(world, session_id),
         DeckbuilderAction::JoinSelected => {
@@ -330,6 +333,7 @@ fn host_session(world: &mut World) {
             let mut ui = world.resource_mut::<DeckbuilderUi>();
             ui.share_code = code;
             ui.passphrase.clear();
+            ui.local_notice = None;
             ui.screen = Screen::Lobby;
         }
         Err(error) => set_notice(world, error),
@@ -341,7 +345,27 @@ fn join_direct(world: &mut World) {
     let result = network::start_direct_join(world, code.trim());
     code.clear();
     match result {
-        Ok(()) => set_screen(world, Screen::Lobby),
+        Ok(()) => {
+            world.resource_mut::<DeckbuilderUi>().local_notice = None;
+            set_screen(world, Screen::Lobby);
+        }
+        Err(error) => set_notice(world, error),
+    }
+}
+
+fn copy_share_code(world: &mut World) {
+    let code = world.resource::<DeckbuilderUi>().share_code.clone();
+    let result = code
+        .ok_or_else(|| "No private connection code is available.".to_owned())
+        .and_then(|code| {
+            world
+                .get_resource_mut::<Clipboard>()
+                .ok_or_else(|| "System clipboard support is unavailable.".to_owned())?
+                .set_text(code)
+                .map_err(|error| format!("Could not copy the connection code: {error}"))
+        });
+    match result {
+        Ok(()) => set_notice(world, "Private BGN1 code copied to the clipboard."),
         Err(error) => set_notice(world, error),
     }
 }
@@ -374,6 +398,7 @@ fn join_discovered(world: &mut World) {
     match result {
         Ok(()) => {
             network::stop_browser(world);
+            world.resource_mut::<DeckbuilderUi>().local_notice = None;
             set_screen(world, Screen::Lobby);
         }
         Err(error) => set_notice(world, error),
@@ -609,11 +634,16 @@ fn spawn_host(
                     spawn_labeled_field(
                         form,
                         fonts,
-                        "Advertised LAN/tailnet address",
+                        "Direct-code advertised address",
                         Field::AdvertisedHost,
                         &ui.advertised_host,
                         255,
                     );
+                    form.spawn(text(
+                        fonts,
+                        UiTextRole::Metadata,
+                        "Pre-filled from an active LAN interface. BGN1 embeds this address; LAN and Tailscale discovery publish their own routes.",
+                    ));
                     spawn_labeled_field(form, fonts, "Game port", Field::Port, &ui.port, 5);
                     spawn_action(
                         form,
@@ -673,7 +703,7 @@ fn spawn_direct(
                     fonts,
                     "Join Direct",
                     DeckbuilderAction::JoinDirect,
-                    ui.direct_code.trim().is_empty(),
+                    false,
                 );
                 spawn_action(form, fonts, "Back", DeckbuilderAction::Back, false);
                 spawn_notices(form, fonts, ui, state);
@@ -724,7 +754,9 @@ fn spawn_password(
             form.spawn(text(fonts, UiTextRole::Title, "Session Admission"));
             form.spawn(text(fonts, UiTextRole::Supporting, "This temporary passphrase is sent only through the certificate-pinned encrypted connection."));
             spawn_labeled_field(form, fonts, "Temporary session passphrase", Field::JoinPassphrase, &ui.passphrase, 64);
-            spawn_action(form, fonts, "Join Session", DeckbuilderAction::SubmitPassword, ui.passphrase.len() < 8);
+            // Validation happens in the action handler. Keeping this actionable avoids
+            // rebuilding the whole form (and destroying text focus) on every keystroke.
+            spawn_action(form, fonts, "Join Session", DeckbuilderAction::SubmitPassword, false);
             spawn_action(form, fonts, "Back", DeckbuilderAction::Back, false);
             spawn_notices(form, fonts, ui, state);
         });
@@ -800,8 +832,15 @@ fn spawn_lobby(
                 root.spawn(text(
                     fonts,
                     UiTextRole::Supporting,
-                    "Private fallback code (share out of band):",
+                    "Private fallback code — copy and share it out of band:",
                 ));
+                spawn_action(
+                    root,
+                    fonts,
+                    "Copy Private BGN1 Code",
+                    DeckbuilderAction::CopyShareCode,
+                    false,
+                );
                 root.spawn(text(fonts, UiTextRole::Metadata, code.clone()));
             }
             spawn_action(
@@ -1286,6 +1325,309 @@ mod tests {
             .world()
             .resource::<DeckbuilderUi>()
             .direct_code
+            .is_empty());
+    }
+
+    #[test]
+    fn direct_join_button_activates_after_real_field_edit() {
+        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+        run_frames(&mut app, 3);
+        let multiplayer = find_named(app.world_mut(), "Multiplayer").expect("menu control");
+        assert!(click_action(&mut app, multiplayer));
+        run_frames(&mut app, 2);
+        let direct =
+            find_named(app.world_mut(), "Join with BGN1 Code").expect("direct join control");
+        assert!(click_action(&mut app, direct));
+        run_frames(&mut app, 2);
+
+        let field = find_named(app.world_mut(), "BGN1 connection code").expect("direct field");
+        app.world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .expect("editable direct field")
+            .editor_mut()
+            .set_text("invalid code");
+        run_frames(&mut app, 2);
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().direct_code,
+            "invalid code"
+        );
+
+        let join = find_named(app.world_mut(), "Join Direct").expect("join button");
+        assert!(click_action(&mut app, join));
+        run_frames(&mut app, 2);
+        assert!(app
+            .world()
+            .resource::<DeckbuilderUi>()
+            .local_notice
+            .as_deref()
+            .is_some_and(|notice| notice.contains("unsupported connection-code version")));
+        assert!(app
+            .world()
+            .resource::<DeckbuilderUi>()
+            .direct_code
+            .is_empty());
+    }
+
+    #[test]
+    fn hosted_code_has_an_explicit_copy_action() {
+        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+        run_frames(&mut app, 3);
+        {
+            let mut ui = app.world_mut().resource_mut::<DeckbuilderUi>();
+            ui.screen = Screen::Lobby;
+            ui.share_code = Some("BGN1.private-fixture".to_owned());
+        }
+        app.world_mut()
+            .resource_mut::<network::DeckNetworkState>()
+            .role = network::NetworkRole::Host;
+        app.world_mut().resource_mut::<UiDirty>().0 = true;
+        run_frames(&mut app, 2);
+
+        let copy = find_named(app.world_mut(), "Copy Private BGN1 Code")
+            .expect("host can copy the code without retyping it");
+        assert!(click_action(&mut app, copy));
+        run_frames(&mut app, 2);
+        let notice = app
+            .world()
+            .resource::<DeckbuilderUi>()
+            .local_notice
+            .as_deref()
+            .expect("copy reports success or a typed platform failure");
+        assert!(notice.contains("clipboard"));
+        assert!(!notice.contains("private-fixture"));
+    }
+
+    #[test]
+    fn direct_join_button_hands_a_valid_code_to_real_udp_transport() {
+        let advertised_host = network::default_advertised_host()
+            .unwrap_or_else(|| std::net::Ipv4Addr::LOCALHOST.to_string());
+        let advertised_address = advertised_host
+            .parse::<std::net::IpAddr>()
+            .expect("detected host is an IP address");
+        let probe = std::net::UdpSocket::bind((advertised_address, 0))
+            .expect("reserve an available UDP port");
+        let port = probe.local_addr().expect("probe address").port();
+        drop(probe);
+
+        let mut host = test_app(1280, 720, UiScaleMode::Auto);
+        let mut guest = test_app(1280, 720, UiScaleMode::Auto);
+        run_frames(&mut host, 3);
+        run_frames(&mut guest, 3);
+        network::start_host(
+            host.world_mut(),
+            network::HostConfiguration {
+                session_name: "UI Socket Table".to_owned(),
+                password: "temporary-passphrase".to_owned(),
+                advertised_host,
+                port,
+                discover_lan: false,
+                discover_tailnet: false,
+            },
+        )
+        .expect("host opens real UDP transport");
+        let code = network::hosted_code(host.world()).expect("host exposes BGN1 code");
+
+        let multiplayer = find_named(guest.world_mut(), "Multiplayer").expect("menu control");
+        assert!(click_action(&mut guest, multiplayer));
+        run_frames(&mut guest, 2);
+        let direct =
+            find_named(guest.world_mut(), "Join with BGN1 Code").expect("direct join control");
+        assert!(click_action(&mut guest, direct));
+        run_frames(&mut guest, 2);
+        let field = find_named(guest.world_mut(), "BGN1 connection code").expect("direct field");
+        guest
+            .world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .expect("editable direct field")
+            .editor_mut()
+            .set_text(&code);
+        run_frames(&mut guest, 2);
+        let join = find_named(guest.world_mut(), "Join Direct").expect("join button");
+        assert!(click_action(&mut guest, join));
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while std::time::Instant::now() < deadline
+            && !guest
+                .world()
+                .resource::<network::DeckNetworkState>()
+                .admitted
+        {
+            host.update();
+            guest.update();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(
+            guest
+                .world()
+                .resource::<network::DeckNetworkState>()
+                .admitted,
+            "the real direct transport never admitted the UI guest"
+        );
+        assert_eq!(
+            guest.world().resource::<DeckbuilderUi>().screen,
+            Screen::Lobby
+        );
+    }
+
+    #[test]
+    fn discovery_password_button_activates_after_real_field_edit() {
+        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+        run_frames(&mut app, 3);
+        {
+            let mut ui = app.world_mut().resource_mut::<DeckbuilderUi>();
+            ui.screen = Screen::Password;
+            ui.previous = Screen::Browser;
+        }
+        app.world_mut().resource_mut::<UiDirty>().0 = true;
+        run_frames(&mut app, 2);
+
+        let field =
+            find_named(app.world_mut(), "Temporary session passphrase").expect("password field");
+        app.world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .expect("editable password field")
+            .editor_mut()
+            .set_text("temporary-passphrase");
+        run_frames(&mut app, 2);
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().passphrase,
+            "temporary-passphrase"
+        );
+
+        let join = find_named(app.world_mut(), "Join Session").expect("join button");
+        assert!(app.world().get::<UiDisabled>(join).is_none());
+        assert!(click_action(&mut app, join));
+        run_frames(&mut app, 2);
+        assert_eq!(
+            app.world()
+                .resource::<DeckbuilderUi>()
+                .local_notice
+                .as_deref(),
+            Some("The selected session is no longer available.")
+        );
+        assert!(app
+            .world()
+            .resource::<DeckbuilderUi>()
+            .passphrase
+            .is_empty());
+    }
+
+    #[test]
+    fn discovered_route_password_button_reaches_real_udp_transport() {
+        use bevy_game_discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
+        use bevy_game_multiplayer::{DirectConnectionCode, DiscoveredDirectTarget};
+
+        let advertised_host = network::default_advertised_host()
+            .unwrap_or_else(|| std::net::Ipv4Addr::LOCALHOST.to_string());
+        let advertised_address = advertised_host
+            .parse::<std::net::IpAddr>()
+            .expect("detected host is an IP address");
+        let probe = std::net::UdpSocket::bind((advertised_address, 0))
+            .expect("reserve an available UDP port");
+        let port = probe.local_addr().expect("probe address").port();
+        drop(probe);
+
+        let mut host = test_app(1280, 720, UiScaleMode::Auto);
+        let mut guest = test_app(1280, 720, UiScaleMode::Auto);
+        run_frames(&mut host, 3);
+        run_frames(&mut guest, 3);
+        network::start_host(
+            host.world_mut(),
+            network::HostConfiguration {
+                session_name: "Discovered Socket Table".to_owned(),
+                password: "temporary-passphrase".to_owned(),
+                advertised_host,
+                port,
+                discover_lan: false,
+                discover_tailnet: false,
+            },
+        )
+        .expect("host opens real UDP transport");
+        let code = network::hosted_code(host.world()).expect("host exposes BGN1 code");
+        let code = DirectConnectionCode::parse(&code).expect("host code parses");
+
+        let mut provider = FakeDiscoveryProvider::default();
+        provider.publish(
+            SessionMetadata::new(
+                network::GAME_ID,
+                network::PROTOCOL_VERSION,
+                network::BUILD_ID,
+                "Discovered Socket Table",
+                1,
+                2,
+                true,
+            )
+            .expect("discovery metadata"),
+            DiscoveredDirectTarget {
+                session_id: code.session_id,
+                endpoint: code.endpoint,
+                certificate_fingerprint: code.certificate_fingerprint,
+                certificate_expires_unix_seconds: code.certificate_expires_unix_seconds,
+            },
+            std::time::Duration::from_secs(60),
+        );
+        let expected = guest.world().resource::<ExpectedSession>().clone();
+        for observation in provider.drain() {
+            guest
+                .world_mut()
+                .resource_mut::<DiscoveryRegistry>()
+                .apply(observation, Some(&expected));
+        }
+        guest.world_mut().resource_mut::<DeckbuilderUi>().screen = Screen::Browser;
+        guest.world_mut().resource_mut::<UiDirty>().0 = true;
+        run_frames(&mut guest, 2);
+
+        let listing = {
+            let world = guest.world_mut();
+            let mut names = world.query::<(Entity, &Name)>();
+            names
+                .iter(world)
+                .find_map(|(entity, name)| {
+                    name.as_str()
+                        .starts_with("Discovered Socket Table")
+                        .then_some(entity)
+                })
+                .expect("discovered listing")
+        };
+        assert!(click_action(&mut guest, listing));
+        run_frames(&mut guest, 2);
+        let select = find_named(guest.world_mut(), "Join Selected").expect("selected action");
+        assert!(click_action(&mut guest, select));
+        run_frames(&mut guest, 2);
+        let field =
+            find_named(guest.world_mut(), "Temporary session passphrase").expect("password field");
+        guest
+            .world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .expect("editable password field")
+            .editor_mut()
+            .set_text("temporary-passphrase");
+        run_frames(&mut guest, 2);
+        let join = find_named(guest.world_mut(), "Join Session").expect("join action");
+        assert!(click_action(&mut guest, join));
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while std::time::Instant::now() < deadline
+            && !guest
+                .world()
+                .resource::<network::DeckNetworkState>()
+                .admitted
+        {
+            host.update();
+            guest.update();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(
+            guest
+                .world()
+                .resource::<network::DeckNetworkState>()
+                .admitted,
+            "the discovered password route never admitted the UI guest"
+        );
+        assert!(guest
+            .world()
+            .resource::<DeckbuilderUi>()
+            .passphrase
             .is_empty());
     }
 }

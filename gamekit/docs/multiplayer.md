@@ -16,6 +16,12 @@ rotating credential stored in the platform application-data directory.
 - UDP `7777` carries the certificate-pinned WebTransport game session by default.
 - UDP `7778` carries development-only tailnet discovery probes and responses.
 - mDNS advertises `_bevy-gamekit._udp.local.` only on the local multicast domain.
+- Native DNS-SD owns record TTLs and goodbye removal. The browser renews short
+  registry leases while the OS still has the record; freshness is a discovery
+  lease, not proof the game socket is reachable. Abrupt host loss can remain
+  visible until the OS expires its DNS records.
+- Native discovery uses Bonjour on macOS, Windows DNS-SD on Windows, and an
+  installed/running Avahi service with D-Bus on Linux.
 - Tailscale is installed, authenticated, and routed outside the game. The adapter
   runs the fixed command `tailscale status --json`; it never logs in, requests an API
   token, manages routes, or distributes Tailscale.
@@ -27,11 +33,16 @@ development—it does not prove Steam identity, invitations, relay, or NAT trave
 
 ## Host setup
 
-Choose an advertised address reachable over the selected route. For LAN testing,
-use the host's LAN address or resolvable hostname. For tailnet testing, use the host's
-Tailscale address. Set an 8–64 character printable temporary passphrase and do not
-reuse an account or important password. The host retains only a salted Argon2id
-verifier; clients clear plaintext UI buffers after each attempt.
+The host form preselects an active non-loopback LAN address for the private `BGN1`
+route. Verify the address shown in the lobby before sharing the code; override it
+with the host's Tailscale address when the direct-code recipient is remote over the
+tailnet. LAN and Tailscale discovery publish their own provider-specific addresses,
+so enabling both does not force one route onto the other. Loopback addresses are
+rejected whenever discovery is enabled.
+
+Set an 8–64 character printable temporary passphrase and do not reuse an account or
+important password. The host retains only a salted Argon2id verifier; clients clear
+plaintext UI buffers after each attempt.
 
 Allow inbound UDP `7777` for gameplay. For tailnet discovery also allow inbound UDP
 `7778` on the Tailscale interface. LAN discovery additionally requires multicast DNS
@@ -71,6 +82,15 @@ the advertised address, certificate expiry/pinning, protocol/build compatibility
 and game-owned admission separately.
 
 A listing proves only that discovery metadata reached the browser. A successful
-encrypted connection proves transport. Ready/start, private hands, authoritative
-turns, duplicate-command handling, disconnect, and reconnection require their own
-domain or two-app evidence.
+encrypted connection proves transport. An in-memory link does not prove either.
+A same-machine UDP test proves socket setup, BGN1 handoff, admission, and gameplay on
+the selected non-loopback address when one is available, but it still cannot prove a
+second machine's firewall or multicast path. Ready/start, private hands,
+authoritative turns, duplicate-command handling, disconnect, and reconnection
+require their own domain or multi-app evidence. Cross-machine LAN and tailnet walks
+remain required release evidence for those routes.
+
+The socket integration test also disconnects the guest, destroys its App, builds
+a fresh App with the on-disk credential store, and verifies admission, preserved
+private state, stable peer identity, and credential rotation. It runs on one
+machine and is not cross-machine or host-restart recovery evidence.

@@ -8,6 +8,7 @@ mod connection_code;
 mod credentials;
 #[cfg(feature = "direct")]
 mod direct;
+mod local_network;
 mod security;
 mod testing;
 
@@ -30,6 +31,9 @@ pub use direct::{
     DirectTransportError, DiscoveredDirectTarget, PreparedDirectDiscoveryJoin, PreparedDirectHost,
     PreparedDirectJoin, PreparedDirectReconnect, SpkiPinVerifier, DEFAULT_DIRECT_PORT,
     DIRECT_SESSION_PATH,
+};
+pub use local_network::{
+    local_network_addresses, local_network_interface_index, LocalNetworkAddressError,
 };
 pub use security::{
     AdmissionCredential, AdmissionError, AdmissionGrant, InviteToken, PeerId, ReconnectCredential,

@@ -15,6 +15,9 @@ that the UI rendered about itself.
 
 For multiplayer, keep these claims separate: a discovery observation proves listing;
 an authenticated connection proves transport/admission; targeted snapshots prove
-disclosure only when inspected per recipient; and two-app gameplay tests prove
-authority/lifecycle behavior. Real mDNS and tailnet walks are integration evidence,
-not replacements for deterministic fake-provider and in-memory transport tests.
+disclosure only when inspected per recipient; and multi-app gameplay tests prove
+authority/lifecycle behavior. An in-memory link proves only the code using that link.
+A same-machine socket test exercises the transport stack but cannot prove another
+machine's firewall, interface routing, or multicast path. Real cross-machine mDNS and
+tailnet walks are integration evidence, not replacements for deterministic provider
+tests, and deterministic tests are not substitutes for those walks.
