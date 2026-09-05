@@ -1,6 +1,9 @@
 # bevy-experiments
 
-A sandbox for iterating on small Bevy game ideas. Each experiment lives in its own self-contained module under `src/games/` and has its own binary, tests, and docs. Games are intentionally kept separate — no shared utilities — until enough exist to make extraction worth doing.
+A sandbox for iterating on small Bevy game ideas. The original Bevy 0.18 experiments
+remain independent under `src/games/`. The isolated [Gamekit workspace](gamekit/README.md)
+contains opt-in Bevy 0.19 capabilities and the deckbuilder multiplayer adopter.
+Games own their composition roots and rules; Gamekit is shared code, not a shared engine.
 
 ## Games
 

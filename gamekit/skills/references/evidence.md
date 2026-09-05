@@ -21,3 +21,9 @@ A same-machine socket test exercises the transport stack but cannot prove anothe
 machine's firewall, interface routing, or multicast path. Real cross-machine mDNS and
 tailnet walks are integration evidence, not replacements for deterministic provider
 tests, and deterministic tests are not substitutes for those walks.
+
+A restart claim requires destroying the client, constructing a fresh one, loading
+stored credentials, and completing admission/state recovery against a live host.
+Exercise replay after cache eviction. Check focused controls after scrolling and
+clipping, not only minimum dimensions. Skill metadata/trigger-fixture validation is
+structural evidence; actual skill-selection behavior requires separate agent runs.

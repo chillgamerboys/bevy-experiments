@@ -7,19 +7,18 @@ license.workspace = true
 
 [dependencies]
 aeronet = { version = "=0.21.0", default-features = false, features = ["std"] }
-bevy.workspace = true
+bevy = { workspace = true, features = ["ui", "system_clipboard", "png"] }
 bevy_game_discovery = { workspace = true, features = ["mdns", "tailscale-cli"] }
-bevy_game_multiplayer.workspace = true
+bevy_game_multiplayer = { workspace = true, features = ["direct"] }
 bevy_game_turns.workspace = true
 bevy_game_ui.workspace = true
 bevy_replicon = { version = "=0.41.1", default-features = false, features = ["client", "server"] }
 directories = "6"
-rand = "0.8"
 serde.workspace = true
 zeroize = "1"
 
 [dev-dependencies]
-bevy_game_test.workspace = true
+bevy_game_test = { workspace = true, features = ["ui"] }
 serde_json = "1"
 tempfile = "3"
 

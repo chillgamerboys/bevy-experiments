@@ -13,6 +13,7 @@ use bevy_game_ui::{
     ResolvedUiMetrics, UiActivated, UiDisabled, UiFonts, UiRegionRole, UiTextChanged, UiTextRole,
     UiTextSubmitted, UiViewportClass,
 };
+use zeroize::Zeroize as _;
 
 use crate::{
     domain::{CardKind, GameCommand, MatchPhase},
@@ -59,7 +60,7 @@ enum Screen {
     Match,
 }
 
-#[derive(Resource, Debug)]
+#[derive(Resource)]
 struct DeckbuilderUi {
     screen: Screen,
     previous: Screen,
@@ -76,6 +77,23 @@ struct DeckbuilderUi {
     paused: bool,
     share_code: Option<String>,
     local_notice: Option<String>,
+}
+
+impl std::fmt::Debug for DeckbuilderUi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeckbuilderUi")
+            .field("screen", &self.screen)
+            .field("credentials", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
+}
+
+impl Drop for DeckbuilderUi {
+    fn drop(&mut self) {
+        self.passphrase.zeroize();
+        self.direct_code.zeroize();
+        self.share_code.zeroize();
+    }
 }
 
 impl Default for DeckbuilderUi {
@@ -196,10 +214,17 @@ fn collect_text(
 fn set_field(ui: &mut DeckbuilderUi, field: Field, value: String) {
     match field {
         Field::SessionName => ui.session_name = value,
-        Field::Passphrase | Field::JoinPassphrase => ui.passphrase = value,
+        Field::Passphrase | Field::JoinPassphrase => {
+            ui.passphrase.zeroize();
+            ui.passphrase = value;
+        }
         Field::AdvertisedHost => ui.advertised_host = value,
         Field::Port => ui.port = value,
-        Field::DirectCode => ui.direct_code = value,
+        Field::DirectCode => {
+            ui.direct_code.zeroize();
+            ui.share_code.zeroize();
+            ui.direct_code = value;
+        }
     }
 }
 
@@ -287,8 +312,8 @@ fn apply_action(world: &mut World, action: DeckbuilderAction) {
             ui.screen = Screen::Menu;
             ui.previous = Screen::Menu;
             ui.paused = false;
-            ui.passphrase.clear();
-            ui.direct_code.clear();
+            ui.passphrase.zeroize();
+            ui.direct_code.zeroize();
             ui.selected_target = None;
             ui.selected_session = None;
         }
@@ -313,10 +338,10 @@ fn set_notice(world: &mut World, notice: impl Into<String>) {
 
 fn host_session(world: &mut World) {
     let config = {
-        let ui = world.resource::<DeckbuilderUi>();
+        let mut ui = world.resource_mut::<DeckbuilderUi>();
         ui.port.parse::<u16>().ok().map(|port| HostConfiguration {
             session_name: ui.session_name.clone(),
-            password: ui.passphrase.clone(),
+            password: std::mem::take(&mut ui.passphrase),
             advertised_host: ui.advertised_host.clone(),
             port,
             discover_lan: ui.discover_lan,
@@ -331,8 +356,9 @@ fn host_session(world: &mut World) {
         Ok(()) => {
             let code = network::hosted_code(world);
             let mut ui = world.resource_mut::<DeckbuilderUi>();
+            ui.share_code.zeroize();
             ui.share_code = code;
-            ui.passphrase.clear();
+            ui.passphrase.zeroize();
             ui.local_notice = None;
             ui.screen = Screen::Lobby;
         }
@@ -343,7 +369,7 @@ fn host_session(world: &mut World) {
 fn join_direct(world: &mut World) {
     let mut code = std::mem::take(&mut world.resource_mut::<DeckbuilderUi>().direct_code);
     let result = network::start_direct_join(world, code.trim());
-    code.clear();
+    code.zeroize();
     match result {
         Ok(()) => {
             world.resource_mut::<DeckbuilderUi>().local_notice = None;
@@ -394,7 +420,7 @@ fn join_discovered(world: &mut World) {
         .as_ref()
         .ok_or_else(|| "The selected session is no longer available.".to_owned())
         .and_then(|target| network::start_discovered_join(world, target, password.clone()));
-    password.clear();
+    password.zeroize();
     match result {
         Ok(()) => {
             network::stop_browser(world);
@@ -629,7 +655,7 @@ fn spawn_host(
                     form.spawn(text(
                     fonts,
                     UiTextRole::Metadata,
-                    "Use 8–64 printable characters. Do not reuse an account or important password.",
+                    "Use 8-64 printable characters. Do not reuse an account or important password.",
                 ));
                     spawn_labeled_field(
                         form,
@@ -1063,7 +1089,12 @@ fn spawn_action(
     action: DeckbuilderAction,
     disabled: bool,
 ) {
-    let mut entity = parent.spawn((button(name), action));
+    let key = match action {
+        DeckbuilderAction::SetReady(_) => "SetReady".to_owned(),
+        _ => format!("{action:?}"),
+    };
+    let focus_id = bevy_game_ui::UiFocusId::new("deckbuilder", key);
+    let mut entity = parent.spawn((button(name), action, focus_id));
     if disabled {
         entity.insert(UiDisabled);
     }
@@ -1079,7 +1110,11 @@ fn spawn_labeled_field(
     max: usize,
 ) {
     parent.spawn(text(fonts, UiTextRole::Supporting, label));
-    parent.spawn((text_field(fonts, label, value, max), field));
+    parent.spawn((
+        text_field(fonts, label, value, max),
+        field,
+        bevy_game_ui::UiFocusId::new("deckbuilder-fields", format!("{field:?}")),
+    ));
 }
 
 fn spawn_notices(
@@ -1215,15 +1250,33 @@ mod tests {
                 assert!(node.size.x >= 44.0, "{} is too narrow", node.path);
                 assert!(node.size.y >= 44.0, "{} is too short", node.path);
             }
+            let actions = {
+                let world = app.world_mut();
+                let mut query = world
+                    .query_filtered::<Entity, (With<bevy_game_ui::UiAction>, Without<UiDisabled>)>(
+                    );
+                query.iter(world).collect::<Vec<_>>()
+            };
+            for entity in actions {
+                assert!(focus_action(app.world_mut(), entity));
+                run_frames(&mut app, 3);
+                let visible = bevy_game_test::visible_control_rect(
+                    app.world(),
+                    entity,
+                    Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+                )
+                .expect("focused control must be visible");
+                assert!(
+                    visible.width() >= 43.5 && visible.height() >= 43.5,
+                    "focused control is clipped: {visible:?}"
+                );
+            }
         }
     }
 
     #[test]
     fn service_style_fake_provider_uses_the_same_browser_and_join_selection() {
         use bevy_game_discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
-        use bevy_game_multiplayer::{
-            CertificateFingerprint, DirectEndpoint, DiscoveredDirectTarget,
-        };
 
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         run_frames(&mut app, 2);
@@ -1240,12 +1293,9 @@ mod tests {
                 true,
             )
             .expect("valid fake metadata"),
-            DiscoveredDirectTarget {
+            bevy_game_discovery::DiscoveryEndpoint::Service {
                 session_id,
-                endpoint: DirectEndpoint::new("service.invalid", 7777)
-                    .expect("valid fixture endpoint"),
-                certificate_fingerprint: CertificateFingerprint::from_bytes([7; 32]),
-                certificate_expires_unix_seconds: 2_000_000_000,
+                locator: "public-lobby-77".to_owned(),
             },
             std::time::Duration::from_secs(60),
         );
@@ -1281,6 +1331,55 @@ mod tests {
             .expect("selection creates an opaque join handoff");
         assert_eq!(selected.session_id(), session_id);
         assert_eq!(selected.preferred_source(), Some(DiscoverySource::Service));
+    }
+
+    #[test]
+    fn compact_scaled_forms_scroll_every_enabled_control_into_view() {
+        for screen in [
+            Screen::Multiplayer,
+            Screen::Host,
+            Screen::Direct,
+            Screen::Browser,
+            Screen::Password,
+        ] {
+            let mut app = test_app(1280, 720, UiScaleMode::Percent200);
+            app.world_mut().resource_mut::<DeckbuilderUi>().screen = screen;
+            app.world_mut().resource_mut::<UiDirty>().0 = true;
+            run_frames(&mut app, 4);
+            let entities = {
+                let world = app.world_mut();
+                let mut query = world.query_filtered::<Entity, (
+                    Or<(
+                        With<bevy_game_ui::UiAction>,
+                        With<bevy_game_ui::UiTextField>,
+                    )>,
+                    Without<UiDisabled>,
+                )>();
+                query.iter(world).collect::<Vec<_>>()
+            };
+            for entity in entities {
+                assert!(bevy_game_ui::activation_eligible(app.world_mut(), entity));
+                app.world_mut()
+                    .resource_mut::<InputFocus>()
+                    .set(entity, bevy::input_focus::FocusCause::Navigated);
+                run_frames(&mut app, 3);
+                let visible = bevy_game_test::visible_control_rect(
+                    app.world(),
+                    entity,
+                    Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+                );
+                assert!(
+                    visible.is_some(),
+                    "{screen:?}: focused {:?} is outside the clipped viewport",
+                    app.world().get::<Name>(entity)
+                );
+                let rect = visible.expect("visible form control");
+                assert!(
+                    rect.width() >= 43.5 && rect.height() >= 43.5,
+                    "{screen:?}: clipped focused control {rect:?}"
+                );
+            }
+        }
     }
 
     #[test]

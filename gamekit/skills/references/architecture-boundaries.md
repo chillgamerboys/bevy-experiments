@@ -38,3 +38,9 @@ service-specific endpoints into game UI. Treat external routing such as Tailscal
 an adapter dependency, not a shared engine or player identity system. Never place
 passwords, bearer invitations, reconnect credentials, or full connection codes in a
 discovery record.
+
+Keep pure identity/security data below both discovery and concrete transport
+adapters. A discovery handoff is data, not a method that mutates a Bevy World to
+open a particular transport. A service-provider test must work without any direct
+endpoint. Provider lifetime, endpoint ownership, cancellation, and I/O budgets are
+part of the capability contract, not details to leave to one adopter.

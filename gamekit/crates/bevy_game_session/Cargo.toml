@@ -1,0 +1,21 @@
+[package]
+name = "bevy_game_session"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+argon2 = "0.5"
+base64 = "0.22"
+rand = "0.8"
+serde.workspace = true
+serde_json = "1"
+zeroize = "1"
+subtle = "2.6"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[lints]
+workspace = true

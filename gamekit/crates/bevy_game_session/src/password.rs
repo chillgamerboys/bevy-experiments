@@ -26,7 +26,7 @@ pub struct SessionPassword(String);
 impl SessionPassword {
     /// Accepts 8–64 printable ASCII characters.
     pub fn new(value: impl Into<String>) -> Result<Self, PasswordPolicyError> {
-        let value = value.into();
+        let value = zeroize::Zeroizing::new(value.into());
         if !(8..=64).contains(&value.len()) {
             return Err(PasswordPolicyError::InvalidLength);
         }
@@ -39,7 +39,7 @@ impl SessionPassword {
         if value.starts_with(' ') || value.ends_with(' ') {
             return Err(PasswordPolicyError::SurroundingWhitespace);
         }
-        Ok(Self(value))
+        Ok(Self(value.to_string()))
     }
 
     /// Borrows plaintext only for the pinned encrypted admission handshake.

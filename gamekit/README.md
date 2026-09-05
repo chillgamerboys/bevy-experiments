@@ -5,6 +5,22 @@ the legacy Bevy 0.18 experiments in the repository root. Each game remains its
 own composition root and owns its rules, domain state, schedules, presentation
 models, and typed intents.
 
+## Capability boundaries
+
+| Crate | Owns | Does not own |
+|---|---|---|
+| `bevy_game_hex` | Pure axial geometry and 2D picking | Boards, terrain, pieces, moves |
+| `bevy_game_turns` | Validated ordered participants and rounds | Turn legality or victory |
+| `bevy_game_session` | Pure identity, credentials, admission security, endpoint data | Bevy, sockets, seats |
+| `bevy_game_discovery` | Listings and provider-neutral route handoffs | Transport construction or admission |
+| `bevy_game_multiplayer` | Aeronet/Replicon adapter, optional direct WebTransport, connection-bound lifecycle | Game rules and disclosure |
+| `bevy_game_ui` | Native controls, scoped focus, semantic styling | Screen models or typed game actions |
+| `bevy_game_test` | Deterministic App helpers; opt-in `ui` evidence helpers | Game fixtures and assertions |
+
+The `direct` transport and test helper's `ui` features are explicit opt-ins. The
+deckbuilder enables what it uses, so ordinary `cargo run -p deckbuilder_ui` works.
+See [migration and verification](docs/refactor.md) for breaking changes.
+
 Run Gamekit commands from this directory:
 
 ```sh

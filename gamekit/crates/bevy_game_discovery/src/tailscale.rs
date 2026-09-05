@@ -5,11 +5,12 @@ use std::{
     fmt, io,
     net::{IpAddr, SocketAddr, UdpSocket},
     path::{Path, PathBuf},
-    process::Command,
+    process::Stdio,
+    sync::{mpsc, Mutex},
     time::Duration,
 };
 
-use bevy_game_multiplayer::DiscoveredDirectTarget;
+use bevy_game_session::DiscoveredDirectTarget;
 use serde_json::Value;
 
 use crate::{
@@ -24,6 +25,31 @@ const MAX_STATUS_BYTES: usize = 1024 * 1024;
 const MAX_DATAGRAM_BYTES: usize = 4096;
 const MAX_PROBE_ADDRESSES: usize = 256;
 const ROUTE_TTL: Duration = Duration::from_secs(15);
+const CLI_TIMEOUT: Duration = Duration::from_secs(2);
+const PACKET_BUDGET: usize = 64;
+
+/// Bounded background status request. Dropping it discards the result; execution
+/// has a hard deadline and no process or socket runs on a Bevy schedule.
+#[derive(Debug)]
+pub struct TailscaleStatusTask(
+    Mutex<mpsc::Receiver<Result<TailscaleStatus, TailnetDiscoveryError>>>,
+);
+
+/// One consistent CLI snapshot used for both local binding and peer probing.
+#[derive(Debug)]
+pub struct TailscaleStatus {
+    /// Local tailnet addresses.
+    pub local_addresses: Vec<IpAddr>,
+    /// Reachable reported peers.
+    pub peers: Vec<TailscalePeer>,
+}
+
+impl TailscaleStatusTask {
+    /// Returns a completed result without waiting. One task has at most one result.
+    pub fn poll(&self) -> Option<Result<TailscaleStatus, TailnetDiscoveryError>> {
+        self.0.lock().ok()?.try_recv().ok()
+    }
+}
 
 /// Reachable peer returned by `tailscale status --json`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +67,22 @@ pub struct TailscaleCli {
 }
 
 impl TailscaleCli {
+    /// Starts one explicit, bounded CLI request outside gameplay schedules.
+    #[must_use]
+    pub fn request_status(&self) -> TailscaleStatusTask {
+        let cli = self.clone();
+        let (send, receive) = mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let result = cli.status().and_then(|root| {
+                Ok(TailscaleStatus {
+                    local_addresses: parse_local_addresses(&root)?,
+                    peers: parse_peers(&root)?,
+                })
+            });
+            let _sent = send.send(result);
+        });
+        TailscaleStatusTask(Mutex::new(receive))
+    }
     /// Uses `tailscale` (or `tailscale.exe`) from the process path.
     #[must_use]
     pub fn from_path() -> Self {
@@ -76,41 +118,76 @@ impl TailscaleCli {
     /// Returns this device's tailnet addresses from the same fixed status command.
     pub fn local_addresses(&self) -> Result<Vec<IpAddr>, TailnetDiscoveryError> {
         let root = self.status()?;
-        let addresses = root
-            .get("Self")
-            .and_then(|value| value.get("TailscaleIPs"))
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .filter_map(|value| value.parse::<IpAddr>().ok())
-            .filter(|address| !address.is_unspecified() && !address.is_multicast())
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-        if addresses.is_empty() {
-            Err(TailnetDiscoveryError::ClientDisconnected)
-        } else {
-            Ok(addresses)
-        }
+        parse_local_addresses(&root)
     }
 
     fn status(&self) -> Result<Value, TailnetDiscoveryError> {
-        let output = Command::new(&self.program)
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        runtime.block_on(self.status_with_timeout(CLI_TIMEOUT))
+    }
+
+    async fn status_with_timeout(
+        &self,
+        deadline: Duration,
+    ) -> Result<Value, TailnetDiscoveryError> {
+        use tokio::io::AsyncReadExt as _;
+        let mut child = tokio::process::Command::new(&self.program)
             .args(["status", "--json"])
-            .output()
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
             .map_err(|error| match error.kind() {
                 io::ErrorKind::NotFound => TailnetDiscoveryError::CliUnavailable,
                 _ => TailnetDiscoveryError::Io(error),
             })?;
-        if !output.status.success() {
-            return Err(TailnetDiscoveryError::ClientDisconnected);
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or(TailnetDiscoveryError::MalformedStatus)?;
+        let result = tokio::time::timeout(deadline, async {
+            let mut bytes = Vec::new();
+            stdout
+                .take((MAX_STATUS_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)
+                .await?;
+            if bytes.len() > MAX_STATUS_BYTES {
+                return Err(TailnetDiscoveryError::MalformedStatus);
+            }
+            if !child.wait().await?.success() {
+                return Err(TailnetDiscoveryError::ClientDisconnected);
+            }
+            serde_json::from_slice(&bytes).map_err(|_| TailnetDiscoveryError::MalformedStatus)
+        })
+        .await
+        .unwrap_or(Err(TailnetDiscoveryError::CliTimeout));
+        if result.is_err() {
+            let _killed = child.kill().await;
         }
-        if output.stdout.len() > MAX_STATUS_BYTES {
-            return Err(TailnetDiscoveryError::MalformedStatus);
-        }
-        serde_json::from_slice(&output.stdout)
-            .map_err(|_error| TailnetDiscoveryError::MalformedStatus)
+        result
+    }
+}
+
+fn parse_local_addresses(root: &Value) -> Result<Vec<IpAddr>, TailnetDiscoveryError> {
+    let addresses = root
+        .get("Self")
+        .and_then(|value| value.get("TailscaleIPs"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter_map(|value| value.parse::<IpAddr>().ok())
+        .filter(|address| !address.is_unspecified() && !address.is_multicast())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if addresses.is_empty() {
+        Err(TailnetDiscoveryError::ClientDisconnected)
+    } else {
+        Ok(addresses)
     }
 }
 
@@ -259,9 +336,18 @@ impl TailnetBrowser {
         now: Duration,
         now_unix_seconds: u64,
     ) -> Result<Vec<DiscoveryObservation>, TailnetDiscoveryError> {
+        self.poll_budget(now, now_unix_seconds, PACKET_BUDGET)
+    }
+
+    fn poll_budget(
+        &self,
+        now: Duration,
+        now_unix_seconds: u64,
+        budget: usize,
+    ) -> Result<Vec<DiscoveryObservation>, TailnetDiscoveryError> {
         let mut observations = Vec::new();
         let mut buffer = [0_u8; MAX_DATAGRAM_BYTES];
-        loop {
+        for _ in 0..budget {
             let (length, source) = match self.socket.recv_from(&mut buffer) {
                 Ok(value) => value,
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(observations),
@@ -294,6 +380,7 @@ impl TailnetBrowser {
                 ),
             });
         }
+        Ok(observations)
     }
 }
 
@@ -310,6 +397,8 @@ impl fmt::Debug for TailnetBrowser {
 /// Failure from the optional Tailscale CLI/unicast provider.
 #[derive(Debug)]
 pub enum TailnetDiscoveryError {
+    /// The fixed CLI request exceeded its hard deadline.
+    CliTimeout,
     /// Tailscale executable was not installed or on the configured path.
     CliUnavailable,
     /// CLI reported a disconnected or failing client.
@@ -333,6 +422,7 @@ impl From<io::Error> for TailnetDiscoveryError {
 impl fmt::Display for TailnetDiscoveryError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
+            Self::CliTimeout => "Tailscale status timed out",
             Self::CliUnavailable => "Tailscale CLI is not installed",
             Self::ClientDisconnected => "Tailscale client is not connected",
             Self::MalformedStatus => "Tailscale status output is malformed",
@@ -359,7 +449,7 @@ fn parse_peers(root: &Value) -> Result<Vec<TailscalePeer>, TailnetDiscoveryError
         .ok_or(TailnetDiscoveryError::MalformedStatus)?;
     let mut parsed = Vec::new();
     for peer in peers.values() {
-        if peer.get("Online").and_then(Value::as_bool) == Some(false) {
+        if peer.get("Online").and_then(Value::as_bool) != Some(true) {
             continue;
         }
         let dns_name = peer
@@ -393,6 +483,57 @@ fn parse_peers(root: &Value) -> Result<Vec<TailscalePeer>, TailnetDiscoveryError
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn cli_timeout_kills_a_hung_fixed_argument_process() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let directory = tempfile::tempdir().expect("scratch");
+        let path = directory.path().join("hung-status");
+        std::fs::write(&path, "#!/bin/sh\nexec sleep 10\n").expect("fixture");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))
+            .expect("executable");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        let started = std::time::Instant::now();
+        assert!(matches!(
+            runtime.block_on(
+                TailscaleCli::with_program(path).status_with_timeout(Duration::from_millis(50))
+            ),
+            Err(TailnetDiscoveryError::CliTimeout)
+        ));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn packet_polling_leaves_work_after_its_budget() {
+        let browser =
+            TailnetBrowser::bind("127.0.0.1".parse().expect("loopback")).expect("browser");
+        // UDP delivery is asynchronous even on loopback. Wait for delivery in
+        // this budget test instead of treating immediate readiness as a contract.
+        browser
+            .socket
+            .set_nonblocking(false)
+            .expect("blocking fixture");
+        browser
+            .socket
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("bounded fixture wait");
+        let sender = UdpSocket::bind("127.0.0.1:0").expect("sender");
+        for _ in 0..2 {
+            sender
+                .send_to(b"irrelevant", browser.socket.local_addr().expect("address"))
+                .expect("datagram");
+        }
+        assert!(browser
+            .poll_budget(Duration::ZERO, 0, 1)
+            .expect("budgeted poll")
+            .is_empty());
+        let mut byte = [0; MAX_DATAGRAM_BYTES];
+        assert!(browser.socket.recv_from(&mut byte).is_ok());
+    }
 
     #[test]
     fn status_parser_filters_offline_and_invalid_addresses() {

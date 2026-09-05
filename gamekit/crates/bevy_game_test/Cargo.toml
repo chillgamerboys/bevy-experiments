@@ -5,9 +5,13 @@ edition.workspace = true
 publish.workspace = true
 license.workspace = true
 
+[features]
+default = []
+ui = ["dep:bevy_game_ui"]
+
 [dependencies]
 bevy.workspace = true
-bevy_game_ui.workspace = true
+bevy_game_ui = { workspace = true, optional = true }
 
 [lints]
 workspace = true

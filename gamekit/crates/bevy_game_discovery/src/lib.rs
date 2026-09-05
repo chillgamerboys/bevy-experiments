@@ -6,7 +6,6 @@
 
 #[cfg(feature = "mdns")]
 mod mdns;
-mod password;
 #[cfg(feature = "tailscale-cli")]
 mod tailscale;
 
@@ -17,23 +16,22 @@ use std::{
 };
 
 use bevy::prelude::*;
-use bevy_game_multiplayer::{
-    CertificateFingerprint, DirectEndpoint, DirectTransportError, DiscoveredDirectTarget,
-    PreparedDirectDiscoveryJoin, SessionId,
-};
+#[cfg(any(feature = "mdns", feature = "tailscale-cli", test))]
+use bevy_game_session::{CertificateFingerprint, DirectEndpoint};
+use bevy_game_session::{DiscoveredDirectTarget, SessionId};
 use serde::{Deserialize, Serialize};
 
+pub use bevy_game_session::{
+    PasswordAttemptError, PasswordPolicyError, SessionPassword, SessionPasswordVerifier,
+};
 #[cfg(feature = "mdns")]
 pub use mdns::{
     MdnsAdvertiser, MdnsBrowser, MdnsDiscoveryError, MdnsSessionAdvertisement, MDNS_SERVICE_TYPE,
 };
-pub use password::{
-    PasswordAttemptError, PasswordPolicyError, SessionPassword, SessionPasswordVerifier,
-};
 #[cfg(feature = "tailscale-cli")]
 pub use tailscale::{
     TailnetBrowser, TailnetDiscoveryError, TailnetResponder, TailscaleCli, TailscalePeer,
-    TAILNET_DISCOVERY_PORT,
+    TailscaleStatus, TailscaleStatusTask, TAILNET_DISCOVERY_PORT,
 };
 
 const MAX_GAME_ID_BYTES: usize = 64;
@@ -108,7 +106,7 @@ pub enum Compatibility {
 }
 
 /// Sanitized player-visible metadata shared by every discovery provider.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SessionMetadata {
     game_id: String,
     protocol_version: String,
@@ -117,6 +115,33 @@ pub struct SessionMetadata {
     claimed_players: u8,
     player_capacity: u8,
     password_required: bool,
+}
+
+impl<'de> Deserialize<'de> for SessionMetadata {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            game_id: String,
+            protocol_version: String,
+            build_id: String,
+            display_name: String,
+            claimed_players: u8,
+            player_capacity: u8,
+            password_required: bool,
+        }
+        let wire = Wire::deserialize(deserializer)?;
+        Self::new(
+            wire.game_id,
+            wire.protocol_version,
+            wire.build_id,
+            wire.display_name,
+            wire.claimed_players,
+            wire.player_capacity,
+            wire.password_required,
+        )
+        .map_err(serde::de::Error::custom)
+    }
 }
 
 impl SessionMetadata {
@@ -199,28 +224,59 @@ fn bounded(value: String, maximum: usize) -> Result<String, DiscoveryDataError> 
     }
 }
 
+/// Public adapter handoff. Discovery never opens a transport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiscoveryEndpoint {
+    /// A certificate-pinned direct endpoint.
+    Direct(DiscoveredDirectTarget),
+    /// An opaque, non-secret service listing resolved by the owning provider adapter.
+    Service {
+        /// Stable host-process identity.
+        session_id: SessionId,
+        /// Provider-local public lobby identifier, never an invite or credential.
+        locator: String,
+    },
+}
+
+impl DiscoveryEndpoint {
+    /// Identity independent of the transport adapter.
+    #[must_use]
+    pub const fn session_id(&self) -> SessionId {
+        match self {
+            Self::Direct(target) => target.session_id,
+            Self::Service { session_id, .. } => *session_id,
+        }
+    }
+}
+
+impl From<DiscoveredDirectTarget> for DiscoveryEndpoint {
+    fn from(target: DiscoveredDirectTarget) -> Self {
+        Self::Direct(target)
+    }
+}
+
 /// One secret-free provider route to a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveryRoute {
     provider: DiscoveryProviderId,
     source: DiscoverySource,
-    target: DiscoveredDirectTarget,
+    target: DiscoveryEndpoint,
     expires_at: Duration,
 }
 
 impl DiscoveryRoute {
     /// Creates a provider route with an absolute registry expiry.
     #[must_use]
-    pub const fn new(
+    pub fn new(
         provider: DiscoveryProviderId,
         source: DiscoverySource,
-        target: DiscoveredDirectTarget,
+        target: impl Into<DiscoveryEndpoint>,
         expires_at: Duration,
     ) -> Self {
         Self {
             provider,
             source,
-            target,
+            target: target.into(),
             expires_at,
         }
     }
@@ -228,13 +284,12 @@ impl DiscoveryRoute {
 
 /// Opaque ordered transport handoff for one selected discovered session.
 ///
-/// Provider endpoints and certificate material stay internal. Games may inspect
-/// broad source categories and open a pinned connection without learning whether
-/// the concrete address came from mDNS, Tailscale, or a future lobby service.
+/// Games pass endpoint data to a compatible adapter. No provider constructs a
+/// transport, authenticates a player, or decides game admission.
 #[derive(Clone)]
 pub struct DiscoveryJoinRoute {
     session_id: SessionId,
-    routes: Vec<(DiscoverySource, DiscoveredDirectTarget)>,
+    routes: Vec<(DiscoverySource, DiscoveryEndpoint)>,
 }
 
 impl DiscoveryJoinRoute {
@@ -256,24 +311,10 @@ impl DiscoveryJoinRoute {
         self.routes.len()
     }
 
-    /// Opens the preferred certificate-pinned encrypted connection.
-    pub fn connect_preferred(&self, world: &mut World) -> Result<Entity, DiscoveryConnectError> {
-        self.connect_route(world, 0)
-    }
-
-    /// Opens one retained route by preference index.
-    pub fn connect_route(
-        &self,
-        world: &mut World,
-        index: usize,
-    ) -> Result<Entity, DiscoveryConnectError> {
-        let (_source, target) = self
-            .routes
-            .get(index)
-            .ok_or(DiscoveryConnectError::UnknownRoute)?;
-        let prepared =
-            PreparedDirectDiscoveryJoin::new(target).map_err(DiscoveryConnectError::Transport)?;
-        Ok(prepared.connect(world))
+    /// Borrows one route for adapter dispatch or a bounded alternate-route retry.
+    #[must_use]
+    pub fn endpoint(&self, index: usize) -> Option<&DiscoveryEndpoint> {
+        self.routes.get(index).map(|(_, target)| target)
     }
 }
 
@@ -347,6 +388,22 @@ struct RegistryEntry {
     metadata: SessionMetadata,
     compatibility: Compatibility,
     routes: BTreeMap<DiscoveryProviderId, DiscoveryRoute>,
+    advertisements: BTreeMap<DiscoveryProviderId, (SessionMetadata, Compatibility)>,
+}
+
+impl RegistryEntry {
+    fn refresh_projection(&mut self) {
+        let preferred = self
+            .routes
+            .values()
+            .min_by_key(|route| (provider_priority(route.source), route.provider));
+        if let Some((metadata, compatibility)) =
+            preferred.and_then(|route| self.advertisements.get(&route.provider))
+        {
+            self.metadata = metadata.clone();
+            self.compatibility = *compatibility;
+        }
+    }
 }
 
 /// Deduplicated session registry owned by [`DiscoveryPlugin`].
@@ -370,7 +427,7 @@ impl FakeDiscoveryProvider {
     pub fn publish(
         &mut self,
         metadata: SessionMetadata,
-        target: DiscoveredDirectTarget,
+        target: impl Into<DiscoveryEndpoint>,
         expires_at: Duration,
     ) {
         self.queued.push_back(DiscoveryObservation::Found {
@@ -423,7 +480,8 @@ impl DiscoveryRegistry {
     ) -> Option<DiscoveryEvent> {
         match observation {
             DiscoveryObservation::Found { metadata, route } => {
-                let session_id = route.target.session_id;
+                let session_id = route.target.session_id();
+                self.provider_notices.remove(&route.provider);
                 let existed = self.entries.contains_key(&session_id);
                 let compatibility = expected.map_or(Compatibility::Unknown, |expected| {
                     expected.compatibility(&metadata)
@@ -435,10 +493,13 @@ impl DiscoveryRegistry {
                         metadata: metadata.clone(),
                         compatibility,
                         routes: BTreeMap::new(),
+                        advertisements: BTreeMap::new(),
                     });
-                entry.metadata = metadata;
-                entry.compatibility = compatibility;
+                entry
+                    .advertisements
+                    .insert(route.provider, (metadata, compatibility));
                 entry.routes.insert(route.provider, route);
+                entry.refresh_projection();
                 Some(if existed {
                     DiscoveryEvent::Updated { session_id }
                 } else {
@@ -451,6 +512,8 @@ impl DiscoveryRegistry {
             } => {
                 let entry = self.entries.get_mut(&session_id)?;
                 entry.routes.remove(&provider);
+                entry.advertisements.remove(&provider);
+                entry.refresh_projection();
                 if entry.routes.is_empty() {
                     self.entries.remove(&session_id);
                     Some(DiscoveryEvent::Removed { session_id })
@@ -477,10 +540,17 @@ impl DiscoveryRegistry {
             let Some(entry) = self.entries.get_mut(&session_id) else {
                 continue;
             };
+            let previous_count = entry.routes.len();
             entry.routes.retain(|_, route| route.expires_at > now);
+            entry
+                .advertisements
+                .retain(|provider, _| entry.routes.contains_key(provider));
+            entry.refresh_projection();
             if entry.routes.is_empty() {
                 self.entries.remove(&session_id);
                 events.push(DiscoveryEvent::Removed { session_id });
+            } else if entry.routes.len() != previous_count {
+                events.push(DiscoveryEvent::Updated { session_id });
             }
         }
         events
@@ -661,33 +731,6 @@ impl fmt::Display for DiscoveryDataError {
 
 impl std::error::Error for DiscoveryDataError {}
 
-/// Failure while turning an opaque discovered route into a pinned connection.
-#[derive(Debug)]
-pub enum DiscoveryConnectError {
-    /// Requested alternate route does not exist in this handoff.
-    UnknownRoute,
-    /// Secure direct transport rejected or could not open the route.
-    Transport(DirectTransportError),
-}
-
-impl fmt::Display for DiscoveryConnectError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::UnknownRoute => "discovery retry route is unavailable",
-            Self::Transport(_) => "discovered secure connection could not be opened",
-        })
-    }
-}
-
-impl std::error::Error for DiscoveryConnectError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Transport(error) => Some(error),
-            Self::UnknownRoute => None,
-        }
-    }
-}
-
 fn maintain_registry(
     time: Res<Time<Real>>,
     expected: Option<Res<ExpectedSession>>,
@@ -730,6 +773,7 @@ fn resolve_join_requests(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(any(feature = "mdns", feature = "tailscale-cli"))]
 struct WireAnnouncement {
     schema: u8,
     session_id: SessionId,
@@ -739,6 +783,7 @@ struct WireAnnouncement {
     certificate_expires_unix_seconds: u64,
 }
 
+#[cfg(any(feature = "mdns", feature = "tailscale-cli"))]
 impl WireAnnouncement {
     fn target(
         &self,
@@ -761,6 +806,21 @@ impl WireAnnouncement {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn received_metadata_cannot_bypass_constructor_invariants() {
+        let valid = serde_json::to_value(metadata("Valid")).expect("serialized metadata");
+        for (field, value) in [
+            ("display_name", serde_json::json!("bad\nname")),
+            ("game_id", serde_json::json!("x".repeat(65))),
+            ("claimed_players", serde_json::json!(255)),
+            ("player_capacity", serde_json::json!(0)),
+        ] {
+            let mut wire = valid.clone();
+            *wire.get_mut(field).expect("fixture field") = value;
+            assert!(serde_json::from_value::<SessionMetadata>(wire).is_err());
+        }
+    }
 
     fn metadata(name: &str) -> SessionMetadata {
         SessionMetadata::new("deckbuilder", "1", "build-a", name, 1, 2, true)
@@ -818,7 +878,10 @@ mod tests {
             .expect("compatible session resolves");
         assert_eq!(resolved.preferred_source(), Some(DiscoverySource::Lan));
         assert_eq!(resolved.route_count(), 2);
-        assert!(registry.expire(Duration::from_secs(11)).is_empty());
+        assert!(matches!(
+            registry.expire(Duration::from_secs(11)).as_slice(),
+            [DiscoveryEvent::Updated { .. }]
+        ));
         assert_eq!(registry.sessions(Duration::from_secs(11)).len(), 1);
         assert_eq!(registry.expire(Duration::from_secs(21)).len(), 1);
     }
@@ -845,7 +908,10 @@ mod tests {
         let mut provider = FakeDiscoveryProvider::default();
         provider.publish(
             metadata("Steam-like Lobby"),
-            route(DiscoveryProviderId::FAKE, DiscoverySource::Service, 10).target,
+            DiscoveryEndpoint::Service {
+                session_id: SessionId::from_bytes([1; 16]),
+                locator: "public-lobby-42".to_owned(),
+            },
             Duration::from_secs(10),
         );
         let mut registry = DiscoveryRegistry::default();
@@ -853,6 +919,12 @@ mod tests {
             registry.apply(observation, None);
         }
         assert_eq!(registry.sessions(Duration::ZERO).len(), 1);
+        let handoff = registry
+            .resolve(SessionId::from_bytes([1; 16]))
+            .expect("service route");
+        assert!(
+            matches!(handoff.endpoint(0), Some(DiscoveryEndpoint::Service { locator, .. }) if locator == "public-lobby-42")
+        );
         provider.remove(SessionId::from_bytes([1; 16]));
         for observation in provider.drain() {
             registry.apply(observation, None);

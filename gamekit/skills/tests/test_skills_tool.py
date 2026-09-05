@@ -24,6 +24,17 @@ class SkillsToolTests(unittest.TestCase):
         self.target = Path(self.scratch.name) / "adopter"
         self.target.mkdir()
         subprocess.run(["git", "init", "--quiet"], cwd=self.target, check=True)
+        self.source = Path(self.scratch.name) / "source"
+        shutil.copytree(ROOT, self.source, ignore=shutil.ignore_patterns("__pycache__"))
+        subprocess.run(["git", "init", "--quiet"], cwd=self.source, check=True)
+        self.commit_source(self.source, "v0.1.0")
+
+    def commit_source(self, source: Path, tag: str) -> None:
+        """Pin fixture changes with a real commit and tag."""
+        subprocess.run(["git", "add", "."], cwd=source, check=True)
+        subprocess.run(["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                        "commit", "--quiet", "-m", tag], cwd=source, check=True)
+        subprocess.run(["git", "tag", tag], cwd=source, check=True)
 
     def tearDown(self) -> None:
         self.scratch.cleanup()
@@ -32,7 +43,7 @@ class SkillsToolTests(unittest.TestCase):
         """Run the CLI and assert its exit status."""
 
         result = subprocess.run(
-            [sys.executable, str(TOOL), *arguments],
+            [sys.executable, str(TOOL), *arguments, "--source-root", str(self.source)] if "--source-root" not in arguments else [sys.executable, str(TOOL), *arguments],
             check=False,
             capture_output=True,
             text=True,
@@ -52,13 +63,13 @@ class SkillsToolTests(unittest.TestCase):
             "--revision",
             "v0.1.0",
             "--apply",
-            "--allow-unverified-source",
         )
 
     def test_install_is_complete_and_idempotent_for_both_clients(self) -> None:
         self.install()
         manifest = json.loads((self.target / ".bevy-gamekit/skills.json").read_text())
         self.assertEqual(len(manifest["skills"]), 7)
+        self.assertRegex(manifest["source"]["resolved_sha"], r"^[0-9a-f]{40}$")
         for skill in manifest["skills"]:
             codex = self.target / ".agents/skills" / skill / "SKILL.md"
             claude = self.target / ".claude/skills" / skill / "SKILL.md"
@@ -78,7 +89,6 @@ class SkillsToolTests(unittest.TestCase):
             "v0.1.0",
             "--apply",
             "--allow-dirty",
-            "--allow-unverified-source",
         )
         after = sorted(
             (path.relative_to(self.target), path.read_bytes())
@@ -92,13 +102,14 @@ class SkillsToolTests(unittest.TestCase):
         overlay = self.target / ".bevy-gamekit/overlays/build-bevy-ui.md"
         overlay.write_text("Game-local UI convention.\n")
         next_source = Path(self.scratch.name) / "next-source"
-        shutil.copytree(ROOT, next_source)
+        shutil.copytree(self.source, next_source)
         skill = next_source / "source/architect-bevy-game/SKILL.md"
         skill.write_text(skill.read_text() + "\nPinned upgrade fixture.\n")
         addition = next_source / "source/architect-bevy-game/references/upgrade.md"
         addition.parent.mkdir()
         addition.write_text("Upgrade reference.\n")
         (next_source / "source/debug-bevy-runtime/agents/openai.yaml").unlink()
+        self.commit_source(next_source, "v0.2.0")
         self.run_tool(
             "sync",
             "--target",
@@ -109,7 +120,6 @@ class SkillsToolTests(unittest.TestCase):
             str(next_source),
             "--apply",
             "--allow-dirty",
-            "--allow-unverified-source",
         )
         self.assertEqual(overlay.read_text(), "Game-local UI convention.\n")
         manifest = json.loads((self.target / ".bevy-gamekit/skills.json").read_text())
@@ -130,9 +140,10 @@ class SkillsToolTests(unittest.TestCase):
         generated = self.target / ".agents/skills/build-bevy-ui/SKILL.md"
         generated.write_text(generated.read_text() + "\nLocal generated edit.\n")
         next_source = Path(self.scratch.name) / "next-source"
-        shutil.copytree(ROOT, next_source)
+        shutil.copytree(self.source, next_source)
         source_skill = next_source / "source/build-bevy-ui/SKILL.md"
         source_skill.write_text(source_skill.read_text() + "\nUpstream edit.\n")
+        self.commit_source(next_source, "v0.2.0")
         result = self.run_tool(
             "sync",
             "--target",
@@ -143,7 +154,6 @@ class SkillsToolTests(unittest.TestCase):
             str(next_source),
             "--apply",
             "--allow-dirty",
-            "--allow-unverified-source",
             expected=2,
         )
         self.assertIn("CONFLICT", result.stdout)
@@ -160,9 +170,34 @@ class SkillsToolTests(unittest.TestCase):
             "ssh://example.invalid/bevy-game-library",
             "--revision",
             "latest",
-            "--allow-unverified-source",
             expected=2,
         )
+
+    def test_arbitrary_branch_is_not_a_pin(self) -> None:
+        subprocess.run(["git", "branch", "release-looking-branch"], cwd=self.source, check=True)
+        self.run_tool("install", "--target", str(self.target), "--repository", "fixture",
+                      "--revision", "release-looking-branch", expected=2)
+
+    def test_sync_rejects_modified_or_missing_cached_base(self) -> None:
+        self.install()
+        base = self.target / ".bevy-gamekit/base/.agents/skills/build-bevy-ui/SKILL.md"
+        base.write_text("tampered base")
+        result = self.run_tool("sync", "--target", str(self.target), "--revision", "v0.1.0",
+                              "--allow-dirty", "--apply", expected=2)
+        self.assertIn("does not match recorded hashes", result.stderr)
+        base.unlink()
+        self.run_tool("sync", "--target", str(self.target), "--revision", "v0.1.0",
+                      "--allow-dirty", expected=2)
+
+    def test_sync_rejects_manifest_path_traversal(self) -> None:
+        self.install()
+        path = self.target / ".bevy-gamekit/skills.json"
+        manifest = json.loads(path.read_text())
+        manifest["generated"]["../outside"] = "0" * 64
+        path.write_text(json.dumps(manifest))
+        result = self.run_tool("sync", "--target", str(self.target), "--revision", "v0.1.0",
+                              "--allow-dirty", expected=2)
+        self.assertIn("unsafe generated path", result.stderr)
 
 
 if __name__ == "__main__":
