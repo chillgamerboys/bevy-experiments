@@ -20,6 +20,8 @@ use bevy_game_multiplayer::{
 pub const MDNS_SERVICE_TYPE: &str = "_bevy-gamekit._udp.local.";
 const NATIVE_SERVICE_TYPE: &str = "_bevy-gamekit._udp";
 const ROUTE_TTL: Duration = Duration::from_secs(10);
+const RENEW_INTERVAL: Duration = Duration::from_secs(4);
+const MAX_RECORDS: usize = 256;
 const MAX_SERVICE_ID_BYTES: usize = 512;
 
 const PROPERTY_SCHEMA: &str = "v";
@@ -69,6 +71,17 @@ pub struct MdnsAdvertiser {
 }
 
 impl MdnsAdvertiser {
+    /// Updates public metadata without replacing this provider's endpoint.
+    pub fn refresh_metadata(
+        &mut self,
+        metadata: SessionMetadata,
+    ) -> Result<bool, MdnsDiscoveryError> {
+        self.refresh(MdnsSessionAdvertisement::new(
+            metadata,
+            self.current.target.clone(),
+        )?)
+    }
+
     /// Starts multicast advertisement; this is the socket-opening action.
     pub fn start(advertisement: MdnsSessionAdvertisement) -> Result<Self, MdnsDiscoveryError> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -146,9 +159,69 @@ impl Drop for MdnsAdvertiser {
 
 /// Active continuous browser for password-gated LAN sessions.
 pub struct MdnsBrowser {
-    runtime: tokio::runtime::Runtime,
     browser: ServiceBrowser,
-    sessions: BTreeMap<String, SessionId>,
+    runtime: tokio::runtime::Runtime,
+    records: NativeRecords,
+}
+
+/// The OS owns DNS TTLs. Registry leases are renewed while its browse record exists.
+#[derive(Default)]
+struct NativeRecords {
+    sessions: BTreeMap<String, MdnsSessionAdvertisement>,
+    next_renewal: Duration,
+}
+
+impl NativeRecords {
+    fn found(
+        &mut self,
+        key: String,
+        record: MdnsSessionAdvertisement,
+        now: Duration,
+    ) -> Option<DiscoveryObservation> {
+        if self.sessions.len() >= MAX_RECORDS && !self.sessions.contains_key(&key) {
+            return None;
+        }
+        let observation = Self::observation(&record, now);
+        self.sessions.insert(key, record);
+        Some(observation)
+    }
+
+    fn lost(&mut self, key: &str) -> Option<DiscoveryObservation> {
+        let session_id = self.sessions.remove(key)?.target.session_id;
+        (!self
+            .sessions
+            .values()
+            .any(|record| record.target.session_id == session_id))
+        .then_some(DiscoveryObservation::Lost {
+            session_id,
+            provider: DiscoveryProviderId::MDNS,
+        })
+    }
+
+    fn renew(&mut self, now: Duration, unix_seconds: u64) -> Vec<DiscoveryObservation> {
+        if now < self.next_renewal {
+            return Vec::new();
+        }
+        self.next_renewal = now + RENEW_INTERVAL;
+        self.sessions
+            .retain(|_, record| record.target.certificate_expires_unix_seconds > unix_seconds);
+        self.sessions
+            .values()
+            .map(|record| Self::observation(record, now))
+            .collect()
+    }
+
+    fn observation(record: &MdnsSessionAdvertisement, now: Duration) -> DiscoveryObservation {
+        DiscoveryObservation::Found {
+            metadata: record.metadata.clone(),
+            route: DiscoveryRoute::new(
+                DiscoveryProviderId::MDNS,
+                DiscoverySource::Lan,
+                record.target.clone(),
+                now + ROUTE_TTL,
+            ),
+        }
+    }
 }
 
 impl MdnsBrowser {
@@ -167,7 +240,7 @@ impl MdnsBrowser {
         Ok(Self {
             runtime,
             browser,
-            sessions: BTreeMap::new(),
+            records: NativeRecords::default(),
         })
     }
 
@@ -183,40 +256,24 @@ impl MdnsBrowser {
                 tokio::time::timeout(Duration::from_millis(1), self.browser.recv()).await
             });
             match event {
-                Err(_elapsed) => return Ok(observations),
+                Err(_elapsed) => break,
                 Ok(None) => return Err(MdnsDiscoveryError::DaemonStopped),
                 Ok(Some(Err(error))) => return Err(MdnsDiscoveryError::daemon(error)),
                 Ok(Some(Ok(BrowseEvent::Found(service)))) => {
                     if let Ok((metadata, target)) = parse_service(&service, now_unix_seconds) {
-                        self.sessions
-                            .insert(service_key(&service), target.session_id);
-                        observations.push(DiscoveryObservation::Found {
-                            metadata,
-                            route: DiscoveryRoute::new(
-                                DiscoveryProviderId::MDNS,
-                                DiscoverySource::Lan,
-                                target,
-                                now + ROUTE_TTL,
-                            ),
-                        });
+                        observations.extend(self.records.found(
+                            service_key(&service),
+                            MdnsSessionAdvertisement { metadata, target },
+                            now,
+                        ));
                     }
                 }
                 Ok(Some(Ok(BrowseEvent::Removed(service)))) => {
-                    if let Some(session_id) = self.sessions.remove(&removed_service_key(&service)) {
-                        let still_resolved = self
-                            .sessions
-                            .values()
-                            .any(|candidate| *candidate == session_id);
-                        if !still_resolved {
-                            observations.push(DiscoveryObservation::Lost {
-                                session_id,
-                                provider: DiscoveryProviderId::MDNS,
-                            });
-                        }
-                    }
+                    observations.extend(self.records.lost(&removed_service_key(&service)));
                 }
             }
         }
+        observations.extend(self.records.renew(now, now_unix_seconds));
         Ok(observations)
     }
 }
@@ -554,6 +611,48 @@ mod tests {
         assert!(properties
             .iter()
             .all(|(key, value)| key.len() + value.len() < u8::MAX as usize));
+    }
+
+    #[test]
+    fn unchanged_native_record_survives_registry_leases_then_goodbye_removes_it() {
+        let mut records = NativeRecords::default();
+        let mut registry = crate::DiscoveryRegistry::default();
+        let found = records
+            .found("wifi".into(), advertisement(), Duration::ZERO)
+            .expect("record accepted");
+        registry.apply(found, None);
+        for seconds in 0..60 {
+            let now = Duration::from_secs(seconds);
+            for observation in records.renew(now, 1_900_000_000) {
+                registry.apply(observation, None);
+            }
+            registry.expire(now);
+            assert_eq!(
+                registry.sessions(now).len(),
+                1,
+                "live record expired at {seconds}"
+            );
+        }
+        registry.apply(records.lost("wifi").expect("goodbye"), None);
+        assert!(registry.sessions(Duration::from_secs(60)).is_empty());
+        assert!(records
+            .renew(Duration::from_secs(80), 1_900_000_000)
+            .is_empty());
+    }
+
+    #[test]
+    fn removing_one_interface_keeps_the_other_and_certificates_still_expire() {
+        let mut records = NativeRecords::default();
+        records.found("wifi".into(), advertisement(), Duration::ZERO);
+        records.found("ethernet".into(), advertisement(), Duration::ZERO);
+        assert!(records.lost("wifi").is_none());
+        assert_eq!(
+            records.renew(Duration::from_secs(12), 1_900_000_000).len(),
+            1
+        );
+        assert!(records
+            .renew(Duration::from_secs(24), 2_000_000_000)
+            .is_empty());
     }
 
     #[test]

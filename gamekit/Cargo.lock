@@ -2539,6 +2539,7 @@ dependencies = [
  "rand 0.8.7",
  "serde",
  "serde_json",
+ "tempfile",
  "zeroize",
 ]
 

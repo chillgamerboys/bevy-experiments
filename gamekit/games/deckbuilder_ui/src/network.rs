@@ -7,7 +7,7 @@ use std::{
 };
 
 use aeronet::io::{
-    connection::{Disconnected, PeerAddr},
+    connection::{Disconnect, Disconnected, PeerAddr},
     server::Close,
 };
 use bevy::prelude::*;
@@ -181,6 +181,9 @@ struct PendingServerClose {
     server_entity: Entity,
     frames_remaining: u8,
 }
+
+#[derive(Resource)]
+struct GuestConnection(Entity);
 
 impl fmt::Debug for PendingHello {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -534,7 +537,9 @@ pub(crate) fn start_direct_join(world: &mut World, encoded: &str) -> Result<(), 
     let code = DirectConnectionCode::parse(encoded).map_err(|error| error.to_string())?;
     let prepared = PreparedDirectJoin::new(&code).map_err(|error| error.to_string())?;
     let credential = DeckCredential::Invite(prepared.invite_token());
-    prepared.connect(world);
+    disconnect_guest(world);
+    let entity = prepared.connect(world);
+    world.insert_resource(GuestConnection(entity));
     begin_guest_connect(world, credential);
     Ok(())
 }
@@ -546,9 +551,11 @@ pub(crate) fn start_discovered_join(
 ) -> Result<(), String> {
     let password = SessionPassword::new(password).map_err(|error| error.to_string())?;
     let wire = PasswordWire(password.expose_for_encrypted_transport().to_owned());
-    route
+    disconnect_guest(world);
+    let entity = route
         .connect_preferred(world)
         .map_err(|error| error.to_string())?;
+    world.insert_resource(GuestConnection(entity));
     begin_guest_connect(world, DeckCredential::Password(wire));
     Ok(())
 }
@@ -565,7 +572,9 @@ pub(crate) fn reconnect(world: &mut World) -> Result<(), String> {
         .ok_or_else(|| "No reserved session is stored.".to_owned())?;
     let prepared = PreparedDirectReconnect::new(&stored.endpoint_binding)
         .map_err(|error| error.to_string())?;
-    prepared.connect(world);
+    disconnect_guest(world);
+    let entity = prepared.connect(world);
+    world.insert_resource(GuestConnection(entity));
     begin_guest_connect(
         world,
         DeckCredential::Reconnect(stored.reconnect_credential),
@@ -612,6 +621,7 @@ pub(crate) fn submit_command(world: &mut World, command: GameCommand) {
 }
 
 pub(crate) fn close_session(world: &mut World) {
+    disconnect_guest(world);
     if let Some(mut hosted) = world.remove_resource::<HostedSession>() {
         hosted.security.close();
         world.write_message(ToClients {
@@ -631,6 +641,14 @@ pub(crate) fn close_session(world: &mut World) {
     state.admitted = false;
     state.session_id = None;
     state.notice = None;
+}
+
+fn disconnect_guest(world: &mut World) {
+    if let Some(GuestConnection(entity)) = world.remove_resource::<GuestConnection>() {
+        if world.get_entity(entity).is_ok() {
+            world.trigger(Disconnect::new(entity, "leaving session"));
+        }
+    }
 }
 
 fn send_pending_hello(
@@ -821,8 +839,16 @@ fn receive_welcome(
 fn receive_refusal(
     mut refusal: MessageReader<DeckAdmissionRefusal>,
     mut state: ResMut<DeckNetworkState>,
+    guest: Option<Res<GuestConnection>>,
+    mut commands: Commands,
 ) {
     for _ in refusal.read() {
+        if let Some(guest) = guest.as_ref() {
+            commands.trigger(Disconnect::new(guest.0, "admission refused"));
+        }
+        commands.remove_resource::<GuestConnection>();
+        commands.remove_resource::<PendingHello>();
+        state.admitted = false;
         state.notice = Some("The host refused session admission.".to_owned());
     }
 }
@@ -894,11 +920,12 @@ fn on_connected_client_removed(
 }
 
 fn on_transport_disconnected(
-    _trigger: On<Disconnected>,
+    trigger: On<Disconnected>,
+    guest: Option<Res<GuestConnection>>,
     mut state: ResMut<DeckNetworkState>,
     mut commands: Commands,
 ) {
-    if state.role == NetworkRole::Guest {
+    if state.role == NetworkRole::Guest && guest.is_some_and(|guest| guest.0 == trigger.entity) {
         let was_admitted = state.admitted;
         state.admitted = false;
         state.notice = Some(if was_admitted {
@@ -908,6 +935,7 @@ fn on_transport_disconnected(
                 .to_owned()
         });
         commands.remove_resource::<PendingHello>();
+        commands.remove_resource::<GuestConnection>();
     }
 }
 
@@ -938,9 +966,7 @@ fn refresh_host_listing(hosted: &mut HostedSession, claimed_players: u8) -> Resu
     )
     .map_err(|error| error.to_string())?;
     if let Some(mdns) = hosted.mdns.as_mut() {
-        let advertisement = MdnsSessionAdvertisement::new(metadata.clone(), hosted.target.clone())
-            .map_err(|error| error.to_string())?;
-        mdns.refresh(advertisement)
+        mdns.refresh_metadata(metadata.clone())
             .map_err(|error| error.to_string())?;
     }
     if let Some(tailnet) = hosted.tailnet.as_mut() {
@@ -1002,7 +1028,7 @@ fn poll_discovery(
             }
         }
     }
-    if time.elapsed() >= browser.next_tailnet_refresh {
+    if browser.tailnet.is_some() && time.elapsed() >= browser.next_tailnet_refresh {
         browser.next_tailnet_refresh = time.elapsed() + TAILSCALE_REFRESH;
         let peers = browser.tailscale.peers();
         if let (Some(tailnet), Ok(peers)) = (browser.tailnet.as_mut(), peers) {
@@ -1207,6 +1233,11 @@ mod tests {
 
         let mut host = socket_app();
         let mut guest = socket_app();
+        let scratch = tempfile::tempdir().expect("credential directory");
+        let credential_path = scratch.path().join("reconnect.json");
+        guest.insert_resource(ReconnectCredentialStorage::new(
+            AtomicFileReconnectCredentialStore::new(&credential_path),
+        ));
         start_host(
             host.world_mut(),
             HostConfiguration {
@@ -1302,10 +1333,67 @@ mod tests {
                     })
             }
         ));
+        let before = guest
+            .world()
+            .resource::<ReconnectCredentialStorage>()
+            .store()
+            .load()
+            .expect("read credential")
+            .expect("credential persisted");
+        let expected_hand = host
+            .world()
+            .resource::<DeckAuthority>()
+            .snapshot(Seat::Guest)
+            .own_hand;
+        let old_entity = guest.world().resource::<GuestConnection>().0;
+        close_session(guest.world_mut());
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |host, _| {
+                !host
+                    .world()
+                    .resource::<DeckAuthority>()
+                    .snapshot(Seat::Guest)
+                    .seats
+                    .iter()
+                    .any(|seat| seat.seat == Seat::Guest && seat.connected)
+            }
+        ));
+        assert!(guest.world().get_entity(old_entity).is_err());
+        drop(guest);
+        let mut guest = socket_app();
+        guest.insert_resource(ReconnectCredentialStorage::new(
+            AtomicFileReconnectCredentialStore::new(&credential_path),
+        ));
+        reconnect(guest.world_mut()).expect("fresh app starts reconnect");
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |_, guest| {
+                let state = guest.world().resource::<DeckNetworkState>();
+                state.admitted
+                    && state
+                        .latest
+                        .as_ref()
+                        .is_some_and(|snapshot| snapshot.own_hand == expected_hand)
+            }
+        ));
+        let after = guest
+            .world()
+            .resource::<ReconnectCredentialStorage>()
+            .store()
+            .load()
+            .expect("read rotated credential")
+            .expect("rotated credential persisted");
+        assert_eq!(before.peer_id, after.peer_id);
+        assert_ne!(before.reconnect_credential, after.reconnect_credential);
     }
 
     #[test]
-    fn rotating_credential_can_be_persisted_for_fresh_client_app() {
+    fn credential_store_round_trip() {
         let store = bevy_game_multiplayer::MemoryReconnectCredentialStore::default();
         let stored = StoredReconnectCredential {
             session_id: SessionId::from_bytes([1; 16]),
