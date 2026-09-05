@@ -1,4 +1,4 @@
-//! Fixed-size identities, credentials, and host-owned credential rotation.
+//! Transport-independent identities, credentials, and host-owned credential rotation.
 
 use std::{
     collections::BTreeMap,
@@ -138,14 +138,8 @@ secret!(
 );
 
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut difference = 0_u8;
-    for (&left_byte, &right_byte) in left.iter().zip(right) {
-        difference |= left_byte ^ right_byte;
-    }
-    difference == 0
+    use subtle::ConstantTimeEq as _;
+    bool::from(left.ct_eq(right))
 }
 
 /// Credential presented by an encrypted connection during shared authentication.

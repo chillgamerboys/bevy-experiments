@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy::prelude::{Message, Resource};
 use bevy_game_turns::TurnOrder;
-use rand::{rngs::OsRng, RngCore as _};
 use serde::{Deserialize, Serialize};
 
 const STARTING_ENERGY: u8 = 3;
@@ -88,20 +87,14 @@ pub(crate) enum MatchPhase {
     Playing,
 }
 
-/// Random request identity that survives client process restart without a counter.
+/// Monotonic per-seat sequence, restored from the running host after reconnect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub(crate) struct RequestId([u8; 16]);
+pub(crate) struct RequestId(pub(crate) u64);
 
 impl RequestId {
-    pub(crate) fn generate() -> Self {
-        let mut bytes = [0_u8; 16];
-        OsRng.fill_bytes(&mut bytes);
-        Self(bytes)
-    }
-
     #[cfg(test)]
     pub(crate) const fn fixture(value: u8) -> Self {
-        Self([value; 16])
+        Self(value as u64)
     }
 }
 
@@ -131,6 +124,7 @@ pub(crate) enum CommandRefusal {
     NotCurrentTurn,
     CardUnavailable,
     InsufficientEnergy,
+    StaleRequest,
 }
 
 /// Idempotent command outcome.
@@ -170,6 +164,7 @@ pub(crate) struct PrivateCard {
 #[derive(Message, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct GameSnapshot {
     pub(crate) sequence: u64,
+    pub(crate) next_request: u64,
     pub(crate) phase: MatchPhase,
     pub(crate) round: u64,
     pub(crate) current_turn: Seat,
@@ -189,6 +184,7 @@ pub(crate) struct DeckAuthority {
     sequence: u64,
     results: BTreeMap<(Seat, RequestId), GameCommandResult>,
     result_order: VecDeque<(Seat, RequestId)>,
+    request_watermarks: BTreeMap<Seat, u64>,
 }
 
 impl DeckAuthority {
@@ -217,6 +213,7 @@ impl DeckAuthority {
             sequence: 0,
             results: BTreeMap::new(),
             result_order: VecDeque::new(),
+            request_watermarks: BTreeMap::new(),
         }
     }
 
@@ -249,6 +246,17 @@ impl DeckAuthority {
                 },
             };
         }
+        let watermark = self.request_watermarks.entry(source).or_default();
+        if request.request_id.0 <= *watermark {
+            return GameCommandResult {
+                request_id: request.request_id,
+                sequence: self.sequence,
+                outcome: CommandOutcome::Refused(CommandRefusal::StaleRequest),
+            };
+        }
+        // Retained for the entire live host session, independently of result eviction.
+        // Refused commands consume their sequence too: retries must not become legal later.
+        *watermark = request.request_id.0;
         let outcome = self.reduce(source, request.command);
         if outcome == CommandOutcome::Accepted {
             self.sequence = self.sequence.saturating_add(1);
@@ -296,6 +304,7 @@ impl DeckAuthority {
             .unwrap_or_default();
         GameSnapshot {
             sequence: self.sequence,
+            next_request: self.next_request(recipient),
             phase: self.phase,
             round: self.turns.round(),
             current_turn: self.turns.current().copied().unwrap_or(Seat::Host),
@@ -304,6 +313,14 @@ impl DeckAuthority {
             own_hand,
             activity: self.activity.clone(),
         }
+    }
+
+    pub(crate) fn next_request(&self, seat: Seat) -> u64 {
+        self.request_watermarks
+            .get(&seat)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(1)
     }
 
     fn reduce(&mut self, source: Seat, command: GameCommand) -> CommandOutcome {
@@ -403,6 +420,35 @@ mod tests {
             request_id: RequestId::fixture(id),
             command,
         }
+    }
+
+    #[test]
+    fn replay_watermark_survives_result_eviction_and_guest_reconnection() {
+        let mut authority = DeckAuthority::lobby();
+        authority.set_connected(Seat::Guest, true);
+        let old = request(1, GameCommand::SetReady(true));
+        assert_eq!(
+            authority.apply(Seat::Guest, old).outcome,
+            CommandOutcome::Accepted
+        );
+        for id in 2..=100 {
+            authority.apply(Seat::Guest, request(id, GameCommand::SetReady(false)));
+        }
+        authority.set_connected(Seat::Guest, false);
+        authority.set_connected(Seat::Guest, true);
+        let before = authority.snapshot(Seat::Guest);
+        assert_eq!(
+            authority.apply(Seat::Guest, old).outcome,
+            CommandOutcome::Refused(CommandRefusal::StaleRequest)
+        );
+        assert_eq!(authority.snapshot(Seat::Guest), before);
+        assert_eq!(before.next_request, 101);
+        assert_eq!(
+            authority
+                .apply(Seat::Guest, request(101, GameCommand::SetReady(true)))
+                .outcome,
+            CommandOutcome::Accepted
+        );
     }
 
     #[test]

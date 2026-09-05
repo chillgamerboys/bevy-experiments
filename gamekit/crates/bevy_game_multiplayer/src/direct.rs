@@ -27,8 +27,8 @@ use x509_parser::{
 };
 
 use crate::{
-    CertificateFingerprint, DirectConnectionCode, DirectEndpoint, InviteToken,
-    ReconnectEndpointBinding, SessionId,
+    CertificateFingerprint, DirectConnectionCode, DirectEndpoint, DiscoveredDirectTarget,
+    InviteToken, ReconnectEndpointBinding, SessionId,
 };
 
 /// Default editable direct-game UDP port.
@@ -106,19 +106,6 @@ pub struct PreparedDirectJoin {
     target: String,
     invite_token: InviteToken,
     reconnect_binding: ReconnectEndpointBinding,
-}
-
-/// Secret-free route resolved by a discovery provider.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DiscoveredDirectTarget {
-    /// Discovered host-process session identity.
-    pub session_id: SessionId,
-    /// Resolved endpoint for this provider route.
-    pub endpoint: DirectEndpoint,
-    /// Certificate pin announced by discovery.
-    pub certificate_fingerprint: CertificateFingerprint,
-    /// Exact certificate expiry announced by discovery.
-    pub certificate_expires_unix_seconds: u64,
 }
 
 /// Prepared pinned connection whose admission will use a discovery password.
@@ -523,6 +510,57 @@ impl std::error::Error for DirectTransportError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pin_verification_rejects_wrong_pin_expiry_chain_and_malformed_der() {
+        let endpoint = DirectEndpoint::new("127.0.0.1", 7777).expect("endpoint");
+        let (identity, pin, expiry) = generate_identity(&endpoint).expect("identity");
+        let leaf = identity
+            .certificate_chain()
+            .as_slice()
+            .first()
+            .expect("leaf");
+        let der = CertificateDer::from(leaf.der().to_vec());
+        let now = UnixTime::since_unix_epoch(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock"),
+        );
+        assert!(verify_pinned_certificate(pin, Some(expiry), &der, &[], now).is_ok());
+        assert!(verify_pinned_certificate(
+            CertificateFingerprint::from_bytes([0; 32]),
+            Some(expiry),
+            &der,
+            &[],
+            now
+        )
+        .is_err());
+        assert!(verify_pinned_certificate(pin, Some(expiry + 1), &der, &[], now).is_err());
+        assert!(verify_pinned_certificate(
+            pin,
+            Some(expiry),
+            &der,
+            &[],
+            UnixTime::since_unix_epoch(Duration::from_secs(expiry + 1))
+        )
+        .is_err());
+        assert!(verify_pinned_certificate(
+            pin,
+            Some(expiry),
+            &der,
+            std::slice::from_ref(&der),
+            now
+        )
+        .is_err());
+        assert!(verify_pinned_certificate(
+            pin,
+            Some(expiry),
+            &CertificateDer::from(vec![0, 1]),
+            &[],
+            now
+        )
+        .is_err());
+    }
 
     #[test]
     fn generated_identity_matches_share_code_and_debug_is_redacted() {

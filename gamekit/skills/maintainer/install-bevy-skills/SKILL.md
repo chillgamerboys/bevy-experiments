@@ -17,7 +17,7 @@ Install only after showing the audit to the user.
 
 4. Present every ADD, NO-OP, or CONFLICT. Do not infer permission from the request to inspect.
 5. After confirmation, rerun with `--apply`. Use `--allow-dirty` only after identifying every unrelated dirty file.
-6. Verify both client layouts, `.bevy-gamekit/skills.json`, the pinned base snapshot, and an unchanged overlay directory.
+6. Verify both client layouts, schema-2 `.bevy-gamekit/skills.json` with the resolved full SHA, the pinned base snapshot, and an unchanged overlay directory.
 7. Run `python3 ../../scripts/validate_skills.py` from the Gamekit checkout.
 
 The tool installs all seven craft skills. Game-specific rules belong in `.bevy-gamekit/overlays/<skill-name>.md`.
