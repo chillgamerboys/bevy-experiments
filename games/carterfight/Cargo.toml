@@ -1,0 +1,28 @@
+[package]
+name = "carterfight"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+autotests = false
+autoexamples = false
+
+[[test]]
+name = "carterfight_rules"
+path = "tests/main.rs"
+
+[[example]]
+name = "carterfight_review"
+path = "examples/review_capture.rs"
+
+[dependencies]
+bevy = { workspace = true, features = ["2d", "ui", "bevy_audio", "wav", "png"] }
+bevy_game_ui.workspace = true
+rand = "0.8"
+rand_chacha = "0.3"
+
+[dev-dependencies]
+bevy_game_test = { workspace = true, features = ["ui"] }
+
+[lints]
+workspace = true
