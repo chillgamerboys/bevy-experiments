@@ -1,4 +1,4 @@
-//! Bounded, versioned direct connection codes.
+//! Transport-independent bounded, versioned direct connection codes.
 
 use std::{fmt, net::IpAddr};
 
@@ -43,10 +43,23 @@ impl fmt::Debug for CertificateFingerprint {
 }
 
 /// Advertised DNS name/IP and UDP port for a direct host.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct DirectEndpoint {
     host: String,
     port: u16,
+}
+
+impl<'de> Deserialize<'de> for DirectEndpoint {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            host: String,
+            port: u16,
+        }
+        let wire = Wire::deserialize(deserializer)?;
+        Self::new(wire.host, wire.port).map_err(serde::de::Error::custom)
+    }
 }
 
 impl DirectEndpoint {
@@ -213,6 +226,12 @@ impl fmt::Debug for DirectConnectionCode {
 /// Encoded connection code whose ordinary formatting is always redacted.
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedConnectionCode(String);
+
+impl Drop for EncodedConnectionCode {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
+    }
+}
 
 impl EncodedConnectionCode {
     /// Borrows the complete code only for explicit copy/share UI.

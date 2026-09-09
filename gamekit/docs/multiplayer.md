@@ -1,8 +1,8 @@
 # Multiplayer development and testing
 
-Gamekit separates three concerns. `bevy_game_multiplayer` owns secure direct
-transport, certificate pinning, opaque connection codes, peer/session identities,
-and rotating reconnect credentials. `bevy_game_discovery` owns secret-free session
+`bevy_game_session` owns engine-independent identity and admission security.
+`bevy_game_multiplayer` adapts secure direct transport, certificate pinning, and
+credential storage to Bevy. `bevy_game_discovery` owns secret-free session
 listing and route selection. The adopting game owns admission policy, seats, lobby
 rules, commands, authority, snapshots, and UI.
 
@@ -42,7 +42,9 @@ rejected whenever discovery is enabled.
 
 Set an 8–64 character printable temporary passphrase and do not reuse an account or
 important password. The host retains only a salted Argon2id verifier; clients clear
-plaintext UI buffers after each attempt.
+owned plaintext UI buffers after each attempt. With both providers disabled,
+private-code-only hosting permits an empty passphrase. See the memory-ownership
+limits and API changes in [the refactor guide](refactor.md).
 
 Allow inbound UDP `7777` for gameplay. For tailnet discovery also allow inbound UDP
 `7778` on the Tailscale interface. LAN discovery additionally requires multicast DNS

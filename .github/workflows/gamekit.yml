@@ -63,3 +63,13 @@ jobs:
       - run: cargo deny check
       - run: python3 skills/scripts/validate_skills.py
       - run: python3 -m unittest discover -s skills/tests -v
+      - name: Check minimal capability graphs independently
+        run: |
+          cargo check -p bevy_game_discovery --no-default-features
+          cargo check -p bevy_game_multiplayer --no-default-features
+          cargo test -p bevy_game_test --no-default-features --profile ci
+          cargo test -p bevy_game_ui --profile ci
+      - name: Check browser-compatible core and UI (not native networking)
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo check -p bevy_game_hex -p bevy_game_turns -p bevy_game_session -p bevy_game_ui --target wasm32-unknown-unknown

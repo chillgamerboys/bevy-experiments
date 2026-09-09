@@ -17,7 +17,7 @@ use crate::{CertificateFingerprint, DirectEndpoint, PeerId, ReconnectCredential,
 const MAX_FILE_BYTES: usize = 4096;
 
 /// Direct endpoint and certificate identity verified before a credential is stored.
-#[derive(Resource, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Resource, Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ReconnectEndpointBinding {
     /// Host endpoint.
     pub endpoint: DirectEndpoint,
@@ -25,6 +25,24 @@ pub struct ReconnectEndpointBinding {
     pub certificate_fingerprint: CertificateFingerprint,
     /// Exact verified certificate expiry.
     pub certificate_expires_unix_seconds: u64,
+}
+
+impl<'de> Deserialize<'de> for ReconnectEndpointBinding {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Wire {
+            endpoint: DirectEndpoint,
+            certificate_fingerprint: CertificateFingerprint,
+            certificate_expires_unix_seconds: u64,
+        }
+        let wire = Wire::deserialize(deserializer)?;
+        Self::new(
+            wire.endpoint,
+            wire.certificate_fingerprint,
+            wire.certificate_expires_unix_seconds,
+        )
+        .map_err(serde::de::Error::custom)
+    }
 }
 
 impl ReconnectEndpointBinding {
@@ -46,7 +64,7 @@ impl ReconnectEndpointBinding {
 }
 
 /// Credential material persisted by a reconnecting client.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize)]
 pub struct StoredReconnectCredential {
     /// Concrete host session that issued this credential.
     pub session_id: SessionId,
@@ -56,6 +74,28 @@ pub struct StoredReconnectCredential {
     pub peer_id: PeerId,
     /// Current rotating private credential.
     pub reconnect_credential: ReconnectCredential,
+}
+
+impl<'de> Deserialize<'de> for StoredReconnectCredential {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Wire {
+            session_id: SessionId,
+            endpoint_binding: ReconnectEndpointBinding,
+            peer_id: PeerId,
+            reconnect_credential: ReconnectCredential,
+        }
+        let wire = Wire::deserialize(deserializer)?;
+        if !wire.session_id.is_valid() || !wire.peer_id.is_valid() {
+            return Err(serde::de::Error::custom("invalid stored identity"));
+        }
+        Ok(Self {
+            session_id: wire.session_id,
+            endpoint_binding: wire.endpoint_binding,
+            peer_id: wire.peer_id,
+            reconnect_credential: wire.reconnect_credential,
+        })
+    }
 }
 
 impl StoredReconnectCredential {
@@ -212,7 +252,7 @@ impl ReconnectCredentialStore for AtomicFileReconnectCredentialStore {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(CredentialStoreError::Io(error)),
         };
-        let mut bytes = Vec::with_capacity(MAX_FILE_BYTES + 1);
+        let mut bytes = zeroize::Zeroizing::new(Vec::with_capacity(MAX_FILE_BYTES + 1));
         std::io::Read::by_ref(&mut file)
             .take(u64::try_from(MAX_FILE_BYTES + 1).unwrap_or(u64::MAX))
             .read_to_end(&mut bytes)?;
@@ -231,8 +271,9 @@ impl ReconnectCredentialStore for AtomicFileReconnectCredentialStore {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let bytes =
-            serde_json::to_vec(&credential).map_err(|_error| CredentialStoreError::Malformed)?;
+        let bytes = zeroize::Zeroizing::new(
+            serde_json::to_vec(&credential).map_err(|_error| CredentialStoreError::Malformed)?,
+        );
         if bytes.len() > MAX_FILE_BYTES {
             return Err(CredentialStoreError::Malformed);
         }

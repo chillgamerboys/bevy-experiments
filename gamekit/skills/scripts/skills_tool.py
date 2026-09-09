@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -49,11 +50,9 @@ def validate_revision(revision: str) -> None:
         raise ValueError("revision must be an explicit release tag or commit SHA")
 
 
-def verify_source_revision(source_root: Path, revision: str, allow_unverified: bool) -> None:
+def verify_source_revision(source_root: Path, revision: str) -> str:
     """Require canonical files to come from the explicitly pinned checkout."""
 
-    if allow_unverified:
-        return
     try:
         repository_root = Path(
             subprocess.run(
@@ -71,8 +70,9 @@ def verify_source_revision(source_root: Path, revision: str, allow_unverified: b
             capture_output=True,
             text=True,
         ).stdout.strip()
+        reference = revision if re.fullmatch(r"[0-9a-fA-F]{40}", revision) else f"refs/tags/{revision}"
         pinned = subprocess.run(
-            ["git", "rev-parse", f"{revision}^{{commit}}"],
+            ["git", "rev-parse", "--verify", "--end-of-options", f"{reference}^{{commit}}"],
             cwd=repository_root,
             check=True,
             capture_output=True,
@@ -91,6 +91,7 @@ def verify_source_revision(source_root: Path, revision: str, allow_unverified: b
         raise ValueError("source checkout HEAD does not match the requested revision")
     if status.strip():
         raise ValueError("canonical skill source has uncommitted changes")
+    return pinned
 
 
 def ensure_target(target: Path, allow_dirty: bool) -> None:
@@ -98,6 +99,9 @@ def ensure_target(target: Path, allow_dirty: bool) -> None:
 
     if not target.is_dir() or not (target / ".git").exists():
         raise ValueError(f"target is not a Git repository: {target}")
+    for relative in (Path(".bevy-gamekit"), MANIFEST, BASE, Path(".bevy-gamekit/overlays")):
+        if (target / relative).is_symlink():
+            raise ValueError("adoption metadata must not contain symbolic links")
     status = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=target,
@@ -146,11 +150,47 @@ def read_tree(root: Path) -> dict[Path, bytes]:
 
     if not root.exists():
         return {}
+    if root.is_symlink() or any(path.is_symlink() for path in root.rglob("*")):
+        raise ValueError("generated base must not contain symbolic links")
     return {
         path.relative_to(root): path.read_bytes()
         for path in root.rglob("*")
         if path.is_file()
     }
+
+
+def safe_generated_path(target: Path, relative: Path) -> Path:
+    """Reject traversal, unexpected namespaces, and symlinked destinations."""
+
+    if relative.is_absolute() or ".." in relative.parts or len(relative.parts) < 3:
+        raise ValueError(f"unsafe generated path: {relative}")
+    if relative.parts[0] not in {".agents", ".claude"} or relative.parts[1] not in {"skills", "bevy-gamekit"}:
+        raise ValueError(f"unexpected generated path: {relative}")
+    current = target
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError(f"symlinked generated destination: {relative}")
+    return current
+
+
+def verified_base(target: Path, manifest: dict[str, object]) -> dict[Path, bytes]:
+    """Verify the exact cached base file set and contents before a three-way diff."""
+
+    if (target / ".bevy-gamekit").is_symlink():
+        raise ValueError("adoption metadata must not be a symbolic link")
+    generated = manifest.get("generated")
+    if not isinstance(generated, dict) or not generated:
+        raise ValueError("manifest has no generated file hashes")
+    for name, checksum in generated.items():
+        safe_generated_path(target, Path(name))
+        if not isinstance(checksum, str) or not re.fullmatch(r"[0-9a-f]{64}", checksum):
+            raise ValueError("invalid generated file hash")
+    base = read_tree(target / BASE)
+    actual = {str(path): digest(data) for path, data in base.items()}
+    if actual != generated:
+        raise ValueError("pinned rendered base does not match recorded hashes; restore it from the pinned source")
+    return base
 
 
 def classify(base: dict[Path, bytes], head: dict[Path, bytes], target: Path) -> list[Change]:
@@ -160,7 +200,7 @@ def classify(base: dict[Path, bytes], head: dict[Path, bytes], target: Path) -> 
     for path in sorted(set(base) | set(head), key=str):
         old = base.get(path)
         new = head.get(path)
-        target_path = target / path
+        target_path = safe_generated_path(target, path)
         local = target_path.read_bytes() if target_path.is_file() else None
         if old is None and new is not None:
             category = "NO-OP" if local == new else ("ADD" if local is None else "CONFLICT")
@@ -203,14 +243,14 @@ def write_rendered(target: Path, rendered: dict[Path, bytes]) -> None:
         output.write_bytes(data)
 
 
-def write_manifest(target: Path, repository: str, revision: str, rendered: dict[Path, bytes]) -> None:
+def write_manifest(target: Path, repository: str, revision: str, resolved_sha: str, rendered: dict[Path, bytes]) -> None:
     """Write adoption metadata after a complete successful apply."""
 
     manifest_path = target / MANIFEST
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 1,
-        "source": {"repository": repository, "revision": revision},
+        "schema_version": 2,
+        "source": {"repository": repository, "revision": revision, "resolved_sha": resolved_sha},
         "clients": list(CLIENTS),
         "skills": list(SKILLS),
         "generated": {str(path): digest(data) for path, data in sorted(rendered.items(), key=lambda item: str(item[0]))},
@@ -228,7 +268,7 @@ def load_manifest(target: Path) -> dict[str, object]:
     if not manifest_path.is_file():
         raise ValueError("target has no .bevy-gamekit/skills.json; run install first")
     payload = json.loads(manifest_path.read_text())
-    if payload.get("schema_version") != 1:
+    if payload.get("schema_version") not in {1, 2}:
         raise ValueError("unsupported or missing skill manifest schema_version")
     if payload.get("clients") != list(CLIENTS) or payload.get("skills") != list(SKILLS):
         raise ValueError("installed client or skill set differs from the complete v1 pack")
@@ -241,7 +281,7 @@ def apply_changes(target: Path, head: dict[Path, bytes], changes: list[Change]) 
     if any(change.category == "CONFLICT" for change in changes):
         raise ValueError("generated-file conflicts must be resolved before apply")
     for change in changes:
-        target_path = target / change.path
+        target_path = safe_generated_path(target, change.path)
         if change.category in {"ADD", "UPDATE"}:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_bytes(head[change.path])
@@ -255,7 +295,7 @@ def install(args: argparse.Namespace) -> int:
     target = args.target.resolve()
     ensure_target(target, args.allow_dirty)
     validate_revision(args.revision)
-    verify_source_revision(args.source_root.resolve(), args.revision, args.allow_unverified_source)
+    resolved_sha = verify_source_revision(args.source_root.resolve(), args.revision)
     if (target / MANIFEST).exists():
         return synchronize(args)
     head = render(args.source_root.resolve())
@@ -265,7 +305,7 @@ def install(args: argparse.Namespace) -> int:
         return 0
     apply_changes(target, head, changes)
     write_rendered(target, head)
-    write_manifest(target, args.repository, args.revision, head)
+    write_manifest(target, args.repository, args.revision, resolved_sha, head)
     return 0
 
 
@@ -275,15 +315,13 @@ def synchronize(args: argparse.Namespace) -> int:
     target = args.target.resolve()
     ensure_target(target, args.allow_dirty)
     validate_revision(args.revision)
-    verify_source_revision(args.source_root.resolve(), args.revision, args.allow_unverified_source)
+    resolved_sha = verify_source_revision(args.source_root.resolve(), args.revision)
     manifest = load_manifest(target)
     source = manifest.get("source")
     if not isinstance(source, dict) or not isinstance(source.get("repository"), str):
         raise ValueError("manifest source repository is missing")
     repository = getattr(args, "repository", None) or source["repository"]
-    base = read_tree(target / BASE)
-    if not base:
-        raise ValueError("pinned rendered-base snapshot is missing")
+    base = verified_base(target, manifest)
     head = render(args.source_root.resolve())
     changes = classify(base, head, target)
     print_report(changes)
@@ -291,7 +329,7 @@ def synchronize(args: argparse.Namespace) -> int:
         return 0
     apply_changes(target, head, changes)
     write_rendered(target, head)
-    write_manifest(target, repository, args.revision, head)
+    write_manifest(target, repository, args.revision, resolved_sha, head)
     return 0
 
 
@@ -307,7 +345,6 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--source-root", type=Path, default=default_source_root())
         command.add_argument("--apply", action="store_true")
         command.add_argument("--allow-dirty", action="store_true")
-        command.add_argument("--allow-unverified-source", action="store_true", help=argparse.SUPPRESS)
         if name == "install":
             command.add_argument("--repository", required=True)
     return root

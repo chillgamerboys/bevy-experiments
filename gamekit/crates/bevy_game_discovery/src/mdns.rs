@@ -1,20 +1,25 @@
 //! Explicit same-link mDNS/DNS-SD advertisement and browsing.
 
-use std::{collections::BTreeMap, fmt, net::IpAddr, sync::Mutex, time::Duration};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    net::IpAddr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, Mutex,
+    },
+    time::Duration,
+};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use dns_sd_native::{ServiceRegistration, ServiceRegistrationBuilder};
-use mdns_sd_discovery::{
-    BrowseEvent, DiscoveredService, RemovedService, ServiceBrowser, ServiceBrowserBuilder,
-};
+use mdns_sd_discovery::{BrowseEvent, DiscoveredService, RemovedService, ServiceBrowserBuilder};
 
 use crate::{
     DiscoveryObservation, DiscoveryProviderId, DiscoveryRoute, DiscoverySource, SessionMetadata,
     WireAnnouncement,
 };
-use bevy_game_multiplayer::{
-    local_network_interface_index, CertificateFingerprint, DiscoveredDirectTarget, SessionId,
-};
+use bevy_game_session::{CertificateFingerprint, DiscoveredDirectTarget, SessionId};
 
 /// DNS-SD service type used by Gamekit LAN discovery.
 pub const MDNS_SERVICE_TYPE: &str = "_bevy-gamekit._udp.local.";
@@ -65,13 +70,14 @@ impl MdnsSessionAdvertisement {
 
 /// Active publisher for one explicitly enabled LAN session.
 pub struct MdnsAdvertiser {
-    runtime: tokio::runtime::Runtime,
-    registration: Mutex<Option<ServiceRegistration>>,
     current: MdnsSessionAdvertisement,
+    pending: Arc<Mutex<Option<MdnsSessionAdvertisement>>>,
+    health: Arc<Mutex<Result<(), MdnsDiscoveryError>>>,
+    stop: Arc<AtomicBool>,
 }
 
 impl MdnsAdvertiser {
-    /// Updates public metadata without replacing this provider's endpoint.
+    /// Queues changed metadata while preserving this provider's endpoint.
     pub fn refresh_metadata(
         &mut self,
         metadata: SessionMetadata,
@@ -82,22 +88,32 @@ impl MdnsAdvertiser {
         )?)
     }
 
-    /// Starts multicast advertisement; this is the socket-opening action.
+    /// Starts background registration. Poll health for asynchronous startup failures.
     pub fn start(advertisement: MdnsSessionAdvertisement) -> Result<Self, MdnsDiscoveryError> {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .enable_all()
-            .build()
+        let pending = Arc::new(Mutex::new(Some(advertisement.clone())));
+        let health = Arc::new(Mutex::new(Ok(())));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (worker_pending, worker_health, worker_stop) =
+            (pending.clone(), health.clone(), stop.clone());
+        std::thread::Builder::new()
+            .name("gamekit-mdns-advertiser".to_owned())
+            .spawn(move || {
+                if let Err(error) = run_advertiser(&worker_pending, &worker_stop) {
+                    if let Ok(mut health) = worker_health.lock() {
+                        *health = Err(error);
+                    }
+                }
+            })
             .map_err(MdnsDiscoveryError::daemon)?;
-        let registration = register_native(&runtime, &advertisement)?;
         Ok(Self {
-            runtime,
-            registration: Mutex::new(Some(registration)),
             current: advertisement,
+            pending,
+            health,
+            stop,
         })
     }
 
-    /// Re-announces changed public metadata for the same concrete session.
+    /// Coalesces metadata updates in a one-record mailbox, without I/O on the caller.
     pub fn refresh(
         &mut self,
         advertisement: MdnsSessionAdvertisement,
@@ -109,33 +125,55 @@ impl MdnsAdvertiser {
         if advertisement == self.current {
             return Ok(false);
         }
-        let slot = self
-            .registration
-            .get_mut()
-            .map_err(|_error| MdnsDiscoveryError::DaemonStopped)?;
-        if let Some(registration) = slot.take() {
-            self.runtime
-                .block_on(registration.unregister())
-                .map_err(MdnsDiscoveryError::daemon)?;
-        }
-        *slot = Some(register_native(&self.runtime, &advertisement)?);
+        *self
+            .pending
+            .lock()
+            .map_err(|_| MdnsDiscoveryError::DaemonStopped)? = Some(advertisement.clone());
         self.current = advertisement;
         Ok(true)
     }
 
-    /// Surfaces lazy daemon/socket failures.
+    /// Returns the last asynchronous worker failure, if any.
     pub fn poll_health(&self) -> Result<(), MdnsDiscoveryError> {
-        if self
-            .registration
+        self.health
             .lock()
-            .map_err(|_error| MdnsDiscoveryError::DaemonStopped)?
-            .is_some()
-        {
-            Ok(())
-        } else {
-            Err(MdnsDiscoveryError::DaemonStopped)
-        }
+            .map_err(|_| MdnsDiscoveryError::DaemonStopped)?
+            .clone()
     }
+}
+
+fn run_advertiser(
+    pending: &Mutex<Option<MdnsSessionAdvertisement>>,
+    stop: &AtomicBool,
+) -> Result<(), MdnsDiscoveryError> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(MdnsDiscoveryError::daemon)?;
+    let mut registration: Option<ServiceRegistration> = None;
+    while !stop.load(Ordering::Relaxed) {
+        let next = pending
+            .lock()
+            .map_err(|_| MdnsDiscoveryError::DaemonStopped)?
+            .take();
+        if let Some(next) = next {
+            if let Some(old) = registration.take() {
+                unregister_native(&runtime, old);
+            }
+            registration = Some(register_native(&runtime, &next)?);
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    if let Some(registration) = registration {
+        unregister_native(&runtime, registration);
+    }
+    Ok(())
+}
+
+fn unregister_native(runtime: &tokio::runtime::Runtime, registration: ServiceRegistration) {
+    let _result = runtime.block_on(async {
+        tokio::time::timeout(Duration::from_secs(2), registration.unregister()).await
+    });
 }
 
 impl fmt::Debug for MdnsAdvertiser {
@@ -149,18 +187,14 @@ impl fmt::Debug for MdnsAdvertiser {
 
 impl Drop for MdnsAdvertiser {
     fn drop(&mut self) {
-        if let Ok(slot) = self.registration.get_mut() {
-            if let Some(registration) = slot.take() {
-                let _status = self.runtime.block_on(registration.unregister());
-            }
-        }
+        self.stop.store(true, Ordering::Relaxed);
     }
 }
 
 /// Active continuous browser for password-gated LAN sessions.
 pub struct MdnsBrowser {
-    browser: ServiceBrowser,
-    runtime: tokio::runtime::Runtime,
+    events: Mutex<mpsc::Receiver<Result<BrowseEvent, MdnsDiscoveryError>>>,
+    stop: Arc<AtomicBool>,
     records: NativeRecords,
 }
 
@@ -225,21 +259,23 @@ impl NativeRecords {
 }
 
 impl MdnsBrowser {
-    /// Starts browsing; this is the socket-opening action.
+    /// Starts a bounded background DNS-SD browser. Startup errors arrive through poll.
     pub fn start() -> Result<Self, MdnsDiscoveryError> {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .enable_all()
-            .build()
-            .map_err(MdnsDiscoveryError::daemon)?;
-        let mut builder = ServiceBrowserBuilder::new();
-        builder.service_type(NATIVE_SERVICE_TYPE).domain("local.");
-        let browser = runtime
-            .block_on(builder.browse())
+        let (sender, events) = mpsc::sync_channel(64);
+        let stop = Arc::new(AtomicBool::new(false));
+        let worker_stop = stop.clone();
+        std::thread::Builder::new()
+            .name("gamekit-mdns-browser".to_owned())
+            .spawn(move || {
+                let result = run_browser(&worker_stop, &sender);
+                if let Err(error) = result {
+                    let _sent = sender.send(Err(error));
+                }
+            })
             .map_err(MdnsDiscoveryError::daemon)?;
         Ok(Self {
-            runtime,
-            browser,
+            events: Mutex::new(events),
+            stop,
             records: NativeRecords::default(),
         })
     }
@@ -252,14 +288,18 @@ impl MdnsBrowser {
     ) -> Result<Vec<DiscoveryObservation>, MdnsDiscoveryError> {
         let mut observations = Vec::new();
         for _event_budget in 0..64 {
-            let event = self.runtime.block_on(async {
-                tokio::time::timeout(Duration::from_millis(1), self.browser.recv()).await
-            });
+            let event = self
+                .events
+                .lock()
+                .map_err(|_| MdnsDiscoveryError::DaemonStopped)?
+                .try_recv();
             match event {
-                Err(_elapsed) => break,
-                Ok(None) => return Err(MdnsDiscoveryError::DaemonStopped),
-                Ok(Some(Err(error))) => return Err(MdnsDiscoveryError::daemon(error)),
-                Ok(Some(Ok(BrowseEvent::Found(service)))) => {
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    return Err(MdnsDiscoveryError::DaemonStopped)
+                }
+                Ok(Err(error)) => return Err(error),
+                Ok(Ok(BrowseEvent::Found(service))) => {
                     if let Ok((metadata, target)) = parse_service(&service, now_unix_seconds) {
                         observations.extend(self.records.found(
                             service_key(&service),
@@ -268,7 +308,7 @@ impl MdnsBrowser {
                         ));
                     }
                 }
-                Ok(Some(Ok(BrowseEvent::Removed(service)))) => {
+                Ok(Ok(BrowseEvent::Removed(service))) => {
                     observations.extend(self.records.lost(&removed_service_key(&service)));
                 }
             }
@@ -276,6 +316,45 @@ impl MdnsBrowser {
         observations.extend(self.records.renew(now, now_unix_seconds));
         Ok(observations)
     }
+}
+
+impl Drop for MdnsBrowser {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+fn run_browser(
+    stop: &AtomicBool,
+    sender: &mpsc::SyncSender<Result<BrowseEvent, MdnsDiscoveryError>>,
+) -> Result<(), MdnsDiscoveryError> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(MdnsDiscoveryError::daemon)?;
+    let mut builder = ServiceBrowserBuilder::new();
+    builder.service_type(NATIVE_SERVICE_TYPE).domain("local.");
+    let mut browser = runtime
+        .block_on(async { tokio::time::timeout(Duration::from_secs(2), builder.browse()).await })
+        .map_err(MdnsDiscoveryError::daemon)?
+        .map_err(MdnsDiscoveryError::daemon)?;
+    while !stop.load(Ordering::Relaxed) {
+        let event = runtime.block_on(async {
+            tokio::time::timeout(Duration::from_millis(100), browser.recv()).await
+        });
+        match event {
+            Err(_) => continue,
+            Ok(None) => return Err(MdnsDiscoveryError::DaemonStopped),
+            Ok(Some(Err(error))) => return Err(MdnsDiscoveryError::daemon(error)),
+            Ok(Some(Ok(event))) => {
+                // Bounded backpressure preserves removals; dropping the receiver unblocks shutdown.
+                if sender.send(Ok(event)).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 impl fmt::Debug for MdnsBrowser {
@@ -325,8 +404,12 @@ fn register_native(
     advertisement: &MdnsSessionAdvertisement,
 ) -> Result<ServiceRegistration, MdnsDiscoveryError> {
     let address = advertised_address(&advertisement.target)?;
-    let interface_index = local_network_interface_index(address)
+    let interface_index = if_addrs::get_if_addrs()
         .map_err(MdnsDiscoveryError::daemon)?
+        .into_iter()
+        .find(|interface| interface.ip() == address)
+        .and_then(|interface| interface.index)
+        .and_then(std::num::NonZeroU32::new)
         .ok_or(MdnsDiscoveryError::MalformedAnnouncement("LAN interface"))?;
     let mut builder =
         ServiceRegistrationBuilder::new(NATIVE_SERVICE_TYPE, advertisement.target.endpoint.port());
@@ -338,7 +421,8 @@ fn register_native(
         builder.add_txt_record_key_string(key, value);
     }
     runtime
-        .block_on(builder.register())
+        .block_on(async { tokio::time::timeout(Duration::from_secs(2), builder.register()).await })
+        .map_err(MdnsDiscoveryError::daemon)?
         .map_err(MdnsDiscoveryError::daemon)
 }
 
@@ -562,7 +646,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_game_multiplayer::{DirectEndpoint, SessionId};
+    use bevy_game_session::{DirectEndpoint, SessionId};
     use mdns_sd_discovery::TxtRecord;
 
     fn advertisement() -> MdnsSessionAdvertisement {
@@ -715,16 +799,22 @@ mod tests {
     #[test]
     #[ignore = "requires a real non-loopback LAN interface"]
     fn native_advertiser_is_visible_to_an_independent_browser() {
-        let Some(address) = bevy_game_multiplayer::local_network_addresses()
+        let Some(address) = if_addrs::get_if_addrs()
             .expect("local interfaces")
             .into_iter()
-            .next()
+            .find(|interface| {
+                interface.is_oper_up()
+                    && !interface.is_loopback()
+                    && !interface.is_p2p()
+                    && !interface.is_link_local()
+            })
+            .map(|interface| interface.ip())
         else {
             return;
         };
         let mut advertisement = advertisement();
         advertisement.target.session_id =
-            bevy_game_multiplayer::SessionSecurityAuthority::new().session_id();
+            bevy_game_session::SessionSecurityAuthority::new().session_id();
         advertisement.target.endpoint =
             DirectEndpoint::new(address.to_string(), 7777).expect("detected LAN endpoint");
         let expected_session = advertisement.target.session_id;
@@ -741,8 +831,7 @@ mod tests {
                 matches!(
                     observation,
                     DiscoveryObservation::Found { route, .. }
-                        if route.target.session_id == expected_session
-                            && route.target.endpoint.host() == address.to_string()
+                        if matches!(&route.target, crate::DiscoveryEndpoint::Direct(target) if target.session_id == expected_session && target.endpoint.host() == address.to_string())
                 )
             }) {
                 discovered = true;

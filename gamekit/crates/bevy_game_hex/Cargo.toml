@@ -1,13 +1,9 @@
 [package]
-name = "bevy_game_ui"
+name = "bevy_game_hex"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
-
-[dependencies]
-bevy = { workspace = true, features = ["ui_api", "bevy_ui_widgets", "picking"] }
-zeroize = "1"
 
 [lints]
 workspace = true

@@ -7,7 +7,7 @@ description: Audit and synchronize an installed Bevy Gamekit skill pack to an ex
 
 Synchronize conservatively from the pinned rendered base.
 
-1. Read `.bevy-gamekit/skills.json`; stop if its schema, source pin, or base snapshot is missing.
+1. Read `.bevy-gamekit/skills.json`; stop if its schema, source pin, or base snapshot is missing. Verify the complete base file set and recorded hashes before trusting the three-way comparison.
 2. Check out the requested target tag or SHA. Never resolve a moving `latest`, `HEAD`, `main`, or `master` value, and reject a dirty or mismatched source checkout.
 3. Audit without mutation:
 

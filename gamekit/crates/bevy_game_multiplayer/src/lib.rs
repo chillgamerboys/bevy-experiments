@@ -4,12 +4,11 @@
 //! commands, snapshots, disclosure, or simulation. Installing [`GameMultiplayerPlugin`]
 //! registers transport support but never opens a socket.
 
-mod connection_code;
 mod credentials;
 #[cfg(feature = "direct")]
 mod direct;
+mod lifecycle;
 mod local_network;
-mod security;
 mod testing;
 
 use aeronet::AeronetPlugins;
@@ -17,9 +16,13 @@ use aeronet_replicon::{client::AeronetRepliconClientPlugin, server::AeronetRepli
 use bevy::prelude::*;
 use bevy_replicon::prelude::{AuthMethod, RepliconPlugins, RepliconSharedPlugin};
 
-pub use connection_code::{
+pub use bevy_game_session::{
+    AdmissionCredential, AdmissionError, AdmissionGrant, InviteToken, PeerId, ReconnectCredential,
+    SessionId, SessionSecurityAuthority,
+};
+pub use bevy_game_session::{
     CertificateFingerprint, ConnectionCodeError, DirectConnectionCode, DirectEndpoint,
-    EncodedConnectionCode,
+    DiscoveredDirectTarget, EncodedConnectionCode,
 };
 pub use credentials::{
     AtomicFileReconnectCredentialStore, CredentialStoreError, MemoryReconnectCredentialStore,
@@ -28,16 +31,12 @@ pub use credentials::{
 };
 #[cfg(feature = "direct")]
 pub use direct::{
-    DirectTransportError, DiscoveredDirectTarget, PreparedDirectDiscoveryJoin, PreparedDirectHost,
-    PreparedDirectJoin, PreparedDirectReconnect, SpkiPinVerifier, DEFAULT_DIRECT_PORT,
-    DIRECT_SESSION_PATH,
+    DirectTransportError, PreparedDirectDiscoveryJoin, PreparedDirectHost, PreparedDirectJoin,
+    PreparedDirectReconnect, SpkiPinVerifier, DEFAULT_DIRECT_PORT, DIRECT_SESSION_PATH,
 };
+pub use lifecycle::{AuthenticatedPeer, MultiplayerLifecycle};
 pub use local_network::{
     local_network_addresses, local_network_interface_index, LocalNetworkAddressError,
-};
-pub use security::{
-    AdmissionCredential, AdmissionError, AdmissionGrant, InviteToken, PeerId, ReconnectCredential,
-    SessionId, SessionSecurityAuthority,
 };
 pub use testing::{InMemoryEndpoint, InMemorySessionLink, LinkError};
 
@@ -55,32 +54,6 @@ pub enum MultiplayerSystems {
     Send,
 }
 
-/// Transport/session lifecycle without game-specific meaning.
-#[derive(Message, Debug, Clone, PartialEq, Eq)]
-pub enum MultiplayerLifecycle {
-    /// A transport endpoint opened successfully.
-    Opened,
-    /// A peer completed shared session authentication.
-    Authenticated {
-        /// Stable session peer identity.
-        peer: PeerId,
-        /// Whether this connection reclaimed a reserved identity.
-        reconnected: bool,
-    },
-    /// A previously authenticated peer disconnected.
-    Disconnected {
-        /// Stable session peer identity.
-        peer: PeerId,
-    },
-    /// The host deliberately closed the session.
-    Closed,
-    /// A typed setup or runtime failure safe to show to a player.
-    Failed {
-        /// Non-secret human-readable summary.
-        reason: String,
-    },
-}
-
 impl Plugin for GameMultiplayerPlugin {
     fn build(&self, app: &mut App) {
         if !app.is_plugin_added::<bevy::state::app::StatesPlugin>() {
@@ -91,16 +64,24 @@ impl Plugin for GameMultiplayerPlugin {
                 auth_method: AuthMethod::Custom,
             }))
             .add_plugins((AeronetRepliconClientPlugin, AeronetRepliconServerPlugin))
-            .add_message::<MultiplayerLifecycle>()
             .configure_sets(
-                Update,
+                PreUpdate,
                 (
                     MultiplayerSystems::Receive,
                     MultiplayerSystems::GameAuthority,
-                    MultiplayerSystems::Send,
                 )
-                    .chain(),
+                    .chain()
+                    .after(bevy_replicon::prelude::ClientSystems::Receive)
+                    .after(bevy_replicon::prelude::ServerSystems::Receive),
             );
+
+        lifecycle::install(app);
+        app.configure_sets(
+            PostUpdate,
+            MultiplayerSystems::Send
+                .before(bevy_replicon::prelude::ClientSystems::Send)
+                .before(bevy_replicon::prelude::ServerSystems::Send),
+        );
 
         #[cfg(feature = "direct")]
         app.add_plugins((

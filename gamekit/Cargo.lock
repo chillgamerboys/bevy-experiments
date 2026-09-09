@@ -992,18 +992,21 @@ dependencies = [
 name = "bevy_game_discovery"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "base64",
  "bevy",
- "bevy_game_multiplayer",
+ "bevy_game_session",
  "dns-sd-native",
+ "if-addrs",
  "mdns-sd-discovery",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
- "zeroize",
 ]
+
+[[package]]
+name = "bevy_game_hex"
+version = "0.1.0"
 
 [[package]]
 name = "bevy_game_multiplayer"
@@ -1013,17 +1016,31 @@ dependencies = [
  "aeronet_replicon",
  "aeronet_webtransport",
  "atomicwrites",
- "base64",
  "bevy",
+ "bevy_game_session",
  "bevy_replicon",
  "if-addrs",
- "rand 0.8.7",
  "rcgen",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "x509-parser",
+ "zeroize",
+]
+
+[[package]]
+name = "bevy_game_session"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "base64",
+ "getrandom 0.2.17",
+ "rand 0.8.7",
+ "serde",
+ "serde_json",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -1047,6 +1064,7 @@ name = "bevy_game_ui"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "zeroize",
 ]
 
 [[package]]
@@ -2536,7 +2554,6 @@ dependencies = [
  "bevy_game_ui",
  "bevy_replicon",
  "directories",
- "rand 0.8.7",
  "serde",
  "serde_json",
  "tempfile",

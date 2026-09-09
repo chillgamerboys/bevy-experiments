@@ -33,6 +33,10 @@ def main() -> int:
             failures.append(f"{name}: description lacks positive or negative triggers")
         if "TODO" in content:
             failures.append(f"{name}: contains TODO placeholder")
+        for link in re.findall(r"\]\(([^)]+)\)", content):
+            if "://" not in link and not link.startswith("#"):
+                if not (skill_root / link.split("#", 1)[0]).is_file():
+                    failures.append(f"{name}: missing referenced file {link}")
         metadata = (skill_root / "agents/openai.yaml").read_text()
         if f"${name}" not in metadata:
             failures.append(f"{name}: default prompt does not name the skill")
@@ -42,6 +46,12 @@ def main() -> int:
         fixture = fixtures.get(name, {})
         if not fixture.get("should_trigger") or not fixture.get("should_not_trigger"):
             failures.append(f"{name}: missing positive or negative trigger fixtures")
+        for category in ("should_trigger", "should_not_trigger"):
+            examples = fixture.get(category)
+            if not isinstance(examples, list) or any(not isinstance(item, str) or not item.strip() for item in examples):
+                failures.append(f"{name}: invalid {category} examples")
+        if set(fixture.get("should_trigger", [])) & set(fixture.get("should_not_trigger", [])):
+            failures.append(f"{name}: contradictory trigger fixtures")
 
     rendered = render(root)
     for name in SKILLS:
@@ -56,7 +66,7 @@ def main() -> int:
         for failure in failures:
             print(f"FAIL {failure}")
         return 1
-    print(f"validated {len(SKILLS)} skills for {len(CLIENTS)} clients")
+    print(f"structurally validated {len(SKILLS)} skills for {len(CLIENTS)} clients; trigger behavior requires agent evaluation")
     return 0
 
 

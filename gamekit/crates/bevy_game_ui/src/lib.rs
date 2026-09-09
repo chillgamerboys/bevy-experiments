@@ -4,6 +4,19 @@
 //! gameplay authority. Consumers attach their own typed action components to
 //! [`UiAction`] entities and map [`UiActivated`] messages into local intents.
 
+mod focus;
+mod style;
+
+pub use focus::activation_eligible;
+use focus::{
+    emit_activations, emit_text_field_messages, prepare_actions, prepare_scrolling,
+    remember_scoped_focus, retain_modal_focus, scroll_focused_into_view, sync_action_reachability,
+    ModalFocusState, ScopedFocusMemory,
+};
+use style::{
+    apply_semantic_style, apply_text_field_style, paint_interactions, paint_keyboard_focus,
+};
+
 use bevy::input::keyboard::Key;
 use bevy::input_focus::{
     tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin},
@@ -36,7 +49,7 @@ impl Plugin for GameUiPlugin {
             .init_resource::<UiScalePreference>()
             .init_resource::<ResolvedUiMetrics>()
             .init_resource::<ModalFocusState>()
-            .init_resource::<NamedFocusMemory>()
+            .init_resource::<ScopedFocusMemory>()
             .add_message::<UiActivated>()
             .add_message::<UiTextChanged>()
             .add_message::<UiTextSubmitted>()
@@ -51,15 +64,20 @@ impl Plugin for GameUiPlugin {
             .configure_sets(PostUpdate, GameUiSystems::Present)
             .add_systems(
                 Update,
-                (resolve_metrics, remember_named_focus)
+                (
+                    resolve_metrics,
+                    prepare_actions,
+                    sync_action_reachability,
+                    retain_modal_focus,
+                    remember_scoped_focus,
+                )
                     .chain()
                     .in_set(GameUiSystems::ResolveMetrics),
             )
             .add_systems(
                 Update,
                 (
-                    emit_pointer_activation,
-                    emit_keyboard_activation,
+                    emit_activations,
                     emit_text_field_messages,
                     paint_interactions,
                 )
@@ -70,9 +88,9 @@ impl Plugin for GameUiPlugin {
                 PostUpdate,
                 (
                     prepare_actions,
+                    prepare_scrolling,
                     sync_action_reachability,
                     retain_modal_focus,
-                    scroll_focused_into_view,
                     paint_keyboard_focus,
                     apply_semantic_style,
                     apply_text_field_style,
@@ -80,6 +98,10 @@ impl Plugin for GameUiPlugin {
                     .chain()
                     .in_set(GameUiSystems::Present)
                     .before(bevy::ui::UiSystems::Prepare),
+            )
+            .add_systems(
+                PostUpdate,
+                scroll_focused_into_view.after(bevy::ui::UiSystems::Layout),
             );
     }
 }
@@ -291,6 +313,27 @@ pub struct UiAction;
 #[derive(Component, Debug, Clone, Copy)]
 pub struct UiTextField;
 
+/// Explicit stable identity used to restore focus after a game rebuilds a view.
+/// Labels and `Name` are not identities. Duplicate identities fail closed.
+#[derive(Component, Debug, Clone, PartialEq, Eq)]
+pub struct UiFocusId {
+    /// Game-owned scope, unique among simultaneously mounted views.
+    pub scope: String,
+    /// Game-owned control key within that scope.
+    pub key: String,
+}
+
+impl UiFocusId {
+    /// Creates a scoped identity without imposing a game presentation model.
+    #[must_use]
+    pub fn new(scope: impl Into<String>, key: impl Into<String>) -> Self {
+        Self {
+            scope: scope.into(),
+            key: key.into(),
+        }
+    }
+}
+
 /// Disables pointer and keyboard activation for a [`UiAction`].
 #[derive(Component, Debug, Clone, Copy)]
 pub struct UiDisabled;
@@ -320,7 +363,7 @@ pub struct UiActivated {
 }
 
 /// Current value of a changed native text field.
-#[derive(Message, Debug, Clone, PartialEq, Eq)]
+#[derive(Message, Clone, PartialEq, Eq)]
 pub struct UiTextChanged {
     /// Changed field entity carrying the game's typed marker component.
     pub entity: Entity,
@@ -329,13 +372,33 @@ pub struct UiTextChanged {
 }
 
 /// Enter submission from a focused native text field.
-#[derive(Message, Debug, Clone, PartialEq, Eq)]
+#[derive(Message, Clone, PartialEq, Eq)]
 pub struct UiTextSubmitted {
     /// Submitted field entity carrying the game's typed marker component.
     pub entity: Entity,
     /// Current committed text.
     pub value: String,
 }
+
+macro_rules! sensitive_text_message {
+    ($message:ty) => {
+        impl std::fmt::Debug for $message {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct(stringify!($message))
+                    .field("entity", &self.entity)
+                    .field("value", &"[REDACTED]")
+                    .finish()
+            }
+        }
+        impl Drop for $message {
+            fn drop(&mut self) {
+                zeroize::Zeroize::zeroize(&mut self.value);
+            }
+        }
+    };
+}
+sensitive_text_message!(UiTextChanged);
+sensitive_text_message!(UiTextSubmitted);
 
 #[derive(Component, Debug, Clone, Copy)]
 struct ResponsiveControl {
@@ -344,16 +407,6 @@ struct ResponsiveControl {
 
 #[derive(Component, Debug, Clone, Copy)]
 struct LogicalTabIndex(i32);
-
-#[derive(Resource, Default)]
-struct ModalFocusState {
-    active: Option<Entity>,
-    return_focus: Option<Entity>,
-    return_focus_name: Option<String>,
-}
-
-#[derive(Resource, Default)]
-struct NamedFocusMemory(Option<String>);
 
 /// Creates an opaque, keyboard-navigable full-screen root.
 #[must_use]
@@ -563,389 +616,209 @@ fn resolve_metrics(
     }
 }
 
-fn remember_named_focus(
-    focus: Res<InputFocus>,
-    names: Query<&Name>,
-    mut memory: ResMut<NamedFocusMemory>,
-) {
-    let Some(entity) = focus.get() else { return };
-    let Ok(name) = names.get(entity) else { return };
-    memory.0 = Some(name.as_str().to_owned());
-}
-
-fn emit_pointer_activation(
-    interactions: Query<
-        (Entity, &Interaction, Option<&UiDisabled>),
-        (Changed<Interaction>, With<UiAction>),
-    >,
-    mut activated: MessageWriter<UiActivated>,
-) {
-    for (entity, interaction, disabled) in &interactions {
-        if disabled.is_none() && *interaction == Interaction::Pressed {
-            activated.write(UiActivated { entity });
-        }
-    }
-}
-
-fn emit_keyboard_activation(
-    keys: Res<ButtonInput<KeyCode>>,
-    focus: Res<InputFocus>,
-    actions: Query<
-        (),
-        (
-            With<UiAction>,
-            Without<UiDisabled>,
-            Without<InteractionDisabled>,
-        ),
-    >,
-    mut activated: MessageWriter<UiActivated>,
-) {
-    if !keys.any_just_pressed([KeyCode::Enter, KeyCode::Space]) {
-        return;
-    }
-    let Some(entity) = focus.get() else { return };
-    if actions.contains(entity) {
-        activated.write(UiActivated { entity });
-    }
-}
-
-fn editable_value(editable: &EditableText) -> String {
-    let mut value = String::new();
-    value.reserve(editable.value().into_iter().map(str::len).sum());
-    for part in editable.value() {
-        value.push_str(part);
-    }
-    value
-}
-
-fn emit_text_field_messages(
-    keys: Res<ButtonInput<Key>>,
-    focus: Res<InputFocus>,
-    changed: Query<(Entity, &EditableText), (With<UiTextField>, Changed<EditableText>)>,
-    fields: Query<&EditableText, With<UiTextField>>,
-    mut changed_messages: MessageWriter<UiTextChanged>,
-    mut submitted_messages: MessageWriter<UiTextSubmitted>,
-) {
-    for (entity, editable) in &changed {
-        changed_messages.write(UiTextChanged {
-            entity,
-            value: editable_value(editable),
-        });
-    }
-    if !keys.just_pressed(Key::Enter) {
-        return;
-    }
-    let Some(entity) = focus.get() else { return };
-    let Ok(editable) = fields.get(entity) else {
-        return;
-    };
-    if !editable.is_composing() {
-        submitted_messages.write(UiTextSubmitted {
-            entity,
-            value: editable_value(editable),
-        });
-    }
-}
-
-fn prepare_actions(
-    added: Query<(Entity, Option<&Name>, Option<&TabIndex>), Added<UiAction>>,
-    mut commands: Commands,
-) {
-    for (entity, name, tab_index) in &added {
-        let logical = tab_index.map_or(0, |index| index.0);
-        let mut entity_commands = commands.entity(entity);
-        entity_commands.insert((LogicalTabIndex(logical), TabIndex(logical)));
-        if let Some(name) = name {
-            entity_commands.insert(AccessibleLabel::new(name.as_str().to_owned()));
-        }
-    }
-}
-
-fn sync_action_reachability(world: &mut World) {
-    let actions = {
-        let mut query = world
-            .query_filtered::<(Entity, &LogicalTabIndex), Or<(With<UiAction>, With<UiTextField>)>>(
-            );
-        query
-            .iter(world)
-            .map(|(entity, index)| (entity, index.0, world.get::<UiDisabled>(entity).is_some()))
-            .collect::<Vec<_>>()
-    };
-    for (entity, logical_index, disabled) in actions {
-        let Ok(mut entity_mut) = world.get_entity_mut(entity) else {
-            continue;
-        };
-        if disabled {
-            entity_mut.insert((InteractionDisabled, TabIndex(-1)));
-        } else {
-            entity_mut.remove::<InteractionDisabled>();
-            entity_mut.insert(TabIndex(logical_index));
-        }
-    }
-    let focused = world.resource::<InputFocus>().get();
-    if focused.is_some_and(|entity| !is_reachable(world, entity)) {
-        world.resource_mut::<InputFocus>().clear();
-    }
-}
-
-fn retain_modal_focus(world: &mut World) {
-    let topmost = {
-        let mut query =
-            world.query_filtered::<(Entity, Option<&GlobalZIndex>), With<UiModalScope>>();
-        query
-            .iter(world)
-            .filter(|(entity, _)| is_reachable(world, *entity))
-            .max_by_key(|(entity, z)| (z.map_or(0, |index| index.0), entity.to_bits()))
-            .map(|(entity, _)| entity)
-    };
-    let current_focus = world.resource::<InputFocus>().get();
-    let previous_modal = world.resource::<ModalFocusState>().active;
-    match topmost {
-        Some(root) => {
-            if previous_modal != Some(root) {
-                let return_focus =
-                    current_focus.filter(|entity| !is_descendant(world, *entity, root));
-                let return_focus_name = return_focus
-                    .and_then(|entity| world.get::<Name>(entity))
-                    .map(|name| name.as_str().to_owned())
-                    .or_else(|| world.resource::<NamedFocusMemory>().0.clone());
-                let mut state = world.resource_mut::<ModalFocusState>();
-                state.active = Some(root);
-                if state.return_focus.is_none() {
-                    state.return_focus = return_focus;
-                    state.return_focus_name = return_focus_name;
-                }
-            }
-            if current_focus.is_none_or(|entity| {
-                !is_descendant(world, entity, root) || !is_reachable(world, entity)
-            }) {
-                let target = first_reachable_action(world, root);
-                let mut focus = world.resource_mut::<InputFocus>();
-                if let Some(target) = target {
-                    focus.set(target, FocusCause::Navigated);
-                } else {
-                    focus.clear();
-                }
-            }
-        }
-        None if previous_modal.is_some() => {
-            let (return_focus, return_focus_name) = {
-                let mut state = world.resource_mut::<ModalFocusState>();
-                state.active = None;
-                (state.return_focus.take(), state.return_focus_name.take())
-            };
-            let target = return_focus
-                .filter(|entity| is_reachable(world, *entity))
-                .or_else(|| {
-                    let wanted = return_focus_name.as_deref()?;
-                    let mut names = world.query::<(Entity, &Name)>();
-                    names.iter(world).find_map(|(entity, name)| {
-                        (name.as_str() == wanted && is_reachable(world, entity)).then_some(entity)
-                    })
-                });
-            if let Some(target) = target {
-                world
-                    .resource_mut::<InputFocus>()
-                    .set(target, FocusCause::Navigated);
-            }
-        }
-        None => {}
-    }
-}
-
-fn first_reachable_action(world: &World, root: Entity) -> Option<Entity> {
-    let mut stack = vec![root];
-    while let Some(entity) = stack.pop() {
-        if (world.get::<UiAction>(entity).is_some() || world.get::<UiTextField>(entity).is_some())
-            && is_reachable(world, entity)
-        {
-            return Some(entity);
-        }
-        if let Some(children) = world.get::<Children>(entity) {
-            stack.extend(children.iter().rev());
-        }
-    }
-    None
-}
-
-fn is_descendant(world: &World, mut entity: Entity, root: Entity) -> bool {
-    loop {
-        if entity == root {
-            return true;
-        }
-        let Some(parent) = world.get::<ChildOf>(entity) else {
-            return false;
-        };
-        entity = parent.parent();
-    }
-}
-
-fn is_reachable(world: &World, mut entity: Entity) -> bool {
-    if world.get_entity(entity).is_err() {
-        return false;
-    }
-    loop {
-        if world.get::<InteractionDisabled>(entity).is_some()
-            || world
-                .get::<Visibility>(entity)
-                .is_some_and(|visibility| *visibility == Visibility::Hidden)
-            || world
-                .get::<Node>(entity)
-                .is_some_and(|node| node.display == Display::None)
-        {
-            return false;
-        }
-        let Some(parent) = world.get::<ChildOf>(entity) else {
-            return true;
-        };
-        entity = parent.parent();
-    }
-}
-
-fn scroll_focused_into_view(focus: Res<InputFocus>, mut commands: Commands) {
-    if focus.is_changed() {
-        if let Some(entity) = focus.get() {
-            commands.trigger(ScrollIntoView { entity });
-        }
-    }
-}
-
-fn paint_keyboard_focus(
-    focus: Res<InputFocus>,
-    visible: Res<InputFocusVisible>,
-    theme: Res<UiTheme>,
-    actions: Query<Entity, Or<(With<UiAction>, With<UiTextField>)>>,
-    mut commands: Commands,
-) {
-    if !focus.is_changed() && !visible.is_changed() && !theme.is_changed() {
-        return;
-    }
-    for entity in &actions {
-        if visible.0 && focus.get() == Some(entity) {
-            commands.entity(entity).insert(Outline {
-                color: theme.accent,
-                width: Val::Px(3.0),
-                offset: Val::Px(2.0),
-            });
-        } else {
-            commands.entity(entity).remove::<Outline>();
-        }
-    }
-}
-
-fn paint_interactions(
-    theme: Res<UiTheme>,
-    mut actions: Query<(&Interaction, Option<&UiDisabled>, &mut BackgroundColor), With<UiAction>>,
-) {
-    if !theme.is_changed() && actions.is_empty() {
-        return;
-    }
-    for (interaction, disabled, mut background) in &mut actions {
-        background.0 = if disabled.is_some() {
-            theme.control_disabled
-        } else {
-            match interaction {
-                Interaction::Pressed => theme.control_pressed,
-                Interaction::Hovered => theme.control_hovered,
-                Interaction::None => theme.control,
-            }
-        };
-    }
-}
-
-fn apply_semantic_style(
-    theme: Res<UiTheme>,
-    metrics: Res<ResolvedUiMetrics>,
-    mut roots: Query<
-        &mut BackgroundColor,
-        (
-            With<UiScreenRoot>,
-            Without<UiPanel>,
-            Without<UiCard>,
-            Without<UiAction>,
-        ),
-    >,
-    mut panels: Query<
-        (&mut BackgroundColor, &mut BorderColor),
-        (With<UiPanel>, Without<UiCard>, Without<UiAction>),
-    >,
-    mut cards: Query<
-        (&mut BackgroundColor, &mut BorderColor),
-        (With<UiCard>, Without<UiPanel>, Without<UiAction>),
-    >,
-    mut actions: Query<
-        &mut BorderColor,
-        (
-            Or<(With<UiAction>, With<UiTextField>)>,
-            Without<UiPanel>,
-            Without<UiCard>,
-        ),
-    >,
-    mut text_query: Query<(&UiTextRole, &mut TextFont, &mut TextColor)>,
-    mut controls: Query<(&mut Node, &mut ResponsiveControl)>,
-) {
-    for mut background in &mut roots {
-        background.0 = theme.background;
-    }
-    for (mut background, mut border) in &mut panels {
-        background.0 = theme.panel;
-        *border = BorderColor::all(theme.edge);
-    }
-    for (mut background, mut border) in &mut cards {
-        background.0 = theme.card;
-        *border = BorderColor::all(theme.edge);
-    }
-    for mut border in &mut actions {
-        *border = BorderColor::all(theme.edge);
-    }
-    for (role, mut font, mut color) in &mut text_query {
-        let (size, wanted_color) = match role {
-            UiTextRole::Display => (theme.display_size * metrics.heading_scale, theme.text),
-            UiTextRole::Title => (theme.title_size * metrics.heading_scale, theme.accent),
-            UiTextRole::Body => (
-                (theme.body_size * metrics.content_scale).max(18.0),
-                theme.text,
-            ),
-            UiTextRole::Supporting => (
-                (theme.supporting_size * metrics.content_scale).max(18.0),
-                theme.muted_text,
-            ),
-            UiTextRole::Metadata => (
-                theme.metadata_size * metrics.content_scale,
-                theme.muted_text,
-            ),
-        };
-        font.font_size = FontSize::Px(size);
-        color.0 = wanted_color;
-    }
-    let next_scale = metrics.control_scale.max(1.0);
-    for (mut node, mut control) in &mut controls {
-        let ratio = next_scale / control.applied_scale.max(1.0);
-        if let Val::Px(width) = node.min_width {
-            node.min_width = Val::Px((width * ratio).max(44.0 * next_scale));
-        }
-        if let Val::Px(height) = node.min_height {
-            node.min_height = Val::Px((height * ratio).max(44.0 * next_scale));
-        }
-        control.applied_scale = next_scale;
-    }
-}
-
-fn apply_text_field_style(
-    theme: Res<UiTheme>,
-    metrics: Res<ResolvedUiMetrics>,
-    mut fields: Query<(&mut BackgroundColor, &mut TextColor, &mut TextFont), With<UiTextField>>,
-) {
-    for (mut background, mut color, mut font) in &mut fields {
-        background.0 = theme.control;
-        color.0 = theme.text;
-        font.font_size = FontSize::Px((theme.body_size * metrics.content_scale).max(18.0));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn input_app() -> App {
+        let mut app = App::new();
+        app.init_resource::<InputFocus>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<ModalFocusState>()
+            .init_resource::<ScopedFocusMemory>()
+            .add_message::<UiActivated>()
+            .add_systems(Update, emit_activations);
+        app
+    }
+
+    #[test]
+    fn pointer_and_keyboard_share_ancestor_and_modal_eligibility() {
+        let mut app = input_app();
+        let action = app
+            .world_mut()
+            .spawn((UiAction, Node::default(), Interaction::Pressed))
+            .id();
+        let ancestor = app
+            .world_mut()
+            .spawn(Node {
+                display: Display::None,
+                ..default()
+            })
+            .add_child(action)
+            .id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(action, FocusCause::Navigated);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Enter);
+        app.update();
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<Messages<UiActivated>>()
+                .drain()
+                .count(),
+            0
+        );
+        app.world_mut()
+            .get_mut::<Node>(ancestor)
+            .expect("parent")
+            .display = Display::Flex;
+        app.world_mut().entity_mut(action).insert(UiDisabled);
+        assert!(!activation_eligible(app.world_mut(), action));
+        app.world_mut().entity_mut(action).remove::<UiDisabled>();
+        let modal = app
+            .world_mut()
+            .spawn((UiModalScope, Node::default(), GlobalZIndex(1)))
+            .id();
+        assert!(!activation_eligible(app.world_mut(), action));
+        app.world_mut().entity_mut(modal).add_child(action);
+        assert!(activation_eligible(app.world_mut(), action));
+        app.world_mut()
+            .entity_mut(action)
+            .insert(Interaction::Pressed);
+        app.update();
+        // Simultaneous keyboard and pointer input still emits one activation.
+        assert_eq!(
+            app.world_mut()
+                .resource_mut::<Messages<UiActivated>>()
+                .drain()
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn restoration_uses_scoped_identity_not_matching_labels() {
+        let mut app = input_app();
+        let original = app
+            .world_mut()
+            .spawn((UiAction, UiFocusId::new("left", "play"), Name::new("Play")))
+            .id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(original, FocusCause::Navigated);
+        let modal = app.world_mut().spawn((UiModalScope, Node::default())).id();
+        retain_modal_focus(app.world_mut());
+        app.world_mut().despawn(original);
+        let wrong = app
+            .world_mut()
+            .spawn((UiAction, UiFocusId::new("right", "play"), Name::new("Play")))
+            .id();
+        let replacement = app
+            .world_mut()
+            .spawn((
+                UiAction,
+                UiFocusId::new("left", "play"),
+                Name::new("Changed label"),
+            ))
+            .id();
+        app.world_mut().despawn(modal);
+        retain_modal_focus(app.world_mut());
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(replacement)
+        );
+        assert_ne!(replacement, wrong);
+    }
+
+    #[test]
+    fn text_messages_redact_plaintext_from_debug() {
+        let message = UiTextChanged {
+            entity: Entity::PLACEHOLDER,
+            value: "private-test-value".to_owned(),
+        };
+        assert!(!format!("{message:?}").contains("private-test-value"));
+    }
+
+    #[test]
+    fn unchanged_scoped_control_recovers_focus_after_a_view_rebuild() {
+        let mut app = input_app();
+        app.add_systems(PreUpdate, remember_scoped_focus);
+        let original = app
+            .world_mut()
+            .spawn((UiAction, UiFocusId::new("browser", "row-1")))
+            .id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(original, FocusCause::Navigated);
+        app.update();
+        app.world_mut().despawn(original);
+        let replacement = app
+            .world_mut()
+            .spawn((UiAction, UiFocusId::new("browser", "row-1")))
+            .id();
+        sync_action_reachability(app.world_mut());
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(replacement)
+        );
+    }
+
+    #[test]
+    fn scrollable_nodes_receive_native_scrolling_support() {
+        let mut app = App::new();
+        app.add_systems(Update, prepare_scrolling);
+        let entity = app
+            .world_mut()
+            .spawn(Node {
+                overflow: Overflow::scroll_y(),
+                ..default()
+            })
+            .id();
+        app.update();
+        assert!(app
+            .world()
+            .get::<bevy::ui_widgets::ScrollArea>(entity)
+            .is_some());
+        app.world_mut()
+            .get_mut::<Node>(entity)
+            .expect("node")
+            .overflow = Overflow::DEFAULT;
+        app.update();
+        assert!(app
+            .world()
+            .get::<bevy::ui_widgets::ScrollArea>(entity)
+            .is_none());
+    }
+
+    #[test]
+    fn nested_modal_close_restores_the_parent_control_then_original_focus() {
+        let mut app = input_app();
+        let original = app.world_mut().spawn(UiAction).id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(original, FocusCause::Navigated);
+        let outer = app
+            .world_mut()
+            .spawn((UiModalScope, Node::default(), GlobalZIndex(1)))
+            .id();
+        let outer_action = app.world_mut().spawn((UiAction, ChildOf(outer))).id();
+        retain_modal_focus(app.world_mut());
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(outer_action)
+        );
+        let inner = app
+            .world_mut()
+            .spawn((UiModalScope, Node::default(), GlobalZIndex(2)))
+            .id();
+        let inner_action = app.world_mut().spawn((UiAction, ChildOf(inner))).id();
+        retain_modal_focus(app.world_mut());
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(inner_action)
+        );
+        app.world_mut().despawn(inner);
+        retain_modal_focus(app.world_mut());
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(outer_action)
+        );
+        app.world_mut().despawn(outer);
+        retain_modal_focus(app.world_mut());
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(original));
+    }
 
     #[test]
     fn semantic_metrics_cover_compact_standard_wide_and_accessibility_scale() {

@@ -70,12 +70,49 @@ pub struct ParticipantRemoval<P> {
 }
 
 /// A unique ordered roster with a current participant and one-based round.
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TurnOrder<P> {
     participants: Vec<P>,
     current_index: Option<usize>,
     round: u64,
+}
+
+#[cfg(feature = "serde")]
+impl<'de, P: serde::Deserialize<'de> + Eq> serde::Deserialize<'de> for TurnOrder<P> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Stored<P> {
+            participants: Vec<P>,
+            current_index: Option<usize>,
+            round: u64,
+        }
+        let stored = Stored::<P>::deserialize(deserializer)?;
+        let valid_cursor = match stored.current_index {
+            Some(index) => index < stored.participants.len(),
+            None => stored.participants.is_empty(),
+        };
+        let duplicates = stored
+            .participants
+            .iter()
+            .enumerate()
+            .any(|(index, participant)| {
+                stored
+                    .participants
+                    .iter()
+                    .take(index)
+                    .any(|other| other == participant)
+            });
+        if stored.round == 0 || !valid_cursor || duplicates {
+            return Err(serde::de::Error::custom("invalid persisted turn order"));
+        }
+        Ok(Self {
+            participants: stored.participants,
+            current_index: stored.current_index,
+            round: stored.round,
+        })
+    }
 }
 
 impl<P: Clone + Eq> TurnOrder<P> {
@@ -187,6 +224,25 @@ impl<P: Clone + Eq> TurnOrder<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserialization_enforces_roster_cursor_and_round_invariants() {
+        for json in [
+            r#"{"participants":[1,1],"current_index":0,"round":1}"#,
+            r#"{"participants":[1],"current_index":1,"round":1}"#,
+            r#"{"participants":[1],"current_index":null,"round":1}"#,
+            r#"{"participants":[],"current_index":0,"round":1}"#,
+            r#"{"participants":[1],"current_index":0,"round":0}"#,
+        ] {
+            assert!(serde_json::from_str::<TurnOrder<u8>>(json).is_err());
+        }
+        let finished: TurnOrder<u8> =
+            serde_json::from_str(r#"{"participants":[],"current_index":null,"round":8}"#)
+                .expect("finished roster");
+        assert_eq!(finished.current(), None);
+        assert_eq!(finished.round(), 8);
+    }
 
     #[test]
     fn construction_rejects_empty_and_duplicate_rosters() {

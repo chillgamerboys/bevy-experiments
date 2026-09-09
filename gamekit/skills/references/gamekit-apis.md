@@ -14,6 +14,8 @@ the crate.
 Attach a game-local action component to `UiAction`; translate `UiActivated.entity` in a
 consumer system ordered after `GameUiSystems::EmitActivations`. Supply game branding
 through `UiTheme` and `UiFonts`. Keep presentation models and intents local.
+Use explicit `UiFocusId` scope/key pairs for restoration across rebuilds; never
+derive identity from a displayed label. Pointer and keyboard eligibility is shared.
 
 ## `bevy_game_test`
 
@@ -21,6 +23,8 @@ through `UiTheme` and `UiFonts`. Keep presentation models and intents local.
 real Bevy input/focus/text/UI stack without a renderer. Use `run_frames`, `run_until`,
 input helpers, and `ui_tree_snapshot` as mechanics; keep fixtures and assertions in the
 owning game.
+UI helpers require the `ui` feature. Clipped control rectangles and structural
+snapshots do not substitute for rendered and interactive review.
 
 ## `bevy_game_multiplayer`
 
@@ -30,6 +34,9 @@ installation. `PreparedDirectHost`, direct/discovered/reconnect join preparation
 before adding `AuthorizedClient`; derive the game seat server-side and keep commands
 seatless. Rotate reconnect credentials on every successful reconnect and persist them
 atomically without logging their values.
+Enable `direct` explicitly. Lifecycle messages carry endpoint entities;
+`AuthenticatedPeer` is attached only after game-owned admission. `Receive` and
+`GameAuthority` use PreUpdate; `Send` uses PostUpdate before adapter transmission.
 
 ## `bevy_game_discovery`
 
@@ -41,3 +48,14 @@ features perform real I/O only after explicit runtime opt-in. `FakeDiscoveryProv
 is the deterministic Steam-style/service simulation seam. Discovery metadata is
 unauthenticated and must never carry admission secrets. Games own displayed metadata,
 password prompts, capacity, and final admission.
+
+`DiscoveryJoinRoute::endpoint(index)` returns `Direct` or opaque `Service` data.
+The game composition root dispatches to an adapter. Discovery does not open a
+connection. DNS-SD records retain OS-owned lifetimes; provider metadata refreshes
+must preserve provider-specific routes. Native I/O is bounded and off-schedule.
+
+## Pure capabilities
+
+`bevy_game_session` owns transport-independent session security and endpoint data.
+`bevy_game_hex` owns axial coordinates, neighbors, exact distance, and configurable
+2D layout/picking. It knows nothing about board bounds, pieces, movement, or terrain.

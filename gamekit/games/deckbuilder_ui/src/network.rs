@@ -14,8 +14,7 @@ use bevy::prelude::*;
 use bevy_game_discovery::{
     DiscoveryJoinRoute, DiscoveryObservation, DiscoveryPlugin, ExpectedSession, MdnsAdvertiser,
     MdnsBrowser, MdnsSessionAdvertisement, SessionMetadata, SessionPassword,
-    SessionPasswordVerifier, TailnetBrowser, TailnetResponder, TailscaleCli,
-    TAILNET_DISCOVERY_PORT,
+    SessionPasswordVerifier, TailnetBrowser, TailnetResponder, TailscaleCli, TailscaleStatusTask,
 };
 use bevy_game_multiplayer::{
     local_network_addresses, AdmissionCredential, AtomicFileReconnectCredentialStore,
@@ -36,9 +35,10 @@ use crate::domain::{
 };
 
 pub(crate) const GAME_ID: &str = "gamekit-deckbuilder";
-pub(crate) const PROTOCOL_VERSION: &str = "1";
+pub(crate) const PROTOCOL_VERSION: &str = "2";
 pub(crate) const BUILD_ID: &str = env!("CARGO_PKG_VERSION");
-const PROTOCOL_SCHEMA: &str = "gamekit-deckbuilder/v1;seatless-commands;private-target-snapshots";
+const PROTOCOL_SCHEMA: &str =
+    "gamekit-deckbuilder/v2;monotonic-seat-requests;private-target-snapshots";
 const TAILSCALE_REFRESH: Duration = Duration::from_secs(10);
 
 pub(crate) struct DeckNetworkPlugin;
@@ -70,19 +70,37 @@ impl Plugin for DeckNetworkPlugin {
             .add_systems(
                 PreUpdate,
                 (
-                    send_pending_hello,
-                    handle_client_hellos,
-                    handle_remote_requests,
                     receive_welcome,
                     receive_refusal,
                     receive_results,
                     receive_snapshots,
                     receive_closed,
                 )
-                    .chain(),
+                    .chain()
+                    .in_set(bevy_game_multiplayer::MultiplayerSystems::Receive),
             )
-            .add_systems(Update, (poll_discovery, poll_host_discovery))
+            .add_systems(
+                PreUpdate,
+                (handle_client_hellos, handle_remote_requests)
+                    .chain()
+                    .in_set(bevy_game_multiplayer::MultiplayerSystems::GameAuthority),
+            )
+            .add_systems(
+                PostUpdate,
+                send_pending_hello.in_set(bevy_game_multiplayer::MultiplayerSystems::Send),
+            )
+            .add_systems(
+                Update,
+                poll_discovery.before(bevy_game_discovery::DiscoverySystems::Maintain),
+            )
+            .add_systems(Update, poll_host_discovery)
             .add_systems(Update, finish_pending_server_close)
+            .add_systems(
+                PostUpdate,
+                finish_rejected_connections
+                    .after(bevy_replicon::prelude::ServerSystems::SendPackets),
+            )
+            .add_observer(begin_admission_deadline)
             .add_observer(on_connected_client_removed)
             .add_observer(on_transport_disconnected);
         register_protocol(app);
@@ -117,6 +135,7 @@ pub(crate) enum NetworkRole {
 
 #[derive(Resource, Debug)]
 pub(crate) struct DeckNetworkState {
+    next_request: u64,
     pub(crate) role: NetworkRole,
     pub(crate) latest: Option<GameSnapshot>,
     pub(crate) notice: Option<String>,
@@ -127,6 +146,7 @@ pub(crate) struct DeckNetworkState {
 impl Default for DeckNetworkState {
     fn default() -> Self {
         Self {
+            next_request: 1,
             role: NetworkRole::None,
             latest: None,
             notice: None,
@@ -139,13 +159,14 @@ impl Default for DeckNetworkState {
 #[derive(Resource)]
 struct HostedSession {
     security: SessionSecurityAuthority,
-    verifier: SessionPasswordVerifier,
+    verifier: Option<SessionPasswordVerifier>,
     guest_peer: Option<PeerId>,
     encoded_code: EncodedConnectionCode,
     target: DiscoveredDirectTarget,
     metadata: SessionMetadata,
     mdns: Option<MdnsAdvertiser>,
     tailnet: Option<TailnetResponder>,
+    tailnet_status: Option<TailscaleStatusTask>,
     server_entity: Entity,
 }
 
@@ -167,6 +188,8 @@ struct ActiveBrowser {
     mdns: Option<MdnsBrowser>,
     tailnet: Option<TailnetBrowser>,
     tailscale: TailscaleCli,
+    tailnet_enabled: bool,
+    tailnet_status: Option<TailscaleStatusTask>,
     next_tailnet_refresh: Duration,
 }
 
@@ -174,6 +197,35 @@ struct ActiveBrowser {
 struct PendingHello {
     credential: DeckCredential,
     sent: bool,
+}
+
+#[derive(Component)]
+struct AdmissionStarted(std::time::Instant);
+
+#[derive(Component)]
+struct RejectedConnection(std::time::Instant);
+
+fn begin_admission_deadline(event: On<Add, ConnectedClient>, mut commands: Commands) {
+    commands
+        .entity(event.entity)
+        .insert(AdmissionStarted(std::time::Instant::now()));
+}
+
+fn finish_rejected_connections(
+    rejected: Query<(Entity, &RejectedConnection)>,
+    pending: Query<(Entity, &AdmissionStarted), Without<DeckAuthorized>>,
+    mut commands: Commands,
+) {
+    for (entity, delay) in &rejected {
+        if delay.0.elapsed() >= Duration::from_millis(250) {
+            commands.trigger(Disconnect::new(entity, "admission refused"));
+        }
+    }
+    for (entity, started) in &pending {
+        if started.0.elapsed() >= Duration::from_secs(10) {
+            commands.trigger(Disconnect::new(entity, "admission timed out"));
+        }
+    }
 }
 
 #[derive(Resource, Debug)]
@@ -247,6 +299,7 @@ impl Drop for PasswordWire {
 
 #[derive(Message, Debug, Clone, Copy, Serialize, Deserialize)]
 struct DeckWelcome {
+    reconnected: bool,
     session_id: SessionId,
     peer_id: PeerId,
     seat: Seat,
@@ -280,7 +333,8 @@ pub(crate) fn start_solo(world: &mut World) {
     state.notice = None;
 }
 
-pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result<(), String> {
+pub(crate) fn start_host(world: &mut World, mut config: HostConfiguration) -> Result<(), String> {
+    let password = zeroize::Zeroizing::new(std::mem::take(&mut config.password));
     let advertised_host = if config.advertised_host.trim().is_empty() {
         default_advertised_host().ok_or_else(|| {
             "No reachable local address was detected; enter an advertised address explicitly."
@@ -297,8 +351,13 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
                 .to_owned(),
         );
     }
-    let password = SessionPassword::new(config.password).map_err(|error| error.to_string())?;
-    let verifier = SessionPasswordVerifier::new(&password).map_err(|error| error.to_string())?;
+    let verifier = if config.discover_lan || config.discover_tailnet || !password.is_empty() {
+        let password =
+            SessionPassword::new(password.to_string()).map_err(|error| error.to_string())?;
+        Some(SessionPasswordVerifier::new(&password).map_err(|error| error.to_string())?)
+    } else {
+        None
+    };
     let security = SessionSecurityAuthority::new();
     let prepared =
         PreparedDirectHost::new(endpoint, security.session_id(), security.invite_token())
@@ -364,41 +423,10 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
     } else {
         None
     };
-    let tailnet = if config.discover_tailnet {
-        let cli = TailscaleCli::default();
-        match cli
-            .local_addresses()
-            .and_then(|addresses| {
-                addresses
-                    .first()
-                    .copied()
-                    .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)
-            })
-            .and_then(|address| {
-                retarget(&target, address)
-                    .map_err(|_error| {
-                        bevy_game_discovery::TailnetDiscoveryError::MalformedAnnouncement
-                    })
-                    .and_then(|target| {
-                        TailnetResponder::bind(address, metadata.clone(), target)
-                            .map(|responder| (responder, address))
-                    })
-            }) {
-            Ok((responder, address)) => {
-                notices.push(format!(
-                    "Tailnet discovery active at {address}:{TAILNET_DISCOVERY_PORT}; game route uses UDP {}.",
-                    target.endpoint.port(),
-                ));
-                Some(responder)
-            }
-            Err(error) => {
-                notices.push(format!("Tailnet discovery unavailable: {error}"));
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let tailnet = None;
+    let tailnet_status = config
+        .discover_tailnet
+        .then(|| TailscaleCli::default().request_status());
     let encoded_code = code.encode();
     let authority = DeckAuthority::lobby();
     let snapshot = authority.snapshot(Seat::Host);
@@ -413,6 +441,7 @@ pub(crate) fn start_host(world: &mut World, config: HostConfiguration) -> Result
         metadata,
         mdns,
         tailnet,
+        tailnet_status,
         server_entity,
     });
     let mut state = world.resource_mut::<DeckNetworkState>();
@@ -494,35 +523,14 @@ pub(crate) fn start_browser(world: &mut World, discover_tailnet: bool) {
         }
     };
     let tailscale = TailscaleCli::default();
-    let tailnet = if discover_tailnet {
-        match tailscale
-            .local_addresses()
-            .and_then(|addresses| {
-                addresses
-                    .first()
-                    .copied()
-                    .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)
-            })
-            .and_then(TailnetBrowser::bind)
-        {
-            Ok(browser) => Some(browser),
-            Err(error) => {
-                let reason = format!("Tailnet discovery unavailable: {error}");
-                world.write_message(DiscoveryObservation::Unavailable {
-                    provider: bevy_game_discovery::DiscoveryProviderId::TAILSCALE,
-                    reason: reason.clone(),
-                });
-                notices.push(reason);
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let tailnet = None;
+    let tailnet_status = discover_tailnet.then(|| tailscale.request_status());
     world.insert_resource(ActiveBrowser {
         mdns,
         tailnet,
         tailscale,
+        tailnet_enabled: discover_tailnet,
+        tailnet_status,
         next_tailnet_refresh: Duration::ZERO,
     });
     world.resource_mut::<DeckNetworkState>().notice =
@@ -551,10 +559,13 @@ pub(crate) fn start_discovered_join(
 ) -> Result<(), String> {
     let password = SessionPassword::new(password).map_err(|error| error.to_string())?;
     let wire = PasswordWire(password.expose_for_encrypted_transport().to_owned());
-    disconnect_guest(world);
-    let entity = route
-        .connect_preferred(world)
+    let Some(bevy_game_discovery::DiscoveryEndpoint::Direct(target)) = route.endpoint(0) else {
+        return Err("This game has no transport adapter for that service provider.".to_owned());
+    };
+    let prepared = bevy_game_multiplayer::PreparedDirectDiscoveryJoin::new(target)
         .map_err(|error| error.to_string())?;
+    disconnect_guest(world);
+    let entity = prepared.connect(world);
     world.insert_resource(GuestConnection(entity));
     begin_guest_connect(world, DeckCredential::Password(wire));
     Ok(())
@@ -590,6 +601,7 @@ fn begin_guest_connect(world: &mut World, credential: DeckCredential) {
     world.remove_resource::<DeckAuthority>();
     let mut state = world.resource_mut::<DeckNetworkState>();
     state.role = NetworkRole::Guest;
+    state.next_request = 1;
     state.latest = None;
     state.admitted = false;
     state.session_id = None;
@@ -597,11 +609,22 @@ fn begin_guest_connect(world: &mut World, credential: DeckCredential) {
 }
 
 pub(crate) fn submit_command(world: &mut World, command: GameCommand) {
+    let role = world.resource::<DeckNetworkState>().role;
+    let sequence = if matches!(role, NetworkRole::Solo | NetworkRole::Host) {
+        world.resource::<DeckAuthority>().next_request(Seat::Host)
+    } else {
+        let mut state = world.resource_mut::<DeckNetworkState>();
+        if !state.admitted || state.latest.is_none() {
+            return;
+        }
+        let sequence = state.next_request;
+        state.next_request = sequence.saturating_add(1);
+        sequence
+    };
     let request = GameRequest {
-        request_id: RequestId::generate(),
+        request_id: RequestId(sequence),
         command,
     };
-    let role = world.resource::<DeckNetworkState>().role;
     match role {
         NetworkRole::Solo | NetworkRole::Host => {
             let source = Seat::Host;
@@ -680,6 +703,7 @@ fn handle_client_hellos(
     mut hosted: Option<ResMut<HostedSession>>,
     mut authority: Option<ResMut<DeckAuthority>>,
     connected: Query<&PeerAddr, With<ConnectedClient>>,
+    already_admitted: Query<(), With<DeckAuthorized>>,
     mut commands: Commands,
     mut accepted: MessageWriter<ToClients<DeckWelcome>>,
     mut refused: MessageWriter<ToClients<DeckAdmissionRefusal>>,
@@ -693,11 +717,17 @@ fn handle_client_hellos(
         let Some(connection) = hello.client_id.entity() else {
             continue;
         };
+        if already_admitted.contains(connection) {
+            continue;
+        }
         if hello.protocol != PROTOCOL_VERSION || hello.build != BUILD_ID {
             refused.write(ToClients {
                 targets: SendTargets::Single(hello.client_id),
                 message: DeckAdmissionRefusal,
             });
+            commands
+                .entity(connection)
+                .insert(RejectedConnection(std::time::Instant::now()));
             continue;
         }
         let grant = match &hello.credential {
@@ -718,6 +748,8 @@ fn handle_client_hellos(
                     .and_then(|password| {
                         hosted
                             .verifier
+                            .as_mut()
+                            .ok_or(bevy_game_multiplayer::AdmissionError::InvalidInvite)?
                             .verify(source, time.elapsed(), &password)
                             .map_err(|_error| bevy_game_multiplayer::AdmissionError::InvalidInvite)
                     })
@@ -729,6 +761,9 @@ fn handle_client_hellos(
                 targets: SendTargets::Single(hello.client_id),
                 message: DeckAdmissionRefusal,
             });
+            commands
+                .entity(connection)
+                .insert(RejectedConnection(std::time::Instant::now()));
             continue;
         };
         if hosted
@@ -740,6 +775,9 @@ fn handle_client_hellos(
                 targets: SendTargets::Single(hello.client_id),
                 message: DeckAdmissionRefusal,
             });
+            commands
+                .entity(connection)
+                .insert(RejectedConnection(std::time::Instant::now()));
             continue;
         }
         hosted.guest_peer = Some(grant.peer);
@@ -750,6 +788,10 @@ fn handle_client_hellos(
         state.latest = Some(authority.snapshot(Seat::Host));
         commands.entity(connection).insert((
             AuthorizedClient,
+            bevy_game_multiplayer::AuthenticatedPeer {
+                peer: grant.peer,
+                reconnected: grant.reconnected,
+            },
             DeckAuthorized {
                 peer: grant.peer,
                 seat: Seat::Guest,
@@ -758,6 +800,7 @@ fn handle_client_hellos(
         accepted.write(ToClients {
             targets: SendTargets::Single(hello.client_id),
             message: DeckWelcome {
+                reconnected: grant.reconnected,
                 session_id: hosted.security.session_id(),
                 peer_id: grant.peer,
                 seat: Seat::Guest,
@@ -813,8 +856,18 @@ fn receive_welcome(
     storage: Option<Res<ReconnectCredentialStorage>>,
     mut state: ResMut<DeckNetworkState>,
     mut commands: Commands,
+    guest: Option<Res<GuestConnection>>,
 ) {
     for welcome in welcome.read() {
+        let Some(guest) = guest.as_ref() else {
+            continue;
+        };
+        commands
+            .entity(guest.0)
+            .insert(bevy_game_multiplayer::AuthenticatedPeer {
+                peer: welcome.peer_id,
+                reconnected: welcome.reconnected,
+            });
         state.admitted = true;
         state.session_id = Some(welcome.session_id);
         state.notice = None;
@@ -843,11 +896,13 @@ fn receive_refusal(
     mut commands: Commands,
 ) {
     for _ in refusal.read() {
+        // Remove the tracked handle before observers run, so transport cleanup cannot
+        // replace the useful admission refusal with a generic disconnect notice.
+        commands.remove_resource::<GuestConnection>();
+        commands.remove_resource::<PendingHello>();
         if let Some(guest) = guest.as_ref() {
             commands.trigger(Disconnect::new(guest.0, "admission refused"));
         }
-        commands.remove_resource::<GuestConnection>();
-        commands.remove_resource::<PendingHello>();
         state.admitted = false;
         state.notice = Some("The host refused session admission.".to_owned());
     }
@@ -869,6 +924,7 @@ fn receive_snapshots(
     mut state: ResMut<DeckNetworkState>,
 ) {
     for snapshot in snapshots.read() {
+        state.next_request = state.next_request.max(snapshot.next_request);
         if state
             .latest
             .as_ref()
@@ -1028,18 +1084,41 @@ fn poll_discovery(
             }
         }
     }
-    if browser.tailnet.is_some() && time.elapsed() >= browser.next_tailnet_refresh {
+    if browser.tailnet_enabled
+        && browser.tailnet_status.is_none()
+        && time.elapsed() >= browser.next_tailnet_refresh
+    {
+        browser.tailnet_status = Some(browser.tailscale.request_status());
+    }
+    if let Some(result) = browser
+        .tailnet_status
+        .as_ref()
+        .and_then(TailscaleStatusTask::poll)
+    {
+        browser.tailnet_status = None;
         browser.next_tailnet_refresh = time.elapsed() + TAILSCALE_REFRESH;
-        let peers = browser.tailscale.peers();
-        if let (Some(tailnet), Ok(peers)) = (browser.tailnet.as_mut(), peers) {
-            if let Err(error) = tailnet.refresh(&peers, GAME_ID) {
-                let reason = format!("Tailnet discovery refresh failed: {error}");
-                observations.write(DiscoveryObservation::Failed {
-                    provider: bevy_game_discovery::DiscoveryProviderId::TAILSCALE,
-                    reason: reason.clone(),
-                });
-                state.notice = Some(reason);
+        let result = result.and_then(|status| {
+            if browser.tailnet.is_none() {
+                let address = status
+                    .local_addresses
+                    .first()
+                    .copied()
+                    .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)?;
+                browser.tailnet = Some(TailnetBrowser::bind(address)?);
             }
+            if let Some(tailnet) = browser.tailnet.as_mut() {
+                tailnet.refresh(&status.peers, GAME_ID)?;
+            }
+            Ok(())
+        });
+        if let Err(error) = result {
+            browser.tailnet = None;
+            let reason = format!("Tailnet discovery unavailable: {error}");
+            observations.write(DiscoveryObservation::Unavailable {
+                provider: bevy_game_discovery::DiscoveryProviderId::TAILSCALE,
+                reason: reason.clone(),
+            });
+            state.notice = Some(reason);
         }
     }
     if let Some(tailnet) = browser.tailnet.as_ref() {
@@ -1061,11 +1140,38 @@ fn poll_discovery(
     }
 }
 
-fn poll_host_discovery(hosted: Option<Res<HostedSession>>, mut state: ResMut<DeckNetworkState>) {
-    let Some(hosted) = hosted else { return };
+fn poll_host_discovery(hosted: Option<ResMut<HostedSession>>, mut state: ResMut<DeckNetworkState>) {
+    let Some(mut hosted) = hosted else { return };
+    if let Some(result) = hosted
+        .tailnet_status
+        .as_ref()
+        .and_then(TailscaleStatusTask::poll)
+    {
+        hosted.tailnet_status = None;
+        let result = result.and_then(|status| {
+            let address = status
+                .local_addresses
+                .first()
+                .copied()
+                .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)?;
+            let target = retarget(&hosted.target, address)
+                .map_err(|_| bevy_game_discovery::TailnetDiscoveryError::MalformedAnnouncement)?;
+            TailnetResponder::bind(address, hosted.metadata.clone(), target)
+        });
+        match result {
+            Ok(responder) => {
+                hosted.tailnet = Some(responder);
+                state.notice = Some("Tailnet discovery is active.".to_owned());
+            }
+            Err(error) => state.notice = Some(format!("Tailnet discovery unavailable: {error}")),
+        }
+    }
     if let Some(advertiser) = hosted.mdns.as_ref() {
         if let Err(error) = advertiser.poll_health() {
-            state.notice = Some(format!("LAN advertisement stopped: {error}"));
+            let notice = format!("LAN advertisement stopped: {error}");
+            if state.notice.as_ref() != Some(&notice) {
+                state.notice = Some(notice);
+            }
         }
     }
     if let Some(responder) = hosted.tailnet.as_ref() {
@@ -1144,8 +1250,84 @@ mod tests {
             .insert_resource(ReconnectCredentialStorage::new(
                 MemoryReconnectCredentialStore::default(),
             ))
-            .add_plugins(DeckNetworkPlugin);
+            .add_plugins(DeckNetworkPlugin)
+            .init_resource::<LifecycleEvidence>()
+            .add_systems(Last, record_lifecycle);
         builder.build()
+    }
+
+    #[derive(Resource, Default)]
+    struct LifecycleEvidence(Vec<bevy_game_multiplayer::MultiplayerLifecycle>);
+
+    fn record_lifecycle(
+        mut events: MessageReader<bevy_game_multiplayer::MultiplayerLifecycle>,
+        mut evidence: ResMut<LifecycleEvidence>,
+    ) {
+        evidence.0.extend(events.read().cloned());
+    }
+
+    #[test]
+    fn password_refusal_closes_both_transport_ends_without_claiming_a_seat() {
+        let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("free port");
+        let port = socket.local_addr().expect("address").port();
+        drop(socket);
+        let mut host = socket_app();
+        let mut guest = socket_app();
+        start_host(
+            host.world_mut(),
+            HostConfiguration {
+                session_name: "Refusal test".to_owned(),
+                password: "correct-passphrase".to_owned(),
+                advertised_host: "127.0.0.1".to_owned(),
+                port,
+                discover_lan: false,
+                discover_tailnet: false,
+            },
+        )
+        .expect("host");
+        let hosted = host.world().resource::<HostedSession>();
+        let mut registry = bevy_game_discovery::DiscoveryRegistry::default();
+        registry.apply(
+            DiscoveryObservation::Found {
+                metadata: hosted.metadata.clone(),
+                route: bevy_game_discovery::DiscoveryRoute::new(
+                    bevy_game_discovery::DiscoveryProviderId::FAKE,
+                    bevy_game_discovery::DiscoverySource::Service,
+                    hosted.target.clone(),
+                    Duration::from_secs(60),
+                ),
+            },
+            None,
+        );
+        let route = registry.resolve(hosted.target.session_id).expect("route");
+        start_discovered_join(guest.world_mut(), &route, "incorrect-passphrase".to_owned())
+            .expect("attempt");
+        assert!(pump_until(
+            &mut host,
+            &mut guest,
+            Duration::from_secs(5),
+            |host, guest| {
+                guest
+                    .world()
+                    .resource::<DeckNetworkState>()
+                    .notice
+                    .as_deref()
+                    == Some("The host refused session admission.")
+                    && !guest.world().contains_resource::<GuestConnection>()
+                    && host
+                        .world_mut()
+                        .query_filtered::<Entity, With<ConnectedClient>>()
+                        .iter(host.world())
+                        .count()
+                        == 0
+            }
+        ));
+        assert!(!guest.world().resource::<DeckNetworkState>().admitted);
+        assert!(host
+            .world()
+            .resource::<HostedSession>()
+            .guest_peer
+            .is_none());
     }
 
     #[test]
@@ -1208,7 +1390,7 @@ mod tests {
         host: &mut App,
         guest: &mut App,
         timeout: Duration,
-        condition: impl Fn(&App, &App) -> bool,
+        mut condition: impl FnMut(&mut App, &mut App) -> bool,
     ) -> bool {
         let deadline = std::time::Instant::now() + timeout;
         while std::time::Instant::now() < deadline {
@@ -1346,6 +1528,7 @@ mod tests {
             .snapshot(Seat::Guest)
             .own_hand;
         let old_entity = guest.world().resource::<GuestConnection>().0;
+        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_game_multiplayer::MultiplayerLifecycle::Authenticated { entity, reconnected: false, .. } if *entity == old_entity)));
         close_session(guest.world_mut());
         assert!(pump_until(
             &mut host,
@@ -1362,6 +1545,7 @@ mod tests {
             }
         ));
         assert!(guest.world().get_entity(old_entity).is_err());
+        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_game_multiplayer::MultiplayerLifecycle::Disconnected { entity, .. } if *entity == old_entity)));
         drop(guest);
         let mut guest = socket_app();
         guest.insert_resource(ReconnectCredentialStorage::new(
@@ -1390,6 +1574,18 @@ mod tests {
             .expect("rotated credential persisted");
         assert_eq!(before.peer_id, after.peer_id);
         assert_ne!(before.reconnect_credential, after.reconnect_credential);
+        assert!(guest
+            .world()
+            .resource::<LifecycleEvidence>()
+            .0
+            .iter()
+            .any(|event| matches!(
+                event,
+                bevy_game_multiplayer::MultiplayerLifecycle::Authenticated {
+                    reconnected: true,
+                    ..
+                }
+            )));
     }
 
     #[test]
