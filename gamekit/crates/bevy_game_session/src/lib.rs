@@ -2,11 +2,23 @@
 //!
 //! No sockets, Bevy schedules, discovery providers, seats, or game rules live here.
 //! Transport adapters authenticate these contracts; games decide what admission grants.
+//!
+//! [`SessionAdmissionAuthority`] supports bounded independent one-use invitations
+//! and a recoverable `offer -> persist -> acknowledge` handshake. It retains only
+//! a current and at most one pending reconnect credential per reserved identity.
+//! Games must drive expiry, apply returned cleanup, and authorize gameplay only
+//! after acknowledgement. [`SessionSecurityAuthority`] retains the legacy immediate
+//! admission/rotation semantics for existing adopters; its grants are not offers.
 
+mod admission;
 mod connection_code;
 mod password;
 mod security;
 
+pub use admission::{
+    AdmissionCleanup, AdmissionFlowError, AdmissionLimits, AdmissionOffer,
+    SessionAdmissionAuthority,
+};
 pub use connection_code::{
     CertificateFingerprint, ConnectionCodeError, DirectConnectionCode, DirectEndpoint,
     EncodedConnectionCode,
