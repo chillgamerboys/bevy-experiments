@@ -1,7 +1,7 @@
 //! Deterministic in-memory byte links for multi-App tests.
 
 use std::sync::{
-    mpsc::{self, Receiver, SyncSender, TryRecvError},
+    mpsc::{self, Receiver, SyncSender, TryRecvError, TrySendError},
     Arc, Mutex,
 };
 
@@ -25,14 +25,15 @@ impl std::fmt::Debug for InMemoryEndpoint {
 }
 
 impl InMemoryEndpoint {
-    /// Sends one bounded payload to the paired endpoint.
+    /// Tries to send one bounded payload without blocking a gameplay/test schedule.
     pub fn send(&self, payload: Vec<u8>) -> Result<(), LinkError> {
         if payload.len() > self.max_message_bytes {
             return Err(LinkError::MessageTooLarge);
         }
-        self.sender
-            .send(payload)
-            .map_err(|_send_error| LinkError::Disconnected)
+        self.sender.try_send(payload).map_err(|error| match error {
+            TrySendError::Full(_) => LinkError::Backpressure,
+            TrySendError::Disconnected(_) => LinkError::Disconnected,
+        })
     }
 
     /// Receives one queued payload without blocking.
@@ -79,6 +80,8 @@ impl InMemorySessionLink {
 pub enum LinkError {
     /// Payload exceeded the configured cap.
     MessageTooLarge,
+    /// The bounded queue is full; the caller must retry or apply its own policy.
+    Backpressure,
     /// The paired endpoint was dropped.
     Disconnected,
     /// Internal synchronization was poisoned.
@@ -89,6 +92,7 @@ impl std::fmt::Display for LinkError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
             Self::MessageTooLarge => "in-memory message exceeds the configured limit",
+            Self::Backpressure => "in-memory message queue is full",
             Self::Disconnected => "in-memory peer is disconnected",
             Self::Unavailable => "in-memory link is unavailable",
         })
@@ -112,5 +116,24 @@ mod tests {
         client.send(vec![3]).expect("client send succeeds");
         assert_eq!(host.try_receive().expect("receive succeeds"), Some(vec![3]));
         assert_eq!(host.send(vec![0; 9]), Err(LinkError::MessageTooLarge));
+    }
+
+    #[test]
+    fn full_queue_returns_backpressure_and_recovers_after_receive() {
+        let (host, client) = InMemorySessionLink::pair(1, 8);
+        assert_eq!(host.send(vec![1]), Ok(()));
+        assert_eq!(host.send(vec![2]), Err(LinkError::Backpressure));
+        assert_eq!(client.try_receive(), Ok(Some(vec![1])));
+        assert_eq!(host.send(vec![2]), Ok(()));
+        assert_eq!(client.try_receive(), Ok(Some(vec![2])));
+        assert_eq!(client.try_receive(), Ok(None));
+        drop(client);
+        assert_eq!(host.send(vec![3]), Err(LinkError::Disconnected));
+    }
+
+    #[test]
+    fn zero_capacity_queue_never_blocks_a_single_threaded_app_pump() {
+        let (host, _client) = InMemorySessionLink::pair(0, 8);
+        assert_eq!(host.send(vec![1]), Err(LinkError::Backpressure));
     }
 }

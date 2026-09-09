@@ -17,6 +17,10 @@ use bevy::prelude::*;
 use bevy_replicon::prelude::{AuthMethod, RepliconPlugins, RepliconSharedPlugin};
 
 pub use bevy_game_session::{
+    AdmissionCleanup, AdmissionFlowError, AdmissionLimits, AdmissionOffer,
+    SessionAdmissionAuthority,
+};
+pub use bevy_game_session::{
     AdmissionCredential, AdmissionError, AdmissionGrant, InviteToken, PeerId, ReconnectCredential,
     SessionId, SessionSecurityAuthority,
 };

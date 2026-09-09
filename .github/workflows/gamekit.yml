@@ -39,6 +39,8 @@ jobs:
         with:
           workspaces: gamekit
       - run: cargo test --workspace --all-features --profile ci
+      - name: Labyrinth four-process abrupt guest restart
+        run: cargo test -p labyrinth --lib network::tests::process::four_native_processes_survive_guest_kill_and_finish_the_fight --profile ci -- --ignored --exact --nocapture
       - run: cargo test --workspace --doc --all-features --profile ci
 
   policy:
@@ -72,4 +74,4 @@ jobs:
       - name: Check browser-compatible core and UI (not native networking)
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo check -p bevy_game_hex -p bevy_game_turns -p bevy_game_session -p bevy_game_ui --target wasm32-unknown-unknown
+          cargo check -p bevy_game_hex -p bevy_game_turns -p bevy_game_session -p bevy_game_ui -p labyrinth_rules --target wasm32-unknown-unknown

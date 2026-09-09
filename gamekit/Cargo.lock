@@ -3745,6 +3745,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "labyrinth"
+version = "0.1.0"
+dependencies = [
+ "aeronet",
+ "bevy",
+ "bevy_game_discovery",
+ "bevy_game_multiplayer",
+ "bevy_game_session",
+ "bevy_game_test",
+ "bevy_game_ui",
+ "bevy_replicon",
+ "directories",
+ "labyrinth_rules",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "zeroize",
+]
+
+[[package]]
+name = "labyrinth_rules"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

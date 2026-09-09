@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "games/*"]
+members = ["crates/*", "games/*", "games/labyrinth/rules"]
 default-members = ["games/deckbuilder_ui"]
 
 [workspace.package]
