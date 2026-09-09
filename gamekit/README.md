@@ -27,12 +27,20 @@ Run Gamekit commands from this directory:
 cargo test --workspace --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo run -p deckbuilder_ui
+cargo run -p labyrinth -- --local
 ```
 
 The deckbuilder now demonstrates a listen host, a two-seat ready lobby, secure
 `BGN1` direct codes, rotating reconnect credentials, automatic LAN discovery,
 and opt-in development tailnet discovery. See [Multiplayer development and
 testing](docs/multiplayer.md) before testing across machines.
+
+[Labyrinth](games/labyrinth/README.md) is the second networked adopter: a four-player
+cooperative positional battle with an independent pure-Rust rules package. It uses
+per-round initiative (not cyclic turn order), explicit status boundaries and a
+persist-before-ACK admission flow. Its [architecture](docs/labyrinth-architecture.md)
+and [test evidence boundaries](docs/labyrinth-testing.md) document what can be reused
+and what remains game-owned. Endless-maze exploration is future work.
 
 Capture a deterministic rendered review frame at an exact logical size:
 
