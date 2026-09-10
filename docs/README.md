@@ -1,6 +1,6 @@
 # Development documentation
 
-- [Draft: GameSkills framework and skills-first development sequence](decisions/gameskills-framework.md)
+- [Draft: GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)
 - [Architecture and ownership](architecture.md)
 - [Current agent handoff and review findings](handoff.md)
