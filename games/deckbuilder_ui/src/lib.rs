@@ -4,11 +4,11 @@ mod domain;
 mod network;
 
 use bevy::prelude::*;
-use bevy_game_discovery::{
+use bevy_gamekit::discovery::{
     Compatibility, DiscoveryEvent, DiscoveryJoinRoute, DiscoveryRegistry, DiscoverySource,
 };
-use bevy_game_session::SessionId;
-use bevy_game_ui::{
+use bevy_gamekit::session::SessionId;
+use bevy_gamekit::ui::{
     region, GameUiSkinPlugin, GameUiSystems, ResolvedUiMetrics, UiActivated, UiControlMetrics,
     UiDisabled, UiFonts, UiInsets, UiRegionRole, UiSkin, UiSpace, UiSpacing, UiTextChanged,
     UiTextRole, UiTextSubmitted, UiViewportClass,
@@ -27,8 +27,8 @@ pub struct DeckbuilderPlugin;
 // choices are local presentation, not defaults imposed on other games.
 fn screen_root(name: impl Into<String>) -> impl Bundle {
     (
-        bevy_game_ui::screen_root(name),
-        bevy_game_ui::UiTooltipHost,
+        bevy_gamekit::ui::screen_root(name),
+        bevy_gamekit::ui::UiTooltipHost,
         UiSkin::Screen,
         UiSpacing {
             row_gap: Some(UiSpace::Pixels(16.0)),
@@ -39,7 +39,7 @@ fn screen_root(name: impl Into<String>) -> impl Bundle {
 
 fn panel(name: impl Into<String>) -> impl Bundle {
     (
-        bevy_game_ui::panel(name),
+        bevy_gamekit::ui::panel(name),
         UiSkin::Panel,
         UiSpacing {
             padding: Some(UiInsets::all(UiSpace::Units(1.5))),
@@ -51,7 +51,7 @@ fn panel(name: impl Into<String>) -> impl Bundle {
 
 fn card(name: impl Into<String>) -> impl Bundle {
     (
-        bevy_game_ui::card(name),
+        bevy_gamekit::ui::card(name),
         UiSkin::Card,
         UiControlMetrics {
             min_size: Vec2::new(172.0, 220.0),
@@ -66,7 +66,7 @@ fn card(name: impl Into<String>) -> impl Bundle {
 
 fn button(name: impl Into<String>) -> impl Bundle {
     (
-        bevy_game_ui::button(name),
+        bevy_gamekit::ui::button(name),
         UiSkin::Control,
         UiControlMetrics {
             min_size: Vec2::new(132.0, 48.0),
@@ -79,7 +79,7 @@ fn button(name: impl Into<String>) -> impl Bundle {
 }
 
 fn text(fonts: &UiFonts, role: UiTextRole, value: impl Into<String>) -> impl Bundle {
-    (bevy_game_ui::text(fonts, role, value), UiSkin::Text)
+    (bevy_gamekit::ui::text(fonts, role, value), UiSkin::Text)
 }
 
 fn text_field(
@@ -89,7 +89,7 @@ fn text_field(
     max: usize,
 ) -> impl Bundle {
     (
-        bevy_game_ui::text_field(fonts, name, initial, max),
+        bevy_gamekit::ui::text_field(fonts, name, initial, max),
         UiSkin::Field,
         UiControlMetrics {
             min_size: Vec2::new(220.0, 48.0),
@@ -106,7 +106,7 @@ impl Plugin for DeckbuilderPlugin {
         app.add_plugins((
             network::DeckNetworkPlugin,
             GameUiSkinPlugin,
-            bevy_game_ui::GameUiTooltipPlugin,
+            bevy_gamekit::ui::GameUiTooltipPlugin,
         ))
         .init_resource::<DeckbuilderUi>()
         .init_resource::<PendingActions>()
@@ -118,7 +118,7 @@ impl Plugin for DeckbuilderPlugin {
             (
                 collect_activations.after(GameUiSystems::EmitActivations),
                 collect_text,
-                menu_keyboard.after(bevy_game_ui::UiTooltipSystems::Resolve),
+                menu_keyboard.after(bevy_gamekit::ui::UiTooltipSystems::Resolve),
                 apply_pending_actions,
                 synchronize_network_screen,
                 mark_discovery_change,
@@ -157,7 +157,7 @@ struct DeckbuilderUi {
     selected_session: Option<SessionId>,
     selected_target: Option<DiscoveryJoinRoute>,
     selected_card: Option<CardKind>,
-    menus: bevy_game_ui::UiMenuStack<DeckMenu>,
+    menus: bevy_gamekit::ui::UiMenuStack<DeckMenu>,
     share_code: Option<String>,
     local_notice: Option<String>,
 }
@@ -170,7 +170,7 @@ enum DeckMenu {
 
 fn menu_keyboard(world: &mut World) {
     if world
-        .resource::<bevy_game_ui::UiTooltipState>()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
         .captures_keyboard()
         || !world
             .resource::<ButtonInput<KeyCode>>()
@@ -221,7 +221,7 @@ impl Default for DeckbuilderUi {
             selected_session: None,
             selected_target: None,
             selected_card: None,
-            menus: bevy_game_ui::UiMenuStack::default(),
+            menus: bevy_gamekit::ui::UiMenuStack::default(),
             share_code: None,
             local_notice: None,
         }
@@ -1180,8 +1180,8 @@ fn spawn_card(
         card(format!("Card {}", kind.title())),
         DeckbuilderAction::SelectCard(kind),
         Button,
-        bevy_game_ui::UiInspectable,
-        bevy_game_ui::UiContextHelp {
+        bevy_gamekit::ui::UiInspectable,
+        bevy_gamekit::ui::UiContextHelp {
             title: kind.title().to_owned(),
             body: format!(
                 "{}\nCost {} energy.{}",
@@ -1194,7 +1194,7 @@ fn spawn_card(
                 }
             ),
         },
-        bevy_game_ui::UiAction,
+        bevy_gamekit::ui::UiAction,
         bevy::input_focus::tab_navigation::TabIndex(0),
     ));
     if disabled {
@@ -1225,7 +1225,7 @@ fn spawn_action(
         DeckbuilderAction::SetReady(_) => "SetReady".to_owned(),
         _ => format!("{action:?}"),
     };
-    let focus_id = bevy_game_ui::UiFocusId::new("deckbuilder", key);
+    let focus_id = bevy_gamekit::ui::UiFocusId::new("deckbuilder", key);
     let mut entity = parent.spawn((button(name), action, focus_id));
     if disabled {
         entity.insert(UiDisabled);
@@ -1245,7 +1245,7 @@ fn spawn_labeled_field(
     parent.spawn((
         text_field(fonts, label, value, max),
         field,
-        bevy_game_ui::UiFocusId::new("deckbuilder-fields", format!("{field:?}")),
+        bevy_gamekit::ui::UiFocusId::new("deckbuilder-fields", format!("{field:?}")),
     ));
 }
 
@@ -1265,10 +1265,10 @@ fn spawn_notices(
 
 fn spawn_game_menu(parent: &mut ChildSpawnerCommands, fonts: &UiFonts, leaving: bool) {
     parent
-        .spawn(bevy_game_ui::menu_overlay("Game Menu Modal"))
+        .spawn(bevy_gamekit::ui::menu_overlay("Game Menu Modal"))
         .with_children(|overlay| {
             overlay
-                .spawn(bevy_game_ui::menu_panel("Game Menu Panel"))
+                .spawn(bevy_gamekit::ui::menu_panel("Game Menu Panel"))
                 .with_children(|pause| {
                     pause.spawn(text(
                         fonts,
@@ -1314,11 +1314,11 @@ fn spawn_game_menu(parent: &mut ChildSpawnerCommands, fonts: &UiFonts, leaving: 
 mod tests {
     use super::*;
     use bevy::input_focus::InputFocus;
-    use bevy_game_test::{
+    use bevy_gamekit::testing::{
         click_action, find_named, focus_action, run_frames, tap_key, ui_tree_snapshot,
         TestAppBuilder,
     };
-    use bevy_game_ui::{UiScaleMode, UiScalePreference};
+    use bevy_gamekit::ui::{UiScaleMode, UiScalePreference};
 
     fn test_app(width: u32, height: u32, scale: UiScaleMode) -> App {
         let mut builder = TestAppBuilder::new().with_ui(width, height);
@@ -1453,14 +1453,14 @@ mod tests {
             let actions = {
                 let world = app.world_mut();
                 let mut query = world
-                    .query_filtered::<Entity, (With<bevy_game_ui::UiAction>, Without<UiDisabled>)>(
+                    .query_filtered::<Entity, (With<bevy_gamekit::ui::UiAction>, Without<UiDisabled>)>(
                     );
                 query.iter(world).collect::<Vec<_>>()
             };
             for entity in actions {
                 assert!(focus_action(app.world_mut(), entity));
                 run_frames(&mut app, 3);
-                let visible = bevy_game_test::visible_control_rect(
+                let visible = bevy_gamekit::testing::visible_control_rect(
                     app.world(),
                     entity,
                     Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
@@ -1476,7 +1476,7 @@ mod tests {
 
     #[test]
     fn service_style_fake_provider_uses_the_same_browser_and_join_selection() {
-        use bevy_game_discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
+        use bevy_gamekit::discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
 
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         run_frames(&mut app, 2);
@@ -1493,7 +1493,7 @@ mod tests {
                 true,
             )
             .expect("valid fake metadata"),
-            bevy_game_discovery::DiscoveryEndpoint::Service {
+            bevy_gamekit::discovery::DiscoveryEndpoint::Service {
                 session_id,
                 locator: "public-lobby-77".to_owned(),
             },
@@ -1550,20 +1550,23 @@ mod tests {
                 let world = app.world_mut();
                 let mut query = world.query_filtered::<Entity, (
                     Or<(
-                        With<bevy_game_ui::UiAction>,
-                        With<bevy_game_ui::UiTextField>,
+                        With<bevy_gamekit::ui::UiAction>,
+                        With<bevy_gamekit::ui::UiTextField>,
                     )>,
                     Without<UiDisabled>,
                 )>();
                 query.iter(world).collect::<Vec<_>>()
             };
             for entity in entities {
-                assert!(bevy_game_ui::activation_eligible(app.world_mut(), entity));
+                assert!(bevy_gamekit::ui::activation_eligible(
+                    app.world_mut(),
+                    entity
+                ));
                 app.world_mut()
                     .resource_mut::<InputFocus>()
                     .set(entity, bevy::input_focus::FocusCause::Navigated);
                 run_frames(&mut app, 3);
-                let visible = bevy_game_test::visible_control_rect(
+                let visible = bevy_gamekit::testing::visible_control_rect(
                     app.world(),
                     entity,
                     Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
@@ -1601,7 +1604,7 @@ mod tests {
             .is_some());
         assert!(app
             .world()
-            .get::<bevy_game_ui::UiTextField>(passphrase)
+            .get::<bevy_gamekit::ui::UiTextField>(passphrase)
             .is_some());
         let node = app.world().get::<Node>(passphrase).expect("field node");
         assert!(matches!(node.min_height, Val::Px(height) if height >= 44.0));
@@ -1813,8 +1816,8 @@ mod tests {
 
     #[test]
     fn discovered_route_password_button_reaches_real_udp_transport() {
-        use bevy_game_discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
-        use bevy_game_session::{DirectConnectionCode, DiscoveredDirectTarget};
+        use bevy_gamekit::discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
+        use bevy_gamekit::session::{DirectConnectionCode, DiscoveredDirectTarget};
 
         let advertised_host = network::default_advertised_host()
             .unwrap_or_else(|| std::net::Ipv4Addr::LOCALHOST.to_string());

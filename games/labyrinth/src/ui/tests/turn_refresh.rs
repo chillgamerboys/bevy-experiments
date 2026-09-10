@@ -1,7 +1,7 @@
 //! Live decision/loadout replacement through native UI; not GPU rendering evidence.
 
 use super::*;
-use bevy_game_ui::{UiContextHelpState, UiSkinOverrides};
+use bevy_gamekit::ui::{UiContextHelpState, UiSkinOverrides};
 use labyrinth_rules::skill_definition;
 
 #[derive(Resource, Default)]
@@ -72,7 +72,7 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                 "confirm eligibility: keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, tooltip={:?}",
                 app.world().resource::<UiState>().selected,
                 app.world().resource::<UiState>().target,
-                app.world().resource::<bevy_game_ui::UiTooltipState>().subjects()
+                app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects()
             );
             activate(&mut app, confirm, keyboard);
             let diagnostics = app
@@ -113,7 +113,7 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                 app.world().resource::<UiState>().selected,
                 app.world().resource::<UiState>().target,
                 app.world().get::<Interaction>(confirm),
-                app.world().resource::<bevy_game_ui::UiTooltipState>().subjects(),
+                app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
                 battle::selected_action(app.world().resource::<LabyrinthView>(), app.world().resource::<UiState>())
             );
             for (actor, action) in commands {
@@ -151,11 +151,14 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                 assert_eq!(state.entity, Some(button));
                 let content = state.content.as_ref().expect("current medic help");
                 assert!(content.title.contains(heading) || content.body.contains(heading));
+                // Retained click/keyboard focus no longer creates a preview.
+                // Explicitly inspect the newly selected command's current data.
+                tap_key(&mut app, KeyCode::KeyT);
                 run_frames(&mut app, 8);
                 let title = find_named(app.world_mut(), "Tooltip Title");
                 assert!(title.is_some(), "current tooltip: {name}, keyboard={keyboard}, scale={scale:?}, source={:?}, state={:?}, help={:?}",
-                    app.world().get::<bevy_game_ui::UiTooltipSource>(button),
-                    app.world().resource::<bevy_game_ui::UiTooltipState>().subjects(),
+                    app.world().get::<bevy_gamekit::ui::UiTooltipSource>(button),
+                    app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
                     app.world().resource::<UiContextHelpState>());
                 let title = title.expect("current tooltip");
                 assert!(!text(&app, title).contains(skill_definition(SkillId::BackRankShot).name));
@@ -164,6 +167,8 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                     Some(&next)
                 );
                 assert!(app.world().resource::<CombatCommands>().0.is_empty());
+                tap_key(&mut app, KeyCode::Escape);
+                run_frames(&mut app, 2);
             }
         }
     }

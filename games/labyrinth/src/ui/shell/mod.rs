@@ -9,7 +9,7 @@ use lobby::lobby;
 pub(super) use settings::overlays;
 
 use super::*;
-use bevy_game_ui::{panel, screen_root, text_field, UiFocusId, UiViewportClass};
+use bevy_gamekit::ui::{panel, screen_root, text_field, UiFocusId, UiViewportClass};
 
 #[derive(Component)]
 struct ShellNotice;
@@ -210,11 +210,14 @@ fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
 
 fn menu(world: &mut World, parent: Entity) {
     let main = world
-        .spawn((bevy_game_ui::menu_panel("Expedition Menu"), ChildOf(parent)))
+        .spawn((
+            bevy_gamekit::ui::menu_panel("Expedition Menu"),
+            ChildOf(parent),
+        ))
         .insert(Node {
             max_height: Val::Auto,
             flex_shrink: 0.0,
-            ..bevy_game_ui::menu_panel_node()
+            ..bevy_gamekit::ui::menu_panel_node()
         })
         .id();
     label(
@@ -228,7 +231,7 @@ fn menu(world: &mut World, parent: Entity) {
         world,
         main,
         "Main Actions",
-        bevy_game_ui::menu_actions_node(),
+        bevy_gamekit::ui::menu_actions_node(),
     );
     control(
         world,
@@ -265,11 +268,14 @@ fn menu(world: &mut World, parent: Entity) {
 
 fn multiplayer_menu(world: &mut World, parent: Entity) {
     let main = world
-        .spawn((bevy_game_ui::menu_panel("Company Menu"), ChildOf(parent)))
+        .spawn((
+            bevy_gamekit::ui::menu_panel("Company Menu"),
+            ChildOf(parent),
+        ))
         .insert(Node {
             max_height: Val::Auto,
             flex_shrink: 0.0,
-            ..bevy_game_ui::menu_panel_node()
+            ..bevy_gamekit::ui::menu_panel_node()
         })
         .id();
     label(
@@ -283,7 +289,7 @@ fn multiplayer_menu(world: &mut World, parent: Entity) {
         world,
         main,
         "Company Actions",
-        bevy_game_ui::menu_actions_node(),
+        bevy_gamekit::ui::menu_actions_node(),
     );
     control(
         world,

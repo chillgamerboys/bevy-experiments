@@ -29,8 +29,8 @@ pub(super) fn mount(world: &mut World, parent: Entity, snapshot: &CombatSnapshot
     for actor in &snapshot.actors {
         let control = world
             .spawn((
-                bevy_game_ui::button(format!("Initiative Actor {}", actor.id.0)),
-                bevy_game_ui::UiFocusId::new("labyrinth-initiative", actor.id.0.to_string()),
+                bevy_gamekit::ui::button(format!("Initiative Actor {}", actor.id.0)),
+                bevy_gamekit::ui::UiFocusId::new("labyrinth-initiative", actor.id.0.to_string()),
                 Action::InspectActor(actor.id),
                 ChildOf(row),
                 UiSkin::Control,
@@ -165,11 +165,11 @@ pub(super) fn update(world: &mut World, snapshot: &CombatSnapshot) {
                 .entity_mut(entity)
                 .insert(AccessibleLabel::new(label.clone()));
         }
-        let help = bevy_game_ui::UiContextHelp {
+        let help = bevy_gamekit::ui::UiContextHelp {
             title: identity,
             body: label,
         };
-        if world.get::<bevy_game_ui::UiContextHelp>(entity) != Some(&help) {
+        if world.get::<bevy_gamekit::ui::UiContextHelp>(entity) != Some(&help) {
             world.entity_mut(entity).insert(help);
         }
         let paint = appearance.control(active);

@@ -1,9 +1,21 @@
-# Future private Gamekit extraction
+# Library distribution and optional future extraction
 
-This repository remains the incubator. Extraction is a later release operation,
-not a reason to make every game a library consumer today. Capabilities and canonical
-skills initially share one release tag; distribution remains private initially.
-Consumers pin tags/resolved SHAs, not branches.
+Gamekit and its games stay in this repository. Games consume the library; the first
+distribution excludes the games and their assets. Capabilities and canonical skills
+initially share one release tag; distribution remains private initially. Consumers
+pin tags/resolved SHAs, not branches. A repository split is not a release prerequisite.
+
+The [consolidation plan](gamekit-consolidation.md) defines release gates. Today,
+`python3 scripts/check_distribution.py` verifies Cargo-selected package sources with
+an external consumer in a temporary library-only workspace. It does not publish or
+produce a release artifact; `publish = false` remains in place. The final distribution
+channel, internal dependency versions, licensing and clean artifact-install check
+remain explicit release work.
+
+## Optional later repository split
+
+The historical recipe below is retained only if a separate library repository is
+chosen later. Do not perform it as part of the current consolidation.
 
 Start with a **fresh disposable clone of a committed, flat-layout revision**.
 Never filter this working repository or the linked worktrees. Use a pinned

@@ -74,7 +74,7 @@ fn concurrent_worker_acquisition_never_exceeds_the_shared_limit() {
 }
 
 fn minimal_app() -> App {
-    let mut builder = bevy_game_test::TestAppBuilder::new().with_minimal_plugins();
+    let mut builder = bevy_gamekit::testing::TestAppBuilder::new().with_minimal_plugins();
     builder.app_mut().add_plugins(LabyrinthNetworkPlugin);
     builder.build()
 }

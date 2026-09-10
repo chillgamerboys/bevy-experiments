@@ -1,6 +1,6 @@
 //! Game-owned structured combat history over shared native feed scrolling.
 use super::*;
-use bevy_game_ui::{UiFeedScroll, UiTooltipOpen};
+use bevy_gamekit::ui::{UiFeedScroll, UiTooltipOpen};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Entry {
@@ -193,7 +193,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
                 bevy::ui::FocusPolicy::Block,
                 Interaction::None,
                 HistoryPanel,
-                bevy_game_ui::UiTooltipAvoid,
+                bevy_gamekit::ui::UiTooltipAvoid,
                 HistoryMode(ui.log_mode),
                 UiRegionRole::ActivityFeed,
                 HistoryEncounter(view.encounter),
@@ -301,7 +301,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         ui.expanded_log.clear();
     }
     let safe_bottom = world
-        .get::<bevy_game_ui::UiTooltipBounds>(root)
+        .get::<bevy_gamekit::ui::UiTooltipBounds>(root)
         .map_or(330.0, |b| b.0.max.y);
     let max_height = (safe_bottom - 138.0).max(70.0);
     if let Some(mut node) = world.get_mut::<Node>(panel) {
@@ -443,23 +443,23 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             if let Some(skill) = entry.skill {
                 let subject = tooltips::ability_subject(skill);
                 if world
-                    .resource::<bevy_game_ui::UiTooltipCatalog>()
+                    .resource::<bevy_gamekit::ui::UiTooltipCatalog>()
                     .0
                     .contains_key(&subject)
                 {
                     let fonts = world.resource::<UiFonts>().clone();
                     world
                         .spawn((
-                            bevy_game_ui::button(format!("History Ability {}", entry.id)),
+                            bevy_gamekit::ui::button(format!("History Ability {}", entry.id)),
                             UiSkin::Control,
-                            bevy_game_ui::UiFocusId::new(
+                            bevy_gamekit::ui::UiFocusId::new(
                                 "labyrinth-history",
                                 format!("ability/{}", entry.id),
                             ),
                             UiTooltipOpen(subject),
                             ChildOf(item),
                         ))
-                        .with_child(bevy_game_ui::text(
+                        .with_child(bevy_gamekit::ui::text(
                             &fonts,
                             UiTextRole::Body,
                             "Ability details ›",

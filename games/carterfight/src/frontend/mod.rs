@@ -7,7 +7,7 @@ mod systems;
 mod tests;
 
 use bevy::prelude::*;
-use bevy_game_ui::{GameUiSystems, UiMotionPreference};
+use bevy_gamekit::ui::{GameUiSystems, UiMotionPreference};
 
 use crate::backend::MoveId;
 

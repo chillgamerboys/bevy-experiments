@@ -12,11 +12,11 @@ use aeronet::io::{
     server::{Close, Closed as TransportClosed},
 };
 use bevy::prelude::*;
-use bevy_game_discovery::{
+use bevy_gamekit::discovery::{
     DiscoveryPlugin, DiscoveryRegistry, ExpectedSession, SessionMetadata, SessionPasswordVerifier,
 };
-use bevy_game_multiplayer::*;
-use bevy_game_session::*;
+use bevy_gamekit::multiplayer::*;
+use bevy_gamekit::session::*;
 use bevy_replicon::prelude::*;
 use sha2::{Digest as _, Sha256};
 use std::{
@@ -98,11 +98,11 @@ impl Plugin for LabyrinthNetworkPlugin {
             .add_systems(PostUpdate, send_hello.in_set(MultiplayerSystems::Send))
             .add_systems(
                 Update,
-                discovery::poll.before(bevy_game_discovery::DiscoverySystems::Maintain),
+                discovery::poll.before(bevy_gamekit::discovery::DiscoverySystems::Maintain),
             )
             .add_systems(
                 Update,
-                discovery::project.after(bevy_game_discovery::DiscoverySystems::Maintain),
+                discovery::project.after(bevy_gamekit::discovery::DiscoverySystems::Maintain),
             )
             .add_observer(disconnected)
             .add_observer(listener_closed);

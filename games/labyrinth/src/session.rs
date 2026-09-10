@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy::prelude::*;
-use bevy_game_session::PeerId;
+use bevy_gamekit::session::PeerId;
 use labyrinth_rules::{
     AbilityLoadout, ActorId, ActorKind, Combat, CombatAction, CombatEvent, CombatSnapshot,
     HeroClass, HeroSetup, DEFAULT_HERO_ROSTER, PARTY_SIZE,

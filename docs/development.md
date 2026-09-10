@@ -33,6 +33,20 @@ launch is not the documented default.
    game-name branches in shared UI. Add static and interactive presentation checks.
 6. Update navigation and verify launch from root and the game directory.
 
+The standard application entry point is the [facade](../crates/bevy_gamekit/README.md):
+
+```toml
+[dependencies]
+bevy_gamekit = { workspace = true, features = ["ui"] }
+
+[dev-dependencies]
+bevy_gamekit = { workspace = true, features = ["testing-ui"] }
+```
+
+Use `bevy_gamekit::ui` and `bevy_gamekit::testing`. Direct capability dependencies
+remain supported for pure rules or narrowly scoped adapters. No facade feature
+automatically starts a service or composes a game. Networking is an explicit choice.
+
 ## Local artifacts
 
 `target/` is the only build tree; review output goes in `target/review/`. `.context/`

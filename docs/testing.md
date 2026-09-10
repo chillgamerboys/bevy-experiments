@@ -9,6 +9,7 @@ cargo test --workspace --doc --all-features --profile ci
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo deny check
 python3 scripts/check_repo.py
+python3 scripts/check_distribution.py
 python3 -m unittest discover -s scripts/tests -v
 python3 skills/scripts/validate_skills.py
 python3 -m unittest discover -s skills/tests -v
@@ -17,6 +18,15 @@ python3 -m unittest discover -s skills/tests -v
 Use `cargo test -p <package> --profile ci` for focused iteration. Preserve three-OS
 CI, minimal-feature capability checks and browser-core compile checks. `cargo deny`
 is a separately installed dependency-policy tool.
+
+`check_distribution.py` asks Cargo for each library package's file list, rejects
+escapes/symlinks, and stages those sources without `games/`. It builds an unrelated
+consumer using empty, pure-algorithm, UI and native-networking feature selections,
+checking the activated dependency graph for game or networking leakage. Use
+`--case empty|pure|ui|network` for a focused probe. Temporary sources are deleted;
+artifacts reuse `target/`. This proves independent source consumption, not registry
+publication, a complete game, visual quality or cross-machine networking. The native
+probe does not open sockets or invoke Tailscale. CI runs all four cases on three OSes.
 
 | Claim | Evidence | Does not establish |
 |---|---|---|
@@ -70,6 +80,16 @@ No automated selection test, snapshot or forecast parity check establishes the
 feel of the dock. A pointer/keyboard walk still checks hover-to-focus transitions,
 off-turn inspection, ability -> target -> Confirm, modal return, overflow and
 resizing. Record any missing interactive or cross-machine evidence explicitly.
+
+Tooltip lifecycle regressions include immediate first-frame preview and departure,
+one-second continuous hover to lock, persistence over empty space, source switching,
+explicit keyboard inspection, modal cleanup, and ×/Escape/outside dismissal.
+The native-layout test compares the card rectangle on every frame across locking:
+the preview must use the same shorter geometry as the locked card, not reserve an
+extra footer. Native pointer tests close the × over an underlying character and
+verify that stationary-pointer dismissal does not reveal a new tooltip. Render
+`labyrinth_review ... 1280 720 auto help` and `help-locked` for separate authored
+presentation states; those captures freeze timing and do not prove hover duration.
 
 See [Labyrinth](../games/labyrinth/labyrinth-testing.md),
 [Carterfight](../games/carterfight/README.md) and

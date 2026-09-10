@@ -81,10 +81,9 @@ pub struct UiTooltipAvoid;
 /// Timing is driven by Bevy's real-time clock, not wall-clock sleeps or simulation time.
 #[derive(Resource, Debug, Clone)]
 pub struct UiTooltipSettings {
-    /// Quiet hover/focus dwell before a preview appears.
-    pub show_delay: Duration,
-    /// Time allowed to cross gaps between source, card, and child cards.
-    pub leave_grace: Duration,
+    /// Continuous hover required to lock an immediately visible preview.
+    /// Leaving before this threshold dismisses it without a grace period.
+    pub lock_delay: Duration,
     /// Bounded number of cards, including the root (clamped to 1–8).
     pub max_depth: usize,
     /// Optional local inspect shortcut; games may rebind it or use requests only.
@@ -96,8 +95,7 @@ pub struct UiTooltipSettings {
 impl Default for UiTooltipSettings {
     fn default() -> Self {
         Self {
-            show_delay: Duration::from_millis(150),
-            leave_grace: Duration::from_millis(450),
+            lock_delay: Duration::from_secs(1),
             max_depth: 4,
             inspect_key: Some(KeyCode::KeyT),
             dismiss_key: Some(KeyCode::Escape),
@@ -129,10 +127,10 @@ pub struct UiTooltipState {
     pub(crate) consumed: bool,
     candidate: Option<UiTooltipSubject>,
     dwell: Duration,
-    away: Duration,
     return_focus: Option<Entity>,
     return_identity: Option<crate::UiFocusId>,
     suppressed: Option<UiTooltipSubject>,
+    dismissed_pointer: Option<Vec<(Entity, Option<Vec2>)>>,
     host: Option<Entity>,
 }
 
@@ -142,7 +140,7 @@ impl UiTooltipState {
     pub fn subjects(&self) -> &[UiTooltipSubject] {
         &self.chain
     }
-    /// Whether explicit pinning is keeping this chain alive.
+    /// Whether sustained hover or explicit inspection has locked this chain.
     #[must_use]
     pub fn is_pinned(&self) -> bool {
         self.pinned
@@ -158,7 +156,8 @@ impl UiTooltipState {
         self.chain.clear();
         self.pinned = false;
         self.keyboard = false;
-        self.away = Duration::ZERO;
+        self.dwell = Duration::ZERO;
+        self.suppressed = self.candidate.clone();
     }
 
     fn follow(&mut self, depth: usize, subject: UiTooltipSubject, maximum: usize) {
@@ -177,29 +176,36 @@ impl UiTooltipState {
         delta: Duration,
         settings: &UiTooltipSettings,
     ) {
-        if candidate != self.candidate {
+        let changed = candidate != self.candidate;
+        if changed {
             self.candidate = candidate.clone();
             self.dwell = Duration::ZERO;
             self.suppressed = None;
         }
-        if self.pinned || self.keyboard || over_card {
-            self.away = Duration::ZERO;
+        if self.keyboard || (self.pinned && over_card) {
             return;
         }
         if let Some(subject) = candidate {
-            self.away = Duration::ZERO;
-            self.dwell = self.dwell.saturating_add(delta);
-            if self.dwell >= settings.show_delay
-                && self.suppressed.as_ref() != Some(&subject)
-                && self.chain.first() != Some(&subject)
-            {
+            if self.suppressed.as_ref() == Some(&subject) {
+                return;
+            }
+            if self.pinned {
+                if !changed || self.chain.first() == Some(&subject) {
+                    return;
+                }
+                self.pinned = false;
+            }
+            if self.chain.first() != Some(&subject) {
                 self.chain = vec![subject];
             }
-        } else {
-            self.away = self.away.saturating_add(delta);
-            if self.away >= settings.leave_grace {
-                self.dismiss();
+            // The first sample establishes entry time. Never charge a preceding
+            // long frame (or time spent on a different source) to this hover.
+            if !changed {
+                self.dwell = self.dwell.saturating_add(delta);
             }
+            self.pinned = self.dwell >= settings.lock_delay;
+        } else if !self.pinned {
+            self.dismiss();
         }
     }
 }
@@ -217,7 +223,7 @@ pub enum UiTooltipSystems {
     Place,
 }
 
-/// Adds delayed previews, sticky reading, explicit pinning, linked cards, and a
+/// Adds immediate previews, dwell-to-lock reading, linked cards, and a
 /// replaceable native renderer. Add alongside GameUiPlugin. `T` inspects/pins;
 /// Escape closes deepest-first. Pointer previews never steal keyboard focus.
 pub struct GameUiTooltipPlugin;
@@ -375,6 +381,13 @@ fn resolve(
             )
         })
     });
+    // Focus can remain on a clicked control after the pointer leaves. It is
+    // still a valid explicit keyboard-inspection source, never a hover preview.
+    let pointer_candidate = candidate.as_ref().filter(|(_, _, entity)| {
+        world
+            .get::<Interaction>(*entity)
+            .is_some_and(|interaction| *interaction != Interaction::None)
+    });
     let over_card = world
         .query_filtered::<&Interaction, With<view::TooltipSurface>>()
         .iter(world)
@@ -383,6 +396,16 @@ fn resolve(
             .query::<(&Interaction, &view::TooltipAction)>()
             .iter(world)
             .any(|(interaction, _)| *interaction != Interaction::None);
+    let outside_click = !over_card
+        && world
+            .get_resource::<ButtonInput<MouseButton>>()
+            .is_some_and(|buttons| buttons.just_pressed(MouseButton::Left));
+    let mut cursors = world
+        .query::<(Entity, &Window)>()
+        .iter(world)
+        .map(|(entity, window)| (entity, window.cursor_position()))
+        .collect::<Vec<_>>();
+    cursors.sort_by_key(|(entity, _)| entity.to_bits());
     let host = world
         .query_filtered::<Entity, With<UiTooltipHost>>()
         .iter(world)
@@ -417,6 +440,14 @@ fn resolve(
     };
     world.resource_scope(|world, mut state: Mut<UiTooltipState>| {
         let was_keyboard = state.keyboard;
+        let explicit_dismissal = outside_click
+            || commands
+                .iter()
+                .any(|command| matches!(command, UiTooltipRequest::Dismiss))
+            || clicked
+                .iter()
+                .any(|action| matches!(action, view::TooltipAction::Close(0)))
+            || (escape && !editing && state.chain.len() == 1);
         let host_changed = state.host.is_some() && state.host != host;
         state.host = host;
         state.consumed = false;
@@ -433,11 +464,23 @@ fn resolve(
             .as_ref()
             .map(|(key, _, _)| key.clone())
             .filter(|key| content(world, &state, key).is_some());
-        state.hover(key.clone(), over_card, delta, &settings);
+        if state.dismissed_pointer.as_ref() != Some(&cursors) {
+            state.dismissed_pointer = None;
+        }
+        let pointer_key = pointer_candidate
+            .filter(|_| state.dismissed_pointer.is_none())
+            .and_then(|(subject, _, _)| key.as_ref().filter(|key| *key == subject))
+            .cloned();
+        if !(inspect && state.pinned) {
+            state.hover(pointer_key, over_card, delta, &settings);
+        }
         if let Some((key, _, anchor)) = &candidate {
-            if state.chain.first() == Some(key) && !state.pinned {
+            if state.chain.first() == Some(key) && !state.keyboard {
                 state.anchor = Some(*anchor);
             }
+        }
+        if outside_click {
+            state.dismiss();
         }
         // Adopters identify controls whose hint has served its purpose on use.
         // Keep it suppressed until hover/focus leaves, including clicks that
@@ -478,13 +521,12 @@ fn resolve(
         }
         for action in clicked {
             match action {
-                view::TooltipAction::Pin => state.pinned = !state.pinned,
                 view::TooltipAction::Close(depth) => {
                     state.chain.truncate(depth);
                     state.suppressed = state.candidate.clone();
                 }
                 view::TooltipAction::Link(depth, subject) => {
-                    if content(world, &state, &subject).is_some() {
+                    if state.pinned && content(world, &state, &subject).is_some() {
                         state.follow(depth, subject, settings.max_depth);
                     }
                 }
@@ -552,6 +594,12 @@ fn resolve(
         if state.chain.is_empty() {
             state.pinned = false;
             state.keyboard = false;
+            // Closing a floating card can expose a different source beneath
+            // its ×. Geometry changes are not fresh hover intent. Wait for an
+            // actual pointer move; explicit keyboard inspection remains usable.
+            if explicit_dismissal && !cursors.is_empty() {
+                state.dismissed_pointer = Some(cursors.clone());
+            }
         }
         if was_keyboard && !state.keyboard {
             let target = state

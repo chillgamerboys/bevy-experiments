@@ -190,10 +190,14 @@ targets; a stronger selected-target highlight and actor emphasis distinguish the
 current selection. Exact source/target ranks are listed in ability tooltips;
 HP forecast segments remain attached to the affected actor.
 
-Hover or focus a control briefly to read its card. Move into the card to keep
-reading; related terms open nested cards. **T** pins and enters keyboard
-inspection; **Escape** closes the deepest card first. A card's Pin control keeps
-it visible without stealing keyboard focus. **K** toggles the equipped skillbook,
+Hover an ability or status to see its card immediately. Leaving before 1 second
+hides it immediately; continuous hover locks it with an accent border and a small
+top-right **×**. Locked cards remain open over empty space, support related terms,
+and close via ×, an outside click, or **Escape** (deepest card first). Hovering a
+different source replaces the card and restarts the lock timer. **T** explicitly
+opens keyboard inspection of the focused source; merely retaining clicked-button
+focus never reopens a preview. Game-menu and combat-log toggles have no tooltips.
+**K** toggles the equipped skillbook,
 which uses the same disclosed ability content. Neither inspection nor a skillbook
 link spends a turn. The shared timing and key bindings can be changed independently
 of Labyrinth's rules and palette.

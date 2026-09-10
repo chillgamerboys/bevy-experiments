@@ -2,11 +2,11 @@
 
 use super::*;
 use bevy::input_focus::InputFocus;
-use bevy_game_test::{
+use bevy_gamekit::testing::{
     click_action, find_named, focus_action, run_frames, tap_key, visible_control_rect,
     HeadlessUiPlugin,
 };
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     activation_eligible, GameUiSkinPlugin, UiAction, UiScaleMode, UiScalePreference, UiTextStyle,
 };
 use sequencer::Runtime;

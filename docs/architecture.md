@@ -5,6 +5,13 @@ Share a stable contract with independent tests and two plausible consumers, not
 merely similar code. Keep uncertain abstractions local until experiments establish
 the common behavior.
 
+Applications may consume the feature-gated [bevy-gamekit facade](../crates/bevy_gamekit/README.md)
+or individual capabilities. The facade only re-exports types; it owns no plugin,
+rules or runtime state. Capabilities cannot depend back on it. Library-only external
+consumer checks enforce a boundary independent of the games' workspace builds.
+See the [consolidation plan](gamekit-consolidation.md) for staged extractions and
+the game-adapted balance harness; no universal combat model is planned.
+
 | Owner | Responsibility | Excludes |
 |---|---|---|
 | `bevy_game_hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
@@ -79,14 +86,18 @@ the measured card and every descendant after `UiSystems::Layout` and before
 `PostLayout` clipping/text processing, within the same frame. It does not write
 late `Node` offsets or wait for a later frame to reveal valid geometry. The host
 is a full-target screen root; cards retain native layout and scroll behavior.
-The configurable 150 ms preview dwell is a reading affordance, not a rendering
-workaround. `UiTooltipDismissOnActivate` lets surface-opening controls suppress
-their hints until hover/focus leaves. It does not suppress ability explanations
-by default or close explicitly pinned inspection.
+Previews appear immediately and are pointer-transparent. Leaving before the
+configurable `UiTooltipSettings::lock_delay` (1 second by default) dismisses them
+immediately. Continuous hover locks a card until explicit dismissal, source
+replacement or a scope/disclosure change. An accent border and corner × indicate
+the locked state; there is no Pin/footer row. Retained click focus is not hover;
+keyboard inspection is explicit via T. This lifecycle is separate from placement
+and never delays display to mask invalid geometry. `UiTooltipDismissOnActivate`
+can suppress a transient hint on activation until its source is left.
 `UiTooltipAvoid` marks same-host surfaces, such as a visible activity log, whose
 measured rectangles placement should avoid. When space is insufficient, placement
 minimizes overlap; adopters still own surface organization. Labyrinth omits the
-log-toggle tooltip entirely and separates non-interactive formation layout anchors
+log-toggle and game-menu tooltips entirely and separates non-interactive formation layout anchors
 from fitted-art input rectangles. Sprite rendering and those hit rectangles use
 the same art-fit calculation; moving the pointer over empty sky is not targeting.
 

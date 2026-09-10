@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::presentation::{ActorDisclosure, CombatDisclosure};
-use bevy_game_ui::UiContextHelp;
+use bevy_gamekit::ui::UiContextHelp;
 use labyrinth_rules::{skill_definition, Team};
 
 fn text_named(app: &mut App, name: &str) -> String {
@@ -14,7 +14,7 @@ fn actor_card_text(app: &App, actor: ActorId) -> String {
     let view = app.world().resource::<LabyrinthView>();
     let card = app
         .world()
-        .resource::<bevy_game_ui::UiTooltipCatalog>()
+        .resource::<bevy_gamekit::ui::UiTooltipCatalog>()
         .0
         .get(&battle::actor_subject(view.encounter, actor))
         .expect("actor card");
@@ -91,11 +91,11 @@ fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target() 
         )));
         assert!(app
             .world()
-            .resource::<bevy_game_ui::UiTooltipState>()
+            .resource::<bevy_gamekit::ui::UiTooltipState>()
             .is_pinned());
         assert_eq!(
             app.world()
-                .resource::<bevy_game_ui::UiTooltipState>()
+                .resource::<bevy_gamekit::ui::UiTooltipState>()
                 .subjects(),
             &[battle::actor_subject(1, ActorId(2))]
         );
@@ -257,7 +257,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
     let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
     assert!(app
         .world()
-        .get::<bevy_game_ui::UiContextHelp>(confirm)
+        .get::<bevy_gamekit::ui::UiContextHelp>(confirm)
         .expect("disabled explanation")
         .body
         .contains("Waiting for your turn"));

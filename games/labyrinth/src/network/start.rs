@@ -1,7 +1,7 @@
 //! Explicit socket and session startup; expensive password setup runs off-schedule.
 
 use super::*;
-use bevy_game_discovery::{DiscoveryEndpoint, SessionPassword};
+use bevy_gamekit::discovery::{DiscoveryEndpoint, SessionPassword};
 
 struct Prepared {
     settings: HostSettings,

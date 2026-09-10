@@ -2,7 +2,7 @@
 
 use bevy::input_focus::{FocusCause, InputFocus};
 use bevy::prelude::*;
-use bevy_game_ui::{UiActivated, UiFonts, UiMotionPreference, UiScaleMode, UiScalePreference};
+use bevy_gamekit::ui::{UiActivated, UiFonts, UiMotionPreference, UiScaleMode, UiScalePreference};
 
 use super::{dialogue::UiNodes, sequencer::Runtime, CarterfightIntent, CarterfightView};
 

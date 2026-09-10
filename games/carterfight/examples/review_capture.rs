@@ -9,7 +9,7 @@ use bevy::{
         view::screenshot::{save_to_disk, Screenshot, ScreenshotCaptured},
     },
 };
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     resolve_ui_metrics, GameUiPlugin, GameUiSkinPlugin, GameUiSystems, ResolvedUiMetrics,
     UiMotionPreference, UiScaleMode, UiScalePreference,
 };

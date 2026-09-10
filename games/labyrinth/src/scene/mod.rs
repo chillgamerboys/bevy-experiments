@@ -143,7 +143,7 @@ impl Plugin for LabyrinthScenePlugin {
                 PostUpdate,
                 fit_actor_hit_regions
                     .after(bevy::ui::UiSystems::Layout)
-                    .before(bevy_game_ui::UiTooltipSystems::Place)
+                    .before(bevy_gamekit::ui::UiTooltipSystems::Place)
                     .before(bevy::ui::UiSystems::PostLayout),
             )
             .add_systems(

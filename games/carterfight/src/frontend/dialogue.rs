@@ -2,7 +2,7 @@
 
 use super::{systems::CarterAssets, CarterfightIntent, CarterfightPhase, CarterfightView};
 use bevy::prelude::*;
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     button, screen_root, text, ResolvedUiMetrics, UiControlMetrics, UiDisabled, UiFocusId,
     UiMotionPreference, UiRegionRole, UiScaleMode, UiScalePreference, UiSkin, UiSkinOverrides,
     UiTextRole, UiTextStyle,
@@ -56,7 +56,7 @@ fn label(
     slot: Option<Slot>,
 ) -> Entity {
     let font = world.resource::<CarterAssets>().font.clone();
-    let bundle = text(world.resource::<bevy_game_ui::UiFonts>(), role, value);
+    let bundle = text(world.resource::<bevy_gamekit::ui::UiFonts>(), role, value);
     let entity = world
         .spawn((
             Name::new(name.to_owned()),

@@ -5,11 +5,8 @@ fn key(value: &str) -> UiTooltipSubject {
 }
 
 #[test]
-fn dwell_grace_pinning_and_deepest_first_are_deterministic() {
-    let settings = UiTooltipSettings {
-        show_delay: Duration::from_millis(350),
-        ..default()
-    };
+fn immediate_preview_locks_only_after_continuous_hover_and_stays_until_dismissed() {
+    let settings = UiTooltipSettings::default();
     let mut state = UiTooltipState::default();
     state.hover(
         Some(key("ability")),
@@ -17,26 +14,62 @@ fn dwell_grace_pinning_and_deepest_first_are_deterministic() {
         Duration::from_millis(349),
         &settings,
     );
-    assert!(state.subjects().is_empty());
+    assert_eq!(state.subjects(), &[key("ability")]);
+    assert!(
+        !state.is_pinned(),
+        "first sample cannot count preceding frame time"
+    );
+    state.hover(
+        Some(key("ability")),
+        false,
+        Duration::from_millis(999),
+        &settings,
+    );
+    assert_eq!(state.subjects(), &[key("ability")]);
+    assert!(!state.is_pinned());
     state.hover(
         Some(key("ability")),
         false,
         Duration::from_millis(1),
         &settings,
     );
-    assert_eq!(state.subjects(), &[key("ability")]);
-    state.hover(None, false, Duration::from_millis(449), &settings);
-    assert_eq!(state.subjects().len(), 1);
-    state.hover(None, true, Duration::from_secs(2), &settings);
+    assert!(state.is_pinned());
     state.follow(0, key("condition"), 4);
     state.follow(1, key("term"), 4);
-    state.pinned = true;
     state.hover(None, false, Duration::from_secs(100), &settings);
     assert_eq!(state.subjects().len(), 3);
     state.chain.pop();
     assert_eq!(state.subjects(), &[key("ability"), key("condition")]);
     state.dismiss();
     assert!(!state.is_pinned());
+}
+
+#[test]
+fn short_hover_leaves_immediately_and_new_sources_reset_lock_timer() {
+    let settings = UiTooltipSettings::default();
+    let mut state = UiTooltipState::default();
+    state.hover(Some(key("a")), false, Duration::ZERO, &settings);
+    state.hover(Some(key("a")), false, Duration::from_millis(999), &settings);
+    state.hover(None, false, Duration::ZERO, &settings);
+    assert!(state.subjects().is_empty());
+    state.hover(Some(key("a")), false, Duration::ZERO, &settings);
+    state.hover(
+        Some(key("a")),
+        false,
+        Duration::from_millis(1000),
+        &settings,
+    );
+    assert!(state.is_pinned());
+    state.hover(None, false, Duration::from_secs(60), &settings);
+    assert_eq!(state.subjects(), &[key("a")]);
+    state.hover(Some(key("b")), false, Duration::from_secs(60), &settings);
+    assert_eq!(state.subjects(), &[key("b")]);
+    assert!(!state.is_pinned());
+    state.hover(None, true, Duration::ZERO, &settings);
+    assert!(
+        state.subjects().is_empty(),
+        "preview cannot capture the pointer"
+    );
 }
 
 #[test]
@@ -194,6 +227,141 @@ fn using_a_control_preserves_deliberately_pinned_inspection() {
     let state = app.world().resource::<UiTooltipState>();
     assert!(state.is_pinned());
     assert_eq!(state.subjects(), &[key("root")]);
+}
+
+#[test]
+fn preview_is_pointer_transparent_and_lock_exposes_only_a_corner_close() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    step(&mut app, 1);
+    let preview = app
+        .world_mut()
+        .query_filtered::<Entity, With<view::TooltipSurface>>()
+        .single(app.world())
+        .expect("preview on first frame");
+    assert!(app.world().get::<Interaction>(preview).is_none());
+    assert_eq!(
+        app.world().get::<Pickable>(preview),
+        Some(&Pickable::IGNORE)
+    );
+    assert_eq!(
+        app.world_mut()
+            .query::<&view::TooltipAction>()
+            .iter(app.world())
+            .count(),
+        0
+    );
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    step(&mut app, 999);
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    step(&mut app, 1);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    let locked = app
+        .world_mut()
+        .query_filtered::<Entity, With<view::TooltipSurface>>()
+        .single(app.world())
+        .expect("locked card");
+    assert_eq!(
+        app.world()
+            .get::<crate::UiSkinOverrides>(locked)
+            .expect("border")
+            .border,
+        Some(app.world().resource::<crate::UiTheme>().accent)
+    );
+    let close = app
+        .world_mut()
+        .query::<(Entity, &view::TooltipAction)>()
+        .iter(app.world())
+        .find_map(|(entity, action)| {
+            matches!(action, view::TooltipAction::Close(0)).then_some(entity)
+        })
+        .expect("close only when locked");
+    let node = app.world().get::<Node>(close).expect("close geometry");
+    assert_eq!(node.position_type, PositionType::Absolute);
+    assert_eq!(node.right, Val::Px(0.0));
+    assert_eq!(node.top, Val::Px(0.0));
+    assert_eq!(node.width, Val::Px(44.0));
+    assert!(!app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|text| matches!(text.0.as_str(), "Pin" | "Unpin" | "Close" | "Pin · T")));
+    assert!(app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|text| text.0 == "×"));
+    app.world_mut().write_message(UiActivated { entity: close });
+    step(&mut app, 1);
+    step(&mut app, 1000);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+}
+
+#[test]
+fn pointer_exit_never_falls_back_to_a_clicked_controls_focus() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(anchor, bevy::input_focus::FocusCause::Pressed);
+    step(&mut app, 1);
+    assert_eq!(
+        app.world().resource::<UiTooltipState>().subjects(),
+        &[key("root")]
+    );
+    app.world_mut().entity_mut(anchor).insert(Interaction::None);
+    step(&mut app, 1);
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(anchor));
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    step(&mut app, 1000);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::KeyT);
+    step(&mut app, 1);
+    assert!(
+        app.world().resource::<UiTooltipState>().is_pinned(),
+        "explicit keyboard inspection still works"
+    );
+}
+
+#[test]
+fn locked_card_survives_empty_space_but_outside_click_dismisses() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    step(&mut app, 1);
+    step(&mut app, 1000);
+    app.world_mut().entity_mut(anchor).insert(Interaction::None);
+    step(&mut app, 60_000);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    app.init_resource::<ButtonInput<MouseButton>>();
+    app.world_mut()
+        .resource_mut::<ButtonInput<MouseButton>>()
+        .press(MouseButton::Left);
+    step(&mut app, 1);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
 }
 
 // These lifecycle-only fixtures do not install the layout engine. Supply

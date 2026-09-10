@@ -604,6 +604,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-gamekit"
+version = "0.1.0"
+dependencies = [
+ "bevy_game_discovery",
+ "bevy_game_hex",
+ "bevy_game_multiplayer",
+ "bevy_game_session",
+ "bevy_game_test",
+ "bevy_game_turns",
+ "bevy_game_ui",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2274,8 +2287,7 @@ name = "carterfight"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_game_test",
- "bevy_game_ui",
+ "bevy-gamekit",
  "rand 0.8.7",
  "rand_chacha",
 ]
@@ -2653,12 +2665,7 @@ version = "0.1.0"
 dependencies = [
  "aeronet",
  "bevy",
- "bevy_game_discovery",
- "bevy_game_multiplayer",
- "bevy_game_session",
- "bevy_game_test",
- "bevy_game_turns",
- "bevy_game_ui",
+ "bevy-gamekit",
  "bevy_replicon",
  "directories",
  "serde",
@@ -3879,11 +3886,7 @@ version = "0.1.0"
 dependencies = [
  "aeronet",
  "bevy",
- "bevy_game_discovery",
- "bevy_game_multiplayer",
- "bevy_game_session",
- "bevy_game_test",
- "bevy_game_ui",
+ "bevy-gamekit",
  "bevy_replicon",
  "directories",
  "labyrinth_rules",
