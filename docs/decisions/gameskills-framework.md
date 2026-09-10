@@ -41,7 +41,7 @@ is a later adoption case with other contributors: its changes need separate PRs
 for their review. Its integration must not become a prerequisite for starting
 our internal refactor. See the deferred [Port Vila pilot](port-vila-adoption.md).
 
-## Proposed order
+## Development order
 
 | Stage | Work | Evidence needed to move on |
 |---|---|---|
@@ -68,13 +68,13 @@ not a fixed inventory to preserve. Assess every instruction, reference and tool
 against real development tasks. Keep useful principles and regression cases;
 split, combine, move or retire the current entry points as the new design needs.
 
-### Proposed core development offering
+### Initial core development offering
 
 The core should help a developer go from a game idea or existing project to a
-working, understandable and releasable game. The [complete proposed catalog and
+working, understandable and releasable game. The [initial catalog and
 pipeline](gameskills-catalog.md) defines 12 core skills and 9 optional skills,
-their responsibilities and the shared execution contracts. These names and
-boundaries remain proposals to validate through real tasks.
+their responsibilities and the shared execution contracts. These approved
+boundaries provide the starting point for validation through real tasks.
 
 `gameskills:plan` is the default entry. It routes bounded work to the current
 agent and authorized independent work to `dispatch`. The toolbox covers debugging,
@@ -89,7 +89,7 @@ assets, compatibility and GameKit integration. Setup and readiness checks should
 be deterministic commands where possible, with a skill only where interpretation
 adds value.
 
-### Proposed levels of creative involvement
+### Levels of creative involvement
 
 Planning and playtesting use the same levels so the developer can control the
 kind of creative input sought. Levels apply to a task or bounded feature, with a
@@ -105,8 +105,8 @@ engineering rigor and honest evidence apply at every level.
 
 Recommend level 2 as the default for Labyrinth and Deckbuilder refinement, level
 1 for precise fixes or already specified behavior, level 3 for collaborative
-feature design, and level 4 for requested exploratory work. These defaults remain
-proposals for discussion. Higher levels do not imply higher quality or require
+feature design, and level 4 for requested exploratory work. These are accepted
+starting points that task-specific instructions can change. Higher levels do not imply higher quality or require
 passing through lower levels first.
 
 Use the developer's task instructions and existing decisions before the project

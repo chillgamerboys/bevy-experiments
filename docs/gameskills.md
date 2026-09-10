@@ -119,6 +119,15 @@ and Linux. Windows explicitly lacks these execution mechanisms; CI must not
 report skipped Windows execution tests as parity. Native client loading and
 agent behavior require separate observations of a specific client and bundle.
 
+The native adapters were inspected with Codex `0.153.4` and Claude Code `2.1.220`
+on macOS. Codex discovery verified this repository's pinned candidate
+`99be57217d4aab6b2e70272531ea6dcc5838a35b`: all 12 core skills and eight selected
+optional skills, with native cache contents matching the immutable bundle.
+The Bevy contribution package is not selected here. Claude discovered all 12 core
+skills in a preliminary source snapshot, but HTTP 401 authentication failures
+prevented any model response or Skill invocation. Claude behavioral compatibility
+remains unverified. Native manifests for all six packages pass both validators.
+
 The queue's integration transition currently verifies ancestry-preserving merges
 or fast-forwards. Squash/rebase integrations that omit the returned source commit
 must retain their externally verified PR evidence; the queue refuses to label
