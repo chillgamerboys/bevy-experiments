@@ -39,7 +39,7 @@ pub(super) fn host(world: &mut World, mut settings: HostSettings) -> Result<(), 
         fingerprint_text(),
         &settings.name,
         1,
-        4,
+        PLAYER_CAPACITY,
         true,
     )
     .map_err(|e| e.to_string())?;
@@ -69,13 +69,13 @@ pub(super) fn host(world: &mut World, mut settings: HostSettings) -> Result<(), 
                     None
                 };
                 let mut security = SessionAdmissionAuthority::new(AdmissionLimits {
-                    max_peers: 3,
-                    max_invites: 3,
-                    pending_timeout: Duration::from_secs(15),
+                    max_peers: GUEST_CAPACITY,
+                    max_invites: GUEST_CAPACITY,
+                    pending_timeout: ADMISSION_TIMEOUT,
                 })
                 .map_err(|e| e.to_string())?;
                 let mut invites = Vec::new();
-                for _ in 0..3 {
+                for _ in 0..GUEST_CAPACITY {
                     invites.push(
                         security
                             .issue_invite(at, at + Duration::from_secs(3600))
@@ -132,7 +132,7 @@ pub(super) fn finish_host(world: &mut World) {
         fingerprint_text(),
         &prepared.settings.name,
         1,
-        4,
+        PLAYER_CAPACITY,
         prepared.verifier.is_some(),
     ) {
         Ok(metadata) => metadata,
@@ -172,7 +172,7 @@ pub(super) fn finish_host(world: &mut World) {
     }
     let view = &mut *world.resource_mut::<LabyrinthView>();
     view.session_name = prepared.settings.name;
-    view.invite_labels = (1..=3)
+    view.invite_labels = (1..=GUEST_CAPACITY)
         .map(|index| format!("Guest invitation {index}"))
         .collect();
     view.notice = Some("Host started. Copy a separate invitation for each guest, or use discovery with the temporary passphrase.".into());

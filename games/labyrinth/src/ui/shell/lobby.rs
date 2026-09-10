@@ -37,21 +37,18 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
         world,
         lobby,
         "Hero Choice Title",
-        "Choose your hero | each role belongs to one player",
+        "Choose your class | classes may repeat; each player owns one hero",
         UiTextRole::Supporting,
     );
     let roles = row(world, lobby, "Hero Choices");
     for hero in HeroClass::ALL {
-        let taken = view.players.iter().any(|player| {
-            player.occupied && Some(player.slot) != view.player && player.hero == hero
-        });
         control(
             world,
             roles,
             format!("Choose {hero:?}"),
             hero.name(),
             Action::Hero(hero),
-            taken,
+            !view.admitted,
         );
     }
     let ready = view
@@ -69,7 +66,7 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
         !view.admitted,
     );
     if view.host {
-        let can_start = view.players.len() == 4
+        let can_start = view.players.len() == PARTY_SIZE
             && view
                 .players
                 .iter()
@@ -105,7 +102,7 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
             world,
             invites,
             "Invite Title",
-            "THREE GUESTS | THREE INVITATIONS",
+            "FIVE GUESTS | FIVE INVITATIONS",
             UiTextRole::Title,
         );
         label(world, invites, "Invite Advice", "Copy one distinct invitation for each friend. Codes stay out of the screen and diagnostics.", UiTextRole::Supporting);

@@ -79,7 +79,7 @@ pub(super) fn present(
         world,
         content,
         "Subtitle",
-        "Four lanterns. One company. Hold the line together.",
+        "Six lanterns. One company. Hold the line together.",
         UiTextRole::Supporting,
     );
     if view.mode == ViewMode::Lobby {
@@ -197,13 +197,13 @@ fn menu(world: &mut World, parent: Entity) {
         "LOCAL WORKSHOP",
         UiTextRole::Title,
     );
-    label(world, local, "Workshop Description", "Control all four heroes with no sockets. Useful for learning ranks and testing rules; this is not a multiplayer test.", UiTextRole::Supporting);
+    label(world, local, "Workshop Description", "Control all six heroes with no sockets. Useful for learning ranks and testing rules; this is not a multiplayer test.", UiTextRole::Supporting);
     let actions = row(world, local, "Workshop Actions");
     control(
         world,
         actions,
         "Start Local",
-        "Play locally | all four heroes",
+        "Play locally | all six heroes",
         Action::StartLocal,
         false,
     );

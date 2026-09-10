@@ -26,10 +26,18 @@ use std::{
 };
 
 use crate::{
-    session::{GameRequest, PartyAuthority, RequestResult, SessionCommand, SessionSnapshot},
+    session::{
+        GameRequest, PartyAuthority, RequestResult, SessionCommand, SessionSnapshot,
+        PLAYER_CAPACITY,
+    },
     view::*,
 };
 use protocol::*;
+
+const GUEST_CAPACITY: usize = labyrinth_rules::PARTY_SIZE - 1;
+const PASSWORD_WORKERS: usize = GUEST_CAPACITY;
+const MAX_HANDSHAKES: usize = GUEST_CAPACITY * 4;
+const ADMISSION_TIMEOUT: Duration = Duration::from_secs(15);
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -286,6 +294,9 @@ fn receive(world: &mut World) {
         if runtime.connection.is_none()
             || runtime.session != Some(offer.session)
             || runtime.attempt != Some(offer.attempt)
+            || offer.slot == 0
+            || offer.slot >= PLAYER_CAPACITY
+            || !offer.peer.is_valid()
         {
             continue;
         }
@@ -318,6 +329,9 @@ fn receive(world: &mut World) {
         if runtime.connection.is_none()
             || runtime.session != Some(admitted.session)
             || runtime.attempt != Some(admitted.attempt)
+            || admitted.slot == 0
+            || admitted.slot >= PLAYER_CAPACITY
+            || !admitted.peer.is_valid()
         {
             continue;
         }
@@ -348,14 +362,37 @@ fn receive(world: &mut World) {
         }
     }
     for envelope in drain::<SnapshotEnvelope>(world) {
-        let mut runtime = world.resource_mut::<Runtime>();
+        let runtime = world.resource::<Runtime>();
         if runtime.role != Role::Guest
+            || !runtime.admitted
             || runtime.connection.is_none()
             || runtime.attempt != Some(envelope.attempt)
         {
             continue;
         }
         let snapshot = envelope.snapshot;
+        let identity = runtime
+            .connection
+            .and_then(|entity| world.get::<AuthenticatedPeer>(entity));
+        if !runtime
+            .player
+            .zip(identity)
+            .is_some_and(|(slot, identity)| {
+                snapshot.validate_recipient(slot, identity.peer).is_ok()
+            })
+            || runtime
+                .latest
+                .as_ref()
+                .is_some_and(|previous| snapshot.validate_successor(previous).is_err())
+        {
+            start::disconnect_guest(world);
+            notice(
+                world,
+                "The host sent an invalid session snapshot; the saved profile was preserved.",
+            );
+            continue;
+        }
+        let mut runtime = world.resource_mut::<Runtime>();
         runtime.sequence = runtime.sequence.max(snapshot.next_sequence);
         if runtime
             .latest

@@ -10,7 +10,7 @@ use std::{
 /// Public launch options. Admission secrets are never accepted on the command line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LaunchOptions {
-    /// Control all four heroes locally without opening a network session.
+    /// Control all six heroes locally without opening a network session.
     pub local: bool,
     /// Deterministic initial encounter seed.
     pub seed: u64,
@@ -151,7 +151,7 @@ impl ProfileGuard {
     #[must_use]
     pub fn title(&self) -> String {
         let mode = if self.local {
-            "Local · all four heroes"
+            "Local · all six heroes"
         } else {
             "Co-op"
         };
@@ -183,7 +183,7 @@ pub enum LaunchError {
 impl fmt::Display for LaunchError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::HelpRequested => "Labyrinth [--local] [--seed INTEGER] [--profile NAME] [--data-dir PATH]\nProfiles isolate reconnect state. Use host, guest-a, guest-b, and guest-c for local multiplayer tests. Never pass admission secrets on the command line.",
+            Self::HelpRequested => "Labyrinth [--local] [--seed INTEGER] [--profile NAME] [--data-dir PATH]\nProfiles isolate reconnect state. Use host and guest-a through guest-e for local multiplayer tests. Never pass admission secrets on the command line.",
             Self::InvalidArguments => "invalid launch arguments; use --help (admission secrets are not command-line options)",
             Self::InvalidProfile => "profile must contain 1-32 ASCII letters, numbers, hyphens or underscores",
             Self::StorageUnavailable => "profile storage is unavailable; try an explicit --data-dir",

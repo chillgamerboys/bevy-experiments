@@ -27,7 +27,7 @@ pub enum ViewMode {
     /// No admitted session.
     #[default]
     Menu,
-    /// Four-player ready lobby.
+    /// Six-player ready lobby.
     Lobby,
     /// Live or completed encounter.
     Combat,
@@ -38,6 +38,8 @@ pub enum ViewMode {
 pub struct PlayerView {
     /// Stable zero-based player slot, never a formation rank.
     pub slot: u8,
+    /// Owned combatant identity, independent of class and formation rank.
+    pub actor: ActorId,
     /// Selected hero.
     pub hero: HeroClass,
     /// Human-readable label.
@@ -131,7 +133,7 @@ pub struct HostSettings {
 /// UI returns intent; the application validates and routes it to authority.
 #[derive(Message, Debug, Clone)]
 pub enum LabyrinthIntent {
-    /// Start a four-hero local rules session.
+    /// Start a six-hero local rules session.
     StartLocal(u64),
     /// Open a listen host.
     Host(HostSettings),
@@ -159,7 +161,7 @@ pub enum LabyrinthIntent {
     SelectHero(HeroClass),
     /// Change local readiness.
     Ready(bool),
-    /// Host starts after all four players are ready.
+    /// Host starts after all six players are ready.
     StartEncounter,
     /// Host returns the current party to the lobby.
     Rematch,

@@ -20,7 +20,7 @@ fn request(authority: &mut PartyAuthority, slot: u8, command: SessionCommand) ->
     )
 }
 
-fn admitted_party() -> (PartyAuthority, [PeerId; 3]) {
+fn admitted_party() -> (PartyAuthority, [PeerId; PARTY_SIZE - 1]) {
     let mut authority = PartyAuthority::new(42, false);
     assert_eq!(
         request(
@@ -31,7 +31,8 @@ fn admitted_party() -> (PartyAuthority, [PeerId; 3]) {
         .rejection,
         None
     );
-    let peers = [peer(11), peer(22), peer(33)];
+    let peers =
+        std::array::from_fn(|index| peer(u8::try_from(index + 1).expect("guest count fits")));
     for (index, identity) in peers.into_iter().enumerate() {
         assert_eq!(
             authority.reserve(identity),
@@ -42,9 +43,9 @@ fn admitted_party() -> (PartyAuthority, [PeerId; 3]) {
     (authority, peers)
 }
 
-fn started_party() -> (PartyAuthority, [PeerId; 3]) {
+fn started_party() -> (PartyAuthority, [PeerId; PARTY_SIZE - 1]) {
     let (mut authority, peers) = admitted_party();
-    for slot in 0..4 {
+    for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
             request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
             None
@@ -58,11 +59,17 @@ fn started_party() -> (PartyAuthority, [PeerId; 3]) {
 }
 
 fn advance_to_hero(authority: &mut PartyAuthority) -> (ActorId, u8) {
-    for _ in 0..8 {
+    for _ in 0..PARTY_SIZE * 2 {
         let combat = authority.snapshot(0).combat.expect("live combat");
         let active = combat.active_actor.expect("nonterminal encounter");
         if combat.actor(active).expect("active character").team() == Team::Heroes {
-            return (active, u8::try_from(active.0 - 1).expect("hero owner slot"));
+            let owner = authority
+                .players
+                .iter()
+                .find(|player| player.actor == active)
+                .expect("active hero has one owner")
+                .slot;
+            return (active, owner);
         }
         assert!(authority.advance_enemy());
     }
@@ -70,10 +77,11 @@ fn advance_to_hero(authority: &mut PartyAuthority) -> (ActorId, u8) {
 }
 
 #[test]
-fn four_unique_reservations_count_pending_and_disconnected_capacity() {
+fn six_unique_reservations_count_pending_and_disconnected_capacity() {
     let mut authority = PartyAuthority::new(42, false);
     assert_eq!(authority.occupied(), 1);
-    for (slot, identity) in [(1, peer(1)), (2, peer(2)), (3, peer(3))] {
+    for slot in 1..PLAYER_CAPACITY {
+        let identity = peer(slot);
         assert_eq!(authority.reserve(identity), Ok(slot));
         assert_eq!(
             authority.reserve(identity),
@@ -81,9 +89,9 @@ fn four_unique_reservations_count_pending_and_disconnected_capacity() {
             "retry preserves its reservation"
         );
     }
-    assert_eq!(authority.occupied(), 4);
+    assert_eq!(authority.occupied(), PLAYER_CAPACITY);
     assert!(!authority.has_space());
-    assert!(authority.reserve(peer(4)).is_err());
+    assert!(authority.reserve(peer(PLAYER_CAPACITY)).is_err());
     assert!(authority
         .snapshot(0)
         .players
@@ -94,15 +102,15 @@ fn four_unique_reservations_count_pending_and_disconnected_capacity() {
     authority.connected(peer(1), false);
     assert_eq!(
         authority.occupied(),
-        4,
+        PLAYER_CAPACITY,
         "disconnected identity keeps its reserved seat"
     );
 }
 
 #[test]
-fn all_four_players_must_be_ready_and_only_host_can_start() {
+fn all_six_players_must_be_ready_and_only_host_can_start() {
     let (mut authority, _) = admitted_party();
-    for slot in 0..3 {
+    for slot in 0..PLAYER_CAPACITY - 1 {
         assert_eq!(
             request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
             None
@@ -113,7 +121,12 @@ fn all_four_players_must_be_ready_and_only_host_can_start() {
         .is_some());
     assert!(authority.in_lobby());
     assert_eq!(
-        request(&mut authority, 3, SessionCommand::Ready(true)).rejection,
+        request(
+            &mut authority,
+            PLAYER_CAPACITY - 1,
+            SessionCommand::Ready(true)
+        )
+        .rejection,
         None
     );
     assert!(request(&mut authority, 1, SessionCommand::Start)
@@ -166,23 +179,54 @@ fn duplicate_cached_request_and_replay_after_eviction_never_reapply() {
 
 #[test]
 fn character_ownership_is_seat_identity_not_current_formation_rank() {
-    let (mut authority, _) = started_party();
-    let initial = authority.snapshot(0).combat.expect("combat");
+    let (mut authority, _) = admitted_party();
+    // Deliberately non-arithmetic IDs and repeated classes make inferred ownership fail.
+    for player in &mut authority.players {
+        player.actor = ActorId(500 + u16::from(player.slot) * 37);
+    }
+    for slot in 0..PLAYER_CAPACITY {
+        assert_eq!(
+            request(
+                &mut authority,
+                slot,
+                SessionCommand::ChooseHero(HeroClass::Knifehand)
+            )
+            .rejection,
+            None
+        );
+    }
+    for slot in 0..PLAYER_CAPACITY {
+        assert_eq!(
+            request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
+            None
+        );
+    }
     assert_eq!(
-        initial.actor(ActorId(1)).expect("host hero").kind,
-        labyrinth_rules::ActorKind::Hero(HeroClass::FieldMedic)
+        request(&mut authority, 0, SessionCommand::Start).rejection,
+        None
     );
-    assert_eq!(initial.rank(ActorId(1)), Some(4));
     let (actor, slot) = advance_to_hero(&mut authority);
     let before = authority.snapshot(slot).combat.expect("combat");
-    let wrong_rank_owner = before.rank(actor).expect("hero rank") - 1;
-    assert_ne!(
-        wrong_rank_owner, slot,
-        "fixture rotates every hero away from seat-index rank"
-    );
+    let ally = before
+        .legal_actions(actor)
+        .into_iter()
+        .find_map(|action| {
+            if let CombatAction::Reposition { ally } = action {
+                Some(ally)
+            } else {
+                None
+            }
+        })
+        .expect("adjacent standing ally");
+    let wrong_owner = authority
+        .players
+        .iter()
+        .find(|player| player.actor == ally)
+        .expect("ally owner")
+        .slot;
     assert!(request(
         &mut authority,
-        wrong_rank_owner,
+        wrong_owner,
         SessionCommand::Act {
             actor,
             action: CombatAction::Wait
@@ -190,18 +234,45 @@ fn character_ownership_is_seat_identity_not_current_formation_rank() {
     )
     .rejection
     .is_some());
-    assert_eq!(authority.snapshot(slot).combat, Some(before));
+    assert_eq!(authority.snapshot(slot).combat, Some(before.clone()));
     assert_eq!(
         request(
             &mut authority,
             slot,
             SessionCommand::Act {
                 actor,
-                action: CombatAction::Wait
+                action: CombatAction::Reposition { ally }
             }
         )
         .rejection,
         None
+    );
+    let after = authority.snapshot(slot);
+    assert_ne!(
+        after.combat.as_ref().expect("combat").rank(actor),
+        before.rank(actor)
+    );
+    assert_eq!(
+        after
+            .players
+            .iter()
+            .find(|player| player.slot == slot)
+            .expect("owner")
+            .actor,
+        actor
+    );
+    assert_eq!(
+        request(
+            &mut authority,
+            wrong_owner,
+            SessionCommand::Act {
+                actor,
+                action: CombatAction::Wait
+            }
+        )
+        .rejection
+        .as_deref(),
+        Some("That is not your hero.")
     );
 }
 
@@ -267,7 +338,7 @@ fn disconnected_guest_pauses_rules_and_reconnect_restores_same_phase_without_tic
         reserved_slot,
         "combat departure cannot remove a controlled hero"
     );
-    assert_eq!(authority.occupied(), 4);
+    assert_eq!(authority.occupied(), PLAYER_CAPACITY);
     assert!(!authority.has_space());
     authority.connected(missing, true);
     assert!(!authority.paused());
@@ -305,7 +376,7 @@ fn lobby_release_clears_only_departing_identity_history_and_allows_replacement()
     assert!(authority.next_sequence(slot) > 1);
     authority.release(departing);
     assert_eq!(authority.slot_for(departing), None);
-    assert_eq!(authority.occupied(), 3);
+    assert_eq!(authority.occupied(), PLAYER_CAPACITY - 1);
     assert_eq!(authority.next_sequence(slot), 1);
     assert_eq!(authority.next_sequence(0), host_sequence);
     let newcomer = peer(99);
@@ -351,7 +422,7 @@ fn rematch_preserves_identities_watermarks_and_invalidates_prior_encounter_comma
     );
     assert!(stale.rejection.is_some());
     assert!(authority.in_lobby());
-    for slot in 0..4 {
+    for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
             request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
             None
@@ -401,7 +472,12 @@ fn accepted_gameplay_records_typed_monotonic_events_with_bounded_history() {
         if combat.actor(actor).expect("actor").team() == Team::Enemies {
             authority.advance_enemy();
         } else {
-            let slot = u8::try_from(actor.0 - 1).expect("hero slot");
+            let slot = authority
+                .players
+                .iter()
+                .find(|player| player.actor == actor)
+                .expect("hero owner")
+                .slot;
             let action = combat.legal_actions(actor).into_iter().find(|action| matches!(action, CombatAction::Skill { skill, .. } if labyrinth_rules::skill_definition(*skill).effects.iter().any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_))))).unwrap_or(CombatAction::Wait);
             assert_eq!(
                 request(&mut authority, slot, SessionCommand::Act { actor, action }).rejection,
@@ -422,4 +498,237 @@ fn accepted_gameplay_records_typed_monotonic_events_with_bounded_history() {
         authority.snapshot(0).combat.expect("combat").outcome,
         Some(CombatOutcome::Victory | CombatOutcome::Defeat)
     ));
+}
+
+#[test]
+fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readiness() {
+    let (mut authority, _) = admitted_party();
+    for slot in 0..PLAYER_CAPACITY {
+        assert_eq!(
+            request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
+            None
+        );
+    }
+    let before = authority.snapshot(0);
+    let chooser = PLAYER_CAPACITY - 1;
+    assert_eq!(
+        request(
+            &mut authority,
+            chooser,
+            SessionCommand::ChooseHero(HeroClass::Knifehand)
+        )
+        .rejection,
+        None
+    );
+    let changed = authority.snapshot(0);
+    assert!(changed.players.iter().all(|player| !player.ready));
+    for player in &changed.players {
+        let prior = before
+            .players
+            .iter()
+            .find(|prior| prior.slot == player.slot)
+            .expect("same player");
+        assert_eq!((player.actor, player.peer), (prior.actor, prior.peer));
+        if player.slot != chooser {
+            assert_eq!(
+                (player.hero, &player.abilities),
+                (prior.hero, &prior.abilities)
+            );
+        } else {
+            assert_eq!(player.hero, HeroClass::Knifehand);
+            assert_eq!(
+                player.abilities,
+                HeroSetup::preset(player.actor, player.hero).abilities
+            );
+        }
+    }
+    assert!(
+        changed
+            .players
+            .iter()
+            .filter(|player| player.hero == HeroClass::Knifehand)
+            .count()
+            >= 3
+    );
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_some());
+}
+
+#[test]
+fn sixth_player_reconnect_preserves_nondefault_actor_loadout_and_live_state() {
+    let (mut authority, peers) = admitted_party();
+    let sixth = authority.players.last_mut().expect("sixth player");
+    sixth.actor = ActorId(909);
+    sixth.abilities =
+        AbilityLoadout::new(vec![labyrinth_rules::SkillId::DeepStrike]).expect("instance loadout");
+    for slot in 0..PLAYER_CAPACITY {
+        assert_eq!(
+            request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
+            None
+        );
+    }
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Start).rejection,
+        None
+    );
+    let before = authority.snapshot(PLAYER_CAPACITY - 1);
+    let identity = *peers.last().expect("sixth human");
+    authority.connected(identity, false);
+    assert!(authority.paused());
+    assert!(!authority.advance_enemy());
+    assert_eq!(authority.reserve(identity), Ok(PLAYER_CAPACITY - 1));
+    authority.connected(identity, true);
+    let after = authority.snapshot(PLAYER_CAPACITY - 1);
+    assert_eq!(after.players, before.players);
+    assert_eq!(after.combat, before.combat);
+    assert_eq!(after.next_sequence, before.next_sequence);
+    assert_eq!(after.events, before.events);
+    assert_eq!(after.validate(), Ok(()));
+}
+
+fn assert_invalid_snapshot(snapshot: &SessionSnapshot) {
+    assert!(snapshot.validate().is_err());
+    let bytes = serde_json::to_vec(snapshot).expect("malformed fixture encodes");
+    assert!(serde_json::from_slice::<SessionSnapshot>(&bytes).is_err());
+}
+
+#[test]
+fn received_snapshots_validate_six_distinct_owners_even_when_classes_repeat() {
+    let (authority, peers) = started_party();
+    let valid = authority.snapshot(1);
+    let first_peer = *peers.first().expect("guest identity");
+    assert_eq!(valid.validate(), Ok(()));
+    assert_eq!(valid.validate_recipient(1, first_peer), Ok(()));
+    assert!(valid.validate_recipient(2, first_peer).is_err());
+    let bytes = serde_json::to_vec(&valid).expect("snapshot");
+    assert_eq!(
+        serde_json::from_slice::<SessionSnapshot>(&bytes).expect("validated roundtrip"),
+        valid
+    );
+
+    let first = valid.players.first().expect("host").clone();
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").slot = first.slot;
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").actor = first.actor;
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").peer = Some(first_peer);
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").hero = HeroClass::Gatekeeper;
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").abilities =
+        AbilityLoadout::new(Vec::new()).expect("empty is bounded");
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.pop();
+    assert_invalid_snapshot(&bad);
+    let mut bad = valid.clone();
+    bad.players.last_mut().expect("guest").connected = false;
+    assert_invalid_snapshot(&bad);
+}
+
+#[test]
+fn repeated_class_actors_cannot_be_swapped_between_owners_in_later_snapshots() {
+    let (authority, _) = started_party();
+    let before = authority.snapshot(0);
+    let mut after = before.clone();
+    let mut twins = after
+        .players
+        .iter_mut()
+        .filter(|player| player.hero == HeroClass::Knifehand);
+    let first = twins.next().expect("first Knifehand");
+    let second = twins.next().expect("second Knifehand");
+    std::mem::swap(&mut first.actor, &mut second.actor);
+    assert_eq!(
+        after.validate(),
+        Ok(()),
+        "static roster remains valid but its ownership changed"
+    );
+    assert!(after.validate_successor(&before).is_err());
+}
+
+#[test]
+fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
+    let mut authority = PartyAuthority::new(42, true);
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Start).rejection,
+        None
+    );
+    let original = authority.snapshot(0);
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Rematch).rejection,
+        None
+    );
+    assert_eq!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ChooseHero(HeroClass::FieldMedic)
+        )
+        .rejection,
+        None
+    );
+    assert!(authority
+        .snapshot(0)
+        .players
+        .iter()
+        .all(|player| !player.ready));
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_some());
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
+        None
+    );
+    assert!(authority
+        .snapshot(0)
+        .players
+        .iter()
+        .all(|player| player.ready));
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Ready(false)).rejection,
+        None
+    );
+    assert!(authority
+        .snapshot(0)
+        .players
+        .iter()
+        .all(|player| !player.ready));
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
+        None
+    );
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Start).rejection,
+        None
+    );
+    let restarted = authority.snapshot(0);
+    assert!(restarted.combat.is_some());
+    assert!(restarted.encounter > original.encounter);
+    assert_eq!(restarted.validate(), Ok(()));
+    assert_eq!(
+        restarted.players.first().expect("local controller").hero,
+        HeroClass::FieldMedic
+    );
+
+    let (mut remote, _) = admitted_party();
+    assert_eq!(
+        request(&mut remote, 0, SessionCommand::Ready(true)).rejection,
+        None
+    );
+    assert_eq!(
+        remote
+            .snapshot(0)
+            .players
+            .iter()
+            .filter(|player| player.ready)
+            .count(),
+        1,
+        "network readiness remains one decision per human"
+    );
 }

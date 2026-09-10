@@ -2,6 +2,7 @@
 
 mod network;
 pub mod profile;
+mod scene;
 mod session;
 pub mod ui;
 pub mod view;

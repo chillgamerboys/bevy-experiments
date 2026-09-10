@@ -228,9 +228,10 @@ pub(super) fn project(world: &mut World) {
                 id: session.session_id,
                 compatible: session.compatibility == Compatibility::Compatible,
                 label: format!(
-                    "{} [{sources}] {}/4 | {} | {}s",
+                    "{} [{sources}] {}/{} | {} | {}s",
                     session.metadata.display_name(),
                     session.metadata.claimed_players(),
+                    session.metadata.player_capacity(),
                     if session.metadata.password_required() {
                         "LOCKED"
                     } else {

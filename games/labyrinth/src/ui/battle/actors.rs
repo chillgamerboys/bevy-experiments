@@ -1,33 +1,28 @@
-//! Stable actor/status entities, formation projection and local feedback visuals.
+//! Stable actor hit areas and compact overlays above a game-owned world scene.
 
 use super::*;
+use bevy::input_focus::InputFocusVisible;
+use labyrinth_rules::{Boundary, Effect, StatusInstance};
 
 pub(super) fn formation(
     world: &mut World,
     parent: Entity,
     name: &str,
-    title: &str,
-    stacked: bool,
+    _title: &str,
+    _stacked: bool,
 ) -> Entity {
     let team = column(
         world,
         parent,
         name,
         Node {
-            width: Val::Percent(if stacked { 100.0 } else { 49.0 }),
+            width: Val::Percent(49.0),
+            height: Val::Percent(100.0),
             min_width: Val::Px(0.0),
+            min_height: Val::Px(0.0),
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(8.0),
-            flex_shrink: 0.0,
             ..default()
         },
-    );
-    label(
-        world,
-        team,
-        &format!("{name} Heading"),
-        title,
-        UiTextRole::Supporting,
     );
     column(
         world,
@@ -35,8 +30,10 @@ pub(super) fn formation(
         &format!("{name} Ranks"),
         Node {
             width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            min_height: Val::Px(0.0),
             flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(8.0),
+            column_gap: Val::Px(4.0),
             align_items: AlignItems::Stretch,
             ..default()
         },
@@ -49,20 +46,24 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         parent,
         &format!("Actor {} Tile", actor.id.0),
         Node {
-            width: Val::Percent(24.0),
+            flex_basis: Val::Px(0.0),
+            height: Val::Percent(100.0),
             min_width: Val::Px(44.0),
-            min_height: Val::Px(150.0),
+            min_height: Val::Px(0.0),
             flex_grow: 1.0,
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(8.0),
+            row_gap: Val::Px(4.0),
             ..default()
         },
     );
+    // Only this artwork hit area anchors the world sprite. Numeric overlays are
+    // siblings below it, so text scaling never paints labels over character art.
     let control = world
         .spawn((
             bevy_game_ui::button(format!("Actor {}", actor.id.0)),
-            UiSkin::Card,
             bevy_game_ui::UiFocusId::new("labyrinth-actors", actor.id.0.to_string()),
+            crate::scene::SceneActorAnchor { actor: actor.id },
+            crate::scene::SceneActorEmphasis::default(),
             Action::Actor(actor.id),
             ChildOf(entity),
         ))
@@ -70,36 +71,46 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
     world.entity_mut(control).insert(Node {
         width: Val::Percent(100.0),
         min_width: Val::Px(44.0),
-        min_height: Val::Px(150.0),
+        min_height: Val::Px(44.0),
+        flex_basis: Val::Px(0.0),
         flex_grow: 1.0,
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(8.0),
-        padding: UiRect::all(Val::Px(10.0)),
-        border: UiRect::all(Val::Px(2.0)),
+        border: UiRect::bottom(Val::Px(3.0)),
         ..default()
     });
-    portrait(world, control, actor.kind);
+    world
+        .entity_mut(control)
+        .insert(BackgroundColor(Color::NONE));
     let text = label(
         world,
-        control,
+        entity,
         &format!("Actor {} Summary", actor.id.0),
-        actor.name(),
+        "",
         UiTextRole::Body,
     );
+    world.entity_mut(text).insert((
+        TextLayout::justify(Justify::Center),
+        Node {
+            width: Val::Percent(100.0),
+            min_width: Val::Px(0.0),
+            flex_shrink: 0.0,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.02, 0.025, 0.03, 0.86)),
+    ));
     let hp = column(
         world,
-        control,
+        entity,
         &format!("Actor {} HP Track", actor.id.0),
         Node {
             width: Val::Percent(100.0),
-            height: Val::Px(8.0),
+            height: Val::Px(6.0),
             flex_shrink: 0.0,
             ..default()
         },
     );
     world
         .entity_mut(hp)
-        .insert(BackgroundColor(Color::srgb(0.025, 0.035, 0.04)));
+        .insert(BackgroundColor(Color::srgb(0.02, 0.025, 0.03)));
     let bar = column(
         world,
         hp,
@@ -113,15 +124,16 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
     world
         .entity_mut(bar)
         .insert(BackgroundColor(actor_color(actor.kind)));
-    // Status controls are siblings, not nested buttons, so each has one activation owner.
+    // Reserve a stable footer on all actors, even when no effects are present.
     let statuses = column(
         world,
         entity,
         &format!("Actor {} Statuses", actor.id.0),
         Node {
             width: Val::Percent(100.0),
+            min_height: Val::Px(44.0),
+            flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),
             ..default()
         },
     );
@@ -136,129 +148,6 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
     });
 }
 
-pub(super) fn portrait(world: &mut World, parent: Entity, kind: ActorKind) {
-    let portrait = column(
-        world,
-        parent,
-        "Original Geometric Portrait",
-        Node {
-            width: Val::Px(74.0),
-            height: Val::Px(74.0),
-            flex_shrink: 0.0,
-            align_self: AlignSelf::Center,
-            ..default()
-        },
-    );
-    world.entity_mut(portrait).insert(Portrait);
-    let color = actor_color(kind);
-    let dark = Color::srgb(0.04, 0.055, 0.06);
-    let piece = |world: &mut World,
-                 name: &str,
-                 left: f32,
-                 top: f32,
-                 width: f32,
-                 height: f32,
-                 color: Color| {
-        let entity = column(
-            world,
-            portrait,
-            name,
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(left),
-                top: Val::Px(top),
-                width: Val::Px(width),
-                height: Val::Px(height),
-                border_radius: BorderRadius::all(Val::Px(3.0)),
-                ..default()
-            },
-        );
-        world.entity_mut(entity).insert(BackgroundColor(color));
-    };
-    piece(world, "Shoulders", 12.0, 41.0, 50.0, 28.0, color);
-    piece(world, "Hood", 22.0, 12.0, 30.0, 35.0, color);
-    piece(world, "Face Shadow", 28.0, 25.0, 18.0, 20.0, dark);
-    piece(
-        world,
-        "Eyes",
-        29.0,
-        29.0,
-        16.0,
-        3.0,
-        Color::srgb(0.94, 0.83, 0.53),
-    );
-    match kind {
-        ActorKind::Hero(HeroClass::Gatekeeper) => {
-            piece(world, "Helmet", 18.0, 9.0, 38.0, 15.0, color);
-            piece(
-                world,
-                "Shield",
-                4.0,
-                43.0,
-                23.0,
-                30.0,
-                Color::srgb(0.30, 0.43, 0.51),
-            );
-        }
-        ActorKind::Hero(HeroClass::Knifehand) => {
-            piece(
-                world,
-                "Scarf",
-                18.0,
-                40.0,
-                37.0,
-                8.0,
-                Color::srgb(0.60, 0.27, 0.18),
-            );
-            piece(
-                world,
-                "Knife",
-                62.0,
-                39.0,
-                4.0,
-                28.0,
-                Color::srgb(0.83, 0.85, 0.79),
-            );
-        }
-        ActorKind::Hero(HeroClass::Scout) => {
-            piece(
-                world,
-                "Quiver",
-                59.0,
-                14.0,
-                7.0,
-                49.0,
-                Color::srgb(0.39, 0.45, 0.28),
-            );
-            piece(world, "Hood Peak", 31.0, 5.0, 11.0, 10.0, color);
-        }
-        ActorKind::Hero(HeroClass::FieldMedic) => {
-            piece(
-                world,
-                "Medicine Cross Horizontal",
-                30.0,
-                53.0,
-                15.0,
-                4.0,
-                dark,
-            );
-            piece(
-                world,
-                "Medicine Cross Vertical",
-                35.0,
-                48.0,
-                4.0,
-                14.0,
-                dark,
-            );
-        }
-        ActorKind::Enemy(_) => {
-            piece(world, "Left Horn", 17.0, 4.0, 9.0, 20.0, color);
-            piece(world, "Right Horn", 48.0, 4.0, 9.0, 20.0, color);
-        }
-    }
-}
-
 pub(super) fn actor_color(kind: ActorKind) -> Color {
     match kind {
         ActorKind::Hero(HeroClass::Gatekeeper) => Color::srgb(0.50, 0.66, 0.73),
@@ -267,6 +156,24 @@ pub(super) fn actor_color(kind: ActorKind) -> Color {
         ActorKind::Hero(HeroClass::FieldMedic) => Color::srgb(0.76, 0.69, 0.86),
         ActorKind::Enemy(_) => Color::srgb(0.74, 0.38, 0.33),
     }
+}
+
+/// A compact identity, not a rank or class: movement never changes this label.
+pub(super) fn token(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    let ordinal = snapshot
+        .actors
+        .iter()
+        .filter(|other| other.team() == actor.team() && other.id < actor.id)
+        .count()
+        + 1;
+    format!(
+        "{}{ordinal}",
+        if actor.team() == Team::Heroes {
+            "H"
+        } else {
+            "E"
+        }
+    )
 }
 
 pub(super) fn reorder(
@@ -283,7 +190,7 @@ pub(super) fn reorder(
         .get::<Children>(parent)
         .map(|children| children.iter().collect::<Vec<_>>())
         .unwrap_or_default();
-    // Keep defeated entities parented (but hidden) for stable identity and recursive cleanup.
+    // Defeated entities remain parented but hidden for identity and recursive cleanup.
     for entity in &current {
         if !wanted.contains(entity) {
             wanted.push(*entity);
@@ -294,51 +201,153 @@ pub(super) fn reorder(
     }
 }
 
+fn prominent_status(actor: &ActorSnapshot) -> Option<&StatusInstance> {
+    actor.statuses.iter().min_by_key(|status| {
+        let definition = status_definition(status.kind);
+        let deals_damage = definition
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::StatusDamage(_)));
+        (!deals_damage, definition.priority, status.id)
+    })
+}
+
+fn compact_status(actor: &ActorSnapshot, status: &StatusInstance) -> String {
+    let definition = status_definition(status.kind);
+    let abbreviation = definition.name.chars().take(3).collect::<String>();
+    let others = actor.statuses.len().saturating_sub(1);
+    let overflow = if others > 0 {
+        format!("+{others}")
+    } else {
+        String::new()
+    };
+    let clock = match definition.duration.boundary {
+        Boundary::OwnerTurnStart | Boundary::OwnerTurnEnd => "t",
+        Boundary::RoundEnd => "r",
+    };
+    format!(
+        "{abbreviation}{}\n{}{clock}{overflow}",
+        status.potency, status.remaining
+    )
+}
+
+fn status_accessibility(actor: &ActorSnapshot) -> String {
+    let mut value = format!(
+        "Inspect all {} effects on {}.",
+        actor.statuses.len(),
+        actor.name()
+    );
+    for status in &actor.statuses {
+        let definition = status_definition(status.kind);
+        let clock = match definition.duration.boundary {
+            Boundary::OwnerTurnStart => "bearer turn starts",
+            Boundary::OwnerTurnEnd => "bearer turn ends",
+            Boundary::RoundEnd => "round ends",
+        };
+        value.push_str(&format!(
+            " {}: potency {}, {} {clock} remaining.",
+            definition.name, status.potency, status.remaining
+        ));
+    }
+    value
+}
+
 pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnapshot) {
     let existing = world
         .query::<(Entity, &StatusBadge)>()
         .iter(world)
-        .filter(|(_, badge)| badge.actor == actor.id)
-        .map(|(entity, badge)| (badge.instance, (entity, badge.text)))
-        .collect::<BTreeMap<_, _>>();
-    for (instance, (entity, _)) in &existing {
-        if !actor.statuses.iter().any(|status| status.id == *instance) {
-            world.despawn(*entity);
+        .find(|(_, badge)| badge.actor == actor.id)
+        .map(|(entity, badge)| (entity, badge.text));
+    let Some(status) = prominent_status(actor) else {
+        if let Some((entity, _)) = existing {
+            if let Some(mut node) = world.get_mut::<Node>(entity) {
+                if node.display != Display::None {
+                    node.display = Display::None;
+                }
+            }
+        }
+        return;
+    };
+    let (entity, text) = existing.unwrap_or_else(|| {
+        let entity = world
+            .spawn((
+                bevy_game_ui::button(format!("Actor {} Effects", actor.id.0)),
+                bevy_game_ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
+                Action::Status(actor.id, status.id),
+                ChildOf(parent),
+            ))
+            .id();
+        world.entity_mut(entity).insert(Node {
+            width: Val::Percent(100.0),
+            min_width: Val::Px(44.0),
+            min_height: Val::Px(44.0),
+            height: Val::Percent(100.0),
+            border: UiRect::bottom(Val::Px(2.0)),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        });
+        let text = label(
+            world,
+            entity,
+            &format!("Actor {} Effects Summary", actor.id.0),
+            "",
+            UiTextRole::Supporting,
+        );
+        world
+            .entity_mut(text)
+            .insert(TextLayout::justify(Justify::Center));
+        world.entity_mut(entity).insert(StatusBadge {
+            actor: actor.id,
+            instance: status.id,
+            text,
+        });
+        (entity, text)
+    });
+    if let Some(mut node) = world.get_mut::<Node>(entity) {
+        if node.display != Display::Flex {
+            node.display = Display::Flex;
         }
     }
-    for status in &actor.statuses {
-        let definition = status_definition(status.kind);
-        let value = format!(
-            "{} {} | {} left",
-            definition.name, status.potency, status.remaining
-        );
-        if let Some((_, text)) = existing.get(&status.id) {
-            set_text(world, *text, value);
-        } else {
-            let entity = control(
-                world,
-                parent,
-                format!("Status {} {}", actor.id.0, status.id),
-                value,
-                Action::Status(actor.id, status.id),
-                false,
-            );
-            if let Some(mut node) = world.get_mut::<Node>(entity) {
-                node.min_width = Val::Px(44.0);
-                node.padding = UiRect::all(Val::Px(4.0));
-            }
-            if let Some(text) = world
-                .get::<Children>(entity)
-                .and_then(|children| children.first())
-                .copied()
-            {
-                world.entity_mut(entity).insert(StatusBadge {
-                    actor: actor.id,
-                    instance: status.id,
-                    text,
-                });
-            }
+    if let Some(mut badge) = world.get_mut::<StatusBadge>(entity) {
+        if badge.instance != status.id {
+            badge.instance = status.id;
         }
+    }
+    if !matches!(world.get::<Action>(entity), Some(Action::Status(_, id)) if *id == status.id) {
+        world
+            .entity_mut(entity)
+            .insert(Action::Status(actor.id, status.id));
+    }
+    set_text(world, text, compact_status(actor, status));
+    let label = AccessibleLabel::new(status_accessibility(actor));
+    if world.get::<AccessibleLabel>(entity).map(|value| &value.0) != Some(&label.0) {
+        world.entity_mut(entity).insert(label);
+    }
+    paint_marker(world, entity, Color::srgb(0.66, 0.55, 0.39));
+    let backing = BackgroundColor(Color::srgba(0.02, 0.025, 0.03, 0.86));
+    if world.get::<BackgroundColor>(entity) != Some(&backing) {
+        world.entity_mut(entity).insert(backing);
+    }
+}
+
+fn paint_marker(world: &mut World, entity: Entity, resting: Color) {
+    let focused = world.resource::<InputFocus>().get() == Some(entity)
+        && world.resource::<InputFocusVisible>().0;
+    let interacting = matches!(
+        world.get::<Interaction>(entity),
+        Some(Interaction::Hovered | Interaction::Pressed)
+    );
+    let color = if focused {
+        Color::srgb(1.0, 0.87, 0.47)
+    } else if interacting {
+        Color::srgb(0.95, 0.95, 0.88)
+    } else {
+        resting
+    };
+    let border = BorderColor::all(color);
+    if world.get::<BorderColor>(entity) != Some(&border) {
+        world.entity_mut(entity).insert(border);
     }
 }
 
@@ -372,77 +381,75 @@ pub(super) fn present(
                 tile.flash_until > time,
             )
         };
-        let rank = snapshot
-            .rank(actor.id)
-            .map_or_else(|| "OUT".to_owned(), |rank| format!("RANK {rank}"));
+        let identity = token(snapshot, actor);
+        let owner = view.players.iter().find(|player| player.actor == actor.id);
+        let yours = !view.local && owner.is_some_and(|player| Some(player.slot) == view.player);
+        let ownership = if actor.team() == Team::Enemies {
+            "Host-controlled enemy.".to_owned()
+        } else if view.local {
+            "Locally controlled hero.".to_owned()
+        } else {
+            owner.map_or_else(
+                || "Unclaimed hero.".to_owned(),
+                |player| {
+                    format!(
+                        "{}Owned by {}.",
+                        if yours { "Your hero. " } else { "" },
+                        player.name
+                    )
+                },
+            )
+        };
+        // This is a preview of the same pure legality contract used by Confirm,
+        // never an authorization gate: every actor remains inspectable off-turn.
+        let eligible = !view.paused
+            && view.admitted
+            && ui.selected.is_some_and(|choice| {
+                matches!(
+                    choice,
+                    Choice::Skill(_) | Choice::Reposition | Choice::Rescue
+                ) && inspection::display_actor(view).is_some_and(|source| {
+                    inspection::action_for(choice, Some(actor.id))
+                        .is_ok_and(|action| snapshot.validate_action(source.id, &action).is_ok())
+                })
+            });
+        // The ownership asterisk is expanded in the accessible label and inspector.
+        set_text(
+            world,
+            text,
+            format!("{identity}{}\n{}", if yours { "*" } else { "" }, actor.hp),
+        );
         let state = if !actor.standing() {
             if actor.team() == Team::Heroes {
-                "DOWNED"
+                "Downed"
             } else {
-                "DEFEATED"
+                "Defeated"
             }
         } else if snapshot.active_actor == Some(actor.id) {
-            "ACTING"
+            "Acting now"
         } else if ui.target == Some(actor.id) {
-            "TARGET"
+            "Selected target"
         } else {
-            ""
+            "Standing"
         };
-        let owner = match actor.kind {
-            ActorKind::Hero(hero) => {
-                if view.local {
-                    "Local".to_owned()
-                } else {
-                    view.players
-                        .iter()
-                        .find(|player| player.hero == hero)
-                        .map_or_else(|| "Unclaimed".to_owned(), |player| player.name.clone())
-                }
+        let label = AccessibleLabel::new(format!(
+            "{identity}, {}, {} of {} HP, rank {}. {state}. {ownership} {} effects. {} Select or inspect.",
+            actor.name(),
+            actor.hp,
+            actor.max_hp,
+            snapshot.rank(actor.id).unwrap_or(0),
+            actor.statuses.len(),
+            if eligible { "Valid target for selected action." } else { "" }
+        ));
+        if world.get::<AccessibleLabel>(control).map(|value| &value.0) != Some(&label.0) {
+            world.entity_mut(control).insert(label);
+        }
+        if let Some(mut emphasis) = world.get_mut::<crate::scene::SceneActorEmphasis>(control) {
+            let selected = ui.target == Some(actor.id);
+            if emphasis.selected != selected {
+                emphasis.selected = selected;
             }
-            ActorKind::Enemy(_) => "Host AI".to_owned(),
-        };
-        let feedback = world
-            .resource::<BattleNodes>()
-            .feedback
-            .get(&actor.id)
-            .map_or("", |(message, _)| message.as_str())
-            .to_owned();
-        let summary = if metrics.viewport == UiViewportClass::Compact {
-            let name = actor.name();
-            let statuses = actor
-                .statuses
-                .iter()
-                .map(|status| {
-                    format!(
-                        "{}:{}",
-                        status_definition(status.kind).name,
-                        status.remaining
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            let compact_state = if state == "ACTING" {
-                "ACT"
-            } else if state == "TARGET" {
-                "TGT"
-            } else {
-                state
-            };
-            format!(
-                "{} {name}\n{} / {} HP\n{compact_state} {statuses}\n{feedback}",
-                snapshot.rank(actor.id).unwrap_or(0),
-                actor.hp,
-                actor.max_hp
-            )
-        } else {
-            format!(
-                "{rank} | {state}\n{}\n{} / {} HP\n{owner}\n{feedback}",
-                actor.name(),
-                actor.hp,
-                actor.max_hp
-            )
-        };
-        set_text(world, text, summary);
+        }
         if let Some(mut node) = world.get_mut::<Node>(bar) {
             let width = Val::Percent(f32::from(actor.hp) / f32::from(actor.max_hp.max(1)) * 100.0);
             if node.width != width {
@@ -459,29 +466,190 @@ pub(super) fn present(
                 node.display = display;
             }
         }
-        let border = if flash {
+        if let Some(mut node) = world.get_mut::<Node>(statuses) {
+            // Two compact text lines can exceed the control minimum at 200%.
+            let height = Val::Px((48.0 * metrics.content_scale).max(44.0 * metrics.control_scale));
+            if node.height != height {
+                node.height = height;
+            }
+        }
+        let marker = if flash {
             Color::srgb(1.0, 0.40, 0.28)
         } else if ui.target == Some(actor.id) {
             Color::srgb(0.94, 0.83, 0.47)
         } else if snapshot.active_actor == Some(actor.id) {
             Color::srgb(0.60, 0.85, 0.77)
+        } else if eligible {
+            Color::srgb(0.47, 0.72, 0.38)
         } else {
-            actor_color(actor.kind)
+            Color::srgba(0.50, 0.56, 0.54, 0.30)
         };
-        let wanted = UiSkinOverrides {
-            border: Some(border),
-            background: Some(if ui.target == Some(actor.id) {
-                Color::srgb(0.19, 0.19, 0.12)
-            } else if snapshot.active_actor == Some(actor.id) {
-                Color::srgb(0.075, 0.18, 0.16)
-            } else {
-                Color::srgb(0.065, 0.09, 0.10)
-            }),
-            ..default()
-        };
-        if world.get::<UiSkinOverrides>(control) != Some(&wanted) {
-            world.entity_mut(control).insert(wanted);
-        }
+        paint_marker(world, control, marker);
         sync_statuses(world, statuses, actor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use labyrinth_rules::{Combat, HeroSetup, StatusKind, DEFAULT_HERO_ROSTER};
+
+    fn status(actor: ActorId, kind: StatusKind, id: u64) -> StatusInstance {
+        let definition = status_definition(kind);
+        StatusInstance {
+            id,
+            kind,
+            bearer: actor,
+            source: ActorId(101),
+            potency: definition.potency,
+            remaining: definition.duration.ticks,
+            eligible_boundary: 1,
+        }
+    }
+
+    fn overlay_world() -> World {
+        let mut world = World::new();
+        world.init_resource::<UiFonts>();
+        world.init_resource::<InputFocus>();
+        world.init_resource::<InputFocusVisible>();
+        world
+    }
+
+    #[test]
+    fn identity_tokens_ignore_rank_class_and_snapshot_array_order() {
+        let setup = std::array::from_fn(|index| {
+            HeroSetup::preset(
+                ActorId(11 + u16::try_from(index).expect("six actors") * 7),
+                HeroClass::Knifehand,
+            )
+        });
+        let mut snapshot = Combat::with_heroes(42, setup)
+            .expect("explicit IDs")
+            .snapshot();
+        let id = ActorId(18);
+        assert_eq!(
+            token(&snapshot, snapshot.actor(id).expect("second hero")),
+            "H2"
+        );
+        snapshot.hero_formation.reverse();
+        snapshot.actors.reverse();
+        assert_eq!(
+            token(&snapshot, snapshot.actor(id).expect("same hero")),
+            "H2"
+        );
+        assert_eq!(
+            token(
+                &snapshot,
+                snapshot.actor(ActorId(101)).expect("first enemy")
+            ),
+            "E1"
+        );
+    }
+
+    #[test]
+    fn effects_are_one_stable_control_with_exact_accessible_details() {
+        let snapshot = Combat::new(42, DEFAULT_HERO_ROSTER)
+            .expect("combat")
+            .snapshot();
+        let mut actor = snapshot.actor(ActorId(1)).expect("hero").clone();
+        actor.statuses = vec![
+            status(actor.id, StatusKind::Brace, 700),
+            status(actor.id, StatusKind::Bleed, 701),
+        ];
+        let mut world = overlay_world();
+        let parent = world.spawn(Node::default()).id();
+        sync_statuses(&mut world, parent, &actor);
+        let (entity, text) = world
+            .query::<(Entity, &StatusBadge)>()
+            .iter(&world)
+            .map(|(entity, badge)| (entity, badge.text))
+            .next()
+            .expect("one effects control");
+        assert_eq!(world.query::<&StatusBadge>().iter(&world).count(), 1);
+        assert_eq!(world.get::<Text>(text).expect("summary").0, "Ble2\n3t+1");
+        assert_eq!(
+            world.get::<AccessibleLabel>(entity).map(|value| &value.0),
+            Some(&status_accessibility(&actor))
+        );
+        assert!(matches!(
+            world.get::<Action>(entity),
+            Some(Action::Status(ActorId(1), 701))
+        ));
+        actor.statuses.clear();
+        sync_statuses(&mut world, parent, &actor);
+        assert_eq!(
+            world.get::<Node>(entity).expect("preserved").display,
+            Display::None
+        );
+        actor
+            .statuses
+            .push(status(actor.id, StatusKind::Haste, 900));
+        sync_statuses(&mut world, parent, &actor);
+        assert_eq!(world.query::<&StatusBadge>().iter(&world).count(), 1);
+        assert_eq!(
+            world.get::<Node>(entity).expect("same control").display,
+            Display::Flex
+        );
+        assert_eq!(world.get::<Text>(text).expect("summary").0, "Has3\n2r");
+        assert!(matches!(
+            world.get::<Action>(entity),
+            Some(Action::Status(ActorId(1), 900))
+        ));
+    }
+
+    #[test]
+    fn native_actor_hit_area_is_unskinned_and_separate_from_hp_overlay() {
+        let snapshot = Combat::new(42, DEFAULT_HERO_ROSTER)
+            .expect("combat")
+            .snapshot();
+        let actor = snapshot.actor(ActorId(1)).expect("hero");
+        let mut world = overlay_world();
+        let parent = world.spawn(Node::default()).id();
+        mount_actor(&mut world, parent, actor);
+        let tile = world
+            .query::<&ActorTile>()
+            .iter(&world)
+            .next()
+            .expect("tile");
+        let control = tile.control;
+        let text = tile.text;
+        assert!(world.get::<Button>(control).is_some());
+        assert!(world.get::<UiSkin>(control).is_none());
+        assert_eq!(
+            world.get::<BackgroundColor>(control),
+            Some(&BackgroundColor(Color::NONE))
+        );
+        assert_eq!(
+            world
+                .get::<crate::scene::SceneActorAnchor>(control)
+                .expect("art anchor")
+                .actor,
+            actor.id
+        );
+        assert_ne!(
+            world.get::<ChildOf>(text).expect("summary parent").parent(),
+            control
+        );
+        assert_eq!(
+            world.get::<Node>(control).expect("target").min_height,
+            Val::Px(44.0)
+        );
+        assert_eq!(
+            world.get::<Node>(control).expect("target").min_width,
+            Val::Px(44.0)
+        );
+        world
+            .resource_mut::<InputFocus>()
+            .set(control, bevy::input_focus::FocusCause::Navigated);
+        world.resource_mut::<InputFocusVisible>().0 = true;
+        paint_marker(&mut world, control, Color::NONE);
+        assert_eq!(
+            world.get::<BorderColor>(control),
+            Some(&BorderColor::all(Color::srgb(1.0, 0.87, 0.47)))
+        );
+        assert_eq!(
+            world.get::<BackgroundColor>(control),
+            Some(&BackgroundColor(Color::NONE))
+        );
     }
 }

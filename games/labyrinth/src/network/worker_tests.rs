@@ -4,24 +4,28 @@ use super::*;
 
 #[test]
 fn cancelled_connection_receivers_do_not_release_in_flight_worker_permits() {
+    assert_eq!(
+        PASSWORD_WORKERS, 5,
+        "all five remote players may verify concurrently"
+    );
     let jobs = Arc::new(AtomicUsize::new(0));
     let mut outstanding = Vec::new();
-    for _ in 0..3 {
-        let permit = WorkerPermit::acquire(&jobs, 3).expect("available worker slot");
+    for _ in 0..PASSWORD_WORKERS {
+        let permit = WorkerPermit::acquire(&jobs, PASSWORD_WORKERS).expect("available worker slot");
         let (sender, receiver) = mpsc::sync_channel::<bool>(1);
         drop(receiver); // Exact lifetime change caused by a disconnected connection.
         assert!(sender.send(false).is_err());
         outstanding.push(permit); // Work is still queued/running even without its UI recipient.
     }
-    assert_eq!(jobs.load(Ordering::Acquire), 3);
+    assert_eq!(jobs.load(Ordering::Acquire), PASSWORD_WORKERS);
     for _ in 0..100 {
-        assert!(WorkerPermit::acquire(&jobs, 3).is_none());
+        assert!(WorkerPermit::acquire(&jobs, PASSWORD_WORKERS).is_none());
     }
     outstanding.pop(); // Only actual worker completion releases capacity.
-    assert_eq!(jobs.load(Ordering::Acquire), 2);
-    let replacement =
-        WorkerPermit::acquire(&jobs, 3).expect("one completed job permits one successor");
-    assert!(WorkerPermit::acquire(&jobs, 3).is_none());
+    assert_eq!(jobs.load(Ordering::Acquire), PASSWORD_WORKERS - 1);
+    let replacement = WorkerPermit::acquire(&jobs, PASSWORD_WORKERS)
+        .expect("one completed job permits one successor");
+    assert!(WorkerPermit::acquire(&jobs, PASSWORD_WORKERS).is_none());
     drop(replacement);
     drop(outstanding);
     assert_eq!(jobs.load(Ordering::Acquire), 0);
@@ -54,7 +58,7 @@ fn concurrent_worker_acquisition_never_exceeds_the_shared_limit() {
         let ready = Arc::clone(&ready);
         let release = Arc::clone(&release);
         threads.push(std::thread::spawn(move || {
-            let _permit = WorkerPermit::acquire(&jobs, 3);
+            let _permit = WorkerPermit::acquire(&jobs, PASSWORD_WORKERS);
             ready.wait();
             release.wait();
         }));
@@ -65,7 +69,7 @@ fn concurrent_worker_acquisition_never_exceeds_the_shared_limit() {
     for thread in threads {
         thread.join().expect("worker budget fixture exits");
     }
-    assert_eq!(admitted, 3);
+    assert_eq!(admitted, PASSWORD_WORKERS);
     assert_eq!(jobs.load(Ordering::Acquire), 0);
 }
 

@@ -22,8 +22,6 @@ use labyrinth_rules::{
 
 #[derive(Component)]
 struct BattleRoot;
-#[derive(Component)]
-struct Portrait;
 
 #[derive(Component)]
 struct ActorTile {
@@ -47,6 +45,8 @@ struct StatusBadge {
 enum Slot {
     Hud,
     Timeline,
+    Order,
+    Feedback,
     Selected,
     Reason,
     Inspector,
@@ -56,15 +56,18 @@ enum Slot {
 
 #[derive(Resource)]
 struct BattleNodes {
-    formations: Entity,
     heroes: Entity,
     enemies: Entity,
+    skills: Entity,
+    loadout: Vec<SkillId>,
     confirm: Entity,
     rematch: Entity,
     inspector: Entity,
     log: Entity,
+    drawer: Entity,
+    drawer_body: Entity,
+    order: Entity,
     viewport: UiViewportClass,
-    stacked: bool,
     last_event: Option<u64>,
     was_paused: bool,
     feedback: BTreeMap<ActorId, (String, f64)>,
@@ -73,6 +76,27 @@ struct BattleNodes {
 pub(super) fn clear(world: &mut World) {
     despawn_marked::<BattleRoot>(world);
     world.remove_resource::<BattleNodes>();
+}
+
+pub(super) fn scroll_details(world: &mut World, direction: i8) {
+    let Some(entity) = world
+        .get_resource::<BattleNodes>()
+        .map(|nodes| nodes.drawer_body)
+    else {
+        return;
+    };
+    let Some(node) = world.get::<ComputedNode>(entity) else {
+        return;
+    };
+    let height = node.size().y * node.inverse_scale_factor;
+    let maximum = ((node.content_size().y - node.size().y) * node.inverse_scale_factor).max(0.0);
+    let current = world
+        .get::<ScrollPosition>(entity)
+        .map_or(0.0, |position| position.0.y);
+    world.entity_mut(entity).insert(ScrollPosition(Vec2::new(
+        0.0,
+        (current + f32::from(direction) * height * 0.85).clamp(0.0, maximum),
+    )));
 }
 
 fn text_slot(
@@ -107,43 +131,34 @@ pub(super) fn present(
         ui.target = None;
     }
     let time = world.resource::<Time>().elapsed_secs_f64();
-    for mut portrait in world
-        .query_filtered::<&mut Node, With<Portrait>>()
-        .iter_mut(world)
-    {
-        let display = if metrics.viewport == UiViewportClass::Compact {
-            Display::None
-        } else {
-            Display::Flex
-        };
-        if portrait.display != display {
-            portrait.display = display;
-        }
-    }
     let tiles = world
         .query::<(Entity, &ActorTile)>()
         .iter(world)
         .map(|(entity, tile)| (tile.actor, entity))
         .collect::<BTreeMap<_, _>>();
     world.resource_scope(|world, mut nodes: Mut<BattleNodes>| {
-        feedback::update(&mut nodes, view, time);
-        let stacked = metrics.viewport == UiViewportClass::Compact && metrics.content_scale > 1.25;
-        if nodes.viewport != metrics.viewport || nodes.stacked != stacked {
-            nodes.viewport = metrics.viewport;
-            nodes.stacked = stacked;
-            if let Some(mut node) = world.get_mut::<Node>(nodes.formations) {
-                node.flex_direction = if stacked {
-                    FlexDirection::Column
-                } else {
-                    FlexDirection::Row
-                };
+        let loadout =
+            inspection::display_actor(view).map_or_else(Vec::new, |actor| actor.skills().to_vec());
+        if nodes.loadout != loadout {
+            layout::mount_skills(world, nodes.skills, &loadout);
+            nodes.loadout = loadout;
+            // A loadout replacement must not leave an unequipped ability selected.
+            if matches!(ui.selected, Some(Choice::Skill(skill)) if !nodes.loadout.contains(&skill))
+            {
+                ui.selected = None;
+                ui.target = None;
             }
-            for rows in [nodes.heroes, nodes.enemies] {
-                if let Some(parent) = world.get::<ChildOf>(rows).map(ChildOf::parent) {
-                    if let Some(mut node) = world.get_mut::<Node>(parent) {
-                        node.width = Val::Percent(if stacked { 100.0 } else { 49.0 });
-                    }
-                }
+        }
+        feedback::update(&mut nodes, view, time);
+        nodes.viewport = metrics.viewport;
+        if let Some(mut node) = world.get_mut::<Node>(nodes.drawer) {
+            let width = Val::Percent(if metrics.content_scale > 1.25 {
+                84.0
+            } else {
+                48.0
+            });
+            if node.width != width {
+                node.width = width;
             }
         }
         // Both front ranks face the breach; presentation order is not actor identity.
@@ -169,8 +184,13 @@ pub(super) fn present(
             };
         }
         for (entity, shown) in [
-            (nodes.inspector, !ui.show_log && ui.inspected.is_some()),
+            (
+                nodes.drawer,
+                ui.show_inspector || ui.show_log || ui.show_timeline,
+            ),
+            (nodes.inspector, ui.show_inspector),
             (nodes.log, ui.show_log),
+            (nodes.order, ui.show_timeline),
         ] {
             if let Some(mut node) = world.get_mut::<Node>(entity) {
                 let display = if shown { Display::Flex } else { Display::None };
@@ -187,11 +207,26 @@ pub(super) fn present(
         .iter(world)
         .map(|(entity, slot)| (entity, *slot))
         .collect::<Vec<_>>();
+    let feedback = world
+        .resource::<BattleNodes>()
+        .feedback
+        .iter()
+        .map(|(actor, (message, _))| {
+            format!(
+                "{} {message}",
+                snapshot
+                    .actor(*actor)
+                    .map_or_else(String::new, |actor| actors::token(snapshot, actor))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("   ·   ");
     for (entity, slot) in slots {
-        set_text(
-            world,
-            entity,
-            slot_value(slot, view, ui, snapshot, metrics.viewport),
-        );
+        let value = if matches!(slot, Slot::Feedback) {
+            feedback.clone()
+        } else {
+            slot_value(slot, view, ui, snapshot, metrics.viewport)
+        };
+        set_text(world, entity, value);
     }
 }

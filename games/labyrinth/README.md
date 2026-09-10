@@ -1,6 +1,6 @@
 # Labyrinth
 
-An original four-player cooperative positional-combat prototype. This first slice
+An original six-player cooperative positional-combat prototype. This first slice
 is **one battle**, not maze exploration yet. It has HP, per-round initiative,
 rank-constrained abilities, movement, bleed, cleansing, downing and rescue. There
 is no stress, PvP, campaign, loot, or host migration.
@@ -13,12 +13,12 @@ From the repository root:
 cargo run -p labyrinth -- --local
 ```
 
-Local mode controls all four heroes and opens no game transport. The default seed
+Local mode controls all six heroes and opens no game transport. The default seed
 is 42; use `--seed 91` to try a different reproducible fight. Plain
 `cargo run -p labyrinth` opens the multiplayer menu; no `--all-features` is needed.
 
-For four instances on one computer, build once, then run the resulting binary in
-four terminals with distinct profiles:
+For six instances on one computer, build once, then run the resulting binary in
+six terminals with distinct profiles:
 
 ```sh
 cargo build -p labyrinth
@@ -26,6 +26,8 @@ cargo build -p labyrinth
 ./target/debug/labyrinth --profile guest-a
 ./target/debug/labyrinth --profile guest-b
 ./target/debug/labyrinth --profile guest-c
+./target/debug/labyrinth --profile guest-d
+./target/debug/labyrinth --profile guest-e
 ```
 
 On Windows use `target\debug\labyrinth.exe`. Profiles isolate reconnect storage
@@ -47,8 +49,11 @@ No admission secrets are accepted on the command line.
    LAN discovery (or explicit development tailnet discovery) with an 8–64 character
    printable ASCII temporary passphrase (no leading/trailing spaces), and guests
    select its listing and enter it.
-4. All four players ready up; the host starts. Each player controls one hero, not
-   whichever hero occupies their original formation rank.
+4. All six players ready up; the host starts. Each player controls one distinct
+   hero, not a class or whichever hero occupies their original formation rank.
+   Classes may repeat. Changing class clears the whole party's readiness so
+   teammates acknowledge the new composition. Co-op requires all six connected
+   players in this milestone; use local mode to control the complete party alone.
 
 The temporary passphrase is **not an account password**. Do not reuse an important
 password. Native Bevy's editable text currently displays typed characters; the form
@@ -71,10 +76,30 @@ Select an ability, inspect its source/target-rank requirements, select a target,
 then Confirm. Unavailable abilities remain inspectable; confirmation explains why
 the selected action cannot currently be submitted. Escape dismisses local overlays.
 
-The initial party is Gatekeeper, Knifehand, Scout, and Field Medic. These are
-original placeholder archetypes. Starting formation follows archetype rank even
-when player slots choose different heroes. Both teams roll effective Speed + d8
-each round; the current round's order stays fixed when actors move or speed changes.
+The battlefield uses replaceable 2D sprites with a minimal native overlay. H1–H6
+and E1–E6 are stable actor labels, not ranks. The starred hero is yours in co-op.
+Select a character, then **Inspect** for its name, owner, rank, exact health and
+effects. **Order** expands this round's rolls; **Log** shows recent outcomes.
+Detail drawers trap focus: Escape/Close returns to combat, Page Up/Down and Home/End
+scroll their content. Skills 1–8 remain inspectable off-turn; only Confirm commits.
+At large text sizes, long ability rows scroll horizontally while the battlefield
+and confirmation remain in view. Opening an effects badge reveals all effects;
+for example `Ble2 / 3t+1` means Bleed potency 2, three bearer-turn boundaries left,
+plus one other effect. The inspector gives the exact trigger and duration wording.
+
+The four class presets are Gatekeeper, Knifehand, Scout, and Field Medic; six
+players may choose any combination, including repeats. The default front-to-rear
+party is Gatekeeper, Knifehand, Knifehand, Scout, Field Medic, Field Medic, facing
+six enemies in another **linear formation**, not a hex grid. Starting ranks follow
+the lobby's seat order; choosing a class does not shuffle the party. Move swaps
+adjacent allies. Both teams roll effective Speed + d8 each round; the current
+round's order stays fixed when actors move or speed changes.
+
+Every actor stores its own validated ability loadout and remaining uses. Class
+presets supply starter abilities only; legality and the action bar read the equipped
+loadout, not the class. Number keys 1–8 inspect its ordered slots. Trusted encounter
+setup can supply a custom loadout now. Item grants, skill trees, loadout editing,
+and hex-themed inventories are future game-owned systems, not implemented gameplay.
 
 Bleed deals 2 damage at the affected actor's next three turn starts. Reapplying it
 refreshes duration without stacking damage. Brace reduces direct damage by 2 until
@@ -100,6 +125,10 @@ combat keeps it reserved, like an interrupted connection. There is no bot takeov
 or host-side kick in this slice. Return to the lobby and have a connected guest
 leave to release its seat, or start a new company. Host process restart deliberately
 ends the session; stored guest credentials cannot recover a lost host world.
+
+The six-rank rules and snapshot schema are incompatible with earlier four-player
+builds. All participants must update together and start a new hosted company;
+old credentials are not deleted or migrated into an unrelated session.
 
 ## Engineering boundaries
 

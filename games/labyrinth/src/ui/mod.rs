@@ -13,7 +13,7 @@ use bevy_game_ui::{
     UiMotionPreference, UiScaleMode, UiScalePreference, UiSkin, UiSkinOverrides, UiSpace,
     UiSpacing, UiTextChanged, UiTextField, UiTextRole, UiTheme,
 };
-use labyrinth_rules::{ActorId, CombatAction, HeroClass, SkillId};
+use labyrinth_rules::{ActorId, CombatAction, HeroClass, SkillId, PARTY_SIZE};
 
 use crate::view::{HostSettings, LabyrinthIntent, LabyrinthView, SecretText, ViewMode};
 
@@ -44,7 +44,8 @@ impl Default for LabyrinthUiConfig {
 
 impl Plugin for LabyrinthUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GameUiSkinPlugin)
+        app.add_plugins((GameUiSkinPlugin, crate::scene::LabyrinthScenePlugin))
+            .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
             .init_resource::<UiState>()
             .init_resource::<LabyrinthUiConfig>()
             .init_resource::<LabyrinthView>()
@@ -78,8 +79,21 @@ impl Plugin for LabyrinthUiPlugin {
                     .chain()
                     .in_set(LabyrinthUiSystems::Input),
             )
+            .add_systems(Startup, load_default_font)
             .add_systems(Update, present.in_set(LabyrinthUiSystems::Present));
     }
+}
+
+fn load_default_font(mut assets: ResMut<Assets<Font>>, mut fonts: ResMut<UiFonts>) {
+    // Embedded with its OFL license, so launching from either workspace or crate works.
+    // Adopters may supply a different font before startup without changing layout.
+    if fonts.body != Handle::default() || fonts.heading != Handle::default() {
+        return;
+    }
+    let font = Font::from_bytes(include_bytes!("assets/AlegreyaSans-Regular.ttf").to_vec());
+    let handle = assets.add(font);
+    fonts.body = handle.clone();
+    fonts.heading = handle;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -113,6 +127,7 @@ struct UiState {
     settings: bool,
     show_log: bool,
     show_timeline: bool,
+    show_inspector: bool,
     session_name: String,
     address: String,
     port: String,
@@ -156,6 +171,8 @@ enum Action {
     Scale,
     ToggleLog,
     ToggleTimeline,
+    ToggleInspector,
+    ScrollDetails(i8),
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -216,11 +233,34 @@ fn keyboard_shortcuts(world: &mut World) {
     if world.resource::<UiState>().settings || world.resource::<LabyrinthView>().paused {
         return;
     }
+    let ui = world.resource::<UiState>();
+    if ui.show_inspector || ui.show_log || ui.show_timeline {
+        let keys = world.resource::<ButtonInput<KeyCode>>();
+        let page = if keys.just_pressed(KeyCode::PageUp) {
+            -1
+        } else if keys.just_pressed(KeyCode::PageDown) {
+            1
+        } else if keys.just_pressed(KeyCode::Home) {
+            -100
+        } else if keys.just_pressed(KeyCode::End) {
+            100
+        } else {
+            0
+        };
+        if page != 0 {
+            apply_action(world, Action::ScrollDetails(page));
+        }
+        return;
+    }
     let shortcut = [
         KeyCode::Digit1,
         KeyCode::Digit2,
         KeyCode::Digit3,
         KeyCode::Digit4,
+        KeyCode::Digit5,
+        KeyCode::Digit6,
+        KeyCode::Digit7,
+        KeyCode::Digit8,
     ]
     .iter()
     .position(|key| keys.just_pressed(*key));
@@ -335,7 +375,9 @@ fn apply_action(world: &mut World, action: Action) {
             Action::Status(actor, status) => {
                 ui.inspected = Some(actor);
                 ui.inspected_status = Some((actor, status));
-                ui.selected = None;
+                ui.show_inspector = true;
+                ui.show_log = false;
+                ui.show_timeline = false;
                 None
             }
             Action::Choice(choice) => {
@@ -364,6 +406,10 @@ fn apply_action(world: &mut World, action: Action) {
                     && matches!(ui.form, Form::Browser | Form::Password);
                 if ui.settings {
                     ui.settings = false;
+                } else if ui.show_inspector || ui.show_log || ui.show_timeline {
+                    ui.show_inspector = false;
+                    ui.show_log = false;
+                    ui.show_timeline = false;
                 } else if ui.selected.is_some() {
                     ui.selected = None;
                     ui.target = None;
@@ -398,10 +444,24 @@ fn apply_action(world: &mut World, action: Action) {
             }
             Action::ToggleLog => {
                 ui.show_log = !ui.show_log;
+                ui.show_inspector = false;
+                ui.show_timeline = false;
+                None
+            }
+            Action::ToggleInspector => {
+                ui.show_inspector = !ui.show_inspector;
+                ui.show_log = false;
+                ui.show_timeline = false;
                 None
             }
             Action::ToggleTimeline => {
                 ui.show_timeline = !ui.show_timeline;
+                ui.show_inspector = false;
+                ui.show_log = false;
+                None
+            }
+            Action::ScrollDetails(direction) => {
+                battle::scroll_details(world, direction);
                 None
             }
         };

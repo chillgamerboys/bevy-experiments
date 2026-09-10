@@ -12,7 +12,7 @@ path = "examples/review_capture.rs"
 
 [dependencies]
 aeronet = { version = "=0.21.0", default-features = false, features = ["std"] }
-bevy = { workspace = true, features = ["ui", "system_clipboard", "png"] }
+bevy = { workspace = true, features = ["2d", "ui", "system_clipboard", "png"] }
 bevy_game_discovery = { workspace = true, features = ["mdns", "tailscale-cli"] }
 bevy_game_multiplayer = { workspace = true, features = ["direct"] }
 bevy_game_session.workspace = true

@@ -58,7 +58,7 @@ pub(super) fn host_messages(world: &mut World) {
     };
     for entity in connected {
         if !hosted.observed.contains_key(&entity) {
-            if hosted.observed.len() >= 12 {
+            if hosted.observed.len() >= MAX_HANDSHAKES {
                 world.trigger(Disconnect::new(entity, "admission queue full"));
                 continue;
             }
@@ -90,11 +90,12 @@ pub(super) fn host_messages(world: &mut World) {
                     refuse(world, &mut hosted, entity, Refused::Admission);
                     continue;
                 };
-                if hosted.pending.len() >= 3 {
+                if hosted.pending.len() >= PASSWORD_WORKERS {
                     refuse(world, &mut hosted, entity, Refused::Admission);
                     continue;
                 }
-                let Some(permit) = WorkerPermit::acquire(&hosted.password_jobs, 3) else {
+                let Some(permit) = WorkerPermit::acquire(&hosted.password_jobs, PASSWORD_WORKERS)
+                else {
                     refuse(world, &mut hosted, entity, Refused::Admission);
                     continue;
                 };
@@ -245,7 +246,7 @@ pub(super) fn host_messages(world: &mut World) {
         .iter()
         .filter(|(entity, begun)| {
             !hosted.security.is_connection_admitted(entity.to_bits())
-                && begun.elapsed() >= Duration::from_secs(15)
+                && begun.elapsed() >= ADMISSION_TIMEOUT
         })
         .map(|(entity, _)| *entity)
         .collect::<Vec<_>>();
@@ -270,7 +271,7 @@ pub(super) fn host_messages(world: &mut World) {
             fingerprint_text(),
             hosted.metadata.display_name(),
             occupied,
-            4,
+            PLAYER_CAPACITY,
             hosted.verifier.is_some(),
         ) {
             hosted.providers.refresh(&metadata);

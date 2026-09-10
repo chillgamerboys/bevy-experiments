@@ -35,8 +35,8 @@ jobs:
         working-directory: .
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-features --profile ci
-      - name: Labyrinth four-process abrupt guest restart
-        run: cargo test -p labyrinth --lib network::tests::process::four_native_processes_survive_guest_kill_and_finish_the_fight --profile ci -- --ignored --exact --nocapture
+      - name: Labyrinth six-process abrupt guest restart
+        run: cargo test -p labyrinth --lib network::tests::process::six_native_processes_survive_guest_kill_and_finish_the_fight --profile ci -- --ignored --exact --nocapture
       - run: cargo test --workspace --doc --all-features --profile ci
 
   policy:

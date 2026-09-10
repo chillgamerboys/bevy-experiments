@@ -6,11 +6,14 @@ use bevy_game_test::{
     visible_control_rect, HeadlessUiPlugin,
 };
 use bevy_game_ui::{activation_eligible, UiAction, UiDisabled};
-use labyrinth_rules::{ActorKind, Combat, StatusInstance, StatusKind};
+use labyrinth_rules::{
+    AbilityLoadout, ActorKind, Combat, HeroSetup, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER,
+    MAX_EQUIPPED_ABILITIES,
+};
 
 fn fixture() -> LabyrinthView {
     let combat = (0..128)
-        .filter_map(|seed| Combat::new(seed, HeroClass::ALL).ok())
+        .filter_map(|seed| Combat::new(seed, DEFAULT_HERO_ROSTER).ok())
         .map(|combat| combat.snapshot())
         .find(|snapshot| {
             snapshot
@@ -27,11 +30,12 @@ fn fixture() -> LabyrinthView {
         player: Some(0),
         encounter: 1,
         combat: Some(combat),
-        players: HeroClass::ALL
+        players: DEFAULT_HERO_ROSTER
             .into_iter()
             .enumerate()
             .map(|(index, hero)| crate::view::PlayerView {
-                slot: u8::try_from(index).expect("four player index"),
+                slot: u8::try_from(index).expect("six player index"),
+                actor: ActorId(u16::try_from(index + 1).expect("actor ID")),
                 hero,
                 name: format!("Player {}", index + 1),
                 occupied: true,
@@ -119,7 +123,7 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
     }
     run_frames(&mut app, 4);
     assert_eq!(find_named(app.world_mut(), "Actor 1"), Some(actor));
-    let badge = find_named(app.world_mut(), "Status 1 500").expect("bleed badge");
+    let badge = find_named(app.world_mut(), "Actor 1 Effects").expect("bleed badge");
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
         let snapshot = view.combat.as_mut().expect("combat");
@@ -132,7 +136,7 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
         snapshot.revision += 1;
     }
     run_frames(&mut app, 3);
-    assert_eq!(find_named(app.world_mut(), "Status 1 500"), Some(badge));
+    assert_eq!(find_named(app.world_mut(), "Actor 1 Effects"), Some(badge));
     assert!(click_action(&mut app, badge));
     run_frames(&mut app, 2);
     let tree = ui_tree_snapshot(app.world_mut()).to_string();
@@ -150,14 +154,13 @@ fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
         .combat
         .clone()
         .expect("combat");
-    let active_kind = snapshot
-        .active_actor
-        .and_then(|id| snapshot.actor(id))
-        .expect("active")
-        .kind;
-    let other = HeroClass::ALL
-        .into_iter()
-        .position(|hero| ActorKind::Hero(hero) != active_kind)
+    let active = snapshot.active_actor.expect("active");
+    let other = app
+        .world()
+        .resource::<LabyrinthView>()
+        .players
+        .iter()
+        .position(|player| player.actor != active)
         .expect("different hero");
     app.world_mut().resource_mut::<LabyrinthView>().player =
         Some(u8::try_from(other).expect("slot"));
@@ -212,7 +215,7 @@ fn six_viewports_preserve_keyboard_reachability_and_semantic_regions() {
                 "Combat Action Rail",
                 "Initiative Timeline",
                 "Actor 1",
-                "Actor 104",
+                "Actor 106",
             ] {
                 assert!(tree.contains(name), "missing {name}");
             }
@@ -418,9 +421,9 @@ fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view() {
 }
 
 #[test]
-fn default_720_battle_overview_shows_every_actor_name_and_hp_without_scrolling() {
+fn default_720_battle_overview_shows_every_actor_identity_and_hp_without_scrolling() {
     let mut app = app(1280, 720, UiScaleMode::Auto);
-    for actor in [1, 2, 3, 4, 101, 102, 103, 104] {
+    for actor in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
         let text = find_named(app.world_mut(), &format!("Actor {actor} Summary"))
             .expect("actor name and HP summary");
         let node = app.world().get::<ComputedNode>(text).expect("layout");
@@ -435,6 +438,31 @@ fn default_720_battle_overview_shows_every_actor_name_and_hp_without_scrolling()
             visible.width() + 0.5 >= expected.x && visible.height() + 0.5 >= expected.y,
             "actor {actor} summary clipped: {visible:?} / {expected:?}"
         );
+    }
+}
+
+#[test]
+fn large_text_fits_actor_overlays_without_overlapping_neighbors() {
+    let mut app = app(1280, 720, UiScaleMode::Percent200);
+    for actor in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
+        let text = find_named(app.world_mut(), &format!("Actor {actor} Summary")).expect("summary");
+        let glyphs = app
+            .world()
+            .get::<bevy::text::TextLayoutInfo>(text)
+            .expect("shaped text");
+        let node = app.world().get::<ComputedNode>(text).expect("text box");
+        assert!(!glyphs.glyphs.is_empty(), "must measure real text");
+        // Layout advance includes trailing spaces; test the rendered glyph quads.
+        for glyph in &glyphs.glyphs {
+            let rect = Rect::from_center_size(glyph.position, glyph.atlas_info.rect.size());
+            if rect.width() > 0.0 && rect.height() > 0.0 {
+                assert!(
+                    rect.min.x >= -0.5 && rect.max.x <= node.size().x + 0.5,
+                    "actor {actor} glyph {rect:?} overflows {:?}",
+                    node.size()
+                );
+            }
+        }
     }
 }
 
@@ -498,6 +526,8 @@ fn facing_front_ranks_are_presentation_only_and_selection_is_distinct() {
     assert_eq!(
         visual,
         [
+            "Actor 6 Tile",
+            "Actor 5 Tile",
             "Actor 4 Tile",
             "Actor 3 Tile",
             "Actor 2 Tile",
@@ -524,4 +554,363 @@ fn reduced_motion_uses_the_shared_preference_without_changing_rules() {
     assert!(app.world().resource::<UiMotionPreference>().reduced);
     run_frames(&mut app, 3);
     assert_eq!(app.world().resource::<LabyrinthView>().combat, before);
+}
+
+#[test]
+fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank() {
+    let mut app = app(1920, 1080, UiScaleMode::Auto);
+    let mut combat =
+        Combat::new(42, [HeroClass::Gatekeeper; PARTY_SIZE]).expect("repeated classes");
+    for _ in 0..labyrinth_rules::MAX_ACTORS {
+        let active = combat.snapshot().active_actor.expect("live decision");
+        if active == ActorId(1) {
+            break;
+        }
+        combat
+            .apply(active, CombatAction::Wait)
+            .expect("advance to first hero");
+    }
+    assert_eq!(combat.snapshot().active_actor, Some(ActorId(1)));
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.local = false;
+        view.player = Some(5);
+        for player in &mut view.players {
+            player.hero = HeroClass::Gatekeeper;
+            // Deliberately not slot+1: ownership survives an independent seat mapping.
+            if player.slot == 5 {
+                player.actor = ActorId(1);
+            }
+            if player.slot == 0 {
+                player.actor = ActorId(6);
+            }
+        }
+        view.combat = Some(combat.snapshot());
+    }
+    run_frames(&mut app, 4);
+    apply_action(app.world_mut(), Action::Choice(Choice::Wait));
+    assert_eq!(
+        battle::selected_action(
+            app.world().resource::<LabyrinthView>(),
+            app.world().resource::<UiState>()
+        ),
+        Ok((ActorId(1), CombatAction::Wait))
+    );
+    let summary = find_named(app.world_mut(), "Actor 1").expect("owned actor");
+    assert!(app
+        .world()
+        .get::<AccessibleLabel>(summary)
+        .expect("accessible owner")
+        .0
+        .contains("Player 6"));
+    app.world_mut().resource_mut::<LabyrinthView>().player = Some(0);
+    run_frames(&mut app, 3);
+    apply_action(app.world_mut(), Action::Choice(Choice::Wait));
+    assert!(battle::selected_action(
+        app.world().resource::<LabyrinthView>(),
+        app.world().resource::<UiState>()
+    )
+    .is_err());
+}
+
+#[test]
+fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_loadouts() {
+    let mut app = app(1920, 1080, UiScaleMode::Auto);
+    let mut next_id = 0;
+    let heroes = DEFAULT_HERO_ROSTER.map(|class| {
+        next_id += 1;
+        let mut hero = HeroSetup::preset(ActorId(next_id), class);
+        hero.abilities = AbilityLoadout::new(SkillId::ALL.into_iter().take(MAX_EQUIPPED_ABILITIES))
+            .expect("custom loadout");
+        hero
+    });
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.local = false;
+        view.player = Some(5);
+        view.combat = Some(
+            Combat::with_heroes(42, heroes)
+                .expect("custom setup")
+                .snapshot(),
+        );
+    }
+    run_frames(&mut app, 4);
+    let actor = find_named(app.world_mut(), "Actor 6").expect("sixth hero");
+    assert!(find_named(app.world_mut(), "Skill 7").is_some());
+    assert!(find_named(app.world_mut(), "Skill 8").is_none());
+    tap_key(&mut app, KeyCode::Digit8);
+    assert_eq!(
+        app.world().resource::<UiState>().selected,
+        Some(Choice::Skill(SkillId::CleanBlade))
+    );
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        let hero = view
+            .combat
+            .as_mut()
+            .expect("combat")
+            .actors
+            .iter_mut()
+            .find(|actor| actor.id == ActorId(6))
+            .expect("owned hero");
+        hero.abilities = AbilityLoadout::new([]).expect("universal-only loadout");
+        hero.skill_uses.clear();
+    }
+    run_frames(&mut app, 4);
+    assert_eq!(find_named(app.world_mut(), "Actor 6"), Some(actor));
+    assert!(find_named(app.world_mut(), "Skill 0").is_none());
+    assert!(find_named(app.world_mut(), "Wait").is_some());
+    assert_eq!(app.world().resource::<UiState>().selected, None);
+}
+
+#[test]
+fn six_seat_lobby_allows_repeated_class_selection_and_requires_every_ready_player() {
+    let mut app = app(1280, 720, UiScaleMode::Auto);
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.mode = ViewMode::Lobby;
+        view.local = false;
+        view.invite_labels = (1..PARTY_SIZE)
+            .map(|index| format!("Guest {index}"))
+            .collect();
+        view.players.last_mut().expect("sixth seat").ready = false;
+    }
+    run_frames(&mut app, 4);
+    let start = find_named(app.world_mut(), "Start Encounter").expect("start");
+    assert!(app.world().get::<UiDisabled>(start).is_some());
+    assert!(find_named(app.world_mut(), "Copy Invitation 4").is_some());
+    for hero in HeroClass::ALL {
+        let choose =
+            find_named(app.world_mut(), &format!("Choose {hero:?}")).expect("class choice");
+        assert!(app.world().get::<UiDisabled>(choose).is_none());
+    }
+    app.world_mut()
+        .resource_mut::<LabyrinthView>()
+        .players
+        .last_mut()
+        .expect("sixth seat")
+        .ready = true;
+    run_frames(&mut app, 4);
+    let start = find_named(app.world_mut(), "Start Encounter").expect("start");
+    assert!(app.world().get::<UiDisabled>(start).is_none());
+}
+
+#[test]
+fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
+    for keyboard in [false, true] {
+        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let snapshot = app
+            .world()
+            .resource::<LabyrinthView>()
+            .combat
+            .clone()
+            .expect("combat");
+        let actor = snapshot.active_actor.expect("hero decision");
+        let source = snapshot.actor(actor).expect("source");
+        let (index, skill, target) = source
+            .skills()
+            .iter()
+            .enumerate()
+            .find_map(|(index, skill)| {
+                snapshot
+                    .actors
+                    .iter()
+                    .find(|target| {
+                        snapshot
+                            .validate_action(
+                                actor,
+                                &CombatAction::Skill {
+                                    skill: *skill,
+                                    target: target.id,
+                                },
+                            )
+                            .is_ok()
+                    })
+                    .map(|target| (index, *skill, target.id))
+            })
+            .expect("legal equipped ability");
+        let skill_control = find_named(app.world_mut(), &format!("Skill {index}")).expect("skill");
+        let target_control =
+            find_named(app.world_mut(), &format!("Actor {}", target.0)).expect("target");
+        for control in [skill_control, target_control] {
+            if keyboard {
+                assert!(focus_action(app.world_mut(), control));
+                tap_key(&mut app, KeyCode::Enter);
+            } else {
+                assert!(click_action(&mut app, control));
+            }
+            run_frames(&mut app, 2);
+            assert!(!app
+                .world_mut()
+                .resource_mut::<Messages<LabyrinthIntent>>()
+                .drain()
+                .any(|intent| matches!(intent, LabyrinthIntent::Combat { .. })));
+            assert_eq!(
+                app.world().resource::<LabyrinthView>().combat.as_ref(),
+                Some(&snapshot)
+            );
+        }
+        let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
+        assert!(activation_eligible(app.world_mut(), confirm));
+        if keyboard {
+            assert!(focus_action(app.world_mut(), confirm));
+            tap_key(&mut app, KeyCode::Space);
+        } else {
+            assert!(click_action(&mut app, confirm));
+        }
+        let intents: Vec<_> = app
+            .world_mut()
+            .resource_mut::<Messages<LabyrinthIntent>>()
+            .drain()
+            .collect();
+        assert_eq!(
+            intents
+                .iter()
+                .filter(|intent| matches!(intent, LabyrinthIntent::Combat { .. }))
+                .count(),
+            1
+        );
+        assert!(intents.iter().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor: who, action: CombatAction::Skill { skill: chosen, target: hit }, .. } if *who == actor && *chosen == skill && *hit == target)));
+    }
+}
+
+#[test]
+fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage() {
+    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
+        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
+            let mut app = app(width, height, scale);
+            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+            let stage = find_named(app.world_mut(), "Facing Formations").expect("stage");
+            assert_eq!(
+                app.world()
+                    .get::<Node>(stage)
+                    .expect("stage layout")
+                    .overflow,
+                Overflow::DEFAULT
+            );
+            let mut rectangles = Vec::new();
+            for id in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
+                let entity = find_named(app.world_mut(), &format!("Actor {id}")).expect("actor");
+                let rect = visible_control_rect(app.world(), entity, viewport)
+                    .expect("art visible before focus/scroll");
+                assert!(
+                    rect.width() >= 43.5 && rect.height() >= 43.5,
+                    "{width} {scale:?} actor{id}: {rect:?}"
+                );
+                rectangles.push((entity, rect));
+            }
+            apply_action(app.world_mut(), Action::ToggleInspector);
+            run_frames(&mut app, 3);
+            for (entity, before) in rectangles {
+                assert_eq!(
+                    visible_control_rect(app.world(), entity, viewport),
+                    Some(before)
+                );
+            }
+            apply_action(app.world_mut(), Action::Cancel);
+            assert!(!app.world().resource::<UiState>().show_inspector);
+        }
+    }
+}
+
+/// Native UI hit-test evidence: unlike click_action, this never assigns Interaction.
+fn pointer_at(app: &mut App, position: Vec2) {
+    use bevy::input::{mouse::MouseButtonInput, ButtonState};
+    let (entity, mut window) = app
+        .world_mut()
+        .query::<(Entity, &mut Window)>()
+        .single_mut(app.world_mut())
+        .expect("window");
+    window.set_cursor_position(Some(position));
+    run_frames(app, 2);
+    for state in [ButtonState::Pressed, ButtonState::Released] {
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state,
+            window: entity,
+        });
+        app.update();
+    }
+}
+
+#[test]
+fn drawer_and_modal_block_pointer_fallthrough_to_world_anchored_actor_controls() {
+    let mut app = app(1280, 720, UiScaleMode::Auto);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+    let target = find_named(app.world_mut(), "Actor 103").expect("target");
+    let point = visible_control_rect(app.world(), target, viewport)
+        .expect("bounds")
+        .center();
+    pointer_at(&mut app, point);
+    assert_eq!(
+        app.world().resource::<UiState>().target,
+        Some(ActorId(103)),
+        "real hit-test reaches actor"
+    );
+    apply_action(app.world_mut(), Action::Cancel);
+    app.world_mut().resource_mut::<UiState>().target = None;
+    apply_action(app.world_mut(), Action::ToggleInspector);
+    run_frames(&mut app, 3);
+    let drawer = find_named(app.world_mut(), "Battle Detail Drawer").expect("drawer");
+    let drawer_rect = visible_control_rect(app.world(), drawer, viewport).expect("drawer bounds");
+    let hit = point.clamp(
+        drawer_rect.min + Vec2::splat(2.0),
+        drawer_rect.max - Vec2::splat(2.0),
+    );
+    pointer_at(&mut app, hit);
+    assert_eq!(app.world().resource::<UiState>().target, None);
+    apply_action(app.world_mut(), Action::Cancel);
+    apply_action(app.world_mut(), Action::Settings);
+    run_frames(&mut app, 3);
+    pointer_at(&mut app, point);
+    assert_eq!(app.world().resource::<UiState>().target, None);
+}
+
+#[test]
+fn detail_scope_traps_focus_restores_selection_and_keyboard_scrolls_last_content() {
+    let mut app = app(1280, 720, UiScaleMode::Percent200);
+    let actor = find_named(app.world_mut(), "Actor 1").expect("actor");
+    assert!(focus_action(app.world_mut(), actor));
+    let before = app.world().resource::<UiState>().selected;
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.log = (0..12).map(|i| format!("Log entry {i}: a long outcome description that must remain fully inspectable at large text size.")).collect();
+    }
+    apply_action(app.world_mut(), Action::ToggleLog);
+    run_frames(&mut app, 4);
+    assert!(!activation_eligible(app.world_mut(), actor));
+    let close = find_named(app.world_mut(), "Close Details").expect("close");
+    assert!(activation_eligible(app.world_mut(), close));
+    tap_key(&mut app, KeyCode::Digit1);
+    assert_eq!(app.world().resource::<UiState>().selected, before);
+    let scroll = find_named(app.world_mut(), "Detail Scroll").expect("scroll");
+    tap_key(&mut app, KeyCode::End);
+    run_frames(&mut app, 3);
+    let node = app.world().get::<ComputedNode>(scroll).expect("computed");
+    let maximum = (node.content_size().y - node.size().y) * node.inverse_scale_factor;
+    assert!(maximum > 100.0, "fixture must overflow");
+    let offset = app
+        .world()
+        .get::<ScrollPosition>(scroll)
+        .expect("position")
+        .0
+        .y;
+    assert!(
+        (offset - maximum).abs() < 1.0,
+        "last content reachable: {offset}/{maximum}"
+    );
+    tap_key(&mut app, KeyCode::Home);
+    run_frames(&mut app, 2);
+    assert_eq!(
+        app.world()
+            .get::<ScrollPosition>(scroll)
+            .expect("position")
+            .0
+            .y,
+        0.0
+    );
+    tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 3);
+    assert!(activation_eligible(app.world_mut(), actor));
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(actor));
 }

@@ -1,10 +1,13 @@
-//! Four-player policy and replay protection. None of these rules belong to transport.
+//! Six-player policy and replay protection. None of these rules belong to transport.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy::prelude::*;
 use bevy_game_session::PeerId;
-use labyrinth_rules::{ActorId, Combat, CombatAction, CombatEvent, CombatSnapshot, HeroClass};
+use labyrinth_rules::{
+    AbilityLoadout, ActorId, ActorKind, Combat, CombatAction, CombatEvent, CombatSnapshot,
+    HeroClass, HeroSetup, DEFAULT_HERO_ROSTER, PARTY_SIZE,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::view::{PlayerView, PresentedEvent};
@@ -14,11 +17,22 @@ mod tests;
 
 const RESULT_CACHE: usize = 64;
 const LOG_LIMIT: usize = 80;
+pub(crate) const PLAYER_CAPACITY: u8 = PARTY_SIZE as u8;
+const ACTORS: [ActorId; PARTY_SIZE] = [
+    ActorId(1),
+    ActorId(2),
+    ActorId(3),
+    ActorId(4),
+    ActorId(5),
+    ActorId(6),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PlayerState {
     pub slot: u8,
+    pub actor: ActorId,
     pub hero: HeroClass,
+    pub abilities: AbilityLoadout,
     pub peer: Option<PeerId>,
     pub occupied: bool,
     pub connected: bool,
@@ -29,6 +43,7 @@ impl PlayerState {
     pub fn view(&self) -> PlayerView {
         PlayerView {
             slot: self.slot,
+            actor: self.actor,
             hero: self.hero,
             name: if self.slot == 0 {
                 "Host".into()
@@ -69,6 +84,7 @@ pub(crate) struct RequestResult {
 }
 
 #[derive(Message, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "UncheckedSessionSnapshot")]
 pub(crate) struct SessionSnapshot {
     pub revision: u64,
     pub encounter: u64,
@@ -78,6 +94,136 @@ pub(crate) struct SessionSnapshot {
     pub log: Vec<String>,
     pub events: Vec<PresentedEvent>,
     pub paused: bool,
+}
+
+#[derive(Deserialize)]
+struct UncheckedSessionSnapshot {
+    revision: u64,
+    encounter: u64,
+    next_sequence: u64,
+    players: Vec<PlayerState>,
+    combat: Option<CombatSnapshot>,
+    log: Vec<String>,
+    events: Vec<PresentedEvent>,
+    paused: bool,
+}
+
+impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
+    type Error = &'static str;
+
+    fn try_from(value: UncheckedSessionSnapshot) -> Result<Self, Self::Error> {
+        let snapshot = Self {
+            revision: value.revision,
+            encounter: value.encounter,
+            next_sequence: value.next_sequence,
+            players: value.players,
+            combat: value.combat,
+            log: value.log,
+            events: value.events,
+            paused: value.paused,
+        };
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
+}
+
+impl SessionSnapshot {
+    /// Validate owner identity separately from class and mutable formation rank.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.revision == 0
+            || self.next_sequence == 0
+            || self.players.len() != PARTY_SIZE
+            || self.log.len() > LOG_LIMIT
+            || self.events.len() > LOG_LIMIT
+        {
+            return Err("Invalid session snapshot bounds.");
+        }
+        let mut slots = BTreeSet::new();
+        let mut actors = BTreeSet::new();
+        let mut peers = BTreeSet::new();
+        for player in &self.players {
+            if player.slot >= PLAYER_CAPACITY
+                || !slots.insert(player.slot)
+                || player.actor.0 == 0
+                || !actors.insert(player.actor)
+                || (!player.occupied && (player.connected || player.ready || player.peer.is_some()))
+                || (player.slot == 0
+                    && (!player.occupied || !player.connected || player.peer.is_some()))
+                || player
+                    .peer
+                    .is_some_and(|peer| !peer.is_valid() || !peers.insert(peer))
+            {
+                return Err("Invalid or duplicate player ownership.");
+            }
+        }
+        if let Some(combat) = &self.combat {
+            combat.validate().map_err(|_| "Invalid combat snapshot.")?;
+            if self.encounter == 0 || self.players.iter().any(|player| !player.occupied) {
+                return Err("Combat requires the complete reserved party.");
+            }
+            for player in &self.players {
+                if !combat.actor(player.actor).is_some_and(|actor| {
+                    actor.kind == ActorKind::Hero(player.hero)
+                        && actor.abilities == player.abilities
+                }) {
+                    return Err("Combat actor does not match its owner and loadout.");
+                }
+            }
+            if !self.paused && self.players.iter().any(|player| !player.connected) {
+                return Err("Disconnected combat must be paused.");
+            }
+        }
+        if self.events.iter().any(|event| event.id == 0)
+            || self.events.windows(2).any(|pair| {
+                pair.first()
+                    .zip(pair.get(1))
+                    .is_some_and(|(a, b)| a.id >= b.id)
+            })
+        {
+            return Err("Invalid session event order.");
+        }
+        Ok(())
+    }
+
+    pub fn validate_recipient(&self, slot: u8, peer: PeerId) -> Result<(), &'static str> {
+        self.validate()?;
+        if self
+            .players
+            .iter()
+            .any(|player| player.slot != 0 && player.occupied && player.peer.is_none())
+            || !self.players.iter().any(|player| {
+                player.slot == slot
+                    && player.peer == Some(peer)
+                    && player.occupied
+                    && player.connected
+            })
+        {
+            return Err("Snapshot does not belong to the admitted player.");
+        }
+        Ok(())
+    }
+
+    pub fn validate_successor(&self, previous: &Self) -> Result<(), &'static str> {
+        for player in &self.players {
+            let prior = previous
+                .players
+                .iter()
+                .find(|prior| prior.slot == player.slot)
+                .ok_or("Player slot changed within the session.")?;
+            if prior.actor != player.actor {
+                return Err("Actor ownership changed within the session.");
+            }
+            if self.encounter == previous.encounter
+                && previous.combat.is_some()
+                && (prior.peer != player.peer
+                    || prior.hero != player.hero
+                    || prior.abilities != player.abilities)
+            {
+                return Err("Combat ownership or loadout changed during the encounter.");
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Resource)]
@@ -98,12 +244,15 @@ pub(crate) struct PartyAuthority {
 
 impl PartyAuthority {
     pub fn new(seed: u64, local: bool) -> Self {
-        let players = HeroClass::ALL
+        let players = ACTORS
             .into_iter()
+            .zip(DEFAULT_HERO_ROSTER)
             .enumerate()
-            .map(|(index, hero)| PlayerState {
+            .map(|(index, (actor, hero))| PlayerState {
                 slot: u8::try_from(index).unwrap_or_default(),
+                actor,
                 hero,
+                abilities: HeroSetup::preset(actor, hero).abilities,
                 peer: None,
                 occupied: local || index == 0,
                 connected: local || index == 0,
@@ -130,10 +279,11 @@ impl PartyAuthority {
         self.combat.is_none()
     }
     pub fn occupied(&self) -> u8 {
-        u8::try_from(self.players.iter().filter(|player| player.occupied).count()).unwrap_or(4)
+        u8::try_from(self.players.iter().filter(|player| player.occupied).count())
+            .unwrap_or(PLAYER_CAPACITY)
     }
     pub fn has_space(&self) -> bool {
-        self.in_lobby() && self.occupied() < 4
+        self.in_lobby() && self.occupied() < PLAYER_CAPACITY
     }
     pub fn slot_for(&self, peer: PeerId) -> Option<u8> {
         self.players
@@ -142,21 +292,15 @@ impl PartyAuthority {
             .map(|player| player.slot)
     }
     pub fn reserve(&mut self, peer: PeerId) -> Result<u8, String> {
+        if !peer.is_valid() {
+            return Err("Invalid player identity.".into());
+        }
         if let Some(slot) = self.slot_for(peer) {
             return Ok(slot);
         }
         if !self.has_space() {
             return Err("Party is full or the encounter has started.".into());
         }
-        let available = HeroClass::ALL
-            .into_iter()
-            .find(|hero| {
-                !self
-                    .players
-                    .iter()
-                    .any(|player| player.occupied && player.hero == *hero)
-            })
-            .ok_or("No hero is available.")?;
         let player = self
             .players
             .iter_mut()
@@ -166,7 +310,6 @@ impl PartyAuthority {
         player.occupied = true;
         player.connected = false;
         player.ready = false;
-        player.hero = available;
         let slot = player.slot;
         self.revision += 1;
         Ok(slot)
@@ -198,6 +341,10 @@ impl PartyAuthority {
             player.occupied = false;
             player.connected = false;
             player.ready = false;
+            if let Some(hero) = DEFAULT_HERO_ROSTER.get(usize::from(player.slot)) {
+                player.hero = *hero;
+                player.abilities = HeroSetup::preset(player.actor, *hero).abilities;
+            }
             // New identity never inherits an old seat's replay history.
             self.sequence.remove(&player.slot);
             self.results.remove(&player.slot);
@@ -269,24 +416,27 @@ impl PartyAuthority {
                 if !self.in_lobby() {
                     return Err("Heroes are chosen in the lobby.".into());
                 }
-                if self
-                    .players
-                    .iter()
-                    .any(|p| p.occupied && p.slot != slot && p.hero == hero)
-                {
-                    return Err("Another player has chosen that hero.".into());
-                }
+                let changed = player.hero != hero;
                 if let Some(player) = self.players.iter_mut().find(|p| p.slot == slot) {
                     player.hero = hero;
-                    player.ready = false;
+                    if changed {
+                        player.abilities = HeroSetup::preset(player.actor, hero).abilities;
+                    }
+                }
+                if changed {
+                    for player in &mut self.players {
+                        player.ready = false;
+                    }
                 }
             }
             SessionCommand::Ready(ready) => {
                 if !self.in_lobby() {
                     return Err("The encounter has already begun.".into());
                 }
-                if let Some(player) = self.players.iter_mut().find(|p| p.slot == slot) {
-                    player.ready = ready;
+                for player in &mut self.players {
+                    if self.local || player.slot == slot {
+                        player.ready = ready;
+                    }
                 }
             }
             SessionCommand::Start => {
@@ -294,17 +444,21 @@ impl PartyAuthority {
                     return Err("Only the host can start from the lobby.".into());
                 }
                 if self.players.iter().any(|p| !p.connected || !p.ready) {
-                    return Err("All four players must be ready.".into());
+                    return Err("All six players must be connected and ready.".into());
                 }
-                let heroes: [HeroClass; 4] = self
+                let heroes: [HeroSetup; PARTY_SIZE] = self
                     .players
                     .iter()
-                    .map(|p| p.hero)
+                    .map(|p| HeroSetup {
+                        id: p.actor,
+                        class: p.hero,
+                        abilities: p.abilities.clone(),
+                    })
                     .collect::<Vec<_>>()
                     .try_into()
                     .map_err(|_| "Invalid party size.")?;
                 self.combat = Some(
-                    Combat::new(self.seed.wrapping_add(self.encounter), heroes)
+                    Combat::with_heroes(self.seed.wrapping_add(self.encounter), heroes)
                         .map_err(|e| e.to_string())?,
                 );
                 self.encounter += 1;
@@ -328,7 +482,7 @@ impl PartyAuthority {
                 if self.paused() {
                     return Err("Combat is paused for a disconnected player.".into());
                 }
-                if !self.local && actor != ActorId(u16::from(player.slot) + 1) {
+                if !self.local && actor != player.actor {
                     return Err("That is not your hero.".into());
                 }
                 let combat = self.combat.as_mut().ok_or("No encounter is running.")?;

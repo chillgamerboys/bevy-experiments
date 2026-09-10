@@ -1,12 +1,14 @@
 use super::*;
 
 #[test]
-fn rejects_duplicate_heroes_and_round_trips_public_state() {
-    assert_eq!(
-        Combat::new(42, [HeroClass::Scout; 4]),
-        Err(RuleError::DuplicateHero)
-    );
-    let combat = Combat::new(42, HeroClass::ALL).expect("valid party");
+fn repeated_hero_classes_are_valid_and_round_trip_public_state() {
+    let repeated =
+        Combat::new(42, [HeroClass::Scout; PARTY_SIZE]).expect("repeated classes allowed");
+    repeated
+        .snapshot()
+        .validate()
+        .expect("six independent scouts");
+    let combat = Combat::new(42, crate::DEFAULT_HERO_ROSTER).expect("valid party");
     let encoded = serde_json::to_string(&combat.snapshot()).expect("serialize");
     let decoded: CombatSnapshot = serde_json::from_str(&encoded).expect("validate snapshot");
     assert_eq!(decoded, combat.snapshot());
@@ -14,7 +16,7 @@ fn rejects_duplicate_heroes_and_round_trips_public_state() {
 }
 
 #[test]
-fn shuffled_hero_selection_preserves_seat_ids_but_starts_in_role_ranks() {
+fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
     let combat = Combat::new(
         42,
         [
@@ -22,6 +24,8 @@ fn shuffled_hero_selection_preserves_seat_ids_but_starts_in_role_ranks() {
             HeroClass::Scout,
             HeroClass::Gatekeeper,
             HeroClass::Knifehand,
+            HeroClass::FieldMedic,
+            HeroClass::Scout,
         ],
     )
     .expect("shuffled valid party");
@@ -31,9 +35,16 @@ fn shuffled_hero_selection_preserves_seat_ids_but_starts_in_role_ranks() {
     );
     assert_eq!(
         combat.state.hero_formation,
-        [ActorId(3), ActorId(4), ActorId(2), ActorId(1)]
+        [
+            ActorId(1),
+            ActorId(2),
+            ActorId(3),
+            ActorId(4),
+            ActorId(5),
+            ActorId(6)
+        ]
     );
-    assert_eq!(combat.state.rank(ActorId(1)), Some(4));
+    assert_eq!(combat.state.rank(ActorId(1)), Some(1));
     combat.snapshot().validate().expect("ownership is not rank");
 }
 
@@ -41,13 +52,13 @@ fn shuffled_hero_selection_preserves_seat_ids_but_starts_in_role_ranks() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "cc5066f78bba51e75b56d779b248c66b87532faa9bbe279f46ee493fedeef30b"
+        "01a8c69e0d9ff59fdb3a37c8957038d3f3ce1e3d50c618944f1b404000a999c8"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }
 
 fn fixture() -> Combat {
-    Combat::new(42, HeroClass::ALL).expect("valid party")
+    Combat::new(42, crate::DEFAULT_HERO_ROSTER).expect("valid party")
 }
 
 fn attach(
@@ -119,7 +130,7 @@ fn frozen_seeded_initiative_rerolls_and_breaks_ties_deterministically() {
     assert_eq!(initial, fixture().state.initiative);
     assert_ne!(
         initial,
-        Combat::new(43, HeroClass::ALL)
+        Combat::new(43, crate::DEFAULT_HERO_ROSTER)
             .expect("party")
             .state
             .initiative
@@ -130,15 +141,15 @@ fn frozen_seeded_initiative_rerolls_and_breaks_ties_deterministically() {
         assert!(acted.insert(active));
         combat.apply(active, CombatAction::Wait).expect("wait");
     }
-    assert_eq!(acted.len(), 8);
+    assert_eq!(acted.len(), MAX_ACTORS);
     assert_eq!(combat.state.round, 2);
     assert_ne!(initial, combat.state.initiative);
     for seed in 0..64 {
-        let candidate = Combat::new(seed, HeroClass::ALL).expect("party");
+        let candidate = Combat::new(seed, crate::DEFAULT_HERO_ROSTER).expect("party");
         candidate.state.validate().expect("sorted unique tiebreaks");
         assert_eq!(
             candidate,
-            Combat::new(seed, HeroClass::ALL).expect("same seed")
+            Combat::new(seed, crate::DEFAULT_HERO_ROSTER).expect("same seed")
         );
     }
 }
@@ -192,8 +203,8 @@ fn all_authored_heroes_have_four_skills_and_displacement_has_legal_fallbacks() {
         assert_eq!(class.skills().len(), 4);
         for skill in class.skills() {
             let definition = skill_definition(*skill);
-            assert!(definition.source_ranks > 0 && definition.source_ranks < 16);
-            assert!(definition.target_ranks > 0 && definition.target_ranks < 16);
+            assert!(definition.source_ranks > 0 && definition.source_ranks < 64);
+            assert!(definition.target_ranks > 0 && definition.target_ranks < 64);
             assert!(!definition.effects.is_empty());
         }
     }
@@ -361,7 +372,7 @@ fn lethal_bleed_consumes_slot_preserves_formation_and_clears_only_requested_stat
     attach(&mut combat, ActorId(4), target, StatusKind::Haste);
     let original_formation = combat.state.hero_formation.clone();
     let mut observed = Vec::new();
-    for _ in 0..8 {
+    for _ in 0..MAX_ACTORS {
         if !combat.state.actor(target).expect("hero").standing() {
             break;
         }
@@ -668,7 +679,13 @@ fn killed_enemy_compacts_without_moving_statuses_or_resolving_later_skill_effect
         .expect("kill before displacement");
     assert_eq!(
         combat.state.enemy_formation,
-        [ActorId(102), ActorId(103), ActorId(104)]
+        [
+            ActorId(102),
+            ActorId(103),
+            ActorId(104),
+            ActorId(105),
+            ActorId(106)
+        ]
     );
     assert_eq!(
         status(&combat, ActorId(102), StatusKind::Bleed)
@@ -687,16 +704,23 @@ fn push_and_pull_shift_ranks_without_crossing_boundaries() {
         .expect("push");
     assert_eq!(
         combat.state.enemy_formation,
-        [ActorId(102), ActorId(101), ActorId(103), ActorId(104)]
+        [
+            ActorId(102),
+            ActorId(101),
+            ActorId(103),
+            ActorId(104),
+            ActorId(105),
+            ActorId(106)
+        ]
     );
     combat
-        .move_actor(ActorId(104), 1, &mut Vec::new(), &mut Work(MAX_WORK))
+        .move_actor(ActorId(106), 1, &mut Vec::new(), &mut Work(MAX_WORK))
         .expect("boundary no-op");
-    assert_eq!(combat.state.rank(ActorId(104)), Some(4));
+    assert_eq!(combat.state.rank(ActorId(106)), Some(6));
     combat
-        .move_actor(ActorId(104), -1, &mut Vec::new(), &mut Work(MAX_WORK))
+        .move_actor(ActorId(106), -1, &mut Vec::new(), &mut Work(MAX_WORK))
         .expect("pull");
-    assert_eq!(combat.state.rank(ActorId(104)), Some(3));
+    assert_eq!(combat.state.rank(ActorId(106)), Some(5));
 }
 
 #[test]
@@ -858,11 +882,11 @@ fn scripted_party_and_ai_complete_identically_without_bevy() {
             assert!(event_ids.insert(event.id));
         }
     }
-    assert_eq!(humans_acted.len(), 4);
+    assert_eq!(humans_acted.len(), PARTY_SIZE);
     assert_eq!(
         left.state.outcome,
         Some(CombatOutcome::Victory),
-        "scripted four-hero party can win the authored encounter"
+        "scripted six-hero party can win the authored encounter"
     );
     let terminal = left.clone();
     assert_eq!(
@@ -875,7 +899,7 @@ fn scripted_party_and_ai_complete_identically_without_bevy() {
 #[test]
 fn all_heroes_downed_is_immediate_defeat_and_no_enemy_actions_remain() {
     let mut combat = fixture();
-    for actor in (1..=4).map(ActorId) {
+    for actor in (1..=6).map(ActorId) {
         damage_fixture(&mut combat, actor, 0);
     }
     assert_eq!(combat.state.outcome, Some(CombatOutcome::Defeat));

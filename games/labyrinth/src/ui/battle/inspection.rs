@@ -30,14 +30,13 @@ pub(super) fn display_actor(view: &LabyrinthView) -> Option<&ActorSnapshot> {
             .iter()
             .find(|player| Some(player.slot) == view.player)?;
         snapshot
-            .actors
-            .iter()
-            .find(|actor| actor.kind == ActorKind::Hero(player.hero))
+            .actor(player.actor)
+            .filter(|actor| actor.team() == Team::Heroes)
     }
 }
 
 pub(super) fn action_for(choice: Choice, target: Option<ActorId>) -> Result<CombatAction, String> {
-    let target = || target.ok_or_else(|| "Choose an actor tile as the target.".to_owned());
+    let target = || target.ok_or_else(|| "Select a character to target.".to_owned());
     Ok(match choice {
         Choice::Skill(skill) => CombatAction::Skill {
             skill,
@@ -88,7 +87,7 @@ pub(crate) fn selected_action(
 }
 
 pub(super) fn rank_mask(mask: u8) -> String {
-    (1..=4)
+    (1..=PARTY_SIZE)
         .map(|rank| {
             if mask & (1 << (rank - 1)) != 0 {
                 rank.to_string()
@@ -105,81 +104,55 @@ pub(super) fn slot_value(
     view: &LabyrinthView,
     ui: &UiState,
     snapshot: &CombatSnapshot,
-    viewport: UiViewportClass,
+    _viewport: UiViewportClass,
 ) -> String {
     match slot {
         Slot::Hud => {
             let actor = snapshot
                 .active_actor
                 .and_then(|id| snapshot.actor(id))
-                .map_or("No actor", ActorSnapshot::name);
+                .map_or_else(
+                    || "No actor".to_owned(),
+                    |actor| format!("{} · {}", actors::token(snapshot, actor), actor.name()),
+                );
             let ending = snapshot.outcome.map(|outcome| match outcome {
                 CombatOutcome::Victory => "VICTORY",
                 CombatOutcome::Defeat => "DEFEAT",
             });
-            let mode = if view.local {
-                "LOCAL | all four heroes".to_owned()
-            } else {
-                format!(
-                    "CO-OP | {}/4 connected",
-                    view.players
-                        .iter()
-                        .filter(|player| player.connected)
-                        .count()
-                )
-            };
-            if viewport == UiViewportClass::Compact {
-                format!(
-                    "{} | R{} | {}",
-                    if view.local { "LOCAL" } else { "CO-OP" },
-                    snapshot.round,
-                    ending.unwrap_or(actor)
-                )
-            } else {
-                format!(
-                    "LABYRINTH | {mode}\nRound {} | {}",
-                    snapshot.round,
-                    ending.unwrap_or(actor)
-                )
-            }
+            format!("Round {} · {}", snapshot.round, ending.unwrap_or(&actor))
         }
-        Slot::Timeline => timeline::value(snapshot, ui, viewport),
-        Slot::Selected => {
-            if let Some((actor, id)) = ui.inspected_status {
-                if let Some(status) = snapshot
-                    .actor(actor)
-                    .and_then(|actor| actor.statuses.iter().find(|status| status.id == id))
-                {
-                    return format!(
-                        "{} | potency {} | {} boundaries left. {}",
-                        status_definition(status.kind).name,
-                        status.potency,
-                        status.remaining,
-                        status_definition(status.kind).description
-                    );
-                }
-            }
-            match ui.selected {
+        Slot::Timeline => timeline::value(snapshot, false),
+        Slot::Order => timeline::value(snapshot, true),
+        Slot::Feedback => String::new(),
+        Slot::Selected => match ui.selected {
             Some(Choice::Skill(skill)) => {
                 let definition = skill_definition(skill);
-                format!("{} | src [{}] tgt [{}]\n{}", definition.name, rank_mask(definition.source_ranks), rank_mask(definition.target_ranks), definition.description)
+                format!("{} · {}", definition.name, definition.description)
             }
-            Some(Choice::Reposition) => "MOVE | swap with an adjacent ally, including a downed ally. Costs this turn.".to_owned(),
-            Some(Choice::Rescue) => "RESCUE | revive any downed ally at 25% maximum HP. Costs this turn.".to_owned(),
-            Some(Choice::Defend) => "DEFEND | Brace reduces direct damage by 2 until your next turn starts; not bleed.".to_owned(),
+            Some(Choice::Reposition) => {
+                "MOVE | swap with an adjacent ally, including a downed ally. Costs this turn."
+                    .to_owned()
+            }
+            Some(Choice::Rescue) => {
+                "RESCUE | revive any downed ally at 25% maximum HP. Costs this turn.".to_owned()
+            }
+            Some(Choice::Defend) => {
+                "DEFEND | Brace reduces direct damage by 2 until your next turn starts; not bleed."
+                    .to_owned()
+            }
             Some(Choice::Wait) => "WAIT | spend this turn without another effect.".to_owned(),
-            None => "Inspect a skill (1-4), select an actor tile, then Confirm. Inspection never spends a turn.".to_owned(),
-        }
-        }
+            None => display_actor(view).map_or_else(
+                || "Watching the company".to_owned(),
+                |actor| format!("{} · choose an ability, then a target", actor.name()),
+            ),
+        },
         Slot::Reason => {
-            let target = ui
-                .target
-                .and_then(|id| snapshot.actor(id))
-                .map_or("none", ActorSnapshot::name);
-            let reason = selected_action(view, ui).map_or_else(
-                |reason| reason,
-                |_| "Legal action | ready to confirm".to_owned(),
+            let target = ui.target.and_then(|id| snapshot.actor(id)).map_or_else(
+                || "—".to_owned(),
+                |actor| format!("{} {}", actors::token(snapshot, actor), actor.name()),
             );
+            let reason = selected_action(view, ui)
+                .map_or_else(|reason| reason, |_| "Ready to confirm".to_owned());
             format!("Target: {target} | {reason}")
         }
         Slot::Inspector => {
@@ -190,15 +163,40 @@ pub(super) fn slot_value(
             else {
                 return "Choose an actor or a status badge to inspect it.".to_owned();
             };
-            let mut value = format!("{} | {} / {} HP | Speed {}\nRank is position, not ownership. Heroes at 0 HP are downed and can be rescued.", actor.name(), actor.hp, actor.max_hp, actor.speed());
-            for status in &actor.statuses {
-                if ui.inspected_status.is_none_or(|(_, id)| id == status.id) {
-                    let definition = status_definition(status.kind);
-                    value.push_str(&format!(
-                        "\n{} | potency {} | {} boundaries left. {}",
-                        definition.name, status.potency, status.remaining, definition.description
-                    ));
+            let owner = view
+                .players
+                .iter()
+                .find(|player| player.actor == actor.id)
+                .map_or("Host AI", |player| player.name.as_str());
+            let mut value = format!(
+                "{} · {}\n{} / {} HP · Speed {}\n{}",
+                actors::token(snapshot, actor),
+                actor_label(snapshot, actor),
+                actor.hp,
+                actor.max_hp,
+                actor.speed(),
+                if view.local && actor.team() == Team::Heroes {
+                    "Local control"
+                } else {
+                    owner
                 }
+            );
+            if let Some(Choice::Skill(skill)) = ui.selected {
+                let definition = skill_definition(skill);
+                value.push_str(&format!(
+                    "\n\n{}\nFrom ranks [{}] → target ranks [{}]\n{}",
+                    definition.name,
+                    rank_mask(definition.source_ranks),
+                    rank_mask(definition.target_ranks),
+                    definition.description
+                ));
+            }
+            for status in &actor.statuses {
+                let definition = status_definition(status.kind);
+                value.push_str(&format!(
+                    "\n\n{} · potency {} · {} boundaries left. {}",
+                    definition.name, status.potency, status.remaining, definition.description
+                ));
             }
             value
         }
@@ -221,22 +219,20 @@ pub(super) fn slot_value(
             .map_or_else(
                 || "No skill".to_owned(),
                 |(actor, skill)| {
-                    let selected = if ui.selected == Some(Choice::Skill(skill)) {
-                        " | selected"
-                    } else {
-                        ""
-                    };
                     let uses = actor
                         .remaining_uses(skill)
                         .map_or_else(String::new, |remaining| format!(" | {remaining} uses"));
-                    format!(
-                        "{}. {}{uses}{selected}",
-                        index + 1,
-                        skill_definition(skill).name
-                    )
+                    format!("{}. {}{uses}", index + 1, skill_definition(skill).name)
                 },
             ),
     }
+}
+
+fn actor_label(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    let rank = snapshot
+        .rank(actor.id)
+        .map_or_else(|| "out".to_owned(), |rank| rank.to_string());
+    format!("{} | rank {rank} | #{}", actor.name(), actor.id.0)
 }
 
 pub(super) fn paint_choices(world: &mut World, view: &LabyrinthView, ui: &UiState) {

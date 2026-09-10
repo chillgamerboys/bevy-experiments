@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
 pub(super) const GAME_ID: &str = "gamekit-labyrinth";
-pub(super) const PROTOCOL: &str = "1";
-pub(super) const SCHEMA: &str = "labyrinth/v1;four-seats;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
+pub(super) const PROTOCOL: &str = "2";
+pub(super) const SCHEMA: &str = "labyrinth/v2;six-seats;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
 
 #[derive(Serialize)]
 pub(super) struct WirePassword(pub String);

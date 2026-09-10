@@ -8,11 +8,13 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    skill_definition, skills_for, status_definition, RemovalReason, Stat, StatusInstance,
-    StatusKind, TargetRule,
+    skill_definition, skills_for, status_definition, AbilityLoadout, RemovalReason, Stat,
+    StatusInstance, StatusKind, TargetRule, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, MAX_ACTORS,
+    MAX_STATUSES, PARTY_SIZE,
 };
 
-/// Stable character identity; hero IDs are 1..4, enemy IDs are 101..104.
+/// Stable nonzero character identity, independent of player, class, and rank.
+/// Convenience construction uses heroes 1..6 and enemies 101..106.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ActorId(pub u16);
 
@@ -25,7 +27,7 @@ pub enum Team {
     Enemies,
 }
 
-/// Four original playable roles; one of each is required in this encounter.
+/// Four original playable archetypes. Repeated classes are allowed in a party.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum HeroClass {
     /// Durable front-rank fighter.
@@ -39,7 +41,7 @@ pub enum HeroClass {
 }
 
 impl HeroClass {
-    /// Default front-to-back formation and stable lobby choice order.
+    /// Complete class catalog and stable lobby choice order, not a party roster.
     pub const ALL: [Self; 4] = [
         Self::Gatekeeper,
         Self::Knifehand,
@@ -69,14 +71,14 @@ impl HeroClass {
         }
     }
 
-    /// Exactly four authored skills for this role.
+    /// Four starter skills for this archetype, not its actor's actual loadout.
     #[must_use]
     pub fn skills(self) -> &'static [SkillId] {
         skills_for(ActorKind::Hero(self))
     }
 }
 
-/// The authored encounter's four original opponents.
+/// Four enemy archetypes reused by the six-opponent encounter roster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnemyKind {
     /// Front bruiser.
@@ -90,7 +92,7 @@ pub enum EnemyKind {
 }
 
 impl EnemyKind {
-    /// Authored front-to-back enemy roster.
+    /// Complete enemy archetype catalog, not an encounter roster.
     pub const ALL: [Self; 4] = [
         Self::AshBrute,
         Self::IronBrute,
@@ -200,6 +202,31 @@ pub enum SkillId {
     HollowBolt,
 }
 
+impl SkillId {
+    /// Complete typed catalog, independent of which abilities presets equip.
+    pub const ALL: [Self; 19] = [
+        Self::FrontStrike,
+        Self::LongReach,
+        Self::DrivingBlow,
+        Self::FieldDressing,
+        Self::BleedingCut,
+        Self::DeepStrike,
+        Self::ThrownKnife,
+        Self::CleanBlade,
+        Self::BackRankShot,
+        Self::SnapShot,
+        Self::HookShot,
+        Self::Exchange,
+        Self::Mend,
+        Self::Staunch,
+        Self::StaffStrike,
+        Self::Rally,
+        Self::BrutalStrike,
+        Self::RaggedCut,
+        Self::HollowBolt,
+    ];
+}
+
 /// A single action. Expected turn/player identity belongs in the app envelope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CombatAction {
@@ -293,6 +320,8 @@ pub struct ActorSnapshot {
     pub max_hp: u16,
     /// Immutable base speed.
     pub base_speed: u16,
+    /// Explicit equipped abilities, independent of the class starter preset.
+    pub abilities: AbilityLoadout,
     /// Character-bound live effects.
     pub statuses: Vec<StatusInstance>,
     /// Number of times each limited skill has been used this encounter.
@@ -315,10 +344,10 @@ impl ActorSnapshot {
     pub const fn standing(&self) -> bool {
         self.hp > 0
     }
-    /// Owned skill catalog.
+    /// This actor's actual equipped abilities, not its class starter preset.
     #[must_use]
-    pub fn skills(&self) -> &'static [SkillId] {
-        skills_for(self.kind)
+    pub fn skills(&self) -> &[SkillId] {
+        self.abilities.as_slice()
     }
     /// Effective speed; existing initiative entries never use this retroactively.
     #[must_use]
@@ -368,7 +397,7 @@ pub struct CombatSnapshot {
     pub active_actor: Option<ActorId>,
     /// Every authored actor, including defeated enemies.
     pub actors: Vec<ActorSnapshot>,
-    /// Four hero ranks, front to back; downing does not remove a rank.
+    /// Six hero ranks, front to back; downing does not remove a rank.
     pub hero_formation: Vec<ActorId>,
     /// Living enemy ranks, compacted front to back.
     pub enemy_formation: Vec<ActorId>,
@@ -436,31 +465,33 @@ impl CombatSnapshot {
     pub fn validate(&self) -> Result<(), RuleError> {
         if self.round == 0
             || self.turn_id == 0
-            || self.actors.len() != 8
-            || self.hero_formation.len() != 4
-            || self.enemy_formation.len() > 4
+            || self.actors.len() != MAX_ACTORS
+            || self.hero_formation.len() != PARTY_SIZE
+            || self.enemy_formation.len() > PARTY_SIZE
             || self.initiative.is_empty()
-            || self.initiative.len() > 8
+            || self.initiative.len() > MAX_ACTORS
         {
             return Err(RuleError::InvalidState);
         }
         let mut actor_ids = BTreeSet::new();
-        let mut classes = BTreeSet::new();
         let mut instances = BTreeSet::new();
         for actor in &self.actors {
-            if !actor_ids.insert(actor.id)
+            if actor.id.0 == 0
+                || !actor_ids.insert(actor.id)
                 || (actor.max_hp, actor.base_speed) != actor.kind.stats()
                 || actor.hp > actor.max_hp
-                || actor.statuses.len() > 16
+                || actor.statuses.len() > MAX_STATUSES
             {
                 return Err(RuleError::InvalidState);
             }
             match actor.kind {
-                ActorKind::Hero(class)
-                    if (1..=4).contains(&actor.id.0) && classes.insert(class) => {}
+                ActorKind::Hero(_) if !DEFAULT_ENEMY_IDS.contains(&actor.id) => {}
                 ActorKind::Enemy(kind)
-                    if (101..=104).contains(&actor.id.0)
-                        && EnemyKind::ALL.get(usize::from(actor.id.0 - 101)) == Some(&kind) => {}
+                    if DEFAULT_ENEMY_IDS
+                        .iter()
+                        .position(|id| *id == actor.id)
+                        .and_then(|index| DEFAULT_ENEMY_ROSTER.get(index))
+                        == Some(&kind) => {}
                 _ => return Err(RuleError::InvalidState),
             }
             if actor.skill_uses.iter().any(|(skill, used)| {
@@ -491,7 +522,13 @@ impl CombatSnapshot {
                 }
             }
         }
-        if classes.len() != 4 {
+        if self
+            .actors
+            .iter()
+            .filter(|actor| actor.team() == Team::Heroes)
+            .count()
+            != PARTY_SIZE
+        {
             return Err(RuleError::InvalidState);
         }
         let hero_ids: BTreeSet<_> = self
@@ -526,7 +563,7 @@ impl CombatSnapshot {
                 || !(1..=8).contains(&entry.roll)
                 || entry.speed > 100
                 || entry.total != entry.speed + u16::from(entry.roll)
-                || entry.tie_breaker >= 8
+                || usize::from(entry.tie_breaker) >= MAX_ACTORS
                 || !tiebreakers.insert(entry.tie_breaker)
                 || (pending_seen && entry.completed)
             {
@@ -617,7 +654,7 @@ impl CombatSnapshot {
                 let definition = skill_definition(skill);
                 if self
                     .rank(actor)
-                    .is_none_or(|rank| definition.source_ranks & (1 << (rank - 1)) == 0)
+                    .is_none_or(|rank| !definition.allows_source_rank(rank))
                 {
                     return Err(RuleError::WrongRank);
                 }
@@ -627,7 +664,7 @@ impl CombatSnapshot {
                 let recipient = self.actor(target).ok_or(RuleError::UnknownActor)?;
                 if self
                     .rank(target)
-                    .is_none_or(|rank| definition.target_ranks & (1 << (rank - 1)) == 0)
+                    .is_none_or(|rank| !definition.allows_target_rank(rank))
                 {
                     return Err(RuleError::WrongTargetRank);
                 }
@@ -684,8 +721,12 @@ impl CombatSnapshot {
 /// Typed, non-mutating command or state rejection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleError {
-    /// Supplied hero lineup is not exactly one of each class.
-    DuplicateHero,
+    /// Character ID was zero or collided with the authored enemy roster.
+    InvalidActorId,
+    /// Two heroes supplied the same stable character identity.
+    DuplicateActor,
+    /// Equipped abilities contained duplicates or exceeded the fixed wire bound.
+    InvalidLoadout,
     /// Data violates a trusted domain invariant.
     InvalidState,
     /// Character identity does not exist.
@@ -698,7 +739,7 @@ pub enum RuleError {
     NotStanding,
     /// Rescue requires a downed hero ally.
     NotDowned,
-    /// The skill belongs to another actor kind.
+    /// The skill is not equipped by the acting character.
     UnknownSkill,
     /// The acting rank cannot use this skill.
     WrongRank,
@@ -719,7 +760,11 @@ pub enum RuleError {
 impl fmt::Display for RuleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::DuplicateHero => "Choose exactly one of each hero",
+            Self::InvalidActorId => "Character identity is invalid or reserved",
+            Self::DuplicateActor => "Each character needs a unique identity",
+            Self::InvalidLoadout => {
+                "Equipped abilities must be unique and within the loadout limit"
+            }
             Self::InvalidState => "Invalid combat state",
             Self::UnknownActor => "Unknown character",
             Self::WrongActor => "It is not this character's turn",

@@ -1,16 +1,16 @@
 //! Atomic reducer and bounded automatic phase resolution.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction,
-    CombatEvent, CombatEventKind, CombatOutcome, CombatPhase, CombatSnapshot, DamageKind, Effect,
-    EnemyKind, HeroClass, InitiativeEntry, Reapplication, RemovalReason, RuleError, Stat,
-    StatusInstance, StatusKind, StatusTag, Team,
+    skill_definition, status_definition, AbilityLoadout, ActorId, ActorKind, ActorSnapshot,
+    Boundary, CombatAction, CombatEvent, CombatEventKind, CombatOutcome, CombatPhase,
+    CombatSnapshot, DamageKind, Effect, HeroClass, HeroSetup, InitiativeEntry, Reapplication,
+    RemovalReason, RuleError, Stat, StatusInstance, StatusKind, StatusTag, Team, DEFAULT_ENEMY_IDS,
+    DEFAULT_ENEMY_ROSTER, MAX_ACTORS, MAX_COMBAT_WORK, MAX_STATUSES, PARTY_SIZE,
 };
 
-const MAX_STATUSES: usize = 16;
-const MAX_WORK: usize = 512;
+const MAX_WORK: usize = MAX_COMBAT_WORK;
 
 /// Host-owned deterministic combat authority, independent of players and transport.
 ///
@@ -63,30 +63,55 @@ impl Work {
 }
 
 impl Combat {
-    /// Begin the authored encounter with one of every hero in player/seat order.
-    /// IDs 1..4 preserve that ownership order. Initial formation is independently
-    /// sorted into Gatekeeper, Knifehand, Scout, Medic ranks regardless of seat.
-    /// All start-boundary effects are committed before the first snapshot is exposed.
-    pub fn new(seed: u64, heroes: [HeroClass; 4]) -> Result<Self, RuleError> {
-        if heroes
-            .iter()
-            .collect::<std::collections::BTreeSet<_>>()
-            .len()
-            != 4
-        {
-            return Err(RuleError::DuplicateHero);
+    /// Begin the six-versus-six encounter with convenience IDs 1..6.
+    /// The supplied array is front-to-back formation, not a unique-class catalog.
+    /// Repeated classes receive independent loadouts, HP, uses, and statuses.
+    pub fn new(seed: u64, heroes: [HeroClass; PARTY_SIZE]) -> Result<Self, RuleError> {
+        let mut next_id = 0_u16;
+        Self::with_heroes(
+            seed,
+            heroes.map(|class| {
+                next_id += 1;
+                HeroSetup::preset(ActorId(next_id), class)
+            }),
+        )
+    }
+
+    /// Begins the encounter from game-owned character identities and loadouts.
+    ///
+    /// Array order alone determines initial formation; class and numeric ID do
+    /// not sort or move actors. IDs must be nonzero, unique, and distinct from
+    /// the authored enemy IDs. No player IDs, items, or skill trees enter rules.
+    pub fn with_heroes(seed: u64, heroes: [HeroSetup; PARTY_SIZE]) -> Result<Self, RuleError> {
+        let mut ids = BTreeSet::new();
+        for hero in &heroes {
+            if hero.id.0 == 0 || DEFAULT_ENEMY_IDS.contains(&hero.id) {
+                return Err(RuleError::InvalidActorId);
+            }
+            if !ids.insert(hero.id) {
+                return Err(RuleError::DuplicateActor);
+            }
         }
-        let mut actors = Vec::with_capacity(8);
-        for (index, kind) in heroes
+        let hero_formation = heroes.iter().map(|hero| hero.id).collect();
+        let mut actors = Vec::with_capacity(MAX_ACTORS);
+        for (id, kind, abilities) in heroes
             .into_iter()
-            .map(ActorKind::Hero)
-            .chain(EnemyKind::ALL.into_iter().map(ActorKind::Enemy))
-            .enumerate()
+            .map(|hero| (hero.id, ActorKind::Hero(hero.class), hero.abilities))
+            .chain(
+                DEFAULT_ENEMY_IDS
+                    .into_iter()
+                    .zip(DEFAULT_ENEMY_ROSTER)
+                    .map(|(id, kind)| {
+                        let kind = ActorKind::Enemy(kind);
+                        (
+                            id,
+                            kind,
+                            AbilityLoadout::new(crate::skills_for(kind).iter().copied())
+                                .expect("authored enemy presets are bounded and unique"),
+                        )
+                    }),
+            )
         {
-            let id = ActorId(
-                u16::try_from(if index < 4 { index + 1 } else { index + 97 })
-                    .map_err(|_| RuleError::InvalidState)?,
-            );
             let (max_hp, base_speed) = kind.stats();
             actors.push(ActorSnapshot {
                 id,
@@ -94,18 +119,11 @@ impl Combat {
                 hp: max_hp,
                 max_hp,
                 base_speed,
+                abilities,
                 statuses: Vec::new(),
                 skill_uses: BTreeMap::new(),
             });
         }
-        let mut hero_formation: Vec<_> = actors
-            .iter()
-            .filter_map(|actor| match actor.kind {
-                ActorKind::Hero(class) => Some((class, actor.id)),
-                ActorKind::Enemy(_) => None,
-            })
-            .collect();
-        hero_formation.sort_by_key(|(class, _)| *class);
         let state = CombatSnapshot {
             revision: 0,
             round: 0,
@@ -113,8 +131,8 @@ impl Combat {
             phase: CombatPhase::RoundStart,
             active_actor: None,
             actors,
-            hero_formation: hero_formation.into_iter().map(|(_, id)| id).collect(),
-            enemy_formation: (101..=104).map(ActorId).collect(),
+            hero_formation,
+            enemy_formation: DEFAULT_ENEMY_IDS.to_vec(),
             initiative: Vec::new(),
             outcome: None,
             boundary_sequence: 0,
@@ -920,3 +938,7 @@ impl Combat {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "setup_tests.rs"]
+mod setup_tests;

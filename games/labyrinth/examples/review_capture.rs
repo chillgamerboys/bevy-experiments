@@ -15,7 +15,9 @@ use labyrinth::{
     ui::LabyrinthUiPlugin,
     view::{LabyrinthView, PlayerView, ViewMode},
 };
-use labyrinth_rules::{Combat, HeroClass};
+use labyrinth_rules::{
+    ActorId, Combat, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER, PARTY_SIZE,
+};
 
 #[derive(Resource)]
 struct Capture {
@@ -52,13 +54,38 @@ fn main() {
         .get(5)
         .cloned()
         .unwrap_or_else(|| "combat".to_owned());
-    let mut combat = Combat::new(42, HeroClass::ALL).expect("review fixture");
-    for _ in 0..8 {
+    let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("review fixture");
+    for _ in 0..PARTY_SIZE * 2 {
         let Some(action) = combat.ai_action() else {
             break;
         };
         if let Some(actor) = combat.snapshot().active_actor {
             combat.apply(actor, action).expect("legal fixture AI");
+        }
+    }
+    let mut snapshot = combat.snapshot();
+    if matches!(route.as_str(), "effects" | "inspect") {
+        // Authored presentation fixture, not evidence that gameplay applied an effect.
+        let boundary = snapshot.boundary_sequence;
+        if let Some(actor) = snapshot
+            .actors
+            .iter_mut()
+            .find(|actor| actor.id == ActorId(1))
+        {
+            for (id, kind, potency, remaining) in [
+                (500, StatusKind::Bleed, 2, 3),
+                (501, StatusKind::Brace, 2, 1),
+            ] {
+                actor.statuses.push(StatusInstance {
+                    id,
+                    kind,
+                    source: ActorId(103),
+                    bearer: actor.id,
+                    potency,
+                    remaining,
+                    eligible_boundary: boundary + 1,
+                });
+            }
         }
     }
     let view = LabyrinthView {
@@ -73,13 +100,14 @@ fn main() {
         player: Some(0),
         encounter: 1,
         session_name: "The Lantern Company".to_owned(),
-        combat: Some(combat.snapshot()),
+        combat: Some(snapshot),
         paused: route == "paused",
-        players: HeroClass::ALL
+        players: DEFAULT_HERO_ROSTER
             .into_iter()
             .enumerate()
             .map(|(index, hero)| PlayerView {
-                slot: u8::try_from(index).expect("four-player index"),
+                slot: u8::try_from(index).expect("six-player index"),
+                actor: ActorId(u16::try_from(index + 1).expect("hero ID")),
                 hero,
                 name: format!("Player {}", index + 1),
                 occupied: true,
@@ -87,7 +115,7 @@ fn main() {
                 ready: index != 2,
             })
             .collect(),
-        invite_labels: (1..=3)
+        invite_labels: (1..PARTY_SIZE)
             .map(|index| format!("Guest {index} | unused invitation"))
             .collect(),
         log: vec![
@@ -176,7 +204,9 @@ fn capture(
     let click = match (capture.route.as_str(), capture.frame) {
         ("host", 4) => Some("Host Company"),
         ("combat", 4) => Some("Skill 0"),
-        ("combat", 7) => Some("Actor 101"),
+        ("combat", 7) => Some("Actor 105"),
+        ("inspect", 4) => Some("Actor 1 Effects"),
+        ("order", 4) => Some("Timeline Toggle"),
         _ => None,
     };
     if let Some(click) = click {

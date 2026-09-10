@@ -13,7 +13,10 @@ use super::*;
 const CHILD_TEST: &str = "network::tests::process::process_child_entry";
 const ROLE_ENV: &str = "LABYRINTH_PROCESS_TEST_ROLE";
 const DIRECTORY_ENV: &str = "LABYRINTH_PROCESS_TEST_DIRECTORY";
-const ROLES: [&str; 4] = ["host", "guest-a", "guest-b", "guest-c"];
+const ROLES: [&str; TEST_PLAYERS] = [
+    "host", "guest-a", "guest-b", "guest-c", "guest-d", "guest-e",
+];
+const RESTARTED_ROLE: &str = "guest-e";
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct Report {
@@ -107,7 +110,7 @@ impl Processes {
         if !succeeded {
             self.stop();
         }
-        assert!(succeeded, "four-process smoke failed at {stage}");
+        assert!(succeeded, "six-process smoke failed at {stage}");
     }
 }
 
@@ -156,6 +159,7 @@ fn process_child_entry() {
     }
     let deadline = Instant::now() + Duration::from_secs(60);
     let mut ready_sent = false;
+    let mut class_sent = false;
     let mut started = false;
     let mut acted_turn = 0;
     let mut reported = Instant::now();
@@ -169,10 +173,25 @@ fn process_child_entry() {
         if admitted {
             if let Some(snapshot) = latest.as_ref() {
                 if snapshot.combat.is_none() && !ready_sent {
-                    child
-                        .world_mut()
-                        .write_message(LabyrinthIntent::Ready(true));
-                    ready_sent = true;
+                    let chosen = snapshot
+                        .players
+                        .iter()
+                        .find(|player| Some(player.slot) == slot);
+                    if role == RESTARTED_ROLE
+                        && chosen.is_some_and(|player| player.hero != HeroClass::Knifehand)
+                    {
+                        if !class_sent {
+                            child
+                                .world_mut()
+                                .write_message(LabyrinthIntent::SelectHero(HeroClass::Knifehand));
+                            class_sent = true;
+                        }
+                    } else if directory.join("party-ready").exists() {
+                        child
+                            .world_mut()
+                            .write_message(LabyrinthIntent::Ready(true));
+                        ready_sent = true;
+                    }
                 }
                 if role == "host"
                     && !started
@@ -189,7 +208,10 @@ fn process_child_entry() {
                 if let Some(combat) = snapshot.combat.as_ref() {
                     if role == "host"
                         && !directory.join("resume").exists()
-                        && combat.active_actor.is_some_and(|actor| actor.0 < 100)
+                        && combat
+                            .active_actor
+                            .and_then(|id| combat.actor(id))
+                            .is_some_and(|actor| actor.team() == Team::Heroes)
                         && combat.actors.iter().any(|actor| {
                             actor
                                 .statuses
@@ -205,10 +227,12 @@ fn process_child_entry() {
                     let play =
                         !directory.join("frozen").exists() || directory.join("resume").exists();
                     if play && !snapshot.paused && combat.turn_id != acted_turn {
-                        if let Some(actor) = combat
-                            .active_actor
-                            .filter(|actor| slot.is_some_and(|slot| actor.0 == u16::from(slot) + 1))
-                        {
+                        if let Some(actor) = combat.active_actor.filter(|actor| {
+                            snapshot
+                                .players
+                                .iter()
+                                .any(|player| Some(player.slot) == slot && player.actor == *actor)
+                        }) {
                             child.world_mut().write_message(LabyrinthIntent::Combat {
                                 actor,
                                 action: aggressive_action(combat, actor),
@@ -246,8 +270,8 @@ fn process_child_entry() {
 }
 
 #[test]
-#[ignore = "Explicit native four-process restart gate; run with --ignored --exact"]
-fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
+#[ignore = "Explicit native six-process restart gate; run with --ignored --exact"]
+fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
     let directory = tempfile::tempdir().expect("private process fixture");
     #[cfg(unix)]
     {
@@ -259,12 +283,35 @@ fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
     let mut processes = Processes(vec![child_command(root, "host")]);
     processes.require(
         Duration::from_secs(10),
-        || root.join("guest-c.invite").exists(),
+        || root.join("guest-e.invite").exists(),
         "host invitation setup",
     );
     for role in ROLES.iter().skip(1) {
         processes.0.push(child_command(root, role));
+        processes.require(
+            Duration::from_secs(10),
+            || read_report(root, role).is_some_and(|report| report.admitted),
+            "sequential guest admission establishes the sixth-seat restart fixture",
+        );
     }
+    processes.require(
+        Duration::from_secs(5),
+        || {
+            read_report(root, RESTARTED_ROLE)
+                .and_then(|report| report.snapshot)
+                .is_some_and(|snapshot| {
+                    snapshot
+                        .players
+                        .iter()
+                        .any(|player| player.slot == 5 && player.hero == HeroClass::Knifehand)
+                })
+        },
+        "sixth player selects a repeated class before readiness",
+    );
+    write_private(
+        &root.join("party-ready"),
+        b"all six controllers may ready now",
+    );
     let mut last_combat = None;
     let mut stable_since = Instant::now();
     processes.require(
@@ -296,18 +343,46 @@ fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
                     })
                 })
         },
-        "four admitted processes at a stable live-bleed boundary",
+        "six admitted processes at a stable live-bleed boundary",
     );
-    let before = required_report(root, "host")
+    let before_session = required_report(root, "host")
         .snapshot
-        .and_then(|snapshot| snapshot.combat)
-        .expect("stable combat");
+        .expect("stable session");
+    assert_eq!(before_session.players.len(), TEST_PLAYERS);
+    assert!(before_session
+        .players
+        .iter()
+        .all(|player| player.connected && player.ready));
+    let actor_ids: BTreeSet<_> = before_session
+        .players
+        .iter()
+        .map(|player| player.actor)
+        .collect();
+    assert_eq!(actor_ids.len(), TEST_PLAYERS);
+    let original = required_report(root, RESTARTED_ROLE);
+    assert_eq!(original.slot, Some(5), "kill the actual sixth player");
+    let owned = before_session
+        .players
+        .iter()
+        .find(|player| Some(player.slot) == original.slot)
+        .expect("late seat owns a hero")
+        .clone();
+    assert_eq!(owned.hero, HeroClass::Knifehand);
+    assert!(before_session
+        .players
+        .iter()
+        .any(|player| player.actor != owned.actor && player.hero == owned.hero));
+    let before = before_session.combat.expect("stable combat");
+    let owned_actor = before
+        .actor(owned.actor)
+        .expect("sixth combat actor")
+        .clone();
+    assert_eq!(owned_actor.abilities, owned.abilities);
     assert!(before.actors.iter().any(|actor| actor
         .statuses
         .iter()
         .any(|status| status.kind == StatusKind::Bleed)));
-    let original = required_report(root, "guest-a");
-    let mut killed = processes.0.remove(1);
+    let mut killed = processes.0.remove(LAST_GUEST);
     assert_eq!(killed.id(), original.process);
     killed
         .kill()
@@ -330,16 +405,16 @@ fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
         Some(&before),
         "guest process loss advanced bleed/initiative"
     );
-    let replacement = child_command(root, "guest-a");
+    let replacement = child_command(root, RESTARTED_ROLE);
     let replacement_id = replacement.id();
-    processes.0.insert(1, replacement);
+    processes.0.insert(LAST_GUEST, replacement);
     processes.require(
         Duration::from_secs(10),
         || {
             let Some(host) = read_report(root, "host").and_then(|report| report.snapshot) else {
                 return false;
             };
-            let Some(guest) = read_report(root, "guest-a") else {
+            let Some(guest) = read_report(root, RESTARTED_ROLE) else {
                 return false;
             };
             !host.paused
@@ -355,9 +430,28 @@ fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
         },
         "new guest process restores profile identity and exact combat state",
     );
+    let recovered = required_report(root, RESTARTED_ROLE)
+        .snapshot
+        .expect("recovered guest snapshot");
+    assert_eq!(
+        recovered
+            .players
+            .iter()
+            .find(|player| player.slot == owned.slot),
+        Some(&owned),
+        "sixth process restart changed the reserved actor, class or loadout"
+    );
+    assert_eq!(
+        recovered
+            .combat
+            .as_ref()
+            .and_then(|combat| combat.actor(owned.actor)),
+        Some(&owned_actor),
+        "sixth process restart changed its HP, loadout or status instances"
+    );
     write_private(&root.join("resume"), b"resume synthetic controllers");
     processes.require(
-        Duration::from_secs(20),
+        Duration::from_secs(30),
         || {
             let Some(host) = read_report(root, "host")
                 .and_then(|report| report.snapshot)
@@ -374,7 +468,7 @@ fn four_native_processes_survive_guest_kill_and_finish_the_fight() {
                         .is_some_and(|guest| guest == host)
                 })
         },
-        "four processes finish the fight after restart",
+        "six processes finish the fight after restart",
     );
     write_private(&root.join("stop"), b"stop fixture");
     processes.stop();

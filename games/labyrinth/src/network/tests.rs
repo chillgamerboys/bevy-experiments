@@ -6,11 +6,16 @@ use std::{path::Path, thread};
 use bevy_game_discovery::{DiscoveryEndpoint, FakeDiscoveryProvider};
 use bevy_game_multiplayer::{CredentialStoreError, ReconnectCredentialStore};
 use bevy_game_test::TestAppBuilder;
-use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, StatusKind};
+use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, HeroClass, StatusKind, Team};
 
 use super::*;
 
 mod process;
+
+// This is an acceptance requirement, deliberately not derived from production
+// capacity: accidentally reverting the host to four seats must fail these tests.
+const TEST_PLAYERS: usize = 6;
+const LAST_GUEST: usize = TEST_PLAYERS - 1;
 
 fn socket_app(path: Option<&Path>) -> App {
     let mut builder = TestAppBuilder::new().with_minimal_plugins();
@@ -104,61 +109,113 @@ fn converged(apps: &mut [App]) -> bool {
 }
 
 fn join_codes(apps: &mut [App]) -> Vec<String> {
-    let codes: Vec<_> = (0..3)
+    assert_eq!(apps.len(), TEST_PLAYERS);
+    let codes: Vec<_> = (0..LAST_GUEST)
         .map(|index| {
             hosted_code(app(apps, 0).world(), index)
-                .expect("host owns three independent invitations")
+                .expect("host owns five independent invitations")
         })
         .collect();
     let decoded: Vec<_> = codes
         .iter()
         .map(|code| DirectConnectionCode::parse(code).expect("valid BGN1"))
         .collect();
-    for pair in decoded.windows(2) {
-        let first = pair.first().expect("first code");
-        let second = pair.get(1).expect("second code");
-        assert_ne!(first.invite_token, second.invite_token);
-        assert_eq!(first.session_id, second.session_id);
-        assert_eq!(first.endpoint, second.endpoint);
-        assert_eq!(
-            first.certificate_fingerprint,
-            second.certificate_fingerprint
-        );
+    for (index, first) in decoded.iter().enumerate() {
+        for second in decoded.iter().skip(index + 1) {
+            assert_ne!(first.invite_token, second.invite_token);
+            assert_eq!(first.session_id, second.session_id);
+            assert_eq!(first.endpoint, second.endpoint);
+            assert_eq!(
+                first.certificate_fingerprint,
+                second.certificate_fingerprint
+            );
+        }
     }
-    for (guest, code) in apps.iter_mut().skip(1).zip(&codes) {
-        start::join_code(guest.world_mut(), code).expect("private direct attempt starts");
+    for (index, code) in codes.iter().enumerate() {
+        let guest = index + 1;
+        start::join_code(app(apps, guest).world_mut(), code)
+            .expect("private direct attempt starts");
+        assert!(pump_until(apps, Duration::from_secs(10), |apps| {
+            app(apps, guest).world().resource::<Runtime>().admitted
+        }));
     }
     assert!(
         pump_until(apps, Duration::from_secs(15), |apps| all_admitted(apps)
             && converged(apps)),
-        "one host and three clients did not finish real transport admission"
+        "one host and five clients did not finish real transport admission"
     );
     let slots: BTreeSet<_> = apps
         .iter()
         .filter_map(|app| app.world().resource::<Runtime>().player)
         .collect();
-    assert_eq!(slots, BTreeSet::from([0, 1, 2, 3]));
+    assert_eq!(slots, BTreeSet::from([0, 1, 2, 3, 4, 5]));
+    assert_eq!(
+        app(apps, LAST_GUEST).world().resource::<Runtime>().player,
+        Some(5),
+        "sequential admission must establish the late-seat fixture"
+    );
     let peers: BTreeSet<_> = host_snapshot(apps)
         .players
         .iter()
         .filter_map(|player| player.peer)
         .collect();
-    assert_eq!(peers.len(), 3);
+    assert_eq!(peers.len(), LAST_GUEST);
+    let actors: BTreeSet<_> = host_snapshot(apps)
+        .players
+        .iter()
+        .map(|player| player.actor)
+        .collect();
+    assert_eq!(
+        actors.len(),
+        TEST_PLAYERS,
+        "every player owns a distinct hero"
+    );
     assert_eq!(
         app(apps, 0)
             .world()
             .resource::<Hosted>()
             .security
             .reserved_peer_count(),
-        3
+        LAST_GUEST
     );
     codes
 }
 
 fn begin_encounter(apps: &mut [App]) {
-    for app in &mut *apps {
+    assert_eq!(apps.len(), TEST_PLAYERS);
+    for app in apps.iter_mut().take(LAST_GUEST) {
         app.world_mut().write_message(LabyrinthIntent::Ready(true));
     }
+    assert!(pump_until(apps, Duration::from_secs(5), |apps| {
+        host_snapshot(apps)
+            .players
+            .iter()
+            .filter(|player| player.ready)
+            .count()
+            == LAST_GUEST
+            && converged(apps)
+    }));
+    app(apps, 0)
+        .world_mut()
+        .resource_mut::<LabyrinthView>()
+        .notice = None;
+    app(apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    assert!(pump_until(apps, Duration::from_secs(5), |apps| {
+        app(apps, 0)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .is_some()
+    }));
+    assert!(
+        host_snapshot(apps).combat.is_none(),
+        "five ready humans must not start a six-player fight"
+    );
+    app(apps, LAST_GUEST)
+        .world_mut()
+        .write_message(LabyrinthIntent::Ready(true));
     assert!(
         pump_until(apps, Duration::from_secs(5), |apps| {
             host_snapshot(apps)
@@ -167,7 +224,7 @@ fn begin_encounter(apps: &mut [App]) {
                 .all(|player| player.ready && player.connected)
                 && converged(apps)
         }),
-        "four independent ready intents did not converge"
+        "six independent ready intents did not converge"
     );
     app(apps, 0)
         .world_mut()
@@ -176,13 +233,25 @@ fn begin_encounter(apps: &mut [App]) {
         pump_until(apps, Duration::from_secs(5), |apps| {
             host_snapshot(apps).combat.is_some() && converged(apps)
         }),
-        "host did not start the four-player encounter"
+        "host did not start the six-player encounter"
     );
+    let snapshot = combat(apps);
+    assert_eq!(snapshot.hero_formation.len(), TEST_PLAYERS);
+    assert_eq!(snapshot.enemy_formation.len(), TEST_PLAYERS);
 }
 
 fn actor_owner(apps: &[App], actor: ActorId) -> usize {
-    let slot = u8::try_from(actor.0.checked_sub(1).expect("hero IDs are positive"))
-        .expect("hero slot fits");
+    let slot = apps
+        .first()
+        .expect("host exists")
+        .world()
+        .resource::<PartyAuthority>()
+        .snapshot(0)
+        .players
+        .into_iter()
+        .find(|player| player.actor == actor)
+        .expect("hero has an authoritative owner")
+        .slot;
     apps.iter()
         .position(|app| app.world().resource::<Runtime>().player == Some(slot))
         .expect("hero has an admitted owner")
@@ -192,7 +261,11 @@ fn wait_for_hero(apps: &mut [App]) -> CombatSnapshot {
     assert!(
         pump_until(apps, Duration::from_secs(5), |apps| {
             let snapshot = combat(apps);
-            (snapshot.outcome.is_some() || snapshot.active_actor.is_some_and(|actor| actor.0 < 100))
+            (snapshot.outcome.is_some()
+                || snapshot
+                    .active_actor
+                    .and_then(|id| snapshot.actor(id))
+                    .is_some_and(|actor| actor.team() == Team::Heroes))
                 && converged(apps)
         }),
         "enemy progression did not reach a committed hero/terminal boundary"
@@ -235,6 +308,99 @@ fn aggressive_action(snapshot: &CombatSnapshot, actor: ActorId) -> CombatAction 
         .unwrap_or(CombatAction::Defend)
 }
 
+fn choose_repeated_sixth_class(apps: &mut [App]) {
+    let before = host_snapshot(apps);
+    let sixth = before
+        .players
+        .iter()
+        .find(|player| player.slot == 5)
+        .expect("sixth reservation");
+    let actor = sixth.actor;
+    assert_ne!(
+        sixth.hero,
+        HeroClass::Knifehand,
+        "fixture exercises a class change"
+    );
+    assert!(before
+        .players
+        .iter()
+        .any(|player| player.hero == HeroClass::Knifehand));
+    app(apps, LAST_GUEST)
+        .world_mut()
+        .write_message(LabyrinthIntent::SelectHero(HeroClass::Knifehand));
+    assert!(
+        pump_until(apps, Duration::from_secs(5), |apps| {
+            host_snapshot(apps).players.iter().any(|player| {
+                player.slot == 5 && player.actor == actor && player.hero == HeroClass::Knifehand
+            }) && converged(apps)
+        }),
+        "sixth player could not independently choose an already-used class"
+    );
+}
+
+#[test]
+fn repeated_class_players_can_only_command_their_own_hero_instance() {
+    let mut apps: Vec<_> = (0..TEST_PLAYERS).map(|_| socket_app(None)).collect();
+    open_host(&mut apps, "");
+    join_codes(&mut apps);
+    choose_repeated_sixth_class(&mut apps);
+    begin_encounter(&mut apps);
+    let players = host_snapshot(&mut apps).players;
+    let repeated: Vec<_> = players
+        .iter()
+        .filter(|player| player.hero == HeroClass::Knifehand)
+        .collect();
+    assert!(repeated.len() >= 2);
+    let mut before = wait_for_hero(&mut apps);
+    for _ in 0..TEST_PLAYERS {
+        if before
+            .active_actor
+            .is_some_and(|actor| repeated.iter().any(|player| player.actor == actor))
+        {
+            break;
+        }
+        let actor = before
+            .active_actor
+            .expect("hero decision before repeated class");
+        send_action(&mut apps, actor, CombatAction::Wait);
+        before = wait_for_hero(&mut apps);
+    }
+    let actor = before.active_actor.expect("repeated class decision");
+    let owner = repeated
+        .iter()
+        .find(|player| player.actor == actor)
+        .expect("active hero belongs to repeated class");
+    let other = repeated
+        .iter()
+        .find(|player| player.actor != actor)
+        .expect("same class, distinct hero instance");
+    assert_ne!(owner.slot, other.slot);
+    let wrong = actor_owner(&apps, other.actor);
+    let encounter = host_snapshot(&mut apps).encounter;
+    app(&mut apps, wrong)
+        .world_mut()
+        .write_message(LabyrinthIntent::Combat {
+            actor,
+            action: CombatAction::Wait,
+            encounter,
+            decision: before.turn_id,
+        });
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        app(apps, wrong)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .as_ref()
+            .is_some_and(|notice| notice.contains("not your hero"))
+    }));
+    assert_eq!(
+        combat(&mut apps),
+        before,
+        "shared class granted another player's authority"
+    );
+    send_action(&mut apps, actor, CombatAction::Wait);
+}
+
 fn stored(app: &App) -> StoredReconnectCredential {
     app.world()
         .resource::<ReconnectCredentialStorage>()
@@ -262,34 +428,39 @@ fn wait_guest_detached(apps: &mut [App], peer: PeerId) {
 }
 
 #[test]
-fn real_udp_four_players_reject_fifth_and_wrong_ownership_then_finish_encounter() {
-    let mut apps: Vec<_> = (0..4).map(|_| socket_app(None)).collect();
+fn real_udp_six_players_reject_seventh_and_wrong_ownership_then_finish_encounter() {
+    let mut apps: Vec<_> = (0..TEST_PLAYERS).map(|_| socket_app(None)).collect();
     open_host(&mut apps, "");
     let codes = join_codes(&mut apps);
 
-    // A consumed code does not allocate a fourth peer or steal the first identity.
+    // A consumed code does not allocate a sixth peer or steal the first identity.
     apps.push(socket_app(None));
     start::join_code(
-        app(&mut apps, 4).world_mut(),
+        app(&mut apps, TEST_PLAYERS).world_mut(),
         codes.first().expect("first code"),
     )
     .expect("duplicate code attempts transport");
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
-        app(apps, 4)
+        app(apps, TEST_PLAYERS)
             .world()
             .resource::<LabyrinthView>()
             .notice
             .as_ref()
             .is_some_and(|notice| notice.contains("refused") || notice.contains("full"))
     }));
-    assert!(!app(&mut apps, 4).world().resource::<Runtime>().admitted);
+    assert!(
+        !app(&mut apps, TEST_PLAYERS)
+            .world()
+            .resource::<Runtime>()
+            .admitted
+    );
     assert_eq!(
         app(&mut apps, 0)
             .world()
             .resource::<Hosted>()
             .security
             .reserved_peer_count(),
-        3
+        LAST_GUEST
     );
     assert_eq!(
         host_snapshot(&mut apps)
@@ -297,7 +468,7 @@ fn real_udp_four_players_reject_fifth_and_wrong_ownership_then_finish_encounter(
             .iter()
             .filter(|player| player.occupied)
             .count(),
-        4
+        TEST_PLAYERS
     );
 
     // Even a fresh valid bearer invitation cannot exceed game-owned capacity.
@@ -313,11 +484,11 @@ fn real_udp_four_players_reject_fifth_and_wrong_ownership_then_finish_encounter(
         code.invite_token = token;
         code.encode().expose_for_sharing().to_owned()
     };
-    *app(&mut apps, 4) = socket_app(None);
-    start::join_code(app(&mut apps, 4).world_mut(), &extra_code)
-        .expect("valid fifth invite attempts transport");
+    *app(&mut apps, TEST_PLAYERS) = socket_app(None);
+    start::join_code(app(&mut apps, TEST_PLAYERS).world_mut(), &extra_code)
+        .expect("valid seventh invite attempts transport");
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
-        app(apps, 4)
+        app(apps, TEST_PLAYERS)
             .world()
             .resource::<LabyrinthView>()
             .notice
@@ -330,11 +501,16 @@ fn real_udp_four_players_reject_fifth_and_wrong_ownership_then_finish_encounter(
             .resource::<Hosted>()
             .security
             .reserved_peer_count(),
-        3
+        LAST_GUEST
     );
     drop(apps.pop());
     begin_encounter(&mut apps);
 
+    let expected_actors: BTreeSet<_> = host_snapshot(&mut apps)
+        .players
+        .iter()
+        .map(|player| player.actor)
+        .collect();
     let before = wait_for_hero(&mut apps);
     let actor = before.active_actor.expect("first hero decision");
     let owner = actor_owner(&apps, actor);
@@ -379,18 +555,15 @@ fn real_udp_four_players_reject_fifth_and_wrong_ownership_then_finish_encounter(
     }
     assert!(
         combat(&mut apps).outcome.is_some(),
-        "four players did not finish an encounter"
+        "six players did not finish an encounter"
     );
-    assert_eq!(
-        acted,
-        BTreeSet::from([ActorId(1), ActorId(2), ActorId(3), ActorId(4)])
-    );
+    assert_eq!(acted, expected_actors);
     assert!(converged(&mut apps));
 }
 
 #[test]
 fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
-    let mut apps: Vec<_> = (0..4).map(|_| socket_app(None)).collect();
+    let mut apps: Vec<_> = (0..TEST_PLAYERS).map(|_| socket_app(None)).collect();
     open_host(&mut apps, "");
     join_codes(&mut apps);
     begin_encounter(&mut apps);
@@ -412,7 +585,7 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
     };
     send_action(&mut apps, actor, CombatAction::Wait);
     let mut current = wait_for_hero(&mut apps);
-    for _ in 0..16 {
+    for _ in 0..24 {
         if current.active_actor == Some(actor) {
             break;
         }
@@ -448,15 +621,16 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
 }
 
 #[test]
-fn real_udp_fresh_guest_app_restores_peer_formation_initiative_and_live_bleed() {
+fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
     let directory = tempfile::tempdir().expect("isolated profiles");
-    let paths: Vec<_> = (0..3)
+    let paths: Vec<_> = (0..LAST_GUEST)
         .map(|index| directory.path().join(format!("guest-{index}.json")))
         .collect();
     let mut apps = vec![socket_app(None)];
     apps.extend(paths.iter().map(|path| socket_app(Some(path))));
     open_host(&mut apps, "");
     join_codes(&mut apps);
+    choose_repeated_sixth_class(&mut apps);
     begin_encounter(&mut apps);
 
     let mut before = wait_for_hero(&mut apps);
@@ -495,12 +669,32 @@ fn real_udp_fresh_guest_app_restores_peer_formation_initiative_and_live_bleed() 
             .any(|status| status.kind == StatusKind::Bleed)),
         "real actions never established the live bleed reconnect fixture"
     );
-    let original = stored(app(&mut apps, 1));
-    let others = [stored(app(&mut apps, 2)), stored(app(&mut apps, 3))];
-    let slot = app(&mut apps, 1).world().resource::<Runtime>().player;
+    let original = stored(app(&mut apps, LAST_GUEST));
+    let others: Vec<_> = apps
+        .iter()
+        .skip(1)
+        .take(LAST_GUEST - 1)
+        .map(stored)
+        .collect();
+    let slot = app(&mut apps, LAST_GUEST)
+        .world()
+        .resource::<Runtime>()
+        .player;
+    assert_eq!(slot, Some(5));
+    let owned = host_snapshot(&mut apps)
+        .players
+        .into_iter()
+        .find(|player| Some(player.slot) == slot)
+        .expect("sixth owned hero");
+    let owned_actor = before
+        .actor(owned.actor)
+        .expect("sixth hero in combat")
+        .clone();
+    assert_eq!(owned.hero, HeroClass::Knifehand);
+    assert_eq!(owned_actor.abilities, owned.abilities);
     // Drop the live App without a Leave message or graceful disconnect helper.
     // The host must observe actual transport loss; the replacement knows only its file.
-    *app(&mut apps, 1) = socket_app(paths.first().map(std::path::PathBuf::as_path));
+    *app(&mut apps, LAST_GUEST) = socket_app(paths.last().map(std::path::PathBuf::as_path));
     wait_guest_detached(&mut apps, original.peer_id);
     assert!(host_snapshot(&mut apps).paused);
     assert_eq!(
@@ -508,7 +702,7 @@ fn real_udp_fresh_guest_app_restores_peer_formation_initiative_and_live_bleed() 
         before,
         "disconnect progressed a combat boundary"
     );
-    start::reconnect(app(&mut apps, 1).world_mut())
+    start::reconnect(app(&mut apps, LAST_GUEST).world_mut())
         .expect("fresh App reads profile and starts reconnect");
     assert!(
         pump_until(&mut apps, Duration::from_secs(10), |apps| all_admitted(
@@ -518,26 +712,54 @@ fn real_udp_fresh_guest_app_restores_peer_formation_initiative_and_live_bleed() 
         )),
         "fresh guest did not reclaim the running host's reserved state"
     );
-    let recovered = stored(app(&mut apps, 1));
+    let recovered = stored(app(&mut apps, LAST_GUEST));
     assert_eq!(recovered.peer_id, original.peer_id);
     assert_ne!(
         recovered.reconnect_credential,
         original.reconnect_credential
     );
-    assert_eq!(app(&mut apps, 1).world().resource::<Runtime>().player, slot);
+    assert_eq!(
+        app(&mut apps, LAST_GUEST)
+            .world()
+            .resource::<Runtime>()
+            .player,
+        slot
+    );
+    let recovered_player = host_snapshot(&mut apps)
+        .players
+        .into_iter()
+        .find(|player| Some(player.slot) == slot)
+        .expect("recovered sixth reservation");
+    assert_eq!(
+        recovered_player, owned,
+        "restart changed hero ownership, class or loadout"
+    );
+    assert_eq!(
+        combat(&mut apps).actor(owned.actor),
+        Some(&owned_actor),
+        "restart changed sixth hero HP, equipped abilities or status state"
+    );
     assert_eq!(
         combat(&mut apps),
         before,
         "reconnect re-entered a bleed/initiative boundary"
     );
     assert!(!host_snapshot(&mut apps).paused);
-    assert_eq!(stored(app(&mut apps, 2)), others[0]);
-    assert_eq!(stored(app(&mut apps, 3)), others[1]);
+    let recovered_others: Vec<_> = apps
+        .iter()
+        .skip(1)
+        .take(LAST_GUEST - 1)
+        .map(stored)
+        .collect();
+    assert_eq!(
+        recovered_others, others,
+        "sixth guest rotation changed another player's credential"
+    );
 }
 
 #[test]
 fn real_udp_duplicate_and_evicted_replays_never_repeat_an_action() {
-    let mut apps: Vec<_> = (0..4).map(|_| socket_app(None)).collect();
+    let mut apps: Vec<_> = (0..TEST_PLAYERS).map(|_| socket_app(None)).collect();
     open_host(&mut apps, "");
     join_codes(&mut apps);
     begin_encounter(&mut apps);
@@ -636,8 +858,8 @@ fn publish_fake_listing(app: &mut App, metadata: SessionMetadata, target: Discov
 }
 
 #[test]
-fn fake_discovery_hands_three_password_joins_to_real_pinned_transport() {
-    let mut apps: Vec<_> = (0..4).map(|_| socket_app(None)).collect();
+fn fake_discovery_hands_five_password_joins_to_real_pinned_transport() {
+    let mut apps: Vec<_> = (0..TEST_PLAYERS).map(|_| socket_app(None)).collect();
     open_host(&mut apps, "temporary-party-pass");
     let (metadata, target) = {
         let world = app(&mut apps, 0).world();
@@ -652,6 +874,8 @@ fn fake_discovery_hands_three_password_joins_to_real_pinned_transport() {
             },
         )
     };
+    assert_eq!(metadata.player_capacity(), 6);
+    assert_eq!(metadata.claimed_players(), 1);
     for guest in apps.iter_mut().skip(1) {
         publish_fake_listing(guest, metadata.clone(), target.clone());
     }
@@ -717,7 +941,7 @@ fn fake_discovery_hands_three_password_joins_to_real_pinned_transport() {
         ) && converged(
             apps
         )),
-        "three discovered/password guests did not finish real admission"
+        "five discovered/password guests did not finish real admission"
     );
     assert_eq!(
         host_snapshot(&mut apps)
@@ -725,7 +949,7 @@ fn fake_discovery_hands_three_password_joins_to_real_pinned_transport() {
             .iter()
             .filter(|player| player.connected)
             .count(),
-        4
+        TEST_PLAYERS
     );
     assert_eq!(
         app(&mut apps, 0)
@@ -733,7 +957,15 @@ fn fake_discovery_hands_three_password_joins_to_real_pinned_transport() {
             .resource::<Hosted>()
             .security
             .reserved_peer_count(),
-        3
+        LAST_GUEST
+    );
+    assert_eq!(
+        app(&mut apps, 0)
+            .world()
+            .resource::<Hosted>()
+            .metadata
+            .claimed_players(),
+        6
     );
     begin_encounter(&mut apps);
     let snapshot = wait_for_hero(&mut apps);
@@ -1013,7 +1245,7 @@ fn incompatible_and_opaque_service_listings_do_not_open_direct_transport() {
         fingerprint_text(),
         "Other rules",
         1,
-        4,
+        6,
         true,
     )
     .expect("public metadata");

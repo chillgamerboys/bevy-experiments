@@ -5,11 +5,11 @@ through independently composed games. Bevy 0.19; one Cargo workspace.
 
 | Game | Purpose | Run from the repository root |
 |---|---|---|
-| [Labyrinth](games/labyrinth/README.md) | Primary game: four-player cooperative positional combat | `cargo run` |
+| [Labyrinth](games/labyrinth/README.md) | Primary game: six-player cooperative positional combat | `cargo run` |
 | [Carterfight](games/carterfight/README.md) | Pixel-art dialogue battle; contrasting UI adopter | `cargo run -p carterfight` |
 | [Deckbuilder](games/deckbuilder_ui/README.md) | Runnable UI and multiplayer regression example | `cargo run -p deckbuilder_ui` |
 
-For a local Labyrinth battle controlling all four heroes: `cargo run -- --local`.
+For a local Labyrinth battle controlling all six heroes: `cargo run -- --local`.
 Ordinary play does not require `--all-features`. The multiplayer menu opens no host
 until requested. See each game's README for controls and supported behavior.
 
