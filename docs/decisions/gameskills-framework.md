@@ -6,15 +6,19 @@ This document does not claim that the framework refactor or a release is complet
 
 ## Agreed direction
 
-Make creating games with Bevy easier, help improve Bevy upstream, and contribute
-to the engine's community through useful software and learning resources. This
+Make creating games with Bevy easier through useful packages, development
+guidance, games and learning resources. Support Bevy selectively with verified
+bug fixes and compelling improvements to its offering as a game engine. This
 purpose guides the skills, library, games and release decisions.
 
 The framework assumes Bevy and understands GameKit throughout. GameSkills should
 also help an existing Bevy project before it adopts any GameKit crate. GameKit
-remains a set of opt-in capabilities using Bevy's own concepts and extension
-points. Learning resources and library examples should be usable by developers
-without an agent installed.
+remains a maintained set of opt-in capabilities using Bevy's own concepts and
+extension points. Convenient packages such as a simple UI tooltip system are
+valuable GameKit offerings in their own right. Bevy is our established engine
+foundation and continues to evolve; an additional extension does not by itself
+demonstrate a missing engine capability. Learning resources and library examples
+should be usable by developers without an agent installed.
 
 Implement and use GameSkills before the broad documentation and code refactors,
 so subsequent work develops under the workflows we intend to ship. Labyrinth's
@@ -24,9 +28,11 @@ Carterfight retains its small offline-consumer role.
 
 GameSkills supplies development guidance and supporting tools. GameKit supplies
 reusable implementations. The games supply real requirements, examples and
-evidence. Problems encountered during development should lead to the appropriate
-game, GameKit, Bevy, documentation or skill improvement. A successful upstream
-change may let us simplify GameKit and retire a workaround.
+evidence. Most improvements belong in the games, GameKit, our documentation or
+the skills. Credible engine defects and significant engine-level gaps can justify
+upstream investigation, with a compelling rationale and human review before any
+submission. An upstream bug fix may retire a local workaround while GameKit
+continues to provide the convenient package built on that engine capability.
 
 The owner controls this repository and its priorities. The existing Bevy Hex Game
 is a later adoption case with other contributors: its changes need separate PRs
@@ -48,8 +54,9 @@ Each stage should improve the skills when real work demonstrates a gap. A defect
 in one workflow can be corrected without reopening the entire framework design.
 Port Vila verifies existing-repository adoption; it is not the only evidence for
 the games or an automatic blocker for a private Labyrinth playtest build.
-Upstream investigation starts when useful evidence appears; it does not wait for
-the final release stage or require every GameKit capability to move into Bevy.
+Investigate credible engine defects when encountered. Ordinary feature work has
+no upstreaming requirement, and GameKit releases do not depend on Bevy accepting
+our additions.
 
 ## Stage 1: redesign the offerings before migrating the skills
 
@@ -67,26 +74,63 @@ need distinct user requests and useful instructions, established through trials.
 
 | Responsibility | Useful outcome |
 |---|---|
-| Plan a playable change | Identify the player goal, current code, smallest useful slice and acceptance evidence; preserve decisions and authorization across turns |
-| Build and refactor with Bevy | Use ECS, schedules, states and plugin composition appropriately; choose existing Bevy/ecosystem capabilities or GameKit based on the problem; keep game ownership explicit |
+| Plan a Bevy change | Identify the player or developer goal, investigate the code, resolve architectural choices and define a useful scope and acceptance evidence; preserve decisions and authorization across turns |
 | Diagnose problems | Reproduce the failure with known versions, features, assets and runtime state; isolate game, plugin or engine responsibility before changing code |
 | Verify engineering behavior | Select meaningful pure, minimal-app, runtime and performance checks; report what each observation establishes and what remains untested |
 | Playtest and refine | Exercise the actual player journey, controls, feedback, onboarding and accessibility; keep human judgments of clarity and feel separate from automated checks |
 | Review a change | Assess correctness, architecture, scope and evidence using the project's selected capability guidance |
 | Document and teach | Maintain the authoritative explanation, Rustdoc, tested examples and migration instructions; make patterns understandable outside the agent workflow |
-| Deliver and release | Complete commits, reviewable PRs and observed CI; handle merge and publication within authorization; verify actual artifacts and declared compatibility |
-| Prepare a Bevy contribution | Investigate engine or documentation gaps, isolate evidence, explain technical tradeoffs and support a human contributor through Bevy's current process |
+| Deliver a change | Complete commits, reviewable PRs and observed CI; handle merge within authorization |
+| Release a project | Establish release scope and compatibility, verify distributable artifacts and handle publication within authorization |
 
 Routine implementation does not need a skill that merely repeats ordinary agent
-instructions. Bevy-specific craft guidance may live in focused references loaded
-by the relevant workflow. Setup and readiness checks should be deterministic
-commands where possible, with a skill only where interpretation adds value.
+instructions. Bevy-specific craft guidance belongs in focused references loaded
+by the relevant workflow: ECS ownership, schedules, states, plugin composition,
+assets, compatibility and GameKit integration. Setup and readiness checks should
+be deterministic commands where possible, with a skill only where interpretation
+adds value.
+
+### Proposed levels of creative involvement
+
+Planning and playtesting use the same levels so the developer can control the
+kind of creative input sought. Levels apply to a task or bounded feature, with a
+project default for otherwise open-ended work. They describe creative latitude;
+engineering rigor and honest evidence apply at every level.
+
+| Level | Creative responsibility | Example |
+|---|---|---|
+| 1. Implement | Carry out the established design, resolve engineering details and surface contradictions or defects | Implement the specified tooltip behavior while preserving its content and interaction design |
+| 2. Refine | Critique and improve clarity, feedback, usability and tuning within the established player experience and task scope | Improve tooltip readability and placement; identify confusing explanations without changing the underlying rules |
+| 3. Co-design | Develop alternatives and tradeoffs for a bounded feature or system, agree on its direction and prototype or implement within the authorized scope | Work together on a targeting interaction or deck-building decision, using player goals and playtest evidence |
+| 4. Explore | Investigate new concepts or major alternatives through explicitly scoped experiments with time/content limits and evaluation criteria | Prototype alternative core loops in an experiment and compare what players understand and enjoy |
+
+Recommend level 2 as the default for Labyrinth and Deckbuilder refinement, level
+1 for precise fixes or already specified behavior, level 3 for collaborative
+feature design, and level 4 for requested exploratory work. These defaults remain
+proposals for discussion. Higher levels do not imply higher quality or require
+passing through lower levels first.
+
+Use the developer's task instructions and existing decisions before the project
+default. Preserve the selected scope across turns; do not ask for a level on every
+request. Routine engineering decisions and improvements already authorized by the
+task should continue without extra confirmation. A request to propose a redesign
+authorizes design work; implementation follows the scope the developer has given.
+The level itself grants no additional authority to change product direction,
+publish work or make an upstream submission.
+
+For playtesting, level 1 checks the specified experience, level 2 recommends
+improvements within it, level 3 compares feature alternatives, and level 4 tests
+new concepts. Record observations separately from design hypotheses. Automated
+checks and agent interaction do not establish human enjoyment or replace feedback
+from the intended players. Evaluate the levels using the same task at different
+settings: the creative output should change while engineering quality and respect
+for the brief remain consistent.
 
 ### Proposed optional packages
 
-Optional packages follow capabilities used by a game. Each can add specialist
-skills, references, review criteria and verification commands to the same core
-workflows. Avoid separate copies of planning, testing and PR delivery per genre.
+Optional packages follow game capabilities or specialist work. Each can add
+focused skills, references, review criteria and verification commands to the same
+core workflows. Avoid separate copies of planning, testing and PR delivery per genre.
 
 | Package area | Initial purpose |
 |---|---|
@@ -94,6 +138,12 @@ workflows. Avoid separate copies of planning, testing and PR delivery per genre.
 | Turn-based rules | Legal actions, state transitions, deterministic replay, stable identity and game-owned rules |
 | Multiplayer | Authority, disclosure, sessions, admission, reconnect and real transport verification |
 | Framework maintenance | GameKit API design and compatibility; skill authoring, evaluations, packaging and migrations for maintainers of this framework |
+| Bevy contributions, when needed | Prepare evidence for verified engine bugs or compelling engine-level gaps, with human review and Bevy's contribution requirements |
+
+Core debugging and review can recognize a credible engine problem. Contribution
+preparation is an optional workflow used when that problem warrants pursuit. It
+does not run as a routine stage of each game or GameKit change, and its package
+need not ship before the initial core and UI candidate is useful.
 
 Simulation/balance, content pipelines, procedural worlds and specialized platform
 publishing are later candidates when actual work justifies them. Labyrinth and
@@ -181,22 +231,47 @@ scenarios as regression cases while retaining independent tasks for evaluation.
 The [evidence reference](../../skills/references/evidence.md) remains the current
 contract until deliberately revised.
 
-## Improving Bevy and the community through real use
+## GameKit's role and selective contributions to Bevy
 
-For a recurring difficulty, first identify where an improvement belongs:
+GameKit should make useful Bevy capabilities easy to adopt: small packages,
+sensible defaults, clear examples and tested integration. A simple tooltip system
+can remain in GameKit indefinitely. Its reuse across several games validates its
+value as a package; upstream suitability needs a separate engine-level reason.
+
+For a development finding, identify the appropriate owner:
 
 | Finding | Likely destination |
 |---|---|
 | A game's rules, presentation or content choice | The game |
-| Reusable application mechanics or an experimental capability | GameKit or an existing ecosystem project, after checking what already exists |
-| An engine defect or broadly useful engine primitive | Bevy investigation and a focused contribution where maintainers agree it belongs |
-| A discoverability or learning gap | API documentation, a focused example or a community learning resource |
+| Convenient reusable mechanics, defaults, composition or an extension | GameKit or an existing ecosystem project, after checking what already exists |
+| A reproducible defect in expected engine behavior | Bevy bug investigation, followed by human review of a focused contribution |
+| A significant missing engine capability | Investigate the engine-level need and existing options; human review determines whether to pursue an upstream proposal |
+| A discoverability or learning gap | Our documentation, focused examples or a community learning resource; an incorrect Bevy API contract can instead be investigated as a documentation defect |
 | An agent made a poor decision or reported unsupported evidence | The relevant skill/tool, verified against the actual failure |
 
-This is a routing aid, not a rule that every finding produces all five outputs.
-Useful ecosystem code can remain independent. Bevy's [upstreaming guidance](https://bevy.org/learn/contribute/project-information/upstreaming/)
-weighs usefulness, quality and maintenance cost, and supports contributing small
-shared primitives when that achieves the main benefit.
+Bevy's [upstreaming guidance](https://bevy.org/learn/contribute/project-information/upstreaming/)
+considers engine expectations, usefulness, quality and maintenance cost. Popularity
+or the absence of an existing solution is insufficient on its own. Our focus is:
+
+- **Verified bugs:** establish the expected and actual engine behavior, a minimal
+  reproduction, affected versions and a regression check where appropriate. A
+  real bug does not need to affect several of our games to justify investigation.
+- **Key engine gaps:** demonstrate a real game-development need and why it belongs
+  in the engine's offering. Inspect existing APIs, plugins and upstream plans;
+  explain why current options fall short, who benefits, and the integration and
+  maintenance tradeoffs. Convenience, reuse or novelty alone is insufficient.
+
+Before an upstream issue, proposal or PR, a human must review the evidence and
+engine-level rationale, and the design and code for any proposed implementation.
+Follow existing authorization and the receiving project's review process. The
+skills can surface a candidate and support investigation; they cannot declare
+their own work human-reviewed or treat review as satisfied by a general request
+to help Bevy. Acceptance remains with Bevy's maintainers.
+
+For example, if our tooltip implementation encounters a reproducible Bevy input
+defect, isolate and consider contributing a fix for that defect. The tooltip's
+convenient API, defaults and presentation remain a GameKit package. This is an
+illustration of the boundary, not a claim that such a Bevy defect has been found.
 
 For an upstream candidate, reproduce against a known Bevy revision, check existing
 issues and proposals, and isolate the smallest relevant engine-only case. Compare
@@ -217,17 +292,17 @@ applied unchanged to Bevy. Recheck the receiving project's policy when preparing
 a contribution; do not treat an agent-written draft as ready-to-post upstream
 prose. This document governs our companion project, not Bevy itself.
 
-Our larger games and GameKit examples can teach complete application patterns.
-An example proposed for Bevy must meet its own [example guidelines](https://bevy.org/learn/contribute/helping-out/creating-examples/),
-including avoiding ecosystem-crate dependencies. Extract a small Bevy-only lesson
-where useful rather than proposing the whole GameKit-based game as an upstream
-example. Keep community examples runnable and show the relevant Bevy versions.
+Our larger games and GameKit examples teach complete application patterns and
+remain community resources. If a reviewed upstream bug fix or engine improvement
+calls for an example, follow Bevy's [example guidelines](https://bevy.org/learn/contribute/helping-out/creating-examples/),
+including avoiding ecosystem-crate dependencies. Keep our own community examples
+runnable and show the relevant Bevy versions.
 
 Assess success through time to a first playable change, avoidable user
 interventions, reproducible defects resolved, clarity of examples, compatibility
-and adoption feedback. Include useful upstream outcomes and reduced downstream
-workarounds. Skill count, framework size and contribution volume are not quality
-measures. Bevy's [ecosystem guide](https://bevy.org/learn/quick-start/plugin-development/)
+and adoption feedback. Where upstream work is justified, record the engine problem
+resolved and any retired workaround. Set no upstream contribution quota or target
+to transfer GameKit's features into Bevy. Bevy's [ecosystem guide](https://bevy.org/learn/quick-start/plugin-development/)
 also informs small optional dependencies, compatibility documentation and useful
 examples. Promotion should follow demonstrated usefulness and the community's
 contribution and communication practices.
@@ -288,10 +363,11 @@ reported as a failed library contract or as completed integration.
 ## Decisions to settle next
 
 1. The core workflow boundaries, first optional packages and real evaluation tasks.
-2. The native packaging and compatibility contract demonstrated in both clients,
+2. The creative-involvement levels and defaults for planning and playtesting.
+3. The native packaging and compatibility contract demonstrated in both clients,
    including how current installations migrate without losing local ownership.
-3. The first playable release audience, platform/mode scope and delivery channel.
-4. The documentation ownership map, followed by the exact directory layout.
+4. The first playable release audience, platform/mode scope and delivery channel.
+5. The documentation ownership map, followed by the exact directory layout.
 
 ## References and confidence
 
