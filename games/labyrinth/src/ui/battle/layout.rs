@@ -1,20 +1,22 @@
 //! Game-owned stage-first composition. Appearance never determines organization.
 
 use super::*;
+use crate::ui::glyphs::Glyph;
 
 pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiViewportClass) {
     let root = world
         .spawn((
             bevy_game_ui::screen_root("Labyrinth Battlefield"),
             BattleRoot,
+            bevy_game_ui::UiTooltipHost,
         ))
         .id();
     world.entity_mut(root).insert(Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
         flex_direction: FlexDirection::Column,
-        padding: UiRect::all(Val::Px(16.0)),
-        row_gap: Val::Px(8.0),
+        padding: UiRect::all(Val::Px(10.0)),
+        row_gap: Val::Px(5.0),
         overflow: Overflow::clip(),
         ..default()
     });
@@ -26,25 +28,38 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         align_self: AlignSelf::Center,
         ..default()
     });
-    for (key, title, action) in [
-        ("Timeline Toggle", "Order", Action::ToggleTimeline),
-        ("Inspector Toggle", "Inspect", Action::ToggleInspector),
-        ("Battle Log Toggle", "Log", Action::ToggleLog),
-        ("Battle Settings", "Settings", Action::Settings),
+    for (key, title, glyph, action) in [
+        (
+            "Timeline Toggle",
+            "Initiative details",
+            Glyph::Order,
+            Action::ToggleTimeline,
+        ),
+        (
+            "Inspector Toggle",
+            "Inspect selected actor and ability",
+            Glyph::Inspect,
+            Action::ToggleInspector,
+        ),
+        (
+            "Battle Log Toggle",
+            "Combat log",
+            Glyph::Book,
+            Action::ToggleLog,
+        ),
+        (
+            "Battle Settings",
+            "Readability and motion settings",
+            Glyph::Settings,
+            Action::Settings,
+        ),
     ] {
-        control(world, hud, key, title, action, false);
+        dock::glyph_control(world, hud, key, "", title, "", glyph, action);
     }
-    let timeline = text_slot(
-        world,
-        root,
-        "Initiative Timeline",
-        Slot::Timeline,
-        UiTextRole::Supporting,
-    );
-    world.entity_mut(timeline).insert(Node {
-        flex_shrink: 0.0,
-        ..default()
-    });
+    let timeline = timeline::mount(world, root, snapshot);
+    if let Some(mut node) = world.get_mut::<Node>(timeline) {
+        node.flex_shrink = 0.0;
+    }
     let formations = column(
         world,
         root,
@@ -106,11 +121,12 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
             ..default()
         },
     );
+    let detail_color = world.resource::<LabyrinthAppearance>().detail;
     world.entity_mut(drawer).insert((
         GlobalZIndex(50),
         bevy_game_ui::UiModalScope,
         bevy::input_focus::tab_navigation::TabGroup::modal(),
-        BackgroundColor(Color::srgba(0.025, 0.035, 0.045, 0.98)),
+        BackgroundColor(detail_color),
         bevy::ui::FocusPolicy::Block,
     ));
     let drawer_controls = row(world, drawer, "Detail Controls");
@@ -121,6 +137,16 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         "Close",
         Action::Cancel,
         false,
+    );
+    dock::glyph_control(
+        world,
+        drawer_controls,
+        "Combat Leave",
+        "Menu",
+        "Return to menu",
+        "Leave this encounter and return to the main menu.",
+        Glyph::Exit,
+        Action::Leave,
     );
     control(
         world,
@@ -198,95 +224,15 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         Slot::Order,
         UiTextRole::Supporting,
     );
-    let rail = column(
-        world,
-        root,
-        "Combat Action Rail",
-        Node {
-            width: Val::Percent(100.0),
-            min_height: Val::Px(44.0),
-            flex_direction: FlexDirection::Row,
-            row_gap: Val::Px(6.0),
-            padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
-            overflow: Overflow::scroll_x(),
-            flex_shrink: 0.0,
-            ..default()
-        },
-    );
-    world.entity_mut(rail).insert((
-        UiRegionRole::ActionRail,
-        BackgroundColor(Color::srgba(0.025, 0.035, 0.045, 0.94)),
-    ));
-    let skills = row(world, rail, "Hero Skills");
-    if let Some(mut node) = world.get_mut::<Node>(skills) {
-        node.width = Val::Auto;
-        node.flex_wrap = FlexWrap::NoWrap;
-    }
-    text_slot(
-        world,
-        root,
-        "Target Legality",
-        Slot::Reason,
-        UiTextRole::Supporting,
-    );
-    let commit = row(world, root, "Commit Actions");
-    let universal = column(
-        world,
-        commit,
-        "Universal Actions",
-        Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(8.0),
-            ..default()
-        },
-    );
-    for (key, title, choice) in [
-        ("Reposition", "Move", Choice::Reposition),
-        ("Rescue", "Rescue", Choice::Rescue),
-        ("Defend", "Defend", Choice::Defend),
-        ("Wait", "Wait", Choice::Wait),
-    ] {
-        control(world, universal, key, title, Action::Choice(choice), false);
-    }
-    text_slot(
-        world,
-        inspector,
-        "Selected Skill",
-        Slot::Selected,
-        UiTextRole::Body,
-    );
-    let confirm = control(
-        world,
-        commit,
-        "Confirm Combat Action",
-        "Confirm",
-        Action::Confirm,
-        true,
-    );
-    control(
-        world,
-        commit,
-        "Cancel Combat Selection",
-        "Cancel",
-        Action::Cancel,
-        false,
-    );
-    let rematch = control(
-        world,
-        commit,
-        "Combat Rematch",
-        "Return party to lobby",
-        Action::Rematch,
-        true,
-    );
-    control(world, commit, "Combat Leave", "Menu", Action::Leave, false);
+    let dock = dock::mount(world, root, formations);
     world.insert_resource(BattleNodes {
         heroes,
         enemies,
-        skills,
+        skills: dock.skills,
         loadout: Vec::new(),
-        confirm,
-        rematch,
+        confirm: dock.confirm,
+        rematch: dock.rematch,
+        dock,
         inspector,
         log,
         drawer,
@@ -307,44 +253,11 @@ fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
         Node {
             width: Val::Percent(100.0),
             flex_direction: FlexDirection::Row,
-            flex_wrap: FlexWrap::Wrap,
+            flex_wrap: FlexWrap::NoWrap,
             column_gap: Val::Px(8.0),
             row_gap: Val::Px(6.0),
             flex_shrink: 0.0,
             ..default()
         },
     )
-}
-
-pub(super) fn mount_skills(world: &mut World, parent: Entity, loadout: &[SkillId]) {
-    let children = world
-        .get::<Children>(parent)
-        .map(|children| children.to_vec())
-        .unwrap_or_default();
-    for child in children {
-        world.despawn(child);
-    }
-    for (index, skill) in loadout.iter().enumerate() {
-        let entity = control(
-            world,
-            parent,
-            format!("Skill {index}"),
-            skill_definition(*skill).name,
-            Action::SkillSlot(index),
-            false,
-        );
-        world
-            .entity_mut(entity)
-            .insert(bevy_game_ui::UiFocusId::new(
-                "labyrinth-skills",
-                format!("{skill:?}"),
-            ));
-        if let Some(text) = world
-            .get::<Children>(entity)
-            .and_then(|children| children.first())
-            .copied()
-        {
-            world.entity_mut(text).insert(Slot::Skill(index));
-        }
-    }
 }

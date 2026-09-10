@@ -37,14 +37,31 @@
 //! opts selected `Node` fields into semantic spacing. A control's initial pixel
 //! minima are captured once unless [`UiControlMetrics`] is supplied explicitly.
 //! Games can replace those baselines without changing Bevy's global `UiScale`.
+//!
+//! # Context is opt-in, presentation stays local
+//!
+//! [`GameUiContextHelpPlugin`] selects eligible native hover/focus information,
+//! without adding a global tooltip or changing activation. Attach
+//! [`UiContextHelp`] to a card, move, ability, or other existing control and read
+//! [`UiContextHelpState`] after [`UiContextHelpSystems::Resolve`] in `Update`.
+//! One game can present that content in a stable command dock while another uses
+//! its own tooltip. The game owns disclosed content, rich previews, inspector
+//! pinning, layout, and skin; no combat or inventory model crosses this boundary.
 
+mod context_help;
 #[cfg(test)]
 mod contracts;
 mod focus;
 mod metrics;
 mod style;
+mod tooltip;
 
-pub use focus::activation_eligible;
+pub use tooltip::*;
+
+pub use context_help::{
+    GameUiContextHelpPlugin, UiContextHelp, UiContextHelpState, UiContextHelpSystems,
+};
+pub use focus::{activation_eligible, inspection_eligible};
 use focus::{
     emit_activations, emit_text_field_messages, prepare_actions, prepare_scrolling,
     remember_scoped_focus, retain_modal_focus, scroll_focused_into_view, sync_action_reachability,

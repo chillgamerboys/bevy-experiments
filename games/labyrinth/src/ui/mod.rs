@@ -1,16 +1,19 @@
 //! Game-owned native presentation: immutable views in, typed intent out.
 
+mod appearance;
 mod battle;
+mod glyphs;
 mod shell;
 #[cfg(test)]
 mod tests;
 
+pub use appearance::LabyrinthAppearance;
 use bevy::ecs::message::MessageCursor;
 use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
 use bevy_game_ui::{
-    GameUiSkinPlugin, GameUiSystems, ResolvedUiMetrics, UiActivated, UiFonts, UiInsets,
-    UiMotionPreference, UiScaleMode, UiScalePreference, UiSkin, UiSkinOverrides, UiSpace,
+    GameUiSkinPlugin, GameUiSystems, GameUiTooltipPlugin, ResolvedUiMetrics, UiActivated, UiFonts,
+    UiInsets, UiMotionPreference, UiScaleMode, UiScalePreference, UiSkin, UiSkinOverrides, UiSpace,
     UiSpacing, UiTextChanged, UiTextField, UiTextRole, UiTheme,
 };
 use labyrinth_rules::{ActorId, CombatAction, HeroClass, SkillId, PARTY_SIZE};
@@ -44,43 +47,59 @@ impl Default for LabyrinthUiConfig {
 
 impl Plugin for LabyrinthUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((GameUiSkinPlugin, crate::scene::LabyrinthScenePlugin))
-            .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
-            .init_resource::<UiState>()
-            .init_resource::<LabyrinthUiConfig>()
-            .init_resource::<LabyrinthView>()
-            .add_message::<LabyrinthIntent>()
-            .insert_resource(UiTheme {
-                background: Color::srgb(0.025, 0.035, 0.045),
-                panel: Color::srgb(0.055, 0.075, 0.085),
-                card: Color::srgb(0.085, 0.11, 0.12),
-                control: Color::srgb(0.10, 0.14, 0.15),
-                control_hovered: Color::srgb(0.15, 0.23, 0.23),
-                control_pressed: Color::srgb(0.21, 0.31, 0.29),
-                accent: Color::srgb(0.89, 0.75, 0.43),
-                text: Color::srgb(0.94, 0.93, 0.86),
-                muted_text: Color::srgb(0.75, 0.81, 0.79),
-                edge: Color::srgb(0.28, 0.35, 0.34),
-                body_size: 18.0,
-                supporting_size: 18.0,
-                title_size: 26.0,
-                display_size: 48.0,
-                ..UiTheme::default()
-            })
-            .configure_sets(
-                Update,
-                (LabyrinthUiSystems::Input, LabyrinthUiSystems::Present)
-                    .chain()
-                    .after(GameUiSystems::EmitActivations),
-            )
-            .add_systems(
-                Update,
-                (collect_text, collect_actions, keyboard_shortcuts)
-                    .chain()
-                    .in_set(LabyrinthUiSystems::Input),
-            )
-            .add_systems(Startup, load_default_font)
-            .add_systems(Update, present.in_set(LabyrinthUiSystems::Present));
+        app.add_plugins((
+            GameUiSkinPlugin,
+            GameUiTooltipPlugin,
+            crate::scene::LabyrinthScenePlugin,
+        ))
+        .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
+        .init_resource::<UiState>()
+        .init_resource::<LabyrinthAppearance>()
+        .init_resource::<crate::presentation::CombatDisclosure>()
+        .init_resource::<LabyrinthUiConfig>()
+        .init_resource::<LabyrinthView>()
+        .add_message::<LabyrinthIntent>()
+        .insert_resource(UiTheme {
+            background: Color::srgb(0.025, 0.035, 0.045),
+            panel: Color::srgb(0.055, 0.075, 0.085),
+            card: Color::srgb(0.085, 0.11, 0.12),
+            control: Color::srgb(0.10, 0.14, 0.15),
+            control_hovered: Color::srgb(0.15, 0.23, 0.23),
+            control_pressed: Color::srgb(0.21, 0.31, 0.29),
+            accent: Color::srgb(0.89, 0.75, 0.43),
+            text: Color::srgb(0.94, 0.93, 0.86),
+            muted_text: Color::srgb(0.75, 0.81, 0.79),
+            edge: Color::srgb(0.28, 0.35, 0.34),
+            body_size: 18.0,
+            supporting_size: 18.0,
+            title_size: 26.0,
+            display_size: 48.0,
+            ..UiTheme::default()
+        })
+        .configure_sets(
+            Update,
+            (LabyrinthUiSystems::Input, LabyrinthUiSystems::Present)
+                .chain()
+                .after(GameUiSystems::EmitActivations)
+                .after(bevy_game_ui::UiTooltipSystems::Resolve),
+        )
+        .add_systems(
+            Update,
+            (collect_text, collect_actions, keyboard_shortcuts)
+                .chain()
+                .in_set(LabyrinthUiSystems::Input),
+        )
+        .add_systems(Startup, load_default_font)
+        .add_systems(
+            Update,
+            appearance::apply.before(GameUiSystems::EmitActivations),
+        )
+        .add_systems(Update, glyphs::refresh.after(LabyrinthUiSystems::Present))
+        .configure_sets(
+            Update,
+            LabyrinthUiSystems::Present.after(bevy_game_ui::UiContextHelpSystems::Resolve),
+        )
+        .add_systems(Update, present.in_set(LabyrinthUiSystems::Present));
     }
 }
 
@@ -128,6 +147,7 @@ struct UiState {
     show_log: bool,
     show_timeline: bool,
     show_inspector: bool,
+    show_skillbook: bool,
     session_name: String,
     address: String,
     port: String,
@@ -161,6 +181,7 @@ enum Action {
     Copy(usize),
     Reissue(usize),
     Actor(ActorId),
+    InspectActor(ActorId),
     Choice(Choice),
     SkillSlot(usize),
     Status(ActorId, u64),
@@ -172,6 +193,7 @@ enum Action {
     ToggleLog,
     ToggleTimeline,
     ToggleInspector,
+    ToggleSkillbook,
     ScrollDetails(i8),
 }
 
@@ -221,11 +243,21 @@ fn collect_actions(world: &mut World, mut cursor: Local<MessageCursor<UiActivate
 }
 
 fn keyboard_shortcuts(world: &mut World) {
+    if world
+        .resource::<bevy_game_ui::UiTooltipState>()
+        .captures_keyboard()
+    {
+        return;
+    }
     let focus = world.resource::<InputFocus>().get();
     if focus.is_some_and(|entity| world.get::<UiTextField>(entity).is_some()) {
         return;
     }
     let keys = world.resource::<ButtonInput<KeyCode>>();
+    if keys.just_pressed(KeyCode::KeyK) {
+        apply_action(world, Action::ToggleSkillbook);
+        return;
+    }
     if keys.just_pressed(KeyCode::Escape) {
         apply_action(world, Action::Cancel);
         return;
@@ -234,7 +266,8 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     let ui = world.resource::<UiState>();
-    if ui.show_inspector || ui.show_log || ui.show_timeline {
+    let details_open = ui.show_inspector || ui.show_log || ui.show_timeline || ui.show_skillbook;
+    {
         let keys = world.resource::<ButtonInput<KeyCode>>();
         let page = if keys.just_pressed(KeyCode::PageUp) {
             -1
@@ -249,7 +282,10 @@ fn keyboard_shortcuts(world: &mut World) {
         };
         if page != 0 {
             apply_action(world, Action::ScrollDetails(page));
+            return;
         }
+    }
+    if details_open {
         return;
     }
     let shortcut = [
@@ -372,6 +408,14 @@ fn apply_action(world: &mut World, action: Action) {
                 ui.target = Some(actor);
                 None
             }
+            Action::InspectActor(actor) => {
+                ui.inspected = Some(actor);
+                ui.inspected_status = None;
+                ui.show_inspector = true;
+                ui.show_log = false;
+                ui.show_timeline = false;
+                None
+            }
             Action::Status(actor, status) => {
                 ui.inspected = Some(actor);
                 ui.inspected_status = Some((actor, status));
@@ -386,7 +430,12 @@ fn apply_action(world: &mut World, action: Action) {
                 None
             }
             Action::SkillSlot(index) => {
-                battle::select_skill_slot(&view, &mut ui, index);
+                if battle::skills_disclosed(
+                    &view,
+                    world.resource::<crate::presentation::CombatDisclosure>(),
+                ) {
+                    battle::select_skill_slot(&view, &mut ui, index);
+                }
                 None
             }
             Action::Confirm => battle::selected_action(&view, &ui)
@@ -397,7 +446,15 @@ fn apply_action(world: &mut World, action: Action) {
                     encounter: view.encounter,
                     decision: view.combat.as_ref().map_or(0, |snapshot| snapshot.turn_id),
                 }),
+            Action::ToggleSkillbook => {
+                ui.show_skillbook = !ui.show_skillbook;
+                None
+            }
             Action::Cancel => {
+                if ui.show_skillbook {
+                    ui.show_skillbook = false;
+                    return;
+                }
                 let cancel_attempt = !ui.settings
                     && ui.selected.is_none()
                     && view.mode == ViewMode::Menu

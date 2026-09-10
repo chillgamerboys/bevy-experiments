@@ -1,8 +1,15 @@
 //! Stable actor hit areas and compact overlays above a game-owned world scene.
 
 use super::*;
+use crate::presentation::{BattlePresentation, CombatDisclosure};
 use bevy::input_focus::InputFocusVisible;
 use labyrinth_rules::{Boundary, Effect, StatusInstance};
+
+#[derive(Component)]
+struct ForecastBar(Entity);
+
+#[derive(Component)]
+struct FormationCue(Entity);
 
 pub(super) fn formation(
     world: &mut World,
@@ -80,6 +87,24 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
     world
         .entity_mut(control)
         .insert(BackgroundColor(Color::NONE));
+    let cue = label(
+        world,
+        control,
+        &format!("Actor {} Formation Cue", actor.id.0),
+        "",
+        UiTextRole::Body,
+    );
+    world.entity_mut(cue).insert((
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(5.0),
+            width: Val::Percent(100.0),
+            ..default()
+        },
+        TextLayout::justify(Justify::Center),
+        Pickable::IGNORE,
+    ));
+    world.entity_mut(entity).insert(FormationCue(cue));
     let text = label(
         world,
         entity,
@@ -88,9 +113,15 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         UiTextRole::Body,
     );
     world.entity_mut(text).insert((
+        // Bounded identity/current-HP strings fit all six-rank supported widths.
+        // Keep native width-aware justification; NoWrap uses intrinsic shaping
+        // width and left-aligns this block despite a centered paragraph setting.
         TextLayout::justify(Justify::Center),
         Node {
             width: Val::Percent(100.0),
+            // Identity and current HP always occupy two lines. The final
+            // semantic height is resolved below, independently of their values.
+            height: Val::Px(48.0),
             min_width: Val::Px(0.0),
             flex_shrink: 0.0,
             ..default()
@@ -124,6 +155,20 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
     world
         .entity_mut(bar)
         .insert(BackgroundColor(actor_color(actor.kind)));
+    let forecast = world
+        .spawn((
+            Name::new(format!("Actor {} HP Forecast", actor.id.0)),
+            Node {
+                position_type: PositionType::Absolute,
+                height: Val::Percent(100.0),
+                display: Display::None,
+                ..default()
+            },
+            ChildOf(hp),
+            BackgroundColor(Color::NONE),
+        ))
+        .id();
+    world.entity_mut(entity).insert(ForecastBar(forecast));
     // Reserve a stable footer on all actors, even when no effects are present.
     let statuses = column(
         world,
@@ -324,14 +369,29 @@ pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnap
     if world.get::<AccessibleLabel>(entity).map(|value| &value.0) != Some(&label.0) {
         world.entity_mut(entity).insert(label);
     }
-    paint_marker(world, entity, Color::srgb(0.66, 0.55, 0.39));
-    let backing = BackgroundColor(Color::srgba(0.02, 0.025, 0.03, 0.86));
+    let appearance = world
+        .get_resource::<LabyrinthAppearance>()
+        .cloned()
+        .unwrap_or_default();
+    let help = bevy_game_ui::UiContextHelp {
+        title: format!("{} effects", actor.name()),
+        body: status_accessibility(actor),
+    };
+    if world.get::<bevy_game_ui::UiContextHelp>(entity) != Some(&help) {
+        world.entity_mut(entity).insert(help);
+    }
+    paint_marker(world, entity, appearance.accent);
+    let backing = BackgroundColor(appearance.dock);
     if world.get::<BackgroundColor>(entity) != Some(&backing) {
         world.entity_mut(entity).insert(backing);
     }
 }
 
 fn paint_marker(world: &mut World, entity: Entity, resting: Color) {
+    let appearance = world
+        .get_resource::<LabyrinthAppearance>()
+        .cloned()
+        .unwrap_or_default();
     let focused = world.resource::<InputFocus>().get() == Some(entity)
         && world.resource::<InputFocusVisible>().0;
     let interacting = matches!(
@@ -339,15 +399,35 @@ fn paint_marker(world: &mut World, entity: Entity, resting: Color) {
         Some(Interaction::Hovered | Interaction::Pressed)
     );
     let color = if focused {
-        Color::srgb(1.0, 0.87, 0.47)
+        appearance.accent
     } else if interacting {
-        Color::srgb(0.95, 0.95, 0.88)
+        appearance.ink
     } else {
         resting
     };
     let border = BorderColor::all(color);
     if world.get::<BorderColor>(entity) != Some(&border) {
         world.entity_mut(entity).insert(border);
+    }
+}
+
+fn summary_geometry(world: &mut World, entity: Entity, metrics: ResolvedUiMetrics) {
+    let baseline = world.resource::<UiTheme>().body_size;
+    let size = if baseline.is_finite() {
+        (baseline * metrics.content_scale).max(18.0)
+    } else {
+        18.0
+    };
+    let line_height = (size * 1.2).ceil();
+    let height = Val::Px(line_height * 2.0);
+    if let Some(mut node) = world.get_mut::<Node>(entity) {
+        if node.height != height {
+            node.height = height;
+        }
+    }
+    let line_height = bevy::text::LineHeight::Px(line_height);
+    if world.get::<bevy::text::LineHeight>(entity) != Some(&line_height) {
+        world.entity_mut(entity).insert(line_height);
     }
 }
 
@@ -361,7 +441,14 @@ pub(super) fn present(
     time: f64,
 ) {
     let reduced_motion = world.resource::<UiMotionPreference>().reduced;
+    let disclosure = world.resource::<CombatDisclosure>().clone();
+    let projected = BattlePresentation::new(snapshot, &disclosure);
+    let forecast = inspection::forecast_display(world, view, ui);
+    let appearance = world.resource::<LabyrinthAppearance>().clone();
     for actor in &snapshot.actors {
+        let Some(facts) = projected.actor(actor.id) else {
+            continue;
+        };
         let Some(entity) = tiles.get(&actor.id).copied() else {
             continue;
         };
@@ -369,7 +456,7 @@ pub(super) fn present(
             let Some(mut tile) = world.get_mut::<ActorTile>(entity) else {
                 continue;
             };
-            if tile.last_hp != actor.hp {
+            if facts.health.as_known().is_some() && tile.last_hp != actor.hp {
                 tile.flash_until = if reduced_motion { time } else { time + 0.35 };
                 tile.last_hp = actor.hp;
             }
@@ -409,17 +496,33 @@ pub(super) fn present(
                     choice,
                     Choice::Skill(_) | Choice::Reposition | Choice::Rescue
                 ) && inspection::display_actor(view).is_some_and(|source| {
-                    inspection::action_for(choice, Some(actor.id))
-                        .is_ok_and(|action| snapshot.validate_action(source.id, &action).is_ok())
+                    inspection::action_for(choice, Some(actor.id)).is_ok_and(|action| {
+                        snapshot.validate_action_target(source.id, &action).is_ok()
+                    })
                 })
             });
         // The ownership asterisk is expanded in the accessible label and inspector.
+        let after = forecast.as_ref().and_then(|forecast| {
+            forecast
+                .actors
+                .iter()
+                .find(|change| change.actor == actor.id)
+        });
+        // A prospective "34→27" must not add a wrapped line and lift the
+        // character's sprite. Keep this compact numeric strip factual: the
+        // forecast segment, action dock and accessible label show the projected
+        // outcome without taking layout space from the actor's art anchor.
+        let hp_text = facts
+            .health
+            .as_known()
+            .map_or_else(|| "?".to_owned(), |health| health.current.to_string());
         set_text(
             world,
             text,
-            format!("{identity}{}\n{}", if yours { "*" } else { "" }, actor.hp),
+            format!("{identity}{}\n{hp_text}", if yours { "*" } else { "" }),
         );
-        let state = if !actor.standing() {
+        summary_geometry(world, text, metrics);
+        let state = if !facts.standing {
             if actor.team() == Team::Heroes {
                 "Downed"
             } else {
@@ -432,17 +535,59 @@ pub(super) fn present(
         } else {
             "Standing"
         };
+        let health_text = facts.health.as_known().map_or_else(
+            || "HP unknown".to_owned(),
+            |health| format!("{} of {} HP", health.current, health.maximum),
+        );
+        let status_text = facts.statuses.as_known().map_or_else(
+            || "Effects unknown".to_owned(),
+            |statuses| format!("{} effects", statuses.len()),
+        );
         let label = AccessibleLabel::new(format!(
-            "{identity}, {}, {} of {} HP, rank {}. {state}. {ownership} {} effects. {} Select or inspect.",
+            "{identity}, {}, {health_text}, rank {}. {state}. {ownership} {status_text}. {} Select or inspect. {}",
             actor.name(),
-            actor.hp,
-            actor.max_hp,
             snapshot.rank(actor.id).unwrap_or(0),
-            actor.statuses.len(),
-            if eligible { "Valid target for selected action." } else { "" }
+            if eligible {
+                "Valid target for selected action."
+            } else {
+                ""
+            },
+            after.map_or("", |change| change.summary.as_str()),
         ));
         if world.get::<AccessibleLabel>(control).map(|value| &value.0) != Some(&label.0) {
+            world
+                .entity_mut(control)
+                .insert(bevy_game_ui::UiContextHelp {
+                    title: format!("{identity} · {}", actor.name()),
+                    body: label.0.clone(),
+                });
             world.entity_mut(control).insert(label);
+        }
+        let rank = snapshot.rank(actor.id).unwrap_or(0);
+        let source_rank = actor.team() == Team::Heroes
+            && matches!(ui.selected,
+            Some(Choice::Skill(skill)) if rank > 0 && skill_definition(skill).source_ranks & (1 << (rank - 1)) != 0);
+        if let Some(cue) = world.get::<FormationCue>(entity).map(|cue| cue.0) {
+            // Keep position labels literal. Range/selection use the existing
+            // footprint emphasis below, not unexplained punctuation.
+            let text = rank.to_string();
+            if let Some(mut label) = world.get_mut::<Text>(cue) {
+                if label.0 != text {
+                    label.0 = text;
+                }
+            }
+        }
+        if let Some(mut node) = world.get_mut::<Node>(control) {
+            let width = if ui.target == Some(actor.id) {
+                5.0
+            } else if eligible || source_rank {
+                3.0
+            } else {
+                1.0
+            };
+            if node.border.bottom != Val::Px(width) {
+                node.border.bottom = Val::Px(width);
+            }
         }
         if let Some(mut emphasis) = world.get_mut::<crate::scene::SceneActorEmphasis>(control) {
             let selected = ui.target == Some(actor.id);
@@ -451,10 +596,56 @@ pub(super) fn present(
             }
         }
         if let Some(mut node) = world.get_mut::<Node>(bar) {
-            let width = Val::Percent(f32::from(actor.hp) / f32::from(actor.max_hp.max(1)) * 100.0);
+            let width = Val::Percent(facts.health.as_known().map_or(0.0, |health| {
+                f32::from(health.current) / f32::from(health.maximum.max(1)) * 100.0
+            }));
             if node.width != width {
                 node.width = width;
             }
+        }
+        if let Some(forecast_bar) = world.get::<ForecastBar>(entity).map(|bar| bar.0) {
+            let health_change = facts
+                .health
+                .as_known()
+                .zip(after.and_then(|change| change.health.as_known()));
+            let (left, width, color) =
+                health_change.map_or((0.0, 0.0, Color::NONE), |(before, after)| {
+                    let unit = 100.0 / f32::from(before.maximum.max(1));
+                    (
+                        f32::from(before.current.min(after.current)) * unit,
+                        f32::from(before.current.abs_diff(after.current)) * unit,
+                        if after.current < before.current {
+                            appearance.damage
+                        } else {
+                            appearance.healing
+                        },
+                    )
+                });
+            if let Some(mut node) = world.get_mut::<Node>(forecast_bar) {
+                let display = if width > 0.0 {
+                    Display::Flex
+                } else {
+                    Display::None
+                };
+                if node.left != Val::Percent(left)
+                    || node.width != Val::Percent(width)
+                    || node.display != display
+                {
+                    node.left = Val::Percent(left);
+                    node.width = Val::Percent(width);
+                    node.display = display;
+                }
+            }
+            if world.get::<BackgroundColor>(forecast_bar) != Some(&BackgroundColor(color)) {
+                world
+                    .entity_mut(forecast_bar)
+                    .insert(BackgroundColor(color));
+            }
+        }
+        if world.get::<BackgroundColor>(text) != Some(&BackgroundColor(appearance.dock)) {
+            world
+                .entity_mut(text)
+                .insert(BackgroundColor(appearance.dock));
         }
         if let Some(mut node) = world.get_mut::<Node>(entity) {
             let display = if actor.team() == Team::Enemies && !actor.standing() {
@@ -474,24 +665,82 @@ pub(super) fn present(
             }
         }
         let marker = if flash {
-            Color::srgb(1.0, 0.40, 0.28)
+            appearance.damage
         } else if ui.target == Some(actor.id) {
-            Color::srgb(0.94, 0.83, 0.47)
+            appearance.accent
         } else if snapshot.active_actor == Some(actor.id) {
-            Color::srgb(0.60, 0.85, 0.77)
+            appearance.healing
         } else if eligible {
-            Color::srgb(0.47, 0.72, 0.38)
+            appearance.positive
         } else {
-            Color::srgba(0.50, 0.56, 0.54, 0.30)
+            appearance.line
         };
         paint_marker(world, control, marker);
-        sync_statuses(world, statuses, actor);
+        let mut disclosed_actor = actor.clone();
+        disclosed_actor.statuses = facts.statuses.as_known().cloned().unwrap_or_default();
+        sync_statuses(world, statuses, &disclosed_actor);
+        sync_unknown_status(world, statuses, actor, facts.statuses.as_known().is_none());
+    }
+}
+
+#[derive(Component)]
+struct UnknownEffects(ActorId);
+
+fn sync_unknown_status(world: &mut World, parent: Entity, actor: &ActorSnapshot, unknown: bool) {
+    let existing = world
+        .query::<(Entity, &UnknownEffects)>()
+        .iter(world)
+        .find(|(_, e)| e.0 == actor.id)
+        .map(|(entity, _)| entity);
+    let entity = if let Some(entity) = existing {
+        entity
+    } else if unknown {
+        let entity = world
+            .spawn((
+                bevy_game_ui::button(format!("Actor {} Unknown Effects", actor.id.0)),
+                bevy_game_ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
+                bevy_game_ui::UiContextHelp {
+                    title: "Unknown effects".to_owned(),
+                    body: "Conditions have not been disclosed to this viewer.".to_owned(),
+                },
+                Action::InspectActor(actor.id),
+                UnknownEffects(actor.id),
+                ChildOf(parent),
+            ))
+            .id();
+        world.entity_mut(entity).insert((
+            AccessibleLabel::new("Effects unknown. Inspect actor."),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                min_height: Val::Px(44.0),
+                min_width: Val::Px(44.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+        ));
+        label(world, entity, "Undisclosed Effects", "?", UiTextRole::Body);
+        entity
+    } else {
+        return;
+    };
+    if let Some(mut node) = world.get_mut::<Node>(entity) {
+        let display = if unknown {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if node.display != display {
+            node.display = display;
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy_game_test::{run_frames, HeadlessUiPlugin};
     use labyrinth_rules::{Combat, HeroSetup, StatusKind, DEFAULT_HERO_ROSTER};
 
     fn status(actor: ActorId, kind: StatusKind, id: u64) -> StatusInstance {
@@ -645,11 +894,182 @@ mod tests {
         paint_marker(&mut world, control, Color::NONE);
         assert_eq!(
             world.get::<BorderColor>(control),
-            Some(&BorderColor::all(Color::srgb(1.0, 0.87, 0.47)))
+            Some(&BorderColor::all(LabyrinthAppearance::default().accent))
         );
         assert_eq!(
             world.get::<BackgroundColor>(control),
             Some(&BackgroundColor(Color::NONE))
         );
+    }
+
+    fn present_overlay_fixture(app: &mut App, view: &LabyrinthView, ui: &UiState) {
+        let tiles = app
+            .world_mut()
+            .query::<(Entity, &ActorTile)>()
+            .iter(app.world())
+            .map(|(entity, tile)| (tile.actor, entity))
+            .collect();
+        let metrics = *app.world().resource::<ResolvedUiMetrics>();
+        present(
+            app.world_mut(),
+            view,
+            ui,
+            metrics,
+            view.combat.as_ref().expect("fixture"),
+            &tiles,
+            0.0,
+        );
+        run_frames(app, 3);
+    }
+
+    fn art_geometry(app: &mut App) -> Vec<(ActorId, Vec2, Vec2)> {
+        let mut geometry = app
+            .world_mut()
+            .query::<&ActorTile>()
+            .iter(app.world())
+            .map(|tile| {
+                (
+                    tile.actor,
+                    app.world()
+                        .get::<ComputedNode>(tile.control)
+                        .expect("art layout")
+                        .size(),
+                    app.world()
+                        .get::<UiGlobalTransform>(tile.control)
+                        .expect("art position")
+                        .translation,
+                )
+            })
+            .collect::<Vec<_>>();
+        geometry.sort_by_key(|(actor, _, _)| *actor);
+        geometry
+    }
+
+    #[test]
+    fn overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes() {
+        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
+            // Isolate actor-owned geometry from the command dock so this test
+            // identifies accidental text-driven motion in the numeric footer.
+            let mut app = App::new();
+            app.add_plugins(HeadlessUiPlugin::new(1280, 720))
+                .insert_resource(UiScalePreference(scale))
+                .init_resource::<LabyrinthAppearance>()
+                .init_resource::<CombatDisclosure>()
+                .add_systems(Startup, crate::ui::load_default_font);
+            app.finish();
+            app.cleanup();
+            let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("fixture");
+            // Reach this actor through real initiative transitions. Replacing
+            // only active_actor would create an invalid snapshot, which the
+            // forecast correctly rejects before producing accessible outcomes.
+            for _ in 0..labyrinth_rules::MAX_ACTORS {
+                let actor = combat.snapshot().active_actor.expect("active combat");
+                if actor == ActorId(1) {
+                    break;
+                }
+                combat.apply(actor, CombatAction::Wait).expect("wait turn");
+            }
+            let snapshot = combat.snapshot();
+            assert_eq!(snapshot.active_actor, Some(ActorId(1)));
+            snapshot.validate().expect("valid forecast input");
+            let root = app
+                .world_mut()
+                .spawn(Node {
+                    width: Val::Px(180.0),
+                    height: Val::Px(440.0),
+                    flex_direction: FlexDirection::Row,
+                    ..default()
+                })
+                .id();
+            for id in [ActorId(1), ActorId(101)] {
+                mount_actor(app.world_mut(), root, snapshot.actor(id).expect("actor"));
+            }
+            let mut view = LabyrinthView {
+                local: true,
+                admitted: true,
+                combat: Some(snapshot),
+                players: vec![crate::view::PlayerView {
+                    slot: 0,
+                    actor: ActorId(1),
+                    hero: HeroClass::Gatekeeper,
+                    name: "The hero's long player-owned display name".to_owned(),
+                    occupied: true,
+                    connected: true,
+                    ready: true,
+                }],
+                ..default()
+            };
+            run_frames(&mut app, 3);
+            let mut ui = UiState::default();
+            present_overlay_fixture(&mut app, &view, &ui);
+            let before = art_geometry(&mut app);
+            ui.selected = Some(Choice::Skill(SkillId::FrontStrike));
+            ui.target = Some(ActorId(101));
+            present_overlay_fixture(&mut app, &view, &ui);
+            assert_eq!(art_geometry(&mut app), before, "forecast moved art");
+            let enemy = app
+                .world_mut()
+                .query::<&ActorTile>()
+                .iter(app.world())
+                .find(|tile| tile.actor == ActorId(101))
+                .expect("enemy tile");
+            let summary = app.world().get::<Text>(enemy.text).expect("HP text");
+            assert!(!summary.0.contains('→'), "numeric strip stays factual");
+            assert!(app
+                .world()
+                .get::<AccessibleLabel>(enemy.control)
+                .expect("forecast accessibility")
+                .0
+                .contains('→'));
+            for actor in &mut view.combat.as_mut().expect("snapshot").actors {
+                if [ActorId(1), ActorId(101)].contains(&actor.id) {
+                    actor.hp = 9;
+                }
+            }
+            view.local = false;
+            view.player = Some(0);
+            present_overlay_fixture(&mut app, &view, &ui);
+            assert_eq!(art_geometry(&mut app), before, "HP or ownership moved art");
+            app.world_mut()
+                .resource_mut::<CombatDisclosure>()
+                .actors
+                .insert(
+                    ActorId(101),
+                    crate::presentation::ActorDisclosure {
+                        health: false,
+                        ..default()
+                    },
+                );
+            present_overlay_fixture(&mut app, &view, &ui);
+            assert_eq!(art_geometry(&mut app), before, "unknown HP moved art");
+            for tile in app.world_mut().query::<&ActorTile>().iter(app.world()) {
+                let bounds = app
+                    .world()
+                    .get::<ComputedNode>(tile.text)
+                    .expect("summary bounds");
+                let text = app
+                    .world()
+                    .get::<bevy::text::TextLayoutInfo>(tile.text)
+                    .expect("measured essential text");
+                assert!(text.size.x <= bounds.size().x + 0.5);
+                assert!(text.size.y <= bounds.size().y + 0.5);
+                assert!(
+                    app.world()
+                        .get::<Text>(tile.text)
+                        .expect("text")
+                        .0
+                        .lines()
+                        .count()
+                        == 2
+                );
+                assert_eq!(
+                    app.world()
+                        .get::<TextLayout>(tile.text)
+                        .expect("layout")
+                        .justify,
+                    Justify::Center
+                );
+            }
+        }
     }
 }

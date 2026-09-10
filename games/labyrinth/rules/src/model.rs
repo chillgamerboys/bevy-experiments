@@ -617,6 +617,20 @@ impl CombatSnapshot {
         if self.phase != CombatPhase::AwaitingAction || self.active_actor != Some(actor) {
             return Err(RuleError::WrongActor);
         }
+        self.validate_action_target(actor, action)
+    }
+
+    /// Checks equipment, standing state, remaining uses, rank and targets without
+    /// requiring the actor's turn. Suitable for inspection, never authorization.
+    /// [`Self::validate_action`] adds the current-decision requirement for commits.
+    pub fn validate_action_target(
+        &self,
+        actor: ActorId,
+        action: &CombatAction,
+    ) -> Result<(), RuleError> {
+        if self.outcome.is_some() {
+            return Err(RuleError::Finished);
+        }
         let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
         if !source.standing() {
             return Err(RuleError::NotStanding);

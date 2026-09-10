@@ -11,6 +11,8 @@ use std::fmt;
 
 /// Renderer-free plugin for real Bevy UI mechanics and layout, without a skin.
 /// Games explicitly install their visual styling, as in their production app.
+/// Unless supplied before installation, time advances by [`crate::DEFAULT_FIXED_STEP`]
+/// each frame. Tooltip dwell, fades, and input tests must not depend on CPU speed.
 pub struct HeadlessUiPlugin {
     physical_size: UVec2,
     scale_factor: f32,
@@ -44,6 +46,9 @@ impl Default for HeadlessUiPlugin {
 
 impl Plugin for HeadlessUiPlugin {
     fn build(&self, app: &mut App) {
+        let custom_time = app
+            .world()
+            .contains_resource::<bevy::time::TimeUpdateStrategy>();
         assert!(
             self.scale_factor.is_finite() && self.scale_factor > 0.0,
             "headless UI scale factor must be finite and positive"
@@ -72,6 +77,11 @@ impl Plugin for HeadlessUiPlugin {
             bevy::text::TextPlugin,
             bevy::ui::UiPlugin,
         ));
+        if !custom_time {
+            app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                crate::DEFAULT_FIXED_STEP,
+            ));
+        }
         app.init_asset::<bevy::image::TextureAtlasLayout>();
         app.add_plugins(bevy::picking::DefaultPickingPlugins)
             .add_plugins(bevy::ui_widgets::UiWidgetsPlugins)

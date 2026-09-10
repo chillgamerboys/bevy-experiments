@@ -1,6 +1,7 @@
 //! Labyrinth: an independently composed cooperative positional-combat prototype.
 
 mod network;
+pub mod presentation;
 pub mod profile;
 mod scene;
 mod session;

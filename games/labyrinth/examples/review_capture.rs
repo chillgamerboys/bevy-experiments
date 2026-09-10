@@ -8,11 +8,12 @@ use bevy::render::{
 };
 use bevy::{app::AppExit, asset::RenderAssetUsages, camera::RenderTarget, prelude::*};
 use bevy_game_ui::{
-    resolve_ui_metrics, GameUiPlugin, GameUiSystems, ResolvedUiMetrics, UiScaleMode,
-    UiScalePreference,
+    resolve_ui_metrics, GameUiPlugin, GameUiSystems, ResolvedUiMetrics, UiContextHelp,
+    UiContextHelpState, UiContextHelpSystems, UiScaleMode, UiScalePreference,
 };
 use labyrinth::{
-    ui::LabyrinthUiPlugin,
+    presentation::{ActorDisclosure, CombatDisclosure},
+    ui::{LabyrinthAppearance, LabyrinthUiPlugin},
     view::{LabyrinthView, PlayerView, ViewMode},
 };
 use labyrinth_rules::{
@@ -124,6 +125,27 @@ fn main() {
         ],
         ..LabyrinthView::default()
     };
+    let mut disclosure = CombatDisclosure::default();
+    if route == "unknown" {
+        for id in 101..=106 {
+            disclosure.actors.insert(
+                ActorId(id),
+                ActorDisclosure {
+                    health: false,
+                    statuses: false,
+                    details: false,
+                },
+            );
+        }
+    }
+    let mut appearance = LabyrinthAppearance::default();
+    if route == "alternate" {
+        appearance.dock = Color::srgb(0.10, 0.17, 0.19);
+        appearance.detail = Color::srgb(0.08, 0.14, 0.16);
+        appearance.accent = Color::srgb(0.5, 0.95, 0.88);
+        appearance.ink = Color::srgb(0.95, 0.96, 0.85);
+        appearance.damage = Color::srgb(1.0, 0.65, 0.38);
+    }
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -136,6 +158,8 @@ fn main() {
         }))
         .insert_resource(UiScalePreference(scale))
         .insert_resource(view)
+        .insert_resource(disclosure)
+        .insert_resource(appearance)
         .insert_resource(Capture {
             output,
             frame: 0,
@@ -155,7 +179,33 @@ fn main() {
                 .before(GameUiSystems::EmitActivations),
         )
         .add_systems(Update, capture.before(GameUiSystems::EmitActivations))
+        .add_systems(
+            Update,
+            help_fixture
+                .after(UiContextHelpSystems::Resolve)
+                .before(bevy_game_ui::UiTooltipSystems::Resolve)
+                .before(labyrinth::ui::LabyrinthUiSystems::Present),
+        )
         .run();
+}
+
+// A render-target image has no native pointer/focus surface. Author the selected
+// help state for pixel review; production input routing is verified separately.
+fn help_fixture(
+    capture: Res<Capture>,
+    controls: Query<(Entity, &Name, &UiContextHelp)>,
+    mut help: ResMut<UiContextHelpState>,
+) {
+    if capture.route != "help" {
+        return;
+    }
+    if let Some((entity, _, content)) = controls
+        .iter()
+        .find(|(_, name, _)| name.as_str() == "Skill 0")
+    {
+        help.entity = Some(entity);
+        help.content = Some(content.clone());
+    }
 }
 
 fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, mut capture: ResMut<Capture>) {
@@ -203,8 +253,10 @@ fn capture(
     }
     let click = match (capture.route.as_str(), capture.frame) {
         ("host", 4) => Some("Host Company"),
-        ("combat", 4) => Some("Skill 0"),
+        ("combat" | "help", 4) => Some("Skill 0"),
         ("combat", 7) => Some("Actor 105"),
+        ("unknown" | "alternate", 4) => Some("Skill 0"),
+        ("unknown" | "alternate", 7) => Some("Actor 105"),
         ("inspect", 4) => Some("Actor 1 Effects"),
         ("order", 4) => Some("Timeline Toggle"),
         _ => None,

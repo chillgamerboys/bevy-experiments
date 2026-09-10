@@ -59,7 +59,18 @@ pub(crate) fn remember_scoped_focus(
 /// Whether a control can receive activation now, including ancestors and modal scope.
 #[must_use]
 pub fn activation_eligible(world: &mut World, entity: Entity) -> bool {
-    if !is_reachable(world, entity) {
+    eligible(world, entity, false)
+}
+
+/// Inspection ignores disabled action state, but never hidden ancestors or modals.
+/// This does not grant activation or insert a control into keyboard navigation.
+#[must_use]
+pub fn inspection_eligible(world: &mut World, entity: Entity) -> bool {
+    eligible(world, entity, true)
+}
+
+fn eligible(world: &mut World, entity: Entity, inspect: bool) -> bool {
+    if !reachable(world, entity, inspect) {
         return false;
     }
     let topmost = {
@@ -71,7 +82,23 @@ pub fn activation_eligible(world: &mut World, entity: Entity) -> bool {
             .max_by_key(|(entity, z)| (z.map_or(0, |index| index.0), entity.to_bits()))
             .map(|(entity, _)| entity)
     };
-    topmost.is_none_or(|root| is_descendant(world, entity, root))
+    topmost.is_none_or(|root| {
+        if is_descendant(world, entity, root) {
+            return true;
+        }
+        // Inspection cards inherit their anchor's modal scope, not a global
+        // exception to modal eligibility. A newly raised modal blocks both.
+        let mut current = entity;
+        loop {
+            if let Some(origin) = world.get::<crate::tooltip::TooltipOrigin>(current) {
+                return reachable(world, origin.0, true) && is_descendant(world, origin.0, root);
+            }
+            let Some(parent) = world.get::<ChildOf>(current) else {
+                return false;
+            };
+            current = parent.parent();
+        }
+    })
 }
 
 pub(crate) fn emit_activations(world: &mut World) {
@@ -350,13 +377,18 @@ fn is_descendant(world: &World, mut entity: Entity, root: Entity) -> bool {
     }
 }
 
-fn is_reachable(world: &World, mut entity: Entity) -> bool {
+fn is_reachable(world: &World, entity: Entity) -> bool {
+    reachable(world, entity, false)
+}
+
+fn reachable(world: &World, mut entity: Entity, inspect: bool) -> bool {
     if world.get_entity(entity).is_err() {
         return false;
     }
     loop {
-        if world.get::<UiDisabled>(entity).is_some()
-            || world.get::<InteractionDisabled>(entity).is_some()
+        if (!inspect
+            && (world.get::<UiDisabled>(entity).is_some()
+                || world.get::<InteractionDisabled>(entity).is_some()))
             || world
                 .get::<Visibility>(entity)
                 .is_some_and(|visibility| *visibility == Visibility::Hidden)

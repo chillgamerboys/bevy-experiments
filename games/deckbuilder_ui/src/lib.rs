@@ -28,6 +28,7 @@ pub struct DeckbuilderPlugin;
 fn screen_root(name: impl Into<String>) -> impl Bundle {
     (
         bevy_game_ui::screen_root(name),
+        bevy_game_ui::UiTooltipHost,
         UiSkin::Screen,
         UiSpacing {
             row_gap: Some(UiSpace::Pixels(16.0)),
@@ -106,26 +107,30 @@ fn text_field(
 
 impl Plugin for DeckbuilderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((network::DeckNetworkPlugin, GameUiSkinPlugin))
-            .init_resource::<DeckbuilderUi>()
-            .init_resource::<PendingActions>()
-            .init_resource::<UiDirty>()
-            .init_resource::<BrowserTick>()
-            .add_systems(Startup, render_if_dirty)
-            .add_systems(
-                Update,
-                (
-                    collect_activations.after(GameUiSystems::EmitActivations),
-                    collect_text,
-                    apply_pending_actions,
-                    synchronize_network_screen,
-                    mark_discovery_change,
-                    mark_browser_tick,
-                    mark_responsive_change,
-                    render_if_dirty,
-                )
-                    .chain(),
-            );
+        app.add_plugins((
+            network::DeckNetworkPlugin,
+            GameUiSkinPlugin,
+            bevy_game_ui::GameUiTooltipPlugin,
+        ))
+        .init_resource::<DeckbuilderUi>()
+        .init_resource::<PendingActions>()
+        .init_resource::<UiDirty>()
+        .init_resource::<BrowserTick>()
+        .add_systems(Startup, render_if_dirty)
+        .add_systems(
+            Update,
+            (
+                collect_activations.after(GameUiSystems::EmitActivations),
+                collect_text,
+                apply_pending_actions,
+                synchronize_network_screen,
+                mark_discovery_change,
+                mark_browser_tick,
+                mark_responsive_change,
+                render_if_dirty,
+            )
+                .chain(),
+        );
     }
 }
 
@@ -1143,6 +1148,20 @@ fn spawn_card(
         card(format!("Card {}", kind.title())),
         DeckbuilderAction::SelectCard(kind),
         Button,
+        bevy_game_ui::UiInspectable,
+        bevy_game_ui::UiContextHelp {
+            title: kind.title().to_owned(),
+            body: format!(
+                "{}\nCost {} energy.{}",
+                kind.rules(),
+                kind.cost(),
+                if disabled {
+                    " Unavailable: wait for your turn or sufficient energy."
+                } else {
+                    " Select this card, then Play selected card to commit."
+                }
+            ),
+        },
         bevy_game_ui::UiAction,
         bevy::input_focus::tab_navigation::TabIndex(0),
     ));
