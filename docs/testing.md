@@ -36,6 +36,40 @@ UI gates cover 1280x720, 1920x1080 and 3840x2160 at Auto and 200% semantic scale
 Combine structure, captures and pointer/keyboard/modal/resize/motion review. Keep
 current captures under `target/review/` through review, then retain a concise
 revision/command/result record instead of unlimited generated artifacts.
+For Labyrinth's current description/dock correction, manual acceptance prioritizes
+normal-scale play; the 200% visual pass is deferred, not a blocker. Existing
+automated scale regressions are retained.
+
+## Context, forecasts and unknown information
+
+The shared contextual-help tests are independent of Labyrinth. They exercise
+focus/pointer precedence, modal scope/restoration, hidden/disabled/removed sources,
+clipping, activation non-interference and unchanged-resource detection. Their
+explicit `Interaction` and geometry fixtures prove selection mechanics, not native
+cursor hit testing or rendered tooltip placement. Each adopter must also exercise
+real input and layout through its production plugin stack; helpful text appearing
+does not prove that the associated action can be selected and confirmed.
+
+Keep Labyrinth's forecast evidence at two separate levels:
+
+- Pure rules: base power versus effective damage and actual HP loss, shared
+  immediate resolution, status application/removal, position changes, no mutation
+  or random/turn advancement, and off-turn previews granting no commit authority.
+- Presentation: known versus unknown HP, modifiers and details; uncertainty text
+  and absent exact projections; conditional periodic-effect explanations; and
+  matching disclosure in labels, inspection, logs and contextual information.
+
+Vary concealed inputs while keeping public facts fixed and compare the resulting
+presentation, including error shape and derived values. Test partial disclosure,
+not only an entirely concealed actor. Separately review projected HP segments,
+pending effect markers and confirmation clarity at all supported canvas sizes.
+Normal encounters remain fully revealed: a hidden-information fixture is neither
+an implemented reveal ability nor evidence that network payloads are filtered.
+
+No automated selection test, snapshot or forecast parity check establishes the
+feel of the dock. A pointer/keyboard walk still checks hover-to-focus transitions,
+off-turn inspection, ability -> target -> Confirm, modal return, overflow and
+resizing. Record any missing interactive or cross-machine evidence explicitly.
 
 See [Labyrinth](../games/labyrinth/labyrinth-testing.md),
 [Carterfight](../games/carterfight/README.md) and

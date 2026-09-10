@@ -3,14 +3,16 @@
 use std::collections::BTreeMap;
 
 mod actors;
+mod dock;
 mod feedback;
 mod inspection;
 mod layout;
 mod timeline;
+mod tooltips;
 
 use actors::{formation, mount_actor, reorder};
 use inspection::slot_value;
-pub(super) use inspection::{select_skill_slot, selected_action};
+pub(super) use inspection::{select_skill_slot, selected_action, skills_disclosed};
 use layout::mount;
 
 use super::*;
@@ -44,14 +46,11 @@ struct StatusBadge {
 #[derive(Component, Clone, Copy)]
 enum Slot {
     Hud,
-    Timeline,
     Order,
     Feedback,
-    Selected,
     Reason,
     Inspector,
     Log,
-    Skill(usize),
 }
 
 #[derive(Resource)]
@@ -62,6 +61,7 @@ struct BattleNodes {
     loadout: Vec<SkillId>,
     confirm: Entity,
     rematch: Entity,
+    dock: dock::DockNodes,
     inspector: Entity,
     log: Entity,
     drawer: Entity,
@@ -76,15 +76,31 @@ struct BattleNodes {
 pub(super) fn clear(world: &mut World) {
     despawn_marked::<BattleRoot>(world);
     world.remove_resource::<BattleNodes>();
+    world
+        .resource_mut::<bevy_game_ui::UiTooltipCatalog>()
+        .0
+        .retain(|key, _| !key.0.starts_with("labyrinth/"));
 }
 
 pub(super) fn scroll_details(world: &mut World, direction: i8) {
-    let Some(entity) = world
-        .get_resource::<BattleNodes>()
-        .map(|nodes| nodes.drawer_body)
-    else {
+    let Some(entity) = world.get_resource::<BattleNodes>().and_then(|nodes| {
+        if world
+            .get::<Node>(nodes.drawer)
+            .is_some_and(|node| node.display != Display::None)
+        {
+            Some(nodes.drawer_body)
+        } else {
+            None
+        }
+    }) else {
         return;
     };
+    if world
+        .get::<Node>(entity)
+        .is_none_or(|node| node.display == Display::None)
+    {
+        return;
+    }
     let Some(node) = world.get::<ComputedNode>(entity) else {
         return;
     };
@@ -95,7 +111,11 @@ pub(super) fn scroll_details(world: &mut World, direction: i8) {
         .map_or(0.0, |position| position.0.y);
     world.entity_mut(entity).insert(ScrollPosition(Vec2::new(
         0.0,
-        (current + f32::from(direction) * height * 0.85).clamp(0.0, maximum),
+        match direction {
+            100.. => maximum,
+            ..=-100 => 0.0,
+            _ => (current + f32::from(direction) * height * 0.85).clamp(0.0, maximum),
+        },
     )));
 }
 
@@ -120,6 +140,7 @@ pub(super) fn present(
     let Some(snapshot) = view.combat.as_ref() else {
         return;
     };
+    tooltips::refresh(world, view, ui);
     if !world.contains_resource::<BattleNodes>() {
         mount(world, snapshot, metrics.viewport);
     }
@@ -137,10 +158,16 @@ pub(super) fn present(
         .map(|(entity, tile)| (tile.actor, entity))
         .collect::<BTreeMap<_, _>>();
     world.resource_scope(|world, mut nodes: Mut<BattleNodes>| {
-        let loadout =
-            inspection::display_actor(view).map_or_else(Vec::new, |actor| actor.skills().to_vec());
+        let presentation = crate::presentation::BattlePresentation::new(
+            snapshot,
+            world.resource::<crate::presentation::CombatDisclosure>(),
+        );
+        let loadout = inspection::display_actor(view)
+            .and_then(|actor| presentation.actor(actor.id))
+            .and_then(|actor| actor.details.as_known())
+            .map_or_else(Vec::new, |details| details.skills.clone());
         if nodes.loadout != loadout {
-            layout::mount_skills(world, nodes.skills, &loadout);
+            dock::mount_skills(world, nodes.skills, &loadout);
             nodes.loadout = loadout;
             // A loadout replacement must not leave an unequipped ability selected.
             if matches!(ui.selected, Some(Choice::Skill(skill)) if !nodes.loadout.contains(&skill))
@@ -199,9 +226,10 @@ pub(super) fn present(
                 }
             }
         }
+        dock::update(world, &nodes.dock, view, ui);
     });
     actors::present(world, view, ui, metrics, snapshot, &tiles, time);
-    inspection::paint_choices(world, view, ui);
+    timeline::update(world, snapshot);
     let slots = world
         .query::<(Entity, &Slot)>()
         .iter(world)
@@ -221,11 +249,18 @@ pub(super) fn present(
         })
         .collect::<Vec<_>>()
         .join("   ·   ");
+    let disclosure = world
+        .resource::<crate::presentation::CombatDisclosure>()
+        .clone();
     for (entity, slot) in slots {
         let value = if matches!(slot, Slot::Feedback) {
-            feedback.clone()
+            if disclosure.has_unknown() {
+                String::new()
+            } else {
+                feedback.clone()
+            }
         } else {
-            slot_value(slot, view, ui, snapshot, metrics.viewport)
+            slot_value(slot, view, ui, snapshot, &disclosure)
         };
         set_text(world, entity, value);
     }

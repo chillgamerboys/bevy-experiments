@@ -22,6 +22,22 @@ but games decide which animations it affects. Keep views and typed intents local
 Use explicit `UiFocusId` scope/key pairs for restoration across rebuilds; never
 derive identity from a displayed label. Pointer and keyboard eligibility is shared.
 
+`GameUiTooltipPlugin` is a composition-root choice, installed unconditionally by
+Labyrinth. It adds delayed hover/focus previews, gap-tolerant reading, explicit
+pinning and bounded nested cards. Add `UiTooltipHost` to one full-screen root;
+use `UiTooltipBounds` for a game-owned safe area. Timings and inspection keys live
+in `UiTooltipSettings`; the native renderer uses the semantic skin. Games own
+`UiTooltipCatalog` content and stable `UiTooltipSubject` keys; `UiTooltipSource`
+binds anchors and `UiTooltipOpen` opens an explanation without a gameplay action.
+Remove catalog keys when disclosure changes. Never copy hidden state into help.
+`UiContextHelp` also works for simple, entity-lifetime explanations. Opt into
+disabled-control help with `UiInspectable`, never by enabling the action.
+After `UiTooltipSystems::Resolve`, skip game shortcuts when
+`UiTooltipState::captures_keyboard()` is true. Inspect/pin defaults to T; Escape
+closes deepest-first and restores eligible scoped focus. Pointer previews do not
+steal focus. Test time, visibility, nested input containment, revocation and
+keyboard restoration separately from static pixels and a native visual walk.
+
 ## `bevy_game_test`
 
 `TestAppBuilder` installs only requested capabilities. `HeadlessUiPlugin` exercises the

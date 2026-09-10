@@ -1,4 +1,4 @@
-//! Structural/input evidence only: no claim about renderer pixels or real cursor picking.
+//! Structural/native-input evidence only: no renderer or desktop interaction claim.
 
 use super::*;
 use bevy_game_test::{
@@ -10,6 +10,10 @@ use labyrinth_rules::{
     AbilityLoadout, ActorKind, Combat, HeroSetup, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER,
     MAX_EQUIPPED_ABILITIES,
 };
+
+mod dock;
+mod overlay_stability;
+mod turn_refresh;
 
 fn fixture() -> LabyrinthView {
     let combat = (0..128)
@@ -171,9 +175,12 @@ fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
     run_frames(&mut app, 2);
     let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirmation");
     assert!(app.world().get::<UiDisabled>(confirm).is_some());
-    assert!(ui_tree_snapshot(app.world_mut())
-        .to_string()
-        .contains("Wait for your hero"));
+    assert!(app
+        .world()
+        .get::<bevy_game_ui::UiContextHelp>(confirm)
+        .expect("disabled explanation")
+        .body
+        .contains("Waiting for your turn"));
 }
 
 #[test]
@@ -737,7 +744,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
                 assert!(focus_action(app.world_mut(), control));
                 tap_key(&mut app, KeyCode::Enter);
             } else {
-                assert!(click_action(&mut app, control));
+                pointer_control(&mut app, control, Vec2::new(1280.0, 720.0));
             }
             run_frames(&mut app, 2);
             assert!(!app
@@ -756,7 +763,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
             assert!(focus_action(app.world_mut(), confirm));
             tap_key(&mut app, KeyCode::Space);
         } else {
-            assert!(click_action(&mut app, confirm));
+            pointer_control(&mut app, confirm, Vec2::new(1280.0, 720.0));
         }
         let intents: Vec<_> = app
             .world_mut()
@@ -831,6 +838,17 @@ fn pointer_at(app: &mut App, position: Vec2) {
         });
         app.update();
     }
+}
+
+fn pointer_control(app: &mut App, entity: Entity, viewport: Vec2) {
+    let visible = visible_control_rect(
+        app.world(),
+        entity,
+        Rect::from_corners(Vec2::ZERO, viewport),
+    )
+    .expect("native pointer target is visible without synthetic activation");
+    assert!(visible.width() >= 43.5 && visible.height() >= 43.5);
+    pointer_at(app, visible.center());
 }
 
 #[test]

@@ -13,7 +13,7 @@ Read `.bevy-gamekit/overlays/verify-bevy-ui.md` first when it exists; treat it a
 
 1. Read `../../references/evidence.md` and write the specific presentation and interaction claims under review.
 2. Run structural checks for stable names, semantic regions, accessible labels, enabled focus order, minimum targets, clipping, and scroll reachability.
-3. Capture deterministic frames at compact, standard, and wide logical canvases, plus the maximum supported semantic scale.
+3. Capture deterministic frames at the game's default scale and representative target window sizes. Check additional semantic scales only when requested or relevant to the reported defect; maximum-scale review is not a blanket acceptance gate.
 4. Compare hierarchy, contrast, density, alignment, disabled/selected states, and modal stacking in static frames.
 5. Walk the interface using pointer and keyboard only. Verify Tab and Shift-Tab order, Enter/Space parity, modal focus trap/restore, scrolling, resizing, and state refresh.
 6. Observe motion and feel directly. A still image cannot validate transition timing, camera behavior, feedback, or input latency.

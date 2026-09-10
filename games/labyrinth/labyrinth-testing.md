@@ -42,11 +42,23 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 ```
 
 Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
-Routes include `menu`, `host`, `lobby`, `combat`, `effects`, `inspect`, `order` and
-`paused`. Effects/inspect use authored presentation fixtures, not gameplay claims. The offscreen render
+Routes include `menu`, `host`, `lobby`, `combat`, `help`, `effects`, `inspect`, `order` and
+`paused`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
+
+For the current description/dock correction, prioritize normal-scale play and
+ordinary window resizing. The 200% option and existing automated regressions remain,
+but a manual 200% review is deferred and is not a release gate for this pass.
+
+The overlay regressions compare all twelve native actor anchors and actual atlas
+sprite transforms across selection, targeting, utilities and detail drawers. They
+check measured text bounds, description click containment, and wheel scrolling
+using Winit-shaped aggregate window events. A persistent message reader checks
+that inspection does not emit combat commands. A separate real-rule transition
+test covers Scout confirmation followed by Medic loadout, description and skin
+refresh. These are not GPU-rendering or interactive-motion evidence.
 
 ## Interactive six-player checklist
 

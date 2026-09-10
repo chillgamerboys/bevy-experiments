@@ -20,6 +20,35 @@ use appearance::fallback_color;
 pub(crate) use appearance::SceneAppearance;
 use geometry::{anchor_frame, floor_aligned_rect, AnchorFrame};
 
+/// Reuse the world-art identity in native HUD portraits; no duplicate portrait atlas.
+pub(crate) fn portrait_image(world: &World, kind: labyrinth_rules::ActorKind) -> ImageNode {
+    let Some(appearance) = world.get_resource::<SceneAppearance>() else {
+        return ImageNode::solid_color(fallback_color(kind));
+    };
+    let Some(handle) = appearance.actor_sheet.as_ref() else {
+        return ImageNode::solid_color(fallback_color(kind));
+    };
+    let Some(image) = world
+        .get_resource::<Assets<Image>>()
+        .and_then(|assets| assets.get(handle))
+    else {
+        return ImageNode::solid_color(fallback_color(kind));
+    };
+    let Some(cell) = appearance.actor_rect(image.size(), kind) else {
+        return ImageNode::solid_color(fallback_color(kind));
+    };
+    // Square upper-body crop. This is artwork presentation, not actor/rank identity.
+    let side = cell.width() * 0.78;
+    let left = cell.min.x + (cell.width() - side) * 0.5;
+    ImageNode {
+        rect: Some(Rect::from_corners(
+            Vec2::new(left, cell.min.y + cell.height() * 0.04),
+            Vec2::new(left + side, cell.min.y + cell.height() * 0.04 + side),
+        )),
+        ..ImageNode::new(handle.clone())
+    }
+}
+
 /// The native, transparent actor button's art-only rectangle.
 #[derive(Component)]
 pub(crate) struct SceneActorAnchor {
@@ -35,6 +64,23 @@ pub(crate) struct SceneActorEmphasis {
 /// The open battlefield rectangle, excluding the fixed HUD and action rail.
 #[derive(Component)]
 pub(crate) struct SceneStageAnchor;
+
+/// Same atlas fit as the renderer, expressed in UI logical dimensions.
+pub(crate) fn actor_art_size(
+    world: &World,
+    kind: labyrinth_rules::ActorKind,
+    area: Vec2,
+) -> Option<Vec2> {
+    let appearance = world.get_resource::<SceneAppearance>()?;
+    let handle = appearance.actor_sheet.as_ref()?;
+    let image = world.get_resource::<Assets<Image>>()?.get(handle)?;
+    let cell = appearance.actor_rect(image.size(), kind)?;
+    Some(fit_actor_art(area, cell.size()))
+}
+
+fn fit_actor_art(area: Vec2, cell: Vec2) -> Vec2 {
+    cell * ((area * Vec2::new(0.94, 0.93)) / cell).min_element()
+}
 
 pub(crate) struct LabyrinthScenePlugin;
 
@@ -413,9 +459,7 @@ fn paint_actor(
     }) {
         hide(world, nodes.head);
         hide(world, nodes.eyes);
-        let available = frame.size() * Vec2::new(0.94, 0.93);
-        let ratio = (available / rect.size()).min_element();
-        let size = rect.size() * ratio;
+        let size = fit_actor_art(frame.size(), rect.size());
         let height = size.y / frame.size().y;
         let mut sprite = Sprite::from_image(handle.clone());
         sprite.rect = Some(rect);

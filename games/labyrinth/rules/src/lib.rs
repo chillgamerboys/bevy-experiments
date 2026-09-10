@@ -8,6 +8,8 @@ mod combat;
 mod content;
 mod loadout;
 mod model;
+mod preview;
+mod resolve;
 mod status;
 
 pub use combat::Combat;
@@ -17,6 +19,9 @@ pub use model::{
     ActorId, ActorKind, ActorSnapshot, CombatAction, CombatEvent, CombatEventKind, CombatOutcome,
     CombatPhase, CombatSnapshot, DamageKind, EnemyKind, HeroClass, InitiativeEntry, RuleError,
     SkillId, Team,
+};
+pub use preview::{
+    ActionPreview, ActorPreview, ActorPreviewState, DamagePreview, PreviewEvent, PreviewStatus,
 };
 pub use status::{
     status_definition, Boundary, DurationClock, Effect, Modifier, Reapplication, RemovalReason,

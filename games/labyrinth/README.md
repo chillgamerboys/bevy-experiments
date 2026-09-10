@@ -82,6 +82,21 @@ Select a character, then **Inspect** for its name, owner, rank, exact health and
 effects. **Order** expands this round's rolls; **Log** shows recent outcomes.
 Detail drawers trap focus: Escape/Close returns to combat, Page Up/Down and Home/End
 scroll their content. Skills 1–8 remain inspectable off-turn; only Confirm commits.
+The command dock groups equipped abilities and utility actions as flat glyph
+controls. Hover or keyboard-focus an ability for its explanation; this never
+changes the pending command. Descriptions float in the upper battlefield, outside
+the command dock's layout. Their clicks do not select characters behind them.
+Long descriptions scroll with the wheel or Page Up/Down and Home/End; the HP and
+status strips and Confirm stay clear. The dock and numeric labels retain their
+footprint when selecting abilities or targets. Initiative portraits open inspection without
+retargeting. The paired six-rank diagrams face the same direction as the formations.
+
+An ability shows authored base power before targeting. Selecting a valid target
+adds an immediate HP forecast on that character's health bar and in the dock;
+Inspect expands damage modifiers, capped healing, movement and status outcomes.
+Forecasts do not advance combat or predict the next turn's damage. Bleed is shown
+as conditional ticks, not guaranteed future damage. The prototype palette and
+glyph strokes are game-owned `LabyrinthAppearance` tokens, not fixed Gamekit styling.
 At large text sizes, long ability rows scroll horizontally while the battlefield
 and confirmation remain in view. Opening an effects badge reveals all effects;
 for example `Ble2 / 3t+1` means Bleed potency 2, three bearer-turn boundaries left,
@@ -136,6 +151,30 @@ old credentials are not deleted or migrated into an unrelated session.
 It owns rules and content. `src/session.rs` owns players, readiness, replay policy,
 pause, and encounter lifecycle. `src/network/` composes opt-in Gamekit capabilities.
 `src/ui/` projects snapshots and sends typed intents; it never mutates authority.
+`src/presentation.rs` owns viewer facts and immediate forecast formatting. Its
+unknown-information fixtures conceal exact HP, effects and inspection details;
+identity, allegiance, rank and standing/downed state remain public. Current network
+snapshots still include all facts: real reveal rules require server-side recipient
+filtering, not merely hiding UI text. Labyrinth always installs shared Gamekit
+tooltips. The capability remains optional for other game composition roots and
+does not own combat layout, appearance, or disclosure policy.
+
+### Ability inspection
+
+The fixed action rail shows glyphs and numbered shortcuts, not permanent ability
+descriptions. Select an ability, select a target, then Confirm. Formation numbers
+remain plain ranks. Emphasized footprints mark usable source positions and legal
+targets; a stronger selected-target highlight and actor emphasis distinguish the
+current selection. Exact source/target ranks are listed in ability tooltips;
+HP forecast segments remain attached to the affected actor.
+
+Hover or focus a control briefly to read its card. Move into the card to keep
+reading; related terms open nested cards. **T** pins and enters keyboard
+inspection; **Escape** closes the deepest card first. A card's Pin control keeps
+it visible without stealing keyboard focus. **K** toggles the equipped skillbook,
+which uses the same disclosed ability content. Neither inspection nor a skillbook
+link spends a turn. The shared timing and key bindings can be changed independently
+of Labyrinth's rules and palette.
 
 See [architecture and extension contracts](labyrinth-architecture.md)
 and [verification](labyrinth-testing.md). The future endless maze should
