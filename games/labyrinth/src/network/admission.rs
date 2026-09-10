@@ -7,7 +7,6 @@ pub(super) fn host_messages(world: &mut World) {
     let lost = std::mem::take(&mut world.resource_mut::<DisconnectQueue>().0);
     let hellos = drain::<FromClient<Hello>>(world);
     let acknowledgements = drain::<FromClient<Persisted>>(world);
-    let requests = drain::<FromClient<GameRequest>>(world);
     let leaves = drain::<FromClient<LeaveSession>>(world);
     for entity in &lost {
         if world.resource::<Runtime>().connection == Some(*entity) {
@@ -24,6 +23,9 @@ pub(super) fn host_messages(world: &mut World) {
         }
     }
     let Some(mut hosted) = world.remove_resource::<Hosted>() else {
+        world
+            .resource_mut::<Messages<FromClient<GameRequest>>>()
+            .clear();
         return;
     };
     let at = now(world);
@@ -40,10 +42,14 @@ pub(super) fn host_messages(world: &mut World) {
                 .connected(peer, false);
         }
     }
+    let mut left = BTreeSet::new();
     for leave in leaves {
         let Some(entity) = leave.client_id.entity() else {
             continue;
         };
+        if !left.insert(entity) || world.get::<InboundRejected>(entity).is_some() {
+            continue;
+        }
         if world.resource::<PartyAuthority>().in_lobby() {
             if let Some((peer, _)) = hosted.connections.remove(&entity) {
                 cleanup(world, hosted.security.revoke_peer(peer));
@@ -65,11 +71,14 @@ pub(super) fn host_messages(world: &mut World) {
             hosted.observed.insert(entity, Instant::now());
         }
     }
-    for hello in hellos.into_iter().take(32) {
+    for hello in hellos {
         let Some(entity) = hello.client_id.entity() else {
             continue;
         };
-        if !hosted.observed.contains_key(&entity) || !hosted.seen.insert(entity) {
+        if world.get::<InboundRejected>(entity).is_some()
+            || !hosted.observed.contains_key(&entity)
+            || !hosted.seen.insert(entity)
+        {
             continue;
         }
         hosted.attempts.insert(entity, hello.attempt);
@@ -157,7 +166,9 @@ pub(super) fn host_messages(world: &mut World) {
         .collect::<Vec<_>>();
     for (entity, valid) in completed {
         hosted.pending.remove(&entity);
-        if world.get::<ConnectedClient>(entity).is_none() {
+        if world.get::<ConnectedClient>(entity).is_none()
+            || world.get::<InboundRejected>(entity).is_some()
+        {
             continue;
         }
         if !valid {
@@ -173,11 +184,15 @@ pub(super) fn host_messages(world: &mut World) {
             Err(_) => refuse(world, &mut hosted, entity, Refused::Admission),
         }
     }
-    for acknowledged in acknowledgements.into_iter().take(32) {
+    let mut acknowledged_connections = BTreeSet::new();
+    for acknowledged in acknowledgements {
         let Some(entity) = acknowledged.client_id.entity() else {
             continue;
         };
-        if hosted.attempts.get(&entity) != Some(&acknowledged.attempt) {
+        if world.get::<InboundRejected>(entity).is_some()
+            || hosted.attempts.get(&entity) != Some(&acknowledged.attempt)
+            || !acknowledged_connections.insert(entity)
+        {
             continue;
         }
         let Some((peer, slot)) = hosted.connections.get(&entity).copied() else {
@@ -222,24 +237,7 @@ pub(super) fn host_messages(world: &mut World) {
             Err(_) => refuse(world, &mut hosted, entity, Refused::Admission),
         }
     }
-    let mut per_client = BTreeMap::<Entity, usize>::new();
-    for request in requests.into_iter().take(128) {
-        let Some(entity) = request.client_id.entity() else {
-            continue;
-        };
-        let count = per_client.entry(entity).or_default();
-        *count += 1;
-        if *count > 16 || !hosted.security.is_connection_admitted(entity.to_bits()) {
-            continue;
-        }
-        let Some((_, slot)) = hosted.connections.get(&entity).copied() else {
-            continue;
-        };
-        let result = world
-            .resource_mut::<PartyAuthority>()
-            .apply(slot, request.message);
-        to_client(world, entity, result);
-    }
+    requests::dispatch(world, &mut hosted);
     cleanup(world, hosted.security.expire(at));
     let overdue = hosted
         .observed

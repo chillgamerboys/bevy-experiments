@@ -5,7 +5,7 @@ use super::*;
 pub(super) fn handle_client_hellos(
     mut hellos: MessageReader<FromClient<DeckClientHello>>,
     mut hosted: Option<ResMut<HostedSession>>,
-    connected: Query<(&PeerAddr, &ChildOf), With<ConnectedClient>>,
+    connected: Query<(&PeerAddr, &ChildOf), (With<ConnectedClient>, Without<InboundRejected>)>,
     mut commands: Commands,
     mut offered: MessageWriter<ToClients<DeckOffer>>,
     mut refused: MessageWriter<ToClients<DeckAdmissionRefusal>>,
@@ -14,7 +14,7 @@ pub(super) fn handle_client_hellos(
     let Some(hosted) = hosted.as_mut() else {
         return;
     };
-    for hello in hellos.read().take(8) {
+    for hello in hellos.read() {
         let Some(connection) = hello.client_id.entity() else {
             continue;
         };
@@ -134,7 +134,7 @@ pub(super) fn handle_persistence(
     mut acknowledgements: MessageReader<FromClient<DeckPersistence>>,
     mut hosted: Option<ResMut<HostedSession>>,
     mut authority: Option<ResMut<DeckAuthority>>,
-    connected: Query<&ChildOf, With<ConnectedClient>>,
+    connected: Query<&ChildOf, (With<ConnectedClient>, Without<InboundRejected>)>,
     mut commands: Commands,
     mut accepted: MessageWriter<ToClients<DeckWelcome>>,
     mut refused: MessageWriter<ToClients<DeckAdmissionRefusal>>,
@@ -144,7 +144,7 @@ pub(super) fn handle_persistence(
     let (Some(hosted), Some(authority)) = (hosted.as_mut(), authority.as_mut()) else {
         return;
     };
-    for acknowledgement in acknowledgements.read().take(16) {
+    for acknowledgement in acknowledgements.read() {
         let Some(connection) = acknowledgement.client_id.entity() else {
             continue;
         };

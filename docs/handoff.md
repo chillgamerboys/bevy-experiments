@@ -5,6 +5,15 @@ Delivery: [PR #21](https://github.com/chillgamerboys/bevy-experiments/pull/21).
 This is a targeted review across rules, presentation, session/admission, discovery,
 shared UI and distribution boundaries, not an exhaustive audit or a balance sign-off.
 
+## Follow-up status
+
+The five findings below have been implemented in the Podgorica follow-up.
+See the [implementation plan and evidence](handoff-followup-plan.md) and
+[Labyrinth verification](../games/labyrinth/labyrinth-testing.md). The original
+findings and revision-specific evidence are retained below as review history;
+they describe `8ade27d`, not the follow-up implementation. No balance-harness or broad
+networking consolidation work is included in this correction.
+
 ## Start here
 
 Labyrinth is the flagship. Gamekit is a set of opt-in capabilities, not its engine.

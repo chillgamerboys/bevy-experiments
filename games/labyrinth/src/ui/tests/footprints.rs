@@ -127,5 +127,157 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
             .as_ref()
             .expect("snapshot");
         assert_eq!(s.occupant(Team::Heroes, 6), Some(ActorId(5)));
+        let forecast = find_named(app.world_mut(), "Actor 5 HP Forecast").expect("forecast bar");
+        assert_eq!(
+            app.world().get::<Node>(forecast).expect("bar").width,
+            Val::Percent(50.0)
+        );
+        assert!(app
+            .world()
+            .get::<bevy::prelude::AccessibleLabel>(control)
+            .expect("label")
+            .0
+            .contains("Corpse durability 6 → 2 / 8"));
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            let snapshot = view.combat.as_mut().expect("snapshot");
+            snapshot
+                .actors
+                .iter_mut()
+                .find(|a| a.id == ActorId(5))
+                .expect("wagon")
+                .life = LifeState::Corpse {
+                hp: 1,
+                max_hp: 8,
+                created_round: snapshot.round,
+            };
+            snapshot.revision += 1;
+        }
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().get::<Node>(forecast).expect("bar").width,
+            Val::Percent(12.5)
+        );
+        assert!(app
+            .world()
+            .get::<bevy::prelude::AccessibleLabel>(control)
+            .expect("label")
+            .0
+            .contains("Corpse durability 1 → 0 / 8"));
+        app.world_mut()
+            .resource_mut::<crate::presentation::CombatDisclosure>()
+            .actors
+            .insert(
+                ActorId(5),
+                crate::presentation::ActorDisclosure {
+                    health: false,
+                    ..Default::default()
+                },
+            );
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world()
+                .get::<Node>(forecast)
+                .expect("hidden forecast")
+                .display,
+            Display::None
+        );
+        assert!(!app
+            .world()
+            .get::<bevy::prelude::AccessibleLabel>(control)
+            .expect("label")
+            .0
+            .contains("Corpse durability 1"));
     }
+}
+
+#[test]
+fn corpse_help_uses_round_end_and_revokes_hidden_content() {
+    use crate::presentation::{ActorDisclosure, CombatDisclosure};
+    use bevy_gamekit::ui::{UiTooltipCatalog, UiTooltipOpen, UiTooltipRequest, UiTooltipState};
+    let mut app = app(1280, 720, UiScaleMode::Auto);
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        let snapshot = view.combat.as_mut().expect("snapshot");
+        let enemy = snapshot
+            .actors
+            .iter_mut()
+            .find(|a| a.id == ActorId(101))
+            .expect("enemy");
+        enemy.hp = 0;
+        enemy.life = LifeState::Corpse {
+            hp: 1,
+            max_hp: 5,
+            created_round: snapshot.round,
+        };
+        enemy.statuses = vec![StatusInstance {
+            id: 900,
+            kind: StatusKind::Bleed,
+            bearer: enemy.id,
+            source: ActorId(2),
+            potency: 2,
+            remaining: 2,
+            eligible_boundary: snapshot.boundary_sequence + 1,
+        }];
+        snapshot.validate().expect("valid fixture");
+        snapshot.revision += 1;
+    }
+    run_frames(&mut app, 3);
+    let badge = find_named(app.world_mut(), "Actor 101 Effects").expect("corpse badge");
+    let subject = app
+        .world()
+        .get::<UiTooltipOpen>(badge)
+        .expect("help key")
+        .0
+        .clone();
+    let content = app
+        .world()
+        .resource::<UiTooltipCatalog>()
+        .0
+        .get(&subject)
+        .expect("help");
+    assert!(content
+        .facts
+        .join(" ")
+        .contains("2 damage at round end; up to 2 round-end ticks"));
+    assert!(!content.facts.join(" ").contains("at turn start"));
+    let definition = app
+        .world()
+        .resource::<UiTooltipCatalog>()
+        .0
+        .get(&content.links.first().expect("definition link").subject)
+        .expect("definition");
+    assert!(definition
+        .body
+        .contains("On a corpse, damage and duration use round end"));
+    assert!(click_action(&mut app, badge));
+    run_frames(&mut app, 3);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .contains(&subject));
+    app.world_mut()
+        .resource_mut::<CombatDisclosure>()
+        .actors
+        .insert(
+            ActorId(101),
+            ActorDisclosure {
+                statuses: false,
+                health: false,
+                ..Default::default()
+            },
+        );
+    run_frames(&mut app, 3);
+    assert!(!app
+        .world()
+        .resource::<UiTooltipCatalog>()
+        .0
+        .contains_key(&subject));
+    assert!(!app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .contains(&subject));
+    app.world_mut().write_message(UiTooltipRequest::Dismiss);
 }

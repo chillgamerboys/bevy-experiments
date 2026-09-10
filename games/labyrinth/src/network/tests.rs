@@ -10,6 +10,7 @@ use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, HeroClass, 
 
 use super::*;
 
+mod budgets;
 mod process;
 
 // This is an acceptance requirement, deliberately not derived from production

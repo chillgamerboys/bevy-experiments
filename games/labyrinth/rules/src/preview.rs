@@ -50,10 +50,16 @@ impl CombatSnapshot {
             .iter()
             .map(|before| {
                 let after = candidate.actor(before.id).ok_or(RuleError::InvalidState)?;
+                let mut after_state = actor_state(&candidate, after);
+                if before.is_corpse() && after.life == crate::LifeState::Removed {
+                    // Forecast depletion of the pool that existed before clearing.
+                    // Removed authority identities retain no corpse durability.
+                    after_state.max_hp = before.health().1;
+                }
                 Ok(ActorPreview {
                     actor: before.id,
                     before: actor_state(self, before),
-                    after: actor_state(&candidate, after),
+                    after: after_state,
                 })
             })
             .collect::<Result<Vec<_>, RuleError>>()?;
@@ -203,7 +209,7 @@ pub struct ActorPreviewState {
     pub life: crate::LifeState,
     /// Current/projected HP.
     pub hp: u16,
-    /// HP ceiling, unchanged by the current content catalog.
+    /// Ceiling of the displayed pool; corpse clearing retains its before-pool ceiling.
     pub max_hp: u16,
     /// One-based rank, absent for a defeated enemy.
     pub rank: Option<u8>,

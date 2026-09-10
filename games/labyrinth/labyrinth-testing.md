@@ -1,5 +1,43 @@
 # Labyrinth verification
 
+## Handoff follow-up — September 10, 2026
+
+The follow-up to `e073da9` passes 113 application tests, 52 rules
+tests, and the complete workspace all-feature suite (331 tests/doctests). The
+separately enabled six-process abrupt guest-restart gate also passed. New coverage
+includes encrypted request bursts, a noisy prefix followed by a quiet peer,
+unauthorized requests, queue overflow followed by same-identity reconnect with the
+watermark preserved, and an oversized encrypted Hello rejected before decoding.
+Shared budget tests cover count/byte edges and independently served peers.
+
+Presentation tests cover partial corpse damage, clearing with the before-pool HP
+maximum, ordinary lethal damage, dying-hero death/rescue, hidden-health bystanders,
+forecast bars and accessible labels, effective condition timing, and revocation of
+open help when status disclosure is removed. Catalog prose changed the content
+fingerprint to `53e0f0d6572c2408d126b0b82ce61a6a03af2f8d98398aca26105665281c622f`;
+all multiplayer participants need matching builds.
+
+The native local walk used the real reducer: damage and Bleed; Ash Brute death;
+corpse Bleed at round end; a displayed `3 → 0 / 5` clear forecast followed by actual
+removal/formation compaction; rescue of a dying Scout; subsequent death saves and
+permanent death; and the wagon moving from ranks 5–6 to 4–5 while the Medic moved to
+rank 6. The Scout corpse remained through round 5 after creation in round 3. The Mac
+locked before the planned round-6 expiry and resize checks; these remain incomplete
+as native interaction evidence. Pure lifecycle regressions cover expiry separately.
+
+Authored capture routes `corpse-forecast` and `corpse-help` reproduce the two fixed
+presentation paths. Normal-scale 1280×720 and 1920×1080 images are under
+`target/review/followup-corpse-*.png`; they are presentation fixtures, not a gameplay
+recording. At 1280×720 the actor forecast card uses its existing scroll viewport;
+the full clear explanation is visible without scrolling at 1920×1080. Local Clippy,
+formatting, dependency policy, library-only consumers, repository/skill tooling
+checks passed. WebAssembly checks passed for hex, turns, session, UI and rules;
+discovery/multiplayer builds without default features, the minimal test helper,
+and standalone UI tests also passed. Cross-machine networking and remote CI
+results were not verified in this run. Earlier milestone evidence follows.
+
+## Footprint and corpse milestone baseline
+
 The footprint/corpse milestone adds pure lifecycle tests, a five-App real UDP wagon
 admission/action/fresh-client reconnect test, and native UI geometry/selection tests.
 Existing six-player transport and abrupt-process-restart tests remain in place.

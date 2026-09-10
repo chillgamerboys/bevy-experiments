@@ -303,11 +303,7 @@ fn compact_status(actor: &ActorSnapshot, status: &StatusInstance) -> String {
     } else {
         String::new()
     };
-    let clock = match if actor.is_corpse() {
-        Boundary::RoundEnd
-    } else {
-        definition.duration.boundary
-    } {
+    let clock = match definition.effective_timing(actor.life).duration_boundary {
         Boundary::OwnerTurnStart | Boundary::OwnerTurnEnd => "t",
         Boundary::RoundEnd => "r",
     };
@@ -324,20 +320,9 @@ fn status_accessibility(actor: &ActorSnapshot) -> String {
         actor.name()
     );
     for status in &actor.statuses {
-        let definition = status_definition(status.kind);
-        let clock = match if actor.is_corpse() {
-            Boundary::RoundEnd
-        } else {
-            definition.duration.boundary
-        } {
-            Boundary::OwnerTurnStart => "bearer turn starts",
-            Boundary::OwnerTurnEnd => "bearer turn ends",
-            Boundary::RoundEnd => "round ends",
-        };
-        value.push_str(&format!(
-            " {}: potency {}, {} {clock} remaining.",
-            definition.name, status.potency, status.remaining
-        ));
+        value.push(' ');
+        value.push_str(&crate::presentation::status_description(status, actor.life));
+        value.push('.');
     }
     value
 }

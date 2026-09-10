@@ -127,6 +127,37 @@ pub struct StatusDefinition {
     pub persist_on_death: bool,
 }
 
+/// Effective clocks for a bearer, shared by resolution and game presentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StatusTiming {
+    /// When effects fire; absent for modifier-only conditions.
+    pub trigger: Option<Boundary>,
+    /// When remaining duration decrements, after any matching trigger.
+    pub duration_boundary: Boundary,
+}
+
+impl StatusDefinition {
+    /// Corpse conditions keep their duration but use round ends. Dying heroes
+    /// still have initiative slots and retain their authored clocks.
+    #[must_use]
+    pub const fn effective_timing(&self, life: crate::LifeState) -> StatusTiming {
+        if matches!(life, crate::LifeState::Corpse { .. }) {
+            StatusTiming {
+                trigger: match self.trigger {
+                    Some(_) => Some(Boundary::RoundEnd),
+                    None => None,
+                },
+                duration_boundary: Boundary::RoundEnd,
+            }
+        } else {
+            StatusTiming {
+                trigger: self.trigger,
+                duration_boundary: self.duration.boundary,
+            }
+        }
+    }
+}
+
 /// A live public effect instance. Its source may have died since application.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -168,7 +199,7 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             kind,
             name: "Bleed",
             description:
-                "Take 2 damage at the start of your next 3 turns. Refreshes; does not stack.",
+                "Take 2 damage at the start of your next 3 turns (initiative slots while dying). On a corpse, damage and duration use round end instead. Refreshes; does not stack.",
             tags: &[StatusTag::Debuff, StatusTag::Bleeding],
             priority: 20,
             potency: 2,
@@ -248,5 +279,59 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             remove_on_downed: false,
             persist_on_death: false,
         },
+    }
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use super::*;
+    use crate::LifeState;
+
+    #[test]
+    fn effective_clocks_preserve_dying_slots_and_remap_only_corpse_clocks() {
+        let corpse = LifeState::Corpse {
+            hp: 1,
+            max_hp: 5,
+            created_round: 1,
+        };
+        for kind in [
+            StatusKind::Bleed,
+            StatusKind::Brace,
+            StatusKind::Haste,
+            StatusKind::Weakened,
+        ] {
+            let definition = status_definition(kind);
+            for life in [LifeState::Alive, LifeState::Dying { failures: 2 }] {
+                assert_eq!(
+                    definition.effective_timing(life),
+                    StatusTiming {
+                        trigger: definition.trigger,
+                        duration_boundary: definition.duration.boundary,
+                    }
+                );
+            }
+            assert_eq!(
+                definition.effective_timing(corpse).duration_boundary,
+                Boundary::RoundEnd
+            );
+        }
+        assert_eq!(
+            status_definition(StatusKind::Bleed)
+                .effective_timing(corpse)
+                .trigger,
+            Some(Boundary::RoundEnd)
+        );
+        assert_eq!(
+            status_definition(StatusKind::Brace)
+                .effective_timing(corpse)
+                .trigger,
+            None
+        );
+        assert_eq!(
+            status_definition(StatusKind::Bleed)
+                .effective_timing(LifeState::Dying { failures: 2 })
+                .trigger,
+            Some(Boundary::OwnerTurnStart)
+        );
     }
 }

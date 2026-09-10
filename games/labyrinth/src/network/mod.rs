@@ -3,6 +3,7 @@
 mod admission;
 mod discovery;
 mod protocol;
+mod requests;
 mod start;
 #[cfg(test)]
 mod tests;
@@ -80,7 +81,11 @@ impl Plugin for LabyrinthNetworkPlugin {
         }
         app.init_resource::<LabyrinthView>()
             .add_message::<LabyrinthIntent>()
-            .add_plugins((GameMultiplayerPlugin, DiscoveryPlugin))
+            .add_plugins((
+                GameMultiplayerPlugin,
+                GameInboundBudgetPlugin,
+                DiscoveryPlugin,
+            ))
             .init_resource::<Runtime>()
             .init_resource::<HostPreparationBudget>()
             .init_resource::<PasswordWorkBudget>()
@@ -185,6 +190,7 @@ struct ListenerClosedQueue(Vec<Entity>);
 
 #[derive(Resource)]
 struct Hosted {
+    requests: requests::RequestQueues,
     security: SessionAdmissionAuthority,
     server: Entity,
     template: DirectConnectionCode,

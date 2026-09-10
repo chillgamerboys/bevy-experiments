@@ -89,7 +89,11 @@ impl SessionPasswordVerifier {
         })
     }
 
-    /// Verifies one attempt, enforcing per-source and global rolling limits.
+    /// Verifies one attempt, enforcing five failures per source and 30 globally
+    /// over an inclusive 60-second window. A fifth source failure also starts a
+    /// 30-second cooldown. Both limits are checked before hashing, even for a
+    /// correct password; blocked attempts do not extend either limit. Call with
+    /// monotonic elapsed time. Success clears source history, not global history.
     pub fn verify(
         &mut self,
         source: IpAddr,
@@ -101,6 +105,10 @@ impl SessionPasswordVerifier {
             .cooldowns
             .get(&source)
             .is_some_and(|until| *until > now)
+            || self
+                .source_failures
+                .get(&source)
+                .is_some_and(|failures| failures.len() >= PER_SOURCE_FAILURES)
             || self.global_failures.len() >= GLOBAL_FAILURES
         {
             return Err(PasswordAttemptError::RateLimited);
@@ -229,8 +237,92 @@ mod tests {
             verifier.verify(source, Duration::from_secs(5), &correct),
             Err(PasswordAttemptError::RateLimited)
         );
+        for second in [34, 35, 60] {
+            for password in [&correct, &wrong] {
+                assert_eq!(
+                    verifier.verify(source, Duration::from_secs(second), password),
+                    Err(PasswordAttemptError::RateLimited)
+                );
+            }
+        }
+        assert_eq!(verifier.global_failures.len(), 5);
         assert!(verifier
-            .verify(source, Duration::from_secs(35), &correct)
+            .verify(source, Duration::from_secs(61), &correct)
             .is_ok());
+        assert!(!verifier.source_failures.contains_key(&source));
+        assert_eq!(verifier.global_failures.len(), 4);
+    }
+
+    #[test]
+    fn source_window_and_cooldown_gate_before_hash_parsing() {
+        let password = SessionPassword::new("copper comet").expect("password");
+        let source = "127.0.0.1".parse().expect("IP");
+        let mut verifier = SessionPasswordVerifier {
+            encoded_hash: "deliberately invalid".into(),
+            source_failures: BTreeMap::from([(
+                source,
+                [0, 20, 40, 58, 59].map(Duration::from_secs).into(),
+            )]),
+            global_failures: VecDeque::new(),
+            cooldowns: BTreeMap::from([(source, Duration::from_secs(89))]),
+        };
+        assert_eq!(
+            verifier.verify(source, Duration::from_secs(61), &password),
+            Err(PasswordAttemptError::RateLimited)
+        );
+        assert_eq!(
+            verifier.source_failures.get(&source).expect("source").len(),
+            4
+        );
+        assert_eq!(
+            verifier.verify(source, Duration::from_secs(89), &password),
+            Err(PasswordAttemptError::Unavailable)
+        );
+        verifier.cooldowns.clear();
+        verifier
+            .source_failures
+            .insert(source, vec![Duration::from_secs(89); 5].into());
+        assert_eq!(
+            verifier.verify(source, Duration::from_secs(100), &password),
+            Err(PasswordAttemptError::RateLimited)
+        );
+        assert_eq!(
+            verifier.verify(source, Duration::from_secs(150), &password),
+            Err(PasswordAttemptError::Unavailable)
+        );
+        assert!(verifier.source_failures.is_empty());
+        assert!(verifier.cooldowns.is_empty());
+    }
+
+    #[test]
+    fn other_sources_are_independent_until_global_window_is_full() {
+        let correct = SessionPassword::new("copper comet").expect("password");
+        let wrong = SessionPassword::new("silver comet").expect("password");
+        let mut verifier = SessionPasswordVerifier::new(&correct).expect("hash");
+        let source = "127.0.0.1".parse().expect("IP");
+        let other = "127.0.0.2".parse().expect("IP");
+        for _ in 0..5 {
+            assert_eq!(
+                verifier.verify(source, Duration::ZERO, &wrong),
+                Err(PasswordAttemptError::Rejected)
+            );
+        }
+        assert_eq!(verifier.verify(other, Duration::ZERO, &correct), Ok(()));
+        // Fill the remaining global history without spending 25 additional hashes.
+        verifier.global_failures.extend(vec![Duration::ZERO; 25]);
+        verifier.encoded_hash = "deliberately invalid".into();
+        for second in [0, 60] {
+            assert_eq!(
+                verifier.verify(other, Duration::from_secs(second), &correct),
+                Err(PasswordAttemptError::RateLimited)
+            );
+        }
+        assert_eq!(
+            verifier.verify(other, Duration::from_secs(61), &correct),
+            Err(PasswordAttemptError::Unavailable)
+        );
+        assert!(verifier.global_failures.is_empty());
+        assert!(verifier.source_failures.is_empty());
+        assert!(verifier.cooldowns.is_empty());
     }
 }

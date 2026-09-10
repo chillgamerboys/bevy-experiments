@@ -147,7 +147,7 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
     assert!(click_action(&mut app, badge));
     run_frames(&mut app, 2);
     let tree = ui_tree_snapshot(app.world_mut()).to_string();
-    assert!(tree.contains("2 boundaries left"));
+    assert!(tree.contains("up to 2 turn-start ticks if retained"));
     let definition =
         find_named(app.world_mut(), "Tooltip Bleed ›").expect("condition definition link");
     assert!(click_action(&mut app, definition));

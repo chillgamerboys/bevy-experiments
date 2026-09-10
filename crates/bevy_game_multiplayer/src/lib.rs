@@ -7,6 +7,7 @@
 mod credentials;
 #[cfg(feature = "direct")]
 mod direct;
+mod inbound;
 mod lifecycle;
 mod local_network;
 mod testing;
@@ -26,6 +27,7 @@ pub use direct::{
     DirectTransportError, PreparedDirectDiscoveryJoin, PreparedDirectHost, PreparedDirectJoin,
     PreparedDirectReconnect, SpkiPinVerifier, DEFAULT_DIRECT_PORT, DIRECT_SESSION_PATH,
 };
+pub use inbound::{GameInboundBudgetPlugin, InboundLimits, InboundMessageLimit, InboundRejected};
 pub use lifecycle::{AuthenticatedPeer, MultiplayerLifecycle};
 pub use local_network::{
     local_network_addresses, local_network_interface_index, LocalNetworkAddressError,
