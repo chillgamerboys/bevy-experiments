@@ -1,4 +1,4 @@
-//! Explicit OS-process smoke gate. Four independent native processes communicate
+//! Explicit OS-process smoke gate. Six independent native processes communicate
 //! over pinned UDP; only private fixture files hand invitations to each guest.
 
 use std::{

@@ -52,6 +52,37 @@ fn pump_until(
     false
 }
 
+/// Failure diagnostics intentionally omit endpoints, codes, identities and secrets.
+fn admission_diagnostics(apps: &[App]) -> String {
+    apps.iter()
+        .enumerate()
+        .map(|(index, app)| {
+            let world = app.world();
+            let runtime = world.resource::<Runtime>();
+            let socket_open = runtime
+                .connection
+                .is_some_and(|entity| world.get::<aeronet::io::Session>(entity).is_some());
+            let host = world.get_resource::<Hosted>().map(|host| {
+                (
+                    world.get::<aeronet::io::server::Server>(host.server).is_some(),
+                    host.observed.len(),
+                    host.seen.len(),
+                    host.connections.len(),
+                    host.rejected.len(),
+                )
+            });
+            format!(
+                "app {index}: client={:?}, socket_open={socket_open}, credential_pending={}, admitted={}, notice_present={}, host(listening,observed,seen,offered,rejected)={host:?}",
+                world.resource::<State<ClientState>>().get(),
+                runtime.credential.is_some(),
+                runtime.admitted,
+                world.resource::<LabyrinthView>().notice.is_some(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 fn open_host(apps: &mut [App], password: &str) {
     let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("available loopback UDP port");
     let port = socket.local_addr().expect("allocated address").port();
@@ -71,9 +102,17 @@ fn open_host(apps: &mut [App], password: &str) {
     .expect("asynchronous host preparation starts");
     assert!(
         pump_until(apps, Duration::from_secs(10), |apps| {
-            app(apps, 0).world().contains_resource::<Hosted>()
+            let world = app(apps, 0).world();
+            // Hosted means preparation completed, not that async UDP binding has.
+            // A client must not race the listener's actual Opened transition.
+            world.get_resource::<Hosted>().is_some_and(|host| {
+                world
+                    .get::<aeronet::io::server::Server>(host.server)
+                    .is_some()
+            })
         }),
-        "host preparation did not complete"
+        "host listener did not open: {}",
+        admission_diagnostics(apps)
     );
 }
 
@@ -135,9 +174,13 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
         let guest = index + 1;
         start::join_code(app(apps, guest).world_mut(), code)
             .expect("private direct attempt starts");
-        assert!(pump_until(apps, Duration::from_secs(10), |apps| {
-            app(apps, guest).world().resource::<Runtime>().admitted
-        }));
+        assert!(
+            pump_until(apps, Duration::from_secs(10), |apps| {
+                app(apps, guest).world().resource::<Runtime>().admitted
+            }),
+            "guest {guest} did not complete admission: {}",
+            admission_diagnostics(apps)
+        );
     }
     assert!(
         pump_until(apps, Duration::from_secs(15), |apps| all_admitted(apps)
