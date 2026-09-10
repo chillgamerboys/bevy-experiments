@@ -12,6 +12,7 @@ use labyrinth_rules::{
 };
 
 mod dock;
+mod footprints;
 mod history;
 mod menus;
 mod overlay_stability;

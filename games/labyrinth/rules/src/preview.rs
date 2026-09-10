@@ -80,8 +80,9 @@ impl CombatSnapshot {
 
 fn actor_state(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> ActorPreviewState {
     ActorPreviewState {
-        hp: actor.hp,
-        max_hp: actor.max_hp,
+        hp: actor.health().0,
+        max_hp: actor.health().1,
+        life: actor.life,
         rank: snapshot.rank(actor.id),
         statuses: actor.statuses.iter().map(PreviewStatus::from).collect(),
     }
@@ -126,6 +127,10 @@ impl TryFrom<CombatEventKind> for PreviewEvent {
             },
             CombatEventKind::Downed { actor } => Self::Downed { actor },
             CombatEventKind::Defeated { actor } => Self::Defeated { actor },
+            CombatEventKind::CorpseRemoved { actor, .. } => Self::CorpseRemoved { actor },
+            CombatEventKind::DeathSave {
+                actor, failures, ..
+            } => Self::DeathSave { actor, failures },
             CombatEventKind::Rescued { source, actor, hp } => Self::Rescued { source, actor, hp },
             CombatEventKind::Moved { actor, rank } => Self::Moved { actor, rank },
             CombatEventKind::StatusApplied { instance } => {
@@ -194,6 +199,8 @@ pub struct ActorPreview {
 /// Forecast facts, deliberately not a serializable authoritative actor snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorPreviewState {
+    /// Explicit projected life state, so corpse HP is not mistaken for revival.
+    pub life: crate::LifeState,
     /// Current/projected HP.
     pub hp: u16,
     /// HP ceiling, unchanged by the current content catalog.
@@ -239,6 +246,18 @@ pub struct DamagePreview {
 /// Ordered immediate effects. No event IDs, turn starts, or future status triggers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PreviewEvent {
+    /// Corpse destruction frees its occupied spaces.
+    CorpseRemoved {
+        /// Removed identity.
+        actor: ActorId,
+    },
+    /// Damage to a dying hero causes an automatic failure, not a predicted die roll.
+    DeathSave {
+        /// Dying identity.
+        actor: ActorId,
+        /// Resulting failure count.
+        failures: u8,
+    },
     /// HP removed after all modifiers and caps.
     Damage {
         /// Damage source.

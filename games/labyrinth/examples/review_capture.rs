@@ -55,7 +55,25 @@ fn main() {
         .get(5)
         .cloned()
         .unwrap_or_else(|| "combat".to_owned());
-    let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("review fixture");
+    let large = matches!(route.as_str(), "footprints" | "corpses");
+    let heroes = if large {
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER.to_vec()
+    } else {
+        DEFAULT_HERO_ROSTER.to_vec()
+    };
+    let mut combat = if large {
+        Combat::with_party(
+            42,
+            heroes
+                .iter()
+                .enumerate()
+                .map(|(i, hero)| labyrinth_rules::HeroSetup::preset(ActorId(i as u16 + 1), *hero))
+                .collect(),
+        )
+    } else {
+        Combat::new(42, DEFAULT_HERO_ROSTER)
+    }
+    .expect("review fixture");
     let mut events = Vec::new();
     for _ in 0..PARTY_SIZE * 2 {
         let Some(action) = combat.ai_action() else {
@@ -66,6 +84,24 @@ fn main() {
         }
     }
     let mut snapshot = combat.snapshot();
+    if route == "corpses" {
+        // Authored visual fixture, not evidence of a death-save or damage transition.
+        for actor in snapshot
+            .actors
+            .iter_mut()
+            .filter(|a| [ActorId(5), ActorId(101)].contains(&a.id))
+        {
+            actor.hp = 0;
+            actor.life = labyrinth_rules::LifeState::Corpse {
+                hp: actor.max_hp.div_ceil(4),
+                max_hp: actor.max_hp.div_ceil(4),
+                created_round: snapshot.round,
+            };
+        }
+        snapshot
+            .validate()
+            .expect("valid corpse presentation fixture");
+    }
     if matches!(route.as_str(), "effects" | "inspect") {
         // Authored presentation fixture, not evidence that gameplay applied an effect.
         let boundary = snapshot.boundary_sequence;
@@ -116,7 +152,7 @@ fn main() {
                 event,
             })
             .collect(),
-        players: DEFAULT_HERO_ROSTER
+        players: heroes
             .into_iter()
             .enumerate()
             .map(|(index, hero)| PlayerView {

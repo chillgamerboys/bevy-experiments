@@ -123,6 +123,8 @@ pub struct StatusDefinition {
     pub reapplication: Reapplication,
     /// Whether downing removes this specific status.
     pub remove_on_downed: bool,
+    /// Retain the existing instance at death, with no refresh; corpse clocks use round end.
+    pub persist_on_death: bool,
 }
 
 /// A live public effect instance. Its source may have died since application.
@@ -178,7 +180,8 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             effects: &[Effect::StatusDamage(DamageKind::Bleed)],
             modifiers: &[],
             reapplication: Reapplication::Refresh,
-            remove_on_downed: true,
+            remove_on_downed: false,
+            persist_on_death: true,
         },
         StatusKind::Brace => StatusDefinition {
             kind,
@@ -200,6 +203,7 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             }],
             reapplication: Reapplication::Refresh,
             remove_on_downed: true,
+            persist_on_death: false,
         },
         StatusKind::Haste => StatusDefinition {
             kind,
@@ -221,6 +225,7 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             }],
             reapplication: Reapplication::Refresh,
             remove_on_downed: false,
+            persist_on_death: false,
         },
         StatusKind::Weakened => StatusDefinition {
             kind,
@@ -241,6 +246,7 @@ pub const fn status_definition(kind: StatusKind) -> StatusDefinition {
             }],
             reapplication: Reapplication::Refresh,
             remove_on_downed: false,
+            persist_on_death: false,
         },
     }
 }

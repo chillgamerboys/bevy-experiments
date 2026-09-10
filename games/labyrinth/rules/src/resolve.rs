@@ -89,7 +89,13 @@ impl EffectResolver<'_> {
     ) -> Result<(), RuleError> {
         work.spend()?;
         let recipient = self.state.actor(target).ok_or(RuleError::UnknownActor)?;
-        if !recipient.standing() && !matches!(effect, Effect::Rescue(_) | Effect::SwapWithSource) {
+        let allowed = recipient.standing()
+            || match effect {
+                Effect::Damage(_) | Effect::StatusDamage(_) => recipient.damageable(),
+                Effect::Rescue(_) | Effect::SwapWithSource => recipient.dying(),
+                _ => false,
+            };
+        if !allowed {
             return Ok(());
         }
         match effect {
@@ -117,7 +123,7 @@ impl EffectResolver<'_> {
             Effect::SwapWithSource => self.swap(source, target, events, work)?,
             Effect::Rescue(percent) => {
                 if recipient.team() != Team::Heroes
-                    || recipient.standing()
+                    || !recipient.dying()
                     || percent == 0
                     || percent > 100
                 {
@@ -128,6 +134,7 @@ impl EffectResolver<'_> {
                         .map_err(|_| RuleError::InvalidState)?
                         .max(1);
                 self.actor_mut(target)?.hp = hp;
+                self.actor_mut(target)?.life = crate::LifeState::Alive;
                 self.emit(
                     CombatEventKind::Rescued {
                         source,
@@ -167,7 +174,7 @@ impl EffectResolver<'_> {
             kind,
             base,
             effective,
-            hp_loss: effective.min(recipient.hp),
+            hp_loss: effective.min(recipient.health().0),
         };
         if let Some(damage) = self.damage.as_deref_mut() {
             damage.push(preview);
@@ -185,6 +192,55 @@ impl EffectResolver<'_> {
         work: &mut Work,
     ) -> Result<(), RuleError> {
         let recipient = self.actor_mut(target)?;
+        if !recipient.damageable() {
+            return Ok(());
+        }
+        if let crate::LifeState::Corpse {
+            hp,
+            max_hp,
+            created_round,
+        } = recipient.life
+        {
+            let removed = amount.min(hp);
+            recipient.life = crate::LifeState::Corpse {
+                hp: hp - removed,
+                max_hp,
+                created_round,
+            };
+            self.emit(
+                CombatEventKind::Damage {
+                    source,
+                    target,
+                    amount: removed,
+                    kind,
+                },
+                events,
+                work,
+            )?;
+            if removed == hp {
+                self.remove_corpse(target, false, events, work)?;
+            }
+            return Ok(());
+        }
+        if let crate::LifeState::Dying { failures } = recipient.life {
+            if amount > 0 {
+                let failures = failures + 1;
+                recipient.life = crate::LifeState::Dying { failures };
+                self.emit(
+                    CombatEventKind::DeathSave {
+                        actor: target,
+                        roll: None,
+                        failures,
+                    },
+                    events,
+                    work,
+                )?;
+                if failures >= crate::DEATH_SAVE_FAILURES {
+                    self.make_corpse(target, events, work)?;
+                }
+            }
+            return Ok(());
+        }
         let removed = amount.min(recipient.hp);
         recipient.hp -= removed;
         let downed = !recipient.standing();
@@ -201,18 +257,17 @@ impl EffectResolver<'_> {
         )?;
         if downed {
             if team == Team::Heroes {
+                self.actor_mut(target)?.life = crate::LifeState::Dying { failures: 0 };
                 self.emit(CombatEventKind::Downed { actor: target }, events, work)?;
             } else {
-                self.state.enemy_formation.retain(|actor| *actor != target);
-                self.emit(CombatEventKind::Defeated { actor: target }, events, work)?;
-                self.emit_positions(Team::Enemies, events, work)?;
+                self.make_corpse(target, events, work)?;
             }
             let removed: Vec<_> = self
                 .actor_mut(target)?
                 .statuses
                 .iter()
                 .filter(|status| {
-                    team == Team::Enemies || status_definition(status.kind).remove_on_downed
+                    team == Team::Heroes && status_definition(status.kind).remove_on_downed
                 })
                 .map(|status| status.id)
                 .collect();
@@ -234,6 +289,56 @@ impl EffectResolver<'_> {
         Ok(())
     }
 
+    pub(super) fn make_corpse(
+        &mut self,
+        actor: ActorId,
+        events: &mut Vec<CombatEvent>,
+        work: &mut Work,
+    ) -> Result<(), RuleError> {
+        let created_round = self.state.round;
+        let target = self.actor_mut(actor)?;
+        let max_hp = target.max_hp.div_ceil(4);
+        target.hp = 0;
+        target.life = crate::LifeState::Corpse {
+            hp: max_hp,
+            max_hp,
+            created_round,
+        };
+        let removed: Vec<_> = target
+            .statuses
+            .iter()
+            .filter(|s| !status_definition(s.kind).persist_on_death)
+            .map(|s| s.id)
+            .collect();
+        for id in removed {
+            self.remove_status(actor, id, RemovalReason::Defeated, events, work)?;
+        }
+        self.emit(CombatEventKind::Defeated { actor }, events, work)
+    }
+
+    pub(super) fn remove_corpse(
+        &mut self,
+        actor: ActorId,
+        expired: bool,
+        events: &mut Vec<CombatEvent>,
+        work: &mut Work,
+    ) -> Result<(), RuleError> {
+        let target = self.actor_mut(actor)?;
+        let team = target.team();
+        target.life = crate::LifeState::Removed;
+        let ids: Vec<_> = target.statuses.iter().map(|s| s.id).collect();
+        for id in ids {
+            self.remove_status(actor, id, RemovalReason::Defeated, events, work)?;
+        }
+        self.formation_mut(team).retain(|id| *id != actor);
+        self.emit(
+            CombatEventKind::CorpseRemoved { actor, expired },
+            events,
+            work,
+        )?;
+        self.emit_positions(team, events, work)
+    }
+
     pub(super) fn check_outcome(
         &mut self,
         events: &mut Vec<CombatEvent>,
@@ -249,7 +354,12 @@ impl EffectResolver<'_> {
             .any(|actor| actor.team() == Team::Heroes && actor.standing());
         let outcome = if !heroes {
             Some(CombatOutcome::Defeat)
-        } else if self.state.enemy_formation.is_empty() {
+        } else if !self
+            .state
+            .actors
+            .iter()
+            .any(|a| a.team() == Team::Enemies && a.standing())
+        {
             Some(CombatOutcome::Victory)
         } else {
             None
@@ -419,19 +529,38 @@ impl EffectResolver<'_> {
             .actor(target)
             .ok_or(RuleError::UnknownActor)?
             .team();
-        let formation = self.formation_mut(team);
+        let formation = self.state.formation(team);
         let previous = formation
             .iter()
             .position(|id| *id == target)
             .ok_or(RuleError::InvalidState)?;
-        let next = (isize::try_from(previous).map_err(|_| RuleError::InvalidState)?
-            + isize::from(offset))
-        .clamp(
-            0,
-            isize::try_from(formation.len() - 1).map_err(|_| RuleError::InvalidState)?,
-        );
-        let next = usize::try_from(next).map_err(|_| RuleError::InvalidState)?;
+        // A displacement measures rank distance, not number of occupants. Never
+        // split another footprint or silently turn a one-rank push into two.
+        let mut next = previous;
+        let mut remaining = offset.unsigned_abs();
+        loop {
+            let adjacent = if offset < 0 {
+                next.checked_sub(1)
+            } else {
+                next.checked_add(1).filter(|i| *i < formation.len())
+            };
+            let Some(adjacent) = adjacent else {
+                break;
+            };
+            let width = self
+                .state
+                .actor(*formation.get(adjacent).ok_or(RuleError::InvalidState)?)
+                .ok_or(RuleError::InvalidState)?
+                .kind
+                .footprint();
+            if remaining < width {
+                break;
+            }
+            remaining -= width;
+            next = adjacent;
+        }
         if previous != next {
+            let formation = self.formation_mut(team);
             formation.remove(previous);
             formation.insert(next, target);
             self.emit_positions(team, events, work)?;
@@ -446,15 +575,9 @@ impl EffectResolver<'_> {
         work: &mut Work,
     ) -> Result<(), RuleError> {
         let positions = self.formation_mut(team).clone();
-        for (index, actor) in positions.into_iter().enumerate() {
-            self.emit(
-                CombatEventKind::Moved {
-                    actor,
-                    rank: u8::try_from(index + 1).map_err(|_| RuleError::InvalidState)?,
-                },
-                events,
-                work,
-            )?;
+        for actor in positions {
+            let rank = self.state.rank(actor).ok_or(RuleError::InvalidState)?;
+            self.emit(CombatEventKind::Moved { actor, rank }, events, work)?;
         }
         Ok(())
     }

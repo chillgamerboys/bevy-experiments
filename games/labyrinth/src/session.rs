@@ -146,7 +146,14 @@ impl SessionSnapshot {
         }
         if self.revision == 0
             || self.next_sequence == 0
-            || self.players.len() != PARTY_SIZE
+            || self.players.is_empty()
+            || self.players.len() > PARTY_SIZE
+            || self
+                .players
+                .iter()
+                .map(|p| usize::from(ActorKind::Hero(p.hero).footprint()))
+                .sum::<usize>()
+                != PARTY_SIZE
             || self.log.len() > LOG_LIMIT
             || self.events.len() > LOG_LIMIT
         {
@@ -172,6 +179,15 @@ impl SessionSnapshot {
         }
         if let Some(combat) = &self.combat {
             combat.validate().map_err(|_| "Invalid combat snapshot.")?;
+            if combat
+                .actors
+                .iter()
+                .filter(|a| a.team() == labyrinth_rules::Team::Heroes)
+                .count()
+                != self.players.len()
+            {
+                return Err("Every hero requires exactly one owner.");
+            }
             if self.encounter == 0 || self.players.iter().any(|player| !player.occupied) {
                 return Err("Combat requires the complete reserved party.");
             }
@@ -222,8 +238,13 @@ impl SessionSnapshot {
             let prior = previous
                 .players
                 .iter()
-                .find(|prior| prior.slot == player.slot)
-                .ok_or("Player slot changed within the session.")?;
+                .find(|prior| prior.slot == player.slot);
+            let Some(prior) = prior else {
+                if previous.combat.is_none() && !player.occupied {
+                    continue;
+                }
+                return Err("Player slot changed within the session.");
+            };
             if prior.actor != player.actor {
                 return Err("Actor ownership changed within the session.");
             }
@@ -258,9 +279,29 @@ pub(crate) struct PartyAuthority {
 
 impl PartyAuthority {
     pub fn new(seed: u64, local: bool) -> Self {
-        let players = ACTORS
+        Self::with_roster(seed, local, &labyrinth_rules::PROTOTYPE_HERO_ROSTER)
+            .expect("authored company fills six spaces")
+    }
+
+    /// Game-owned company setup; an explicit six-human roster is also supported.
+    pub(crate) fn with_roster(
+        seed: u64,
+        local: bool,
+        roster: &[HeroClass],
+    ) -> Result<Self, &'static str> {
+        if roster.is_empty()
+            || roster.len() > PARTY_SIZE
+            || roster
+                .iter()
+                .map(|h| usize::from(ActorKind::Hero(*h).footprint()))
+                .sum::<usize>()
+                != PARTY_SIZE
+        {
+            return Err("A company must fill six formation spaces.");
+        }
+        let players: Vec<_> = ACTORS
             .into_iter()
-            .zip(DEFAULT_HERO_ROSTER)
+            .zip(roster.iter().copied())
             .enumerate()
             .map(|(index, (actor, hero))| PlayerState {
                 slot: u8::try_from(index).unwrap_or_default(),
@@ -273,7 +314,7 @@ impl PartyAuthority {
                 ready: local,
             })
             .collect();
-        Self {
+        Ok(Self {
             players,
             combat: None,
             sequence: BTreeMap::new(),
@@ -286,7 +327,7 @@ impl PartyAuthority {
             events: VecDeque::new(),
             next_event: 1,
             faulted: false,
-        }
+        })
     }
 
     pub fn in_lobby(&self) -> bool {
@@ -297,7 +338,10 @@ impl PartyAuthority {
             .unwrap_or(PLAYER_CAPACITY)
     }
     pub fn has_space(&self) -> bool {
-        self.in_lobby() && self.occupied() < PLAYER_CAPACITY
+        self.in_lobby() && self.players.iter().any(|p| !p.occupied)
+    }
+    pub fn capacity(&self) -> u8 {
+        u8::try_from(self.players.len()).unwrap_or(PLAYER_CAPACITY)
     }
     pub fn slot_for(&self, peer: PeerId) -> Option<u8> {
         self.players
@@ -355,10 +399,8 @@ impl PartyAuthority {
             player.occupied = false;
             player.connected = false;
             player.ready = false;
-            if let Some(hero) = DEFAULT_HERO_ROSTER.get(usize::from(player.slot)) {
-                player.hero = *hero;
-                player.abilities = HeroSetup::preset(player.actor, *hero).abilities;
-            }
+            // Keep the unoccupied slot's footprint: changing a wagon here would
+            // alter capacity and ownership during unrelated admission cleanup.
             // New identity never inherits an old seat's replay history.
             self.sequence.remove(&player.slot);
             self.results.remove(&player.slot);
@@ -441,6 +483,47 @@ impl PartyAuthority {
                     return Err("Heroes are chosen in the lobby.".into());
                 }
                 let changed = player.hero != hero;
+                let extra = i16::from(ActorKind::Hero(hero).footprint())
+                    - i16::from(ActorKind::Hero(player.hero).footprint());
+                if extra > 0 {
+                    let spare = self.players.iter().rposition(|p| !p.occupied);
+                    let Some(index) = spare else {
+                        return Err("A two-rank hero needs an open formation space; no player can be displaced.".into());
+                    };
+                    if self
+                        .players
+                        .get(index)
+                        .is_some_and(|p| ActorKind::Hero(p.hero).footprint() > 1)
+                    {
+                        // A released wagon may itself be the spare slot. Consume
+                        // exactly one space by shrinking it, not both of its ranks.
+                        let spare = self.players.get_mut(index).ok_or("No spare slot.")?;
+                        spare.hero = HeroClass::FieldMedic;
+                        spare.abilities = HeroSetup::preset(spare.actor, spare.hero).abilities;
+                    } else {
+                        self.players.remove(index);
+                    }
+                } else if extra < 0 {
+                    let (index, actor) = ACTORS
+                        .iter()
+                        .enumerate()
+                        .find(|(_, id)| !self.players.iter().any(|p| p.actor == **id))
+                        .ok_or("No free identity.")?;
+                    let class = *DEFAULT_HERO_ROSTER
+                        .get(index)
+                        .ok_or("Unknown default class.")?;
+                    self.players.push(PlayerState {
+                        slot: index as u8,
+                        actor: *actor,
+                        hero: class,
+                        abilities: HeroSetup::preset(*actor, class).abilities,
+                        peer: None,
+                        occupied: self.local,
+                        connected: self.local,
+                        ready: false,
+                    });
+                    self.players.sort_by_key(|p| p.slot);
+                }
                 if let Some(player) = self.players.iter_mut().find(|p| p.slot == slot) {
                     player.hero = hero;
                     if changed {
@@ -468,9 +551,9 @@ impl PartyAuthority {
                     return Err("Only the host can start from the lobby.".into());
                 }
                 if self.players.iter().any(|p| !p.connected || !p.ready) {
-                    return Err("All six players must be connected and ready.".into());
+                    return Err("Every company member must be connected and ready.".into());
                 }
-                let heroes: [HeroSetup; PARTY_SIZE] = self
+                let mut heroes: Vec<HeroSetup> = self
                     .players
                     .iter()
                     .map(|p| HeroSetup {
@@ -478,11 +561,11 @@ impl PartyAuthority {
                         class: p.hero,
                         abilities: p.abilities.clone(),
                     })
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .map_err(|_| "Invalid party size.")?;
+                    .collect();
+                // Supply units start protected at the rear; ownership stays in slots.
+                heroes.sort_by_key(|hero| hero.class == HeroClass::LanternWagon);
                 self.combat = Some(
-                    Combat::with_heroes(self.seed.wrapping_add(self.encounter), heroes)
+                    Combat::with_party(self.seed.wrapping_add(self.encounter), heroes)
                         .map_err(|e| e.to_string())?,
                 );
                 self.encounter += 1;

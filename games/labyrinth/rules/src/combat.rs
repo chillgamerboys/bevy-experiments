@@ -94,6 +94,43 @@ impl Combat {
     /// not sort or move actors. IDs must be nonzero, unique, and distinct from
     /// the authored enemy IDs. No player IDs, items, or skill trees enter rules.
     pub fn with_heroes(seed: u64, heroes: [HeroSetup; PARTY_SIZE]) -> Result<Self, RuleError> {
+        Self::with_rosters(
+            seed,
+            heroes.to_vec(),
+            DEFAULT_ENEMY_IDS
+                .into_iter()
+                .zip(DEFAULT_ENEMY_ROSTER)
+                .collect(),
+        )
+    }
+
+    /// Prototype encounter: a two-space Hauler followed by four smaller enemies.
+    pub fn with_party(seed: u64, heroes: Vec<HeroSetup>) -> Result<Self, RuleError> {
+        Self::with_rosters(seed, heroes, crate::PROTOTYPE_ENEMY_ROSTER.to_vec())
+    }
+
+    /// Trusted encounter composition; either team may use variable-width actors.
+    /// Roster order is front to back, each identity appears once, maximum six spaces.
+    pub fn with_rosters(
+        seed: u64,
+        heroes: Vec<HeroSetup>,
+        enemies: Vec<(ActorId, crate::EnemyKind)>,
+    ) -> Result<Self, RuleError> {
+        let hero_spaces: usize = heroes
+            .iter()
+            .map(|h| usize::from(ActorKind::Hero(h.class).footprint()))
+            .sum();
+        let enemy_spaces: usize = enemies
+            .iter()
+            .map(|(_, k)| usize::from(ActorKind::Enemy(*k).footprint()))
+            .sum();
+        if hero_spaces == 0
+            || hero_spaces > PARTY_SIZE
+            || enemy_spaces == 0
+            || enemy_spaces > PARTY_SIZE
+        {
+            return Err(RuleError::InvalidState);
+        }
         let mut ids = BTreeSet::new();
         for hero in &heroes {
             if hero.id.0 == 0 || DEFAULT_ENEMY_IDS.contains(&hero.id) {
@@ -103,31 +140,36 @@ impl Combat {
                 return Err(RuleError::DuplicateActor);
             }
         }
+        for (id, _) in &enemies {
+            if id.0 == 0 {
+                return Err(RuleError::InvalidActorId);
+            }
+            if !ids.insert(*id) {
+                return Err(RuleError::DuplicateActor);
+            }
+        }
+        let enemy_formation = enemies.iter().map(|(id, _)| *id).collect();
         let hero_formation = heroes.iter().map(|hero| hero.id).collect();
         let mut actors = Vec::with_capacity(MAX_ACTORS);
         for (id, kind, abilities) in heroes
             .into_iter()
             .map(|hero| (hero.id, ActorKind::Hero(hero.class), hero.abilities))
-            .chain(
-                DEFAULT_ENEMY_IDS
-                    .into_iter()
-                    .zip(DEFAULT_ENEMY_ROSTER)
-                    .map(|(id, kind)| {
-                        let kind = ActorKind::Enemy(kind);
-                        (
-                            id,
-                            kind,
-                            AbilityLoadout::new(crate::skills_for(kind).iter().copied())
-                                .expect("authored enemy presets are bounded and unique"),
-                        )
-                    }),
-            )
+            .chain(enemies.into_iter().map(|(id, kind)| {
+                let kind = ActorKind::Enemy(kind);
+                (
+                    id,
+                    kind,
+                    AbilityLoadout::new(crate::skills_for(kind).iter().copied())
+                        .expect("authored enemy presets are bounded and unique"),
+                )
+            }))
         {
             let (max_hp, base_speed) = kind.stats();
             actors.push(ActorSnapshot {
                 id,
                 kind,
                 hp: max_hp,
+                life: crate::LifeState::Alive,
                 max_hp,
                 base_speed,
                 abilities,
@@ -143,7 +185,7 @@ impl Combat {
             active_actor: None,
             actors,
             hero_formation,
-            enemy_formation: DEFAULT_ENEMY_IDS.to_vec(),
+            enemy_formation,
             initiative: Vec::new(),
             outcome: None,
             boundary_sequence: 0,
@@ -231,9 +273,17 @@ impl Combat {
                         .iter()
                         .any(|effect| matches!(effect, Effect::Damage(_))) =>
                 {
-                    self.state
-                        .actor(*target)
-                        .map(|target_state| ((target_state.hp, *target, *skill), *action))
+                    self.state.actor(*target).map(|target_state| {
+                        (
+                            (
+                                target_state.is_corpse(),
+                                target_state.health().0,
+                                *target,
+                                *skill,
+                            ),
+                            *action,
+                        )
+                    })
                 }
                 _ => None,
             })
@@ -283,7 +333,7 @@ impl Combat {
             .state
             .actors
             .iter()
-            .filter(|actor| actor.standing())
+            .filter(|actor| actor.standing() || actor.dying())
             .map(|actor| (actor.id, actor.speed()))
             .collect();
         actors.sort_by_key(|(id, _)| *id);
@@ -346,6 +396,7 @@ impl Combat {
             let Some(entry) = self.state.initiative.get(self.cursor).cloned() else {
                 self.state.phase = CombatPhase::RoundEnd;
                 self.boundary(Boundary::RoundEnd, None, events, work)?;
+                self.expire_corpses(events, work)?;
                 if self.check_outcome(events, work)? {
                     return Ok(());
                 }
@@ -357,6 +408,22 @@ impl Combat {
                 .turn_id
                 .checked_add(1)
                 .ok_or(RuleError::CounterExhausted)?;
+            if self
+                .state
+                .actor(entry.actor)
+                .is_some_and(ActorSnapshot::dying)
+            {
+                self.boundary(Boundary::OwnerTurnStart, Some(entry.actor), events, work)?;
+                if self
+                    .state
+                    .actor(entry.actor)
+                    .is_some_and(ActorSnapshot::dying)
+                {
+                    let roll = u8::try_from(self.rng.bounded(20, work)? + 1)
+                        .map_err(|_| RuleError::InvalidState)?;
+                    self.death_save(entry.actor, roll, events, work)?;
+                }
+            }
             if !self
                 .state
                 .actor(entry.actor)
@@ -508,6 +575,49 @@ impl Combat {
         self.resolver().cleanse(bearer, tag, events, work)
     }
 
+    fn death_save(
+        &mut self,
+        actor: ActorId,
+        roll: u8,
+        events: &mut Vec<CombatEvent>,
+        work: &mut Work,
+    ) -> Result<(), RuleError> {
+        let crate::LifeState::Dying { mut failures } = self.actor_mut(actor)?.life else {
+            return Ok(());
+        };
+        if roll < crate::DEATH_SAVE_TARGET {
+            failures += 1;
+        }
+        self.actor_mut(actor)?.life = crate::LifeState::Dying { failures };
+        self.emit(
+            CombatEventKind::DeathSave {
+                actor,
+                roll: Some(roll),
+                failures,
+            },
+            events,
+            work,
+        )?;
+        if failures >= crate::DEATH_SAVE_FAILURES {
+            self.resolver().make_corpse(actor, events, work)?;
+        }
+        Ok(())
+    }
+
+    fn expire_corpses(
+        &mut self,
+        events: &mut Vec<CombatEvent>,
+        work: &mut Work,
+    ) -> Result<(), RuleError> {
+        let expired: Vec<_> = self.state.actors.iter().filter(|a| matches!(a.life,
+            crate::LifeState::Corpse { created_round, .. } if self.state.round.saturating_sub(created_round) >= crate::CORPSE_ROUNDS
+        )).map(|a| a.id).collect();
+        for id in expired {
+            self.resolver().remove_corpse(id, true, events, work)?;
+        }
+        Ok(())
+    }
+
     fn boundary(
         &mut self,
         boundary: Boundary,
@@ -550,12 +660,26 @@ impl Combat {
                 continue;
             };
             let definition = status_definition(instance.kind);
+            let corpse = self
+                .state
+                .actor(bearer)
+                .is_some_and(ActorSnapshot::is_corpse);
+            let trigger = if corpse {
+                definition.trigger.map(|_| Boundary::RoundEnd)
+            } else {
+                definition.trigger
+            };
+            let duration_boundary = if corpse {
+                Boundary::RoundEnd
+            } else {
+                definition.duration.boundary
+            };
             // A prior effect may refresh an already-queued ID. That instance is
             // newly activated and must wait for a future boundary just like a new ID.
             if instance.eligible_boundary > sequence {
                 continue;
             }
-            if definition.trigger == Some(boundary) {
+            if trigger == Some(boundary) {
                 self.emit(
                     CombatEventKind::StatusTriggered {
                         actor: bearer,
@@ -586,7 +710,7 @@ impl Combat {
                     }
                 }
             }
-            if definition.duration.boundary == boundary {
+            if duration_boundary == boundary {
                 let expired = if let Some(status) = self
                     .actor_mut(bearer)?
                     .statuses
@@ -640,3 +764,7 @@ mod setup_tests;
 #[cfg(test)]
 #[path = "preview_tests.rs"]
 mod preview_tests;
+
+#[cfg(test)]
+#[path = "lifecycle_tests.rs"]
+mod lifecycle_tests;

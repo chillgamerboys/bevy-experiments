@@ -39,7 +39,7 @@ pub(super) fn host(world: &mut World, mut settings: HostSettings) -> Result<(), 
         fingerprint_text(),
         &settings.name,
         1,
-        PLAYER_CAPACITY,
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER.len() as u8,
         true,
     )
     .map_err(|e| e.to_string())?;
@@ -132,7 +132,7 @@ pub(super) fn finish_host(world: &mut World) {
         fingerprint_text(),
         &prepared.settings.name,
         1,
-        PLAYER_CAPACITY,
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER.len() as u8,
         prepared.verifier.is_some(),
     ) {
         Ok(metadata) => metadata,

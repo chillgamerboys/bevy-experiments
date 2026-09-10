@@ -264,14 +264,17 @@ pub(super) fn host_messages(world: &mut World) {
         world.trigger(Disconnect::new(entity, "admission refused"));
     }
     let occupied = world.resource::<PartyAuthority>().occupied();
-    if hosted.metadata.claimed_players() != occupied {
+    let capacity = world.resource::<PartyAuthority>().capacity();
+    if hosted.metadata.claimed_players() != occupied
+        || hosted.metadata.player_capacity() != capacity
+    {
         if let Ok(metadata) = SessionMetadata::new(
             GAME_ID,
             PROTOCOL,
             fingerprint_text(),
             hosted.metadata.display_name(),
             occupied,
-            PLAYER_CAPACITY,
+            capacity,
             hosted.verifier.is_some(),
         ) {
             hosted.providers.refresh(&metadata);

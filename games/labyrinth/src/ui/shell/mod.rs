@@ -261,7 +261,7 @@ fn menu(world: &mut World, parent: Entity) {
         world,
         main,
         "Local Play Advice",
-        "Local play controls all six heroes. Play with friends hosts or joins a company.",
+        "Local play controls the full company. Play with friends hosts or joins a company.",
         UiTextRole::Supporting,
     );
 }

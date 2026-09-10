@@ -25,7 +25,7 @@ pub(crate) fn portrait_image(world: &World, kind: labyrinth_rules::ActorKind) ->
     let Some(appearance) = world.get_resource::<SceneAppearance>() else {
         return ImageNode::solid_color(fallback_color(kind));
     };
-    let Some(handle) = appearance.actor_sheet.as_ref() else {
+    let Some(handle) = appearance.actor_image(kind) else {
         return ImageNode::solid_color(fallback_color(kind));
     };
     let Some(image) = world
@@ -76,7 +76,7 @@ pub(crate) fn actor_art_size(
     area: Vec2,
 ) -> Option<Vec2> {
     let appearance = world.get_resource::<SceneAppearance>()?;
-    let handle = appearance.actor_sheet.as_ref()?;
+    let handle = appearance.actor_image(kind)?;
     let image = world.get_resource::<Assets<Image>>()?.get(handle)?;
     let cell = appearance.actor_rect(image.size(), kind)?;
     Some(fit_actor_art(area, cell.size()))
@@ -84,6 +84,14 @@ pub(crate) fn actor_art_size(
 
 fn fit_actor_art(area: Vec2, cell: Vec2) -> Vec2 {
     cell * ((area * Vec2::new(0.94, 0.93)) / cell).min_element()
+}
+
+fn corpse_pose(size: Vec2, corpse: bool) -> Vec2 {
+    if corpse {
+        size * Vec2::new(1.0, 0.42)
+    } else {
+        size
+    }
 }
 
 /// Derive input geometry from the same measured column and atlas fit as rendering.
@@ -109,6 +117,7 @@ fn fit_actor_hit_regions(world: &mut World) {
                 return None;
             }
             let (size, center_y) = actor_art_size(world, actor.kind, area)
+                .map(|art| corpse_pose(art, actor.is_corpse()))
                 .map_or((area * Vec2::new(0.48, 0.785), area.y * 0.0425), |art| {
                     (art, area.y * 0.46 - art.y * 0.5)
                 });
@@ -161,6 +170,12 @@ impl Plugin for LabyrinthScenePlugin {
         {
             bevy::asset::embedded_asset!(app, "assets/actors.png");
             bevy::asset::embedded_asset!(app, "assets/room.png");
+            bevy::asset::embedded_asset!(app, "assets/lantern-wagon.png");
+            bevy::asset::embedded_asset!(app, "assets/ossuary-hauler.png");
+            let wagon = bevy::asset::load_embedded_asset!(app, "assets/lantern-wagon.png");
+            let hauler = bevy::asset::load_embedded_asset!(app, "assets/ossuary-hauler.png");
+            app.world_mut().resource_mut::<SceneAppearance>().wagon = Some(wagon);
+            app.world_mut().resource_mut::<SceneAppearance>().hauler = Some(hauler);
             if app
                 .world()
                 .resource::<SceneAppearance>()
@@ -355,12 +370,6 @@ fn present(world: &mut World) {
         .query_filtered::<Entity, With<SceneStageAnchor>>()
         .iter(world)
         .find_map(|entity| frame_for(world, entity));
-    let sheet = appearance.actor_sheet.as_ref().and_then(|handle| {
-        world
-            .get_resource::<Assets<Image>>()?
-            .get(handle)
-            .map(|image| (handle.clone(), image.size()))
-    });
     let backdrop = appearance.backdrop_image.as_ref().and_then(|handle| {
         world
             .get_resource::<Assets<Image>>()?
@@ -407,6 +416,12 @@ fn present(world: &mut World) {
                 .actors
                 .entry(actor.id)
                 .or_insert_with(|| actor_nodes(world, actor.id));
+            let sheet = appearance.actor_image(actor.kind).and_then(|handle| {
+                world
+                    .get_resource::<Assets<Image>>()?
+                    .get(handle)
+                    .map(|image| (handle.clone(), image.size()))
+            });
             paint_actor(
                 world,
                 nodes,
@@ -522,7 +537,7 @@ fn paint_actor(
     }) {
         hide(world, nodes.head);
         hide(world, nodes.eyes);
-        let size = fit_actor_art(frame.size(), rect.size());
+        let size = corpse_pose(fit_actor_art(frame.size(), rect.size()), actor.is_corpse());
         let height = size.y / frame.size().y;
         let mut sprite = Sprite::from_image(handle.clone());
         sprite.rect = Some(rect);

@@ -17,6 +17,95 @@ mod process;
 const TEST_PLAYERS: usize = 6;
 const LAST_GUEST: usize = TEST_PLAYERS - 1;
 
+#[test]
+fn real_udp_wagon_consumes_a_space_and_fresh_guest_reclaims_it() {
+    let directory = tempfile::tempdir().expect("profile directory");
+    let path = directory.path().join("wagon.json");
+    let mut apps: Vec<_> = (0..5)
+        .map(|i| socket_app((i == 4).then_some(path.as_path())))
+        .collect();
+    open_default_host(&mut apps, "");
+    for guest in 1..5 {
+        let code = hosted_code(app(&mut apps, 0).world(), guest - 1).expect("private invitation");
+        start::join_code(app(&mut apps, guest).world_mut(), &code).expect("join starts");
+        assert!(pump_until(&mut apps, Duration::from_secs(10), |apps| app(
+            apps, guest
+        )
+        .world()
+        .resource::<Runtime>()
+        .admitted));
+    }
+    app(&mut apps, 4)
+        .world_mut()
+        .write_message(LabyrinthIntent::SelectHero(HeroClass::LanternWagon));
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        host_snapshot(apps).players.len() == 5 && converged(apps)
+    }));
+    assert_eq!(
+        app(&mut apps, 0)
+            .world()
+            .resource::<Hosted>()
+            .metadata
+            .player_capacity(),
+        5
+    );
+    for app in &mut apps {
+        app.world_mut().write_message(LabyrinthIntent::Ready(true));
+    }
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).players.iter().all(|p| p.ready) && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).combat.is_some() && converged(apps)
+    ));
+    let mut current = wait_for_hero(&mut apps);
+    for _ in 0..24 {
+        if current.active_actor == Some(ActorId(5)) {
+            break;
+        }
+        let actor = current.active_actor.expect("hero decision");
+        send_action(&mut apps, actor, aggressive_action(&current, actor));
+        current = wait_for_hero(&mut apps);
+    }
+    assert_eq!(current.active_actor, Some(ActorId(5)));
+    assert_eq!(actor_owner(&apps, ActorId(5)), 4);
+    assert_eq!(current.ranks(ActorId(5)), Some(5..=6));
+    send_action(
+        &mut apps,
+        ActorId(5),
+        CombatAction::Skill {
+            skill: labyrinth_rules::SkillId::HurledScrap,
+            target: ActorId(101),
+        },
+    );
+    let before = wait_for_hero(&mut apps);
+    let original = stored(app(&mut apps, 4));
+    *app(&mut apps, 4) = socket_app(Some(&path));
+    wait_guest_detached(&mut apps, original.peer_id);
+    assert_eq!(combat(&mut apps), before);
+    start::reconnect(app(&mut apps, 4).world_mut()).expect("fresh App reconnects from disk");
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| all_admitted(apps) && converged(apps)
+    ));
+    assert_eq!(combat(&mut apps), before);
+    let recovered = stored(app(&mut apps, 4));
+    assert_eq!(recovered.peer_id, original.peer_id);
+    assert_ne!(
+        recovered.reconnect_credential,
+        original.reconnect_credential
+    );
+    assert_eq!(actor_owner(&apps, ActorId(5)), 4);
+}
+
 fn socket_ui_app() -> App {
     let mut app = App::new();
     app.insert_resource(bevy::time::TimeUpdateStrategy::Automatic)
@@ -141,6 +230,19 @@ fn admission_diagnostics(apps: &[App]) -> String {
 }
 
 fn open_host(apps: &mut [App], password: &str) {
+    open_default_host(apps, password);
+    // Capacity regressions explicitly exercise six independent human roles,
+    // rather than requiring duplicate classes in the default five-unit company.
+    let world = app(apps, 0).world_mut();
+    world.insert_resource(
+        PartyAuthority::with_roster(42, false, &labyrinth_rules::DEFAULT_HERO_ROSTER)
+            .expect("six-human fixture"),
+    );
+    world.resource_mut::<Runtime>().published = 0;
+    app(apps, 0).update();
+}
+
+fn open_default_host(apps: &mut [App], password: &str) {
     let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("available loopback UDP port");
     let port = socket.local_addr().expect("allocated address").port();
     drop(socket);
@@ -337,7 +439,8 @@ fn begin_encounter(apps: &mut [App]) {
     );
     let snapshot = combat(apps);
     assert_eq!(snapshot.hero_formation.len(), TEST_PLAYERS);
-    assert_eq!(snapshot.enemy_formation.len(), TEST_PLAYERS);
+    assert_eq!(snapshot.enemy_formation.len(), 5);
+    assert_eq!(snapshot.ranks(ActorId(101)), Some(3..=4));
 }
 
 fn actor_owner(apps: &[App], actor: ActorId) -> usize {
@@ -683,7 +786,7 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
         encounter,
         decision: before.turn_id,
     };
-    send_action(&mut apps, actor, CombatAction::Wait);
+    send_action(&mut apps, actor, CombatAction::Defend);
     let mut current = wait_for_hero(&mut apps);
     for _ in 0..24 {
         if current.active_actor == Some(actor) {
@@ -692,7 +795,18 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
         let other = current
             .active_actor
             .expect("hero while waiting for next original turn");
-        send_action(&mut apps, other, CombatAction::Wait);
+        let care = [
+            CombatAction::Rescue { ally: actor },
+            CombatAction::Skill {
+                skill: labyrinth_rules::SkillId::Mend,
+                target: actor,
+            },
+            CombatAction::Defend,
+        ]
+        .into_iter()
+        .find(|action| current.validate_action(other, action).is_ok())
+        .expect("defend is legal");
+        send_action(&mut apps, other, care);
         current = wait_for_hero(&mut apps);
     }
     assert_eq!(current.active_actor, Some(actor));

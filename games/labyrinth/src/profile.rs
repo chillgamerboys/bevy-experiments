@@ -10,7 +10,7 @@ use std::{
 /// Public launch options. Admission secrets are never accepted on the command line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LaunchOptions {
-    /// Control all six heroes locally without opening a network session.
+    /// Control the full company locally without opening a network session.
     pub local: bool,
     /// Deterministic initial encounter seed.
     pub seed: u64,
@@ -151,7 +151,7 @@ impl ProfileGuard {
     #[must_use]
     pub fn title(&self) -> String {
         let mode = if self.local {
-            "Local · all six heroes"
+            "Local · full company"
         } else {
             "Co-op"
         };

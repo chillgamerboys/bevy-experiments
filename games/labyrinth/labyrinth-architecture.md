@@ -6,7 +6,7 @@ Carterfight retain their own composition roots and rules.
 | Layer | Owns | Explicitly excludes |
 |---|---|---|
 | `labyrinth_rules` | Actors, formations, content, statuses, deterministic combat/AI | Bevy entities, peers, sockets, files, animation |
-| Labyrinth session | Six reservations, explicit actor ownership/loadouts, ready/rematch, pause, command watermark | Certificates and discovery provider mechanics |
+| Labyrinth session | Up to six reservations within six formation spaces, explicit actor ownership/loadouts, ready/rematch, pause, command watermark | Certificates and discovery provider mechanics |
 | Labyrinth network | Wire schema, admission policy, target-specific snapshots, capability composition | Combat legality/effect implementation |
 | Labyrinth UI | Forms, selection, inspection, status summaries and accessible native controls | Mutable authoritative state, sprite artwork |
 | Labyrinth scene | ActorId-keyed sprites, art catalog, camera-aware anchors, environment | Input dispatch, legality, combat timing, networking |
@@ -14,7 +14,10 @@ Carterfight retain their own composition roots and rules.
 
 ## Deterministic battle kernel
 
-`Combat::with_heroes(seed, [HeroSetup; PARTY_SIZE])` creates the authority from
+`Combat::with_party(seed, Vec<HeroSetup>)` builds the prototype Hauler encounter;
+`Combat::with_rosters` accepts explicitly composed formations on both teams.
+`Combat::with_heroes(seed, [HeroSetup; PARTY_SIZE])` retains the six-single-rank
+fixture API. All constructors create the authority from
 explicit unique actor IDs, class presets, and ability loadouts in front-to-rear
 rank order. `Combat::new(seed, [HeroClass; PARTY_SIZE])` is a convenience using
 default hero IDs and class starter abilities. Repeated classes are legal; class,
@@ -26,8 +29,14 @@ Actor IDs are stable and independent of mutable formation rank. Player slot owne
 stays in the application. Do not put Bevy Entity IDs in these models.
 
 `PARTY_SIZE` fixes this game's current six-rank contract; `HeroClass::ALL` enumerates
-four content presets, not seats. The twelve actors, six-rank masks, formation rules,
+five content presets, not seats. The bounded actors, six-rank masks, formation rules,
 and both default rosters participate in compatibility validation/fingerprinting.
+
+Formations contain unique occupant IDs, never repeated cells. `ranks(id)` returns
+the complete footprint; `occupant(team, rank)` maps either covered space to one ID.
+Life states distinguish living HP, dying heroes, independent corpse HP, and removed
+remains. See the [formation and death decision](../../docs/decisions/labyrinth-footprints-and-death.md)
+for precise clocks, movement, targeting and provisional death-save semantics.
 
 ### Ability composition seam
 

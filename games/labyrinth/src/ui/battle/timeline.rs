@@ -146,13 +146,29 @@ pub(super) fn update(world: &mut World, snapshot: &CombatSnapshot) {
         set_text(
             world,
             text,
-            format!("{identity}{}", if yours { "*" } else { "" }),
+            format!(
+                "{identity}{}{}",
+                if yours { "*" } else { "" },
+                if actor.is_corpse() {
+                    " ×"
+                } else if completed {
+                    " ✓"
+                } else if active {
+                    " •"
+                } else {
+                    ""
+                }
+            ),
         );
         let label = format!(
             "{identity}, {}. {}{} Inspect without changing target.",
             actor.name(),
             if yours { "Your hero. " } else { "" },
-            if active {
+            if actor.is_corpse() || matches!(actor.life, labyrinth_rules::LifeState::Removed) {
+                "Dead; cannot act."
+            } else if actor.dying() {
+                "Dying; death save instead of an action."
+            } else if active {
                 "Acting now."
             } else if completed {
                 "Completed this round."

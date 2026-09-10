@@ -8,6 +8,10 @@ use labyrinth_rules::{ActorKind, EnemyKind, HeroClass};
 pub(crate) struct SceneAppearance {
     /// Transparent fixed 4x2 sheet: four heroes above the four enemy archetypes.
     pub actor_sheet: Option<Handle<Image>>,
+    /// Independently replaceable large cutouts; no atlas coordinate assumptions.
+    pub wagon: Option<Handle<Image>>,
+    /// Two-rank monster cutout.
+    pub hauler: Option<Handle<Image>>,
     /// Fraction of each cell's left edge to trim, in sheet order. Clean replacement
     /// sheets can use all zeroes; the bundled Medic/Archer contain neighbor pixels.
     pub cell_left_trim: [f32; 8],
@@ -26,6 +30,8 @@ impl Default for SceneAppearance {
     fn default() -> Self {
         Self {
             actor_sheet: None,
+            wagon: None,
+            hauler: None,
             cell_left_trim: [0.0, 0.0, 0.0, 44.0 / 384.0, 0.0, 0.0, 0.0, 26.0 / 384.0],
             backdrop_image: None,
             backdrop_floor: 0.66,
@@ -39,7 +45,18 @@ impl Default for SceneAppearance {
 }
 
 impl SceneAppearance {
+    pub fn actor_image(&self, kind: ActorKind) -> Option<&Handle<Image>> {
+        match kind {
+            ActorKind::Hero(HeroClass::LanternWagon) => self.wagon.as_ref(),
+            ActorKind::Enemy(EnemyKind::OssuaryHauler) => self.hauler.as_ref(),
+            _ => self.actor_sheet.as_ref(),
+        }
+    }
     pub fn actor_rect(&self, size: UVec2, kind: ActorKind) -> Option<Rect> {
+        if kind.footprint() > 1 {
+            return (size.min_element() > 0)
+                .then(|| Rect::from_corners(Vec2::ZERO, size.as_vec2()));
+        }
         let trim = *self.cell_left_trim.get(sheet_index(kind) as usize)?;
         sheet_rect(size, kind, trim)
     }
@@ -55,6 +72,8 @@ pub(super) fn sheet_index(kind: ActorKind) -> u32 {
         ActorKind::Enemy(EnemyKind::IronBrute) => 5,
         ActorKind::Enemy(EnemyKind::WoundStalker) => 6,
         ActorKind::Enemy(EnemyKind::HollowArcher) => 7,
+        ActorKind::Hero(HeroClass::LanternWagon) => 8,
+        ActorKind::Enemy(EnemyKind::OssuaryHauler) => 9,
     }
 }
 
@@ -83,6 +102,7 @@ pub(super) fn fallback_color(kind: ActorKind) -> Color {
         ActorKind::Hero(HeroClass::Knifehand) => Color::srgb(0.46, 0.31, 0.24),
         ActorKind::Hero(HeroClass::Scout) => Color::srgb(0.29, 0.43, 0.31),
         ActorKind::Hero(HeroClass::FieldMedic) => Color::srgb(0.42, 0.35, 0.46),
+        ActorKind::Hero(HeroClass::LanternWagon) => Color::srgb(0.46, 0.38, 0.22),
         ActorKind::Enemy(_) => Color::srgb(0.40, 0.24, 0.21),
     }
 }

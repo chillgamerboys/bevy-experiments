@@ -138,9 +138,16 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
             || "Speed unknown".into(),
             |details| format!("Speed {}", details.speed),
         );
-        let rank = snapshot
-            .rank(actor.id)
-            .map_or_else(|| "Out of formation".into(), |rank| format!("Rank {rank}"));
+        let rank = snapshot.ranks(actor.id).map_or_else(
+            || "Out of formation".into(),
+            |ranks| {
+                if ranks.start() == ranks.end() {
+                    format!("Rank {}", ranks.start())
+                } else {
+                    format!("Ranks {}–{}", ranks.start(), ranks.end())
+                }
+            },
+        );
         let owner = if view.local && actor.team() == Team::Heroes {
             "Local control"
         } else {
@@ -150,6 +157,19 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 .map_or("Host AI", |p| p.name.as_str())
         };
         let mut rows = vec![format!("{health} · {rank}"), format!("{speed} · {owner}")];
+        match actor.life {
+            labyrinth_rules::LifeState::Dying { failures } => rows.push(format!(
+                "Dying · {failures}/3 failed saves. Rescue before permanent death."
+            )),
+            labyrinth_rules::LifeState::Corpse { created_round, .. } => rows.push(format!(
+                "Corpse · clears after round {}. Damage can clear it sooner; cannot rescue.",
+                created_round.saturating_add(labyrinth_rules::CORPSE_ROUNDS)
+            )),
+            labyrinth_rules::LifeState::Removed => {
+                rows.push("Permanently dead · remains cleared".into())
+            }
+            labyrinth_rules::LifeState::Alive => {}
+        }
         if let Some(roll) = snapshot
             .initiative
             .iter()

@@ -11,6 +11,9 @@ struct ForecastBar(Entity);
 #[derive(Component)]
 struct FormationCue(Entity);
 
+#[derive(Component)]
+struct TargetState(Entity);
+
 pub(super) fn formation(
     world: &mut World,
     parent: Entity,
@@ -57,7 +60,7 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
             height: Val::Percent(100.0),
             min_width: Val::Px(44.0),
             min_height: Val::Px(0.0),
-            flex_grow: 1.0,
+            flex_grow: f32::from(actor.kind.footprint()),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(4.0),
             ..default()
@@ -120,6 +123,24 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         Pickable::IGNORE,
     ));
     world.entity_mut(entity).insert(FormationCue(cue));
+    let state = label(
+        world,
+        art_layout,
+        &format!("Actor {} Target State", actor.id.0),
+        "",
+        UiTextRole::Supporting,
+    );
+    world.entity_mut(state).insert((
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(28.0),
+            width: Val::Percent(100.0),
+            ..default()
+        },
+        TextLayout::justify(Justify::Center),
+        Pickable::IGNORE,
+    ));
+    world.entity_mut(entity).insert(TargetState(state));
     let text = label(
         world,
         entity,
@@ -214,6 +235,7 @@ pub(super) fn actor_color(kind: ActorKind) -> Color {
         ActorKind::Hero(HeroClass::Knifehand) => Color::srgb(0.82, 0.59, 0.40),
         ActorKind::Hero(HeroClass::Scout) => Color::srgb(0.50, 0.75, 0.60),
         ActorKind::Hero(HeroClass::FieldMedic) => Color::srgb(0.76, 0.69, 0.86),
+        ActorKind::Hero(HeroClass::LanternWagon) => Color::srgb(0.68, 0.58, 0.34),
         ActorKind::Enemy(_) => Color::srgb(0.74, 0.38, 0.33),
     }
 }
@@ -281,7 +303,11 @@ fn compact_status(actor: &ActorSnapshot, status: &StatusInstance) -> String {
     } else {
         String::new()
     };
-    let clock = match definition.duration.boundary {
+    let clock = match if actor.is_corpse() {
+        Boundary::RoundEnd
+    } else {
+        definition.duration.boundary
+    } {
         Boundary::OwnerTurnStart | Boundary::OwnerTurnEnd => "t",
         Boundary::RoundEnd => "r",
     };
@@ -299,7 +325,11 @@ fn status_accessibility(actor: &ActorSnapshot) -> String {
     );
     for status in &actor.statuses {
         let definition = status_definition(status.kind);
-        let clock = match definition.duration.boundary {
+        let clock = match if actor.is_corpse() {
+            Boundary::RoundEnd
+        } else {
+            definition.duration.boundary
+        } {
             Boundary::OwnerTurnStart => "bearer turn starts",
             Boundary::OwnerTurnEnd => "bearer turn ends",
             Boundary::RoundEnd => "round ends",
@@ -471,9 +501,9 @@ pub(super) fn present(
             let Some(mut tile) = world.get_mut::<ActorTile>(entity) else {
                 continue;
             };
-            if facts.health.as_known().is_some() && tile.last_hp != actor.hp {
+            if facts.health.as_known().is_some() && tile.last_hp != actor.health().0 {
                 tile.flash_until = if reduced_motion { time } else { time + 0.35 };
-                tile.last_hp = actor.hp;
+                tile.last_hp = actor.health().0;
             }
             (
                 tile.control,
@@ -537,12 +567,10 @@ pub(super) fn present(
             format!("{identity}{}\n{hp_text}", if yours { "*" } else { "" }),
         );
         summary_geometry(world, text, metrics);
-        let state = if !facts.standing {
-            if actor.team() == Team::Heroes {
-                "Downed"
-            } else {
-                "Defeated"
-            }
+        let state = if actor.is_corpse() {
+            "Corpse"
+        } else if actor.dying() {
+            "Dying"
         } else if snapshot.active_actor == Some(actor.id) {
             "Acting now"
         } else if ui.target == Some(actor.id) {
@@ -581,11 +609,46 @@ pub(super) fn present(
         let rank = snapshot.rank(actor.id).unwrap_or(0);
         let source_rank = actor.team() == Team::Heroes
             && matches!(ui.selected,
-            Some(Choice::Skill(skill)) if rank > 0 && skill_definition(skill).source_ranks & (1 << (rank - 1)) != 0);
+            Some(Choice::Skill(skill)) if snapshot.ranks(actor.id).is_some_and(|mut ranks|
+                ranks.any(|rank| skill_definition(skill).source_ranks & (1 << (rank - 1)) != 0)));
         if let Some(cue) = world.get::<FormationCue>(entity).map(|cue| cue.0) {
             // Keep position labels literal. Range/selection use the existing
             // footprint emphasis below, not unexplained punctuation.
-            let text = rank.to_string();
+            let ranks = snapshot.ranks(actor.id);
+            let position = ranks.map_or_else(
+                || "—".into(),
+                |r| {
+                    if r.start() == r.end() {
+                        rank.to_string()
+                    } else {
+                        format!("{}–{}", r.start(), r.end())
+                    }
+                },
+            );
+            set_text(world, cue, position);
+        }
+        if let Some(cue) = world.get::<TargetState>(entity).map(|cue| cue.0) {
+            let text = if actor.is_corpse() {
+                let labyrinth_rules::LifeState::Corpse { created_round, .. } = actor.life else {
+                    unreachable!()
+                };
+                format!(
+                    "Corpse {}r",
+                    created_round
+                        .saturating_add(labyrinth_rules::CORPSE_ROUNDS)
+                        .saturating_add(1)
+                        .saturating_sub(snapshot.round)
+                        .min(labyrinth_rules::CORPSE_ROUNDS)
+                )
+            } else if let labyrinth_rules::LifeState::Dying { failures } = actor.life {
+                format!("Dying {failures}/3")
+            } else if ui.target == Some(actor.id) {
+                "Selected".to_owned()
+            } else if eligible {
+                "Target".to_owned()
+            } else {
+                String::new()
+            };
             if let Some(mut label) = world.get_mut::<Text>(cue) {
                 if label.0 != text {
                     label.0 = text;
@@ -663,7 +726,7 @@ pub(super) fn present(
                 .insert(BackgroundColor(appearance.dock));
         }
         if let Some(mut node) = world.get_mut::<Node>(entity) {
-            let display = if actor.team() == Team::Enemies && !actor.standing() {
+            let display = if snapshot.rank(actor.id).is_none() {
                 Display::None
             } else {
                 Display::Flex
@@ -690,6 +753,14 @@ pub(super) fn present(
         } else {
             appearance.line
         };
+        let hp_color = BackgroundColor(if actor.is_corpse() {
+            appearance.muted
+        } else {
+            actor_color(actor.kind)
+        });
+        if world.get::<BackgroundColor>(bar) != Some(&hp_color) {
+            world.entity_mut(bar).insert(hp_color);
+        }
         paint_marker(world, control, marker);
         let mut disclosed_actor = actor.clone();
         disclosed_actor.statuses = facts.statuses.as_known().cloned().unwrap_or_default();

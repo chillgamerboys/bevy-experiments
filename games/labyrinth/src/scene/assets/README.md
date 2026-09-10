@@ -17,3 +17,20 @@ Use case: background-extraction. This is a game sprite atlas edit. Remove ALL of
 ## Room prompt
 
 Use case: stylized-concept. Asset type: original side-view 2D game environment backdrop for Labyrinth, an eerie cooperative positional combat game. Wide landscape image, a deserted ancient stone maze chamber, weathered pillars and giant hexagonal doorway in the central distance, thin green-gray fog, cracked stone ground plane along bottom quarter. Quiet restrained illustrated ink-and-paint cutout art, muted charcoal, slate, gray moss, tiny tarnished gold distant lanterns, subtle depth, no excessive texture noise. Broad empty horizontal foreground for twelve character sprites added by the game. Side-on theatrical composition, not isometric or top down, clear depth and scale but no dramatic perspective tilting the ground. Mostly dark low contrast background with recognizable silhouettes, brighter mist in center behind characters, blackened upper vaults. No characters, no enemies, no text, no interface, no panels, no border. Landscape 1536x1024.
+
+## Two-rank cutouts
+
+Generated with the built-in image-generation tool using `actors.png` as a style
+reference only. Saved as [lantern-wagon.png](lantern-wagon.png) and
+[ossuary-hauler.png](ossuary-hauler.png), with real alpha transparency verified.
+These standalone images do not change the original atlas or define gameplay footprints.
+
+### Lantern Wagon prompt
+
+Use case: stylized-concept. Asset type: transparent 2D side-view game character cutout for Labyrinth. Primary request: a single Lantern Wagon, a weathered wooden supply cart with a hooded living keeper seated on its front right, small hanging amber lantern and tied provisions. Side view facing RIGHT, whole wagon including both wheels visible, broad silhouette, fits a two-rank combatant. Style match the supplied reference characters: gritty ink outlines, angular painterly shading, desaturated dark fantasy earthy cloth and worn wood, eerie mood, readable at small size. Input image is STYLE REFERENCE ONLY, do not reproduce the sheet or other characters. Center single wagon with small even transparent margins. Genuinely transparent background with alpha, no backdrop, floor, shadow plate, text, labels, borders, or UI. Landscape canvas.
+
+Final transparency edit: Background extraction edit. Remove the entire checkerboard background and make genuinely transparent alpha PNG, not a rendered checkerboard. Preserve the wagon and keeper exactly. No colored background, no pattern, no gradients, no floor. Keep all silhouette and interior opaque. Output isolated game cutout with real alpha transparency.
+
+### Ossuary Hauler prompt
+
+Use case: stylized-concept. Asset type: transparent 2D side-view game monster cutout for Labyrinth. Primary request: one massive Ossuary Hauler, hunched pale dungeon scavenger with long heavy forelimbs and an enormous iron cage of old bones strapped to its broad back. Menacing low head, chunky hands on ground, enormous heavy silhouette, facing LEFT toward the heroes. Style match supplied reference characters: gritty black ink contours, angular painterly shading, muted dark fantasy bone grey, worn iron and earthy wraps. Input image STYLE REFERENCE ONLY, do not reproduce the sheet or other figures. Full body centered with small even margins, landscape proportions, spans two formation ranks. Genuinely transparent background with alpha, no scene, floor, shadow plate, text, labels, borders, or UI.

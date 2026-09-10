@@ -142,8 +142,8 @@ impl BattlePresentation {
                         standing: actor.standing(),
                         health: if policy.health {
                             Knowledge::Known(Health {
-                                current: actor.hp,
-                                maximum: actor.max_hp,
+                                current: actor.health().0,
+                                maximum: actor.health().1,
                             })
                         } else {
                             Knowledge::Unknown
@@ -279,7 +279,13 @@ impl ForecastDisplay {
                     effects.push(format!("Remove {}", status_definition(*kind).name))
                 }
                 PreviewEvent::Downed { .. } => effects.push("Downed".to_owned()),
-                PreviewEvent::Defeated { .. } => effects.push("Defeated".to_owned()),
+                PreviewEvent::Defeated { .. } => effects.push("Dies; leaves a corpse".to_owned()),
+                PreviewEvent::CorpseRemoved { .. } => {
+                    effects.push("Corpse cleared; formation closes".to_owned())
+                }
+                PreviewEvent::DeathSave { failures, .. } => {
+                    effects.push(format!("Death save: {failures}/3 failures"))
+                }
                 _ => {}
             }
         }
@@ -290,10 +296,20 @@ impl ForecastDisplay {
             .map(|change| {
                 // Formation compaction can affect actors other than the direct target.
                 // Never expose their undisclosed HP through an otherwise known attack.
+                let newly_dead =
+                    matches!(change.after.life, labyrinth_rules::LifeState::Corpse { .. })
+                        && !matches!(
+                            change.before.life,
+                            labyrinth_rules::LifeState::Corpse { .. }
+                        );
                 let health = if disclosure.actor(change.actor).health {
                     Knowledge::Known(Health {
-                        current: change.after.hp,
-                        maximum: change.after.max_hp,
+                        current: if newly_dead { 0 } else { change.after.hp },
+                        maximum: if newly_dead {
+                            change.before.max_hp
+                        } else {
+                            change.after.max_hp
+                        },
                     })
                 } else {
                     Knowledge::Unknown
@@ -302,6 +318,17 @@ impl ForecastDisplay {
                     || "HP unknown".to_owned(),
                     |hp| format!("HP {} → {} / {}", change.before.hp, hp.current, hp.maximum),
                 );
+                if newly_dead {
+                    summary = health.as_known().map_or_else(
+                        || "Dies; corpse HP unknown".into(),
+                        |_| {
+                            format!(
+                                "Dies; corpse {}/{} HP",
+                                change.after.hp, change.after.max_hp
+                            )
+                        },
+                    );
+                }
                 if change.before.rank != change.after.rank {
                     if let Some(rank) = change.after.rank {
                         summary.push_str(&format!(" · rank {rank}"));
@@ -438,6 +465,42 @@ mod tests {
         assert!(forecast.summary.contains("7 damage"));
         assert!(forecast.summary.contains("HP 20 → 13 / 20"));
         assert_eq!(snapshot, before);
+    }
+
+    #[test]
+    fn lethal_forecast_never_shows_corpse_health_as_living_healing() {
+        let mut snapshot = Combat::new(42, DEFAULT_HERO_ROSTER)
+            .expect("combat")
+            .snapshot();
+        snapshot
+            .actors
+            .iter_mut()
+            .find(|a| a.id == ActorId(101))
+            .expect("enemy")
+            .hp = 1;
+        let forecast = ForecastDisplay::build(
+            &snapshot,
+            &CombatDisclosure::default(),
+            ActorId(1),
+            &CombatAction::Skill {
+                skill: SkillId::FrontStrike,
+                target: ActorId(101),
+            },
+        )
+        .expect("lethal forecast");
+        let enemy = forecast
+            .actors
+            .iter()
+            .find(|a| a.actor == ActorId(101))
+            .expect("target");
+        assert_eq!(
+            enemy.health,
+            Knowledge::Known(Health {
+                current: 0,
+                maximum: 20
+            })
+        );
+        assert!(enemy.summary.contains("corpse 5/5 HP"));
     }
 
     #[test]
