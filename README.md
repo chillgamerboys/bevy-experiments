@@ -29,7 +29,9 @@ review captures live under `target/`; do not commit them or admission credential
 - `crates/`: the [bevy-gamekit facade](crates/bevy_gamekit/README.md) and independent
   geometry, turns, UI, testing, session, discovery and transport capabilities.
 - `games/`: each game owns its composition root, rules, presentation and assets.
-- `skills/`: the canonical seven-skill Bevy pack and deterministic maintainer tools.
+- `plugins/`: GameSkills' 12-skill core and opt-in specialist packages.
+- [GameSkills](skills/README.md): installation, workflow entry and validation;
+  `skills/` also retains the frozen legacy installer during adopter migration.
 - [Documentation](docs/README.md): architecture, onboarding, testing and diagnostics.
 
 Gamekit is not a shared engine. Reuse stable algorithms and infrastructure without

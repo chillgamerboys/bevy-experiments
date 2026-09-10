@@ -1,0 +1,76 @@
+{
+  "bundle": ".gameskills/bundles/99be57217d4aab6b2e70272531ea6dcc5838a35b-211c8240",
+  "commit": "99be57217d4aab6b2e70272531ea6dcc5838a35b",
+  "packages": {
+    "gameskills": {
+      ".claude-plugin/plugin.json": "70d8550e9e0d2a3848326a6c87230f7c2d78c58daf3e965da09172a2e069c57c",
+      ".codex-plugin/plugin.json": "439e0f3d8894ec22d1da05538cb6eff15bba2246e6125e55586a48273f4043a5",
+      "catalog.json": "4b833a428030ba7b20c090524c239484112683282d52180071dc29fadcb57be8",
+      "references/architecture.md": "e1be880a5272c8f2e803e9b284cee49850a78f98ddc595d47b8a4ffd01ffe33d",
+      "references/bevy-craft.md": "6c30127d7fa4ccba89df60c756972a83cfd55f31dc5b157f82b4d74642ff7d3e",
+      "references/creative-levels.md": "7a11de52c05675eb8d69bea0b6a856fe01fc3206de3434a7b8245962d8a83e99",
+      "references/delivery.md": "4aaa9a1fa4ab53537e3c87ec7d27b74a163e1803ed2b990ff118b3166aff0128",
+      "references/gamekit.md": "fa78d7ffd0556395b7419fc20169bd6164c06dfdf671a44aa649c0453b9e8fad",
+      "references/project-context.md": "fd8e120a3ea8fef71d0670a1637d7d8991d597f22a6b90461c65f441585c4956",
+      "references/verification.md": "5d1db9c84606263e37b8fe26bedde475f32bb6042f3b8cad1a18b107060e2763",
+      "references/work-orders.md": "b6f633d53636cdfcf8524f3cfca480733819e33fc8a4f50bf70342492f6f4862",
+      "runtime/gameskills_runtime/__init__.py": "703ed5617eafc1b00c99bc0d75ad3b4317f1bc24b4eadcaf44e11c92a250d04b",
+      "runtime/gameskills_runtime/config.py": "e164cd945f494a839be64a2353df4053fea7cb4f2a5b6c4655a0fd099e023261",
+      "runtime/gameskills_runtime/native.py": "ba1f5c77a247dafd9f0164a9752ba5d2aae381932045f17287746b40d63fe034",
+      "runtime/gameskills_runtime/packaging.py": "1b498175a994bab38d8202c0798f041db5b74943dbed3067876d3fa0852ce862",
+      "runtime/gameskills_runtime/runner.py": "aff49f29a0bb3055884ae2a2d813b64f199827d89b99fe37ff7eeb030e45e69c",
+      "runtime/gameskills_runtime/workflow.py": "ae0e73a9ab4f9ac440ca0306e7b8f4b112201341ce33ddd81530c24b9b4ad402",
+      "scripts/gameskills.py": "c19281f667733fcea7f32d8bbc8c85a2ef6311afb740d78e69e32b9517327f6a",
+      "skills/audit-pr/SKILL.md": "e7f3dcd15253f8c889b467ad57103584ab6d2bb0b83042513d077dacd8c753e0",
+      "skills/create-pr/SKILL.md": "cd16830bb65b3410c029b239f5395d34a732482eceddb31db89bd7f0f59e8190",
+      "skills/debug/SKILL.md": "1aaddc5146feab2a4143a7b855e264a74f7dcf8e5b34b190ecda2e507033d696",
+      "skills/dispatch/SKILL.md": "81da1b04716dbad99d1b9d5c03080cc60c0f657c60e457cb57da14820c92ad21",
+      "skills/merge-pr/SKILL.md": "97e5890760c15af6d84ac82c0f7fec0ba7cd35696040a157ffb987ddd73a6063",
+      "skills/plan/SKILL.md": "11984ee5fb9a27f708dd44382378a56422c9cf4279a85c1868cfdc1d16c32aae",
+      "skills/playtest/SKILL.md": "7a7179802ea31d4a46e0d39961cf69fbdd361fecc5ed92c5fceb9b3ca9d01a70",
+      "skills/release/SKILL.md": "b4fb9a92ee03b17b0286fd5b8abdc580a866312a43d6614b3103484e2572b5f6",
+      "skills/review/SKILL.md": "9cadff8adc4927463eb4efa22a2bb2fb06685159ad04d6f7255436bc6d34a07b",
+      "skills/setup/SKILL.md": "62d14ad28ce07c2cf466ed7f22ad214e09b90107773c54d3ac1b637c93bd7568",
+      "skills/test/SKILL.md": "a491e067b49ce657468d5bde8b433353f327fb27df89b1eb24752ef3a73de495",
+      "skills/update-docs/SKILL.md": "65c95205a709cd240aafb9f761c58d6d8de5ea57dcb4f516201d1b6d29d2ab48"
+    },
+    "gameskills-maintainer": {
+      ".claude-plugin/plugin.json": "5189d4109f77ad4d7f62dd3a0ec3c6f59617ca84184eb76fd84b5919a0d3b6ec",
+      ".codex-plugin/plugin.json": "fb62ac76178aa63a527720882f6aa0535adfc85e9b22ee22b0da77447dacabd0",
+      "references/capability-design.md": "c6a5f287f8b40e3ab321301a6cdc9af53dbb14a05eca8eb236cad9147fd8648e",
+      "references/legacy-migration.md": "f93ab4398878010431901ce8bdd454707c656c8d77c4b3c894832c2659f1dafa",
+      "references/project-context.md": "20cdbdb875bfd2b1fb2235c04e4ce9629321d45784fcb56ac888e545fd23de61",
+      "references/skill-evaluation.md": "6d231a7d9f2824be865651999bac3e45a718491bc9587bfc5fa3718f530124d4",
+      "skills/author-skill/SKILL.md": "e3b992fd9e9ed89d28f31dd11e7ddb508c448f076f1ce90de69dc473c23ce0de",
+      "skills/evaluate-skills/SKILL.md": "e473e78f97c6779b6f97551ebf293aec758dfaec572ee9c0fc3fa67f4b3cc616",
+      "skills/evolve-gamekit/SKILL.md": "b7060fc98dcbf76d8ffb4fded3608d5e6e38c13741bd095df792faba0e42456b"
+    },
+    "gameskills-multiplayer": {
+      ".claude-plugin/plugin.json": "e79c01cfa12731f453865a231f001ff93eaef43d07e98b4f7a91057f64832bca",
+      ".codex-plugin/plugin.json": "39348508e8781154b9cc0dd650b99d7118b0f65f4097c58aa79ea87ada3df472",
+      "references/network-contracts.md": "1cb7ac2495dfc2dcedc9e9183e6c756f307616a783251cc7c110cb7b2a4b2c4c",
+      "references/network-evidence.md": "b68cf2e346fb987ad8387ac94355538e70c275ed2a9e95596200a54033b2ea84",
+      "references/project-context.md": "20cdbdb875bfd2b1fb2235c04e4ce9629321d45784fcb56ac888e545fd23de61",
+      "skills/design-multiplayer/SKILL.md": "6ecc97aaa1c62ec29aaa09b36855b21e09f5a87a9a48c5e1d955f468c89fdcd3",
+      "skills/verify-multiplayer/SKILL.md": "6ae45fbeef4344226d7ab0cbaa8e80d0d90be3003e0a468784098a84e979460a"
+    },
+    "gameskills-turn-based": {
+      ".claude-plugin/plugin.json": "82dc0d6cd95eddce825aeeee4271e2c40399c7704530bb684424fccba707755b",
+      ".codex-plugin/plugin.json": "291b1396b2323a12b8410bef8b6b78d245066649c7991f45daff0044c587b9cc",
+      "references/project-context.md": "20cdbdb875bfd2b1fb2235c04e4ce9629321d45784fcb56ac888e545fd23de61",
+      "references/rules-contracts.md": "f6d471ee534311474a5934679ae83a86f8d89be8e4c6b6270bdfb76149226769",
+      "skills/model-rules/SKILL.md": "a8608a5971e7f4ec9b89afdd15295ae3a31cc3cfe24c2bae4a4bcc6348e7c550"
+    },
+    "gameskills-ui": {
+      ".claude-plugin/plugin.json": "f9e184a31680c870da82abd119dc75f7e576c39023a03c7f8deaa386ea632067",
+      ".codex-plugin/plugin.json": "083834cfba508291d753fa46d01cd4746344fe0e522d29f295782f0fa7fd43e8",
+      "references/project-context.md": "20cdbdb875bfd2b1fb2235c04e4ce9629321d45784fcb56ac888e545fd23de61",
+      "references/ui-contracts.md": "c988964b3386cb43967d5337616829dd3dc36c38d4854252051fb8c58ca01c8d",
+      "references/ui-evidence.md": "d247c22dfe935e513db76fc8c1c9f2faf68236aeb3476eac7fb9f8a4885a940b",
+      "skills/build-ui/SKILL.md": "faf64d21fbfc79a89e19feb6c19ae1bba020011e2ae0eb75e53f94c0da9dad1e",
+      "skills/verify-ui/SKILL.md": "d02f1eaf3a47d954b6e1f400bffd2f5c52fc03bdf110a2f5e21894c0ef90b7ca"
+    }
+  },
+  "schema_version": 1,
+  "version": "0.1.0-dev.1"
+}

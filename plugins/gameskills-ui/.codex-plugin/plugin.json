@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-ui",
+  "version": "0.1.0-dev.1",
+  "description": "Build and verify native Bevy and GameKit user interfaces.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills Ui",
+    "shortDescription": "Build and verify native Bevy and GameKit user interfaces.",
+    "longDescription": "Build and verify native Bevy and GameKit user interfaces.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

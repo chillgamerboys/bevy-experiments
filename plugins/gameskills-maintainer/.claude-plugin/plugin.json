@@ -1,0 +1,10 @@
+{
+  "name": "gameskills-maintainer",
+  "version": "0.1.0-dev.1",
+  "description": "Develop reusable GameKit capabilities and evaluate GameSkills.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

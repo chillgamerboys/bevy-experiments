@@ -1,7 +1,9 @@
 # Development documentation
 
-- [Draft: GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
-- [Draft: complete GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
+- [GameSkills installation and development workflow](gameskills.md)
+- [Scheduled follow-up: Rust GameSkills CLI](decisions/gameskills-rust-cli.md)
+- [GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
+- [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)
 - [Architecture and ownership](architecture.md)
 - [Current agent handoff and review findings](handoff.md)

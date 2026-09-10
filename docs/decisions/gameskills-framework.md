@@ -1,8 +1,10 @@
 # GameSkills and GameKit: a companion to Bevy
 
-Status: draft for discussion, September 10, 2026. The priorities below are agreed;
-the milestone boundaries, skill inventory and documentation layout are proposals.
-This document does not claim that the framework refactor or a release is complete.
+Status: direction and initial skill catalog approved, September 10, 2026.
+Foundation implementation is underway with up to five workers authorized. The
+documentation layout and playable-release scope remain future collaborative work.
+See [current installation and runtime boundaries](../gameskills.md); this decision
+does not claim that the full refactor or a release is complete.
 
 ## Agreed direction
 
@@ -39,11 +41,12 @@ is a later adoption case with other contributors: its changes need separate PRs
 for their review. Its integration must not become a prerequisite for starting
 our internal refactor. See the deferred [Port Vila pilot](port-vila-adoption.md).
 
-## Proposed order
+## Development order
 
 | Stage | Work | Evidence needed to move on |
 |---|---|---|
 | 1. Working skills foundation | Redesign the core and optional offerings, migrate useful lessons, and adopt an installable pinned candidate in this repository | Real tasks in Codex and Claude demonstrate useful selection, correct execution, accurate evidence and complete delivery; installation and source ownership are explicit |
+| 1b. Rust CLI follow-up | Replace the initial Python helpers with independent Rust development tooling using the accepted contracts | Language-neutral behavior checks, native client invocation and an adopter update work without Python; see the [migration decision](gameskills-rust-cli.md) |
 | 2. Documentation refactor | Use those skills to inventory, reconcile and restructure the documentation | One maintained owner per topic; working links and references; current commands and status; historical decisions remain recoverable |
 | 3. GameKit and game refinement | Use the skills for bounded changes across Labyrinth and Deckbuilder | Both consumers retain their own rules and presentation; affected contracts and user paths are verified |
 | 4. Playable candidate and packaging | Complete the agreed Labyrinth play loop, develop Deckbuilder alongside it, and prepare reproducible game/library/skill artifacts | Fresh game builds can be installed and played; library and skills can be consumed from the actual candidate artifacts |
@@ -65,13 +68,13 @@ not a fixed inventory to preserve. Assess every instruction, reference and tool
 against real development tasks. Keep useful principles and regression cases;
 split, combine, move or retire the current entry points as the new design needs.
 
-### Proposed core development offering
+### Initial core development offering
 
 The core should help a developer go from a game idea or existing project to a
-working, understandable and releasable game. The [complete proposed catalog and
+working, understandable and releasable game. The [initial catalog and
 pipeline](gameskills-catalog.md) defines 12 core skills and 9 optional skills,
-their responsibilities and the shared execution contracts. These names and
-boundaries remain proposals to validate through real tasks.
+their responsibilities and the shared execution contracts. These approved
+boundaries provide the starting point for validation through real tasks.
 
 `gameskills:plan` is the default entry. It routes bounded work to the current
 agent and authorized independent work to `dispatch`. The toolbox covers debugging,
@@ -86,7 +89,7 @@ assets, compatibility and GameKit integration. Setup and readiness checks should
 be deterministic commands where possible, with a skill only where interpretation
 adds value.
 
-### Proposed levels of creative involvement
+### Levels of creative involvement
 
 Planning and playtesting use the same levels so the developer can control the
 kind of creative input sought. Levels apply to a task or bounded feature, with a
@@ -102,8 +105,8 @@ engineering rigor and honest evidence apply at every level.
 
 Recommend level 2 as the default for Labyrinth and Deckbuilder refinement, level
 1 for precise fixes or already specified behavior, level 3 for collaborative
-feature design, and level 4 for requested exploratory work. These defaults remain
-proposals for discussion. Higher levels do not imply higher quality or require
+feature design, and level 4 for requested exploratory work. These are accepted
+starting points that task-specific instructions can change. Higher levels do not imply higher quality or require
 passing through lower levels first.
 
 Use the developer's task instructions and existing decisions before the project
@@ -359,14 +362,16 @@ Its feedback can improve this repository immediately; adoption remains subject
 to that project's review and release process. A delayed adopter PR must not be
 reported as a failed library contract or as completed integration.
 
-## Decisions to settle next
+## Decisions settled and still ahead
 
-1. The core workflow boundaries, first optional packages and real evaluation tasks.
-2. The creative-involvement levels and defaults for planning and playtesting.
-3. The native packaging and compatibility contract demonstrated in both clients,
-   including how current installations migrate without losing local ownership.
-4. The first playable release audience, platform/mode scope and delivery channel.
-5. The documentation ownership map, followed by the exact directory layout.
+The initial offering is 12 core skills, with nine optional skills across five
+packages. `plan` is the default entry, level 2 is the creative default, and the
+initial dispatch cap is five workers. The owner authorized implementation.
+
+Native compatibility and workflow effectiveness need actual candidate evidence.
+The first playable release audience, platform/mode scope and delivery channel,
+and the documentation ownership map/layout remain later decisions. They do not
+block implementation of this foundation.
 
 ## References and confidence
 

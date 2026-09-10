@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-turn-based",
+  "version": "0.1.0-dev.1",
+  "description": "Model game-owned rules, legal actions and deterministic replay.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills Turn Based",
+    "shortDescription": "Model game-owned rules, legal actions and deterministic replay.",
+    "longDescription": "Model game-owned rules, legal actions and deterministic replay.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

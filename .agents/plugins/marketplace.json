@@ -1,0 +1,80 @@
+{
+  "name": "gameskills",
+  "interface": {
+    "displayName": "GameSkills"
+  },
+  "plugins": [
+    {
+      "name": "gameskills",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "gameskills-ui",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills-ui"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "gameskills-turn-based",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills-turn-based"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "gameskills-multiplayer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills-multiplayer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "gameskills-maintainer",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills-maintainer"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "gameskills-bevy-contrib",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gameskills-bevy-contrib"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

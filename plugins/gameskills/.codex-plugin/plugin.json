@@ -1,0 +1,20 @@
+{
+  "name": "gameskills",
+  "version": "0.1.0-dev.1",
+  "description": "Plan and deliver Bevy games with measured evidence and bounded coordination.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills",
+    "shortDescription": "Plan and deliver Bevy games with measured evidence and bounded coordination.",
+    "longDescription": "Plan and deliver Bevy games with measured evidence and bounded coordination.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use GameSkills to plan this Bevy task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}
