@@ -68,20 +68,16 @@ split, combine, move or retire the current entry points as the new design needs.
 ### Proposed core development offering
 
 The core should help a developer go from a game idea or existing project to a
-working, understandable and releasable game. These are workflow responsibilities;
-the table does not fix a skill count or final command names. Separate entry points
-need distinct user requests and useful instructions, established through trials.
+working, understandable and releasable game. The [complete proposed catalog and
+pipeline](gameskills-catalog.md) defines 12 core skills and 9 optional skills,
+their responsibilities and the shared execution contracts. These names and
+boundaries remain proposals to validate through real tasks.
 
-| Responsibility | Useful outcome |
-|---|---|
-| Plan a Bevy change | Identify the player or developer goal, investigate the code, resolve architectural choices and define a useful scope and acceptance evidence; preserve decisions and authorization across turns |
-| Diagnose problems | Reproduce the failure with known versions, features, assets and runtime state; isolate game, plugin or engine responsibility before changing code |
-| Verify engineering behavior | Select meaningful pure, minimal-app, runtime and performance checks; report what each observation establishes and what remains untested |
-| Playtest and refine | Exercise the actual player journey, controls, feedback, onboarding and accessibility; keep human judgments of clarity and feel separate from automated checks |
-| Review a change | Assess correctness, architecture, scope and evidence using the project's selected capability guidance |
-| Document and teach | Maintain the authoritative explanation, Rustdoc, tested examples and migration instructions; make patterns understandable outside the agent workflow |
-| Deliver a change | Complete commits, reviewable PRs and observed CI; handle merge within authorization |
-| Release a project | Establish release scope and compatibility, verify distributable artifacts and handle publication within authorization |
+`gameskills:plan` is the default entry. It routes bounded work to the current
+agent and authorized independent work to `dispatch`. The toolbox covers debugging,
+testing, playtesting, review, documentation, PR creation/audit/merge and release;
+`setup` handles adoption and deliberate installation updates. `dispatch --inject`
+adds verified work to an active queue using the same ownership contract.
 
 Routine implementation does not need a skill that merely repeats ordinary agent
 instructions. Bevy-specific craft guidance belongs in focused references loaded
@@ -171,6 +167,9 @@ configuration, observed command results, source-bound evidence and update/recove
 behavior. Its issue-tracker, cloud and organizational requirements do not become
 GameSkills defaults. Its refactor remains in progress; incomplete Claude and
 model-driven workflow trials must not be presented as demonstrated parity.
+The [catalog investigation](gameskills-catalog.md#jxp-investigation-and-provenance)
+also examines the later PR head, legacy plan/dispatch/inject contracts, measured
+token costs and the explicit legacy-rule migration ledger.
 
 ### Installation and cross-agent support
 
