@@ -1,81 +1,36 @@
-# bevy-experiments
+# Bevy Experiments
 
-A sandbox for iterating on small Bevy game ideas. The original Bevy 0.18 experiments
-remain independent under `src/games/`. The isolated [Gamekit workspace](gamekit/README.md)
-contains opt-in Bevy 0.19 capabilities and the deckbuilder multiplayer adopter.
-Games own their composition roots and rules; Gamekit is shared code, not a shared engine.
+A workspace for building **Labyrinth** and refining opt-in Gamekit capabilities
+through independently composed games. Bevy 0.19; one Cargo workspace.
 
-## Games
+| Game | Purpose | Run from the repository root |
+|---|---|---|
+| [Labyrinth](games/labyrinth/README.md) | Primary game: six-player cooperative positional combat | `cargo run` |
+| [Carterfight](games/carterfight/README.md) | Pixel-art dialogue battle; contrasting UI adopter | `cargo run -p carterfight` |
+| [Deckbuilder](games/deckbuilder_ui/README.md) | Runnable UI and multiplayer regression example | `cargo run -p deckbuilder_ui` |
 
-| Name      | Run                          | Docs                                                  |
-|-----------|------------------------------|-------------------------------------------------------|
-| tactics   | `cargo run --bin tactics`    | [docs/tactics](docs/tactics/)                         |
+For a local Labyrinth battle controlling all six heroes: `cargo run -- --local`.
+Ordinary play does not require `--all-features`. The multiplayer menu opens no host
+until requested. See each game's README for controls and supported behavior.
 
-`cargo run` with no args also launches `tactics` (set via `default-run` in `Cargo.toml`).
+## Development
 
-## Layout
-
-```
-src/
-├── lib.rs               # exposes `games`
-├── bin/
-│   └── tactics.rs       # thin wrapper → games::tactics::run()
-└── games/
-    ├── mod.rs
-    └── tactics/
-        ├── mod.rs       # pub fn run(); AppState, TurnState
-        ├── components.rs
-        ├── resources.rs
-        ├── systems.rs
-        └── constants.rs
-
-tests/
-└── tactics/
-    ├── main.rs          # mod movement; mod integration;
-    ├── movement.rs
-    └── integration.rs
-
-docs/
-└── tactics/             # phase-by-phase learning notes + testing docs
+```sh
+cargo test --workspace --all-features --profile ci
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
+python3 scripts/check_repo.py
 ```
 
-## Adding a new experiment
+The CI profile optimizes compile time; normal `cargo run` uses the dev profile.
+Switching profiles/features can compile additional artifacts. Generated builds and
+review captures live under `target/`; do not commit them or admission credentials.
 
-To add a game called `foo`:
+- `crates/`: independent geometry, turns, UI, testing, session, discovery and transport.
+- `games/`: each game owns its composition root, rules, presentation and assets.
+- `skills/`: the canonical seven-skill Bevy pack and deterministic maintainer tools.
+- [Documentation](docs/README.md): architecture, onboarding, testing and diagnostics.
 
-1. Create `src/games/foo/` with its own `mod.rs` exposing `pub fn run()` and whatever submodules it needs (`components.rs`, `systems.rs`, etc.).
-2. Add `pub mod foo;` to `src/games/mod.rs`.
-3. Create `src/bin/foo.rs` with one line: `fn main() { bevy_experiments::games::foo::run(); }`.
-4. Create `tests/foo/main.rs` declaring whichever test modules you want (e.g. `mod movement;`), plus the matching `tests/foo/<name>.rs` files.
-5. Add a `[[test]]` entry to `Cargo.toml`:
-   ```toml
-   [[test]]
-   name = "foo"
-   path = "tests/foo/main.rs"
-   ```
-6. Add a `docs/foo/` directory and a row to the table above.
-
-Copy whatever you need from other games rather than refactoring them — the point of keeping experiments separate is to let each iterate independently. Shared abstractions wait for a later cleanup pass.
-
-## Running
-
-```bash
-cargo run --bin tactics    # launch the tactics game
-cargo test                 # run all per-game test bundles
-cargo test --test tactics  # just the tactics tests
-```
-
-## WSL2 setup notes
-
-For graphics to work under WSL2 you need Mesa Vulkan drivers (Bevy uses wgpu, which needs Vulkan):
-
-```bash
-sudo apt-get install -y mesa-vulkan-drivers vulkan-tools
-```
-
-WSLg handles the windowing — `DISPLAY` and `WAYLAND_DISPLAY` are set automatically.
-
-## Tech
-
-- **Bevy 0.18** — ECS game engine
-- **Rust 2021**
+Gamekit is not a shared engine. Reuse stable algorithms and infrastructure without
+moving genre rules or orchestration into the library. New games go in `games/`
+following the [adopter checklist](docs/development.md), not into a shared game plugin.

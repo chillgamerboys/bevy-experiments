@@ -1,33 +1,60 @@
-[package]
-name = "bevy-experiments"
+[workspace]
+resolver = "3"
+members = ["crates/*", "games/*", "games/labyrinth/rules"]
+default-members = ["games/labyrinth"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-default-run = "tactics"
+publish = false
+license = "MIT OR Apache-2.0"
 
-[lib]
-name = "bevy_experiments"
-path = "src/lib.rs"
+[workspace.dependencies]
+bevy = { version = "0.19", default-features = false, features = ["std", "async_executor", "bevy_state"] }
+bevy_game_discovery = { path = "crates/bevy_game_discovery" }
+bevy_game_multiplayer = { path = "crates/bevy_game_multiplayer" }
+bevy_game_session = { path = "crates/bevy_game_session" }
+bevy_game_test = { path = "crates/bevy_game_test" }
+bevy_game_turns = { path = "crates/bevy_game_turns" }
+bevy_game_ui = { path = "crates/bevy_game_ui" }
+if-addrs = "=0.15.0"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "time"] }
 
-[[test]]
-name = "tactics"
-path = "tests/tactics/main.rs"
+[workspace.lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
 
-[[test]]
-name = "carterfight"
-path = "tests/carterfight/main.rs"
+[workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+dbg_macro = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+todo = "deny"
+too_many_arguments = "allow"
+type_complexity = "allow"
+unimplemented = "deny"
+unwrap_used = "deny"
 
-[dependencies]
-bevy = { version = "0.18", features = ["wav"] }
-rand = "0.8"
-rand_chacha = "0.3"
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-
-# Optimize debug builds for better performance
-# Bevy projects are notoriously slow in debug mode without these settings
 [profile.dev]
-opt-level = 1  # Basic optimization for dev builds
+opt-level = 1
 
 [profile.dev.package."*"]
-opt-level = 3  # Full optimization for dependencies
+opt-level = 3
+
+[profile.ci]
+inherits = "dev"
+opt-level = 0
+debug = "line-tables-only"
+codegen-units = 4
+
+[profile.ci.package."*"]
+opt-level = 0
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+debug = "line-tables-only"
