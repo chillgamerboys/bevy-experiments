@@ -14,7 +14,7 @@ from urllib.parse import unquote, urlsplit
 def source_files(root: Path):
     """Walk source without build output, scratch or symlinked directories."""
     for base, directories, files in os.walk(root, followlinks=False):
-        directories[:] = [n for n in directories if n not in {".git", ".context", "target", "__pycache__"}]
+        directories[:] = [n for n in directories if n not in {".git", ".context", ".gameskills", "target", "__pycache__"}]
         for name in files:
             yield Path(base) / name
 

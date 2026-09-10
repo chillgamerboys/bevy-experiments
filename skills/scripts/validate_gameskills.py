@@ -394,13 +394,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="emit machine-readable structural results")
     args = parser.parse_args(argv)
     failures = validate(args.root)
+    core_count = len(EXPECTED_SKILLS["gameskills"])
+    optional_count = len(LOGICAL_SKILLS) - core_count
     if args.json:
         print(json.dumps({"ok": not failures, "structural_only": True, "packages": len(EXPECTED_SKILLS),
-                          "skills": len(LOGICAL_SKILLS), "failures": failures, "notice": NOTICE}, indent=2))
+                          "skills": len(LOGICAL_SKILLS), "core_skills": core_count,
+                          "optional_skills": optional_count, "failures": failures, "notice": NOTICE}, indent=2))
     else:
         for failure in failures:
             print(f"FAIL {failure}")
-        print(f"{'Failed' if failures else 'Passed'} structural validation: {len(EXPECTED_SKILLS)} packages, {len(LOGICAL_SKILLS)} skills.")
+        print(f"{'Failed' if failures else 'Passed'} structural validation: {core_count} core skills + {optional_count} optional skills in {len(EXPECTED_SKILLS)} packages.")
         print(NOTICE)
     return int(bool(failures))
 

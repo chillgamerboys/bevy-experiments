@@ -17,7 +17,10 @@ permission even when the configured maximum is five workers.
 
 Use the installed core runtime's `--help` and read-only `status`/`catalog`/`config`
 commands to inspect supported settings. `setup --packages ...` prepares the
-configuration proposal; `--apply` is the deliberate local configuration mutation.
+configuration proposal; `--bundle <immutable-bundle> --apply` deliberately stages
+the selected packages and updates local configuration. Package names after
+`--packages` are space-separated. Use `setup --recover` after an interrupted
+update; it restores the previous config/lock and refuses to overwrite newer edits.
 Use exact command syntax from the runtime, inspect the proposal and preserve
 existing owner-controlled values. This helper does not establish native client
 installation or behavioral discovery.

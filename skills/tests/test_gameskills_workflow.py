@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -15,6 +16,7 @@ workflow = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(workflow)
 
 
+@unittest.skipUnless(os.name == "posix", "queue operations require POSIX advisory locking")
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="gameskills-workflow-")
@@ -219,6 +221,52 @@ class WorkflowTests(unittest.TestCase):
         self.assert_unchanged_error(lambda: self.mutate("start", "gpu2", worktree=self.worktree("gpu2")), "shared resource")
         self.mutate("block", "gpu1", payload={"reason": "Window closed", "checks_running": False})
         self.mutate("start", "gpu2", worktree=self.home / "gpu2")
+
+    def test_start_and_resume_recheck_current_package_selection(self):
+        plan = self.plan(self.order("one", packages=["gameskills-ui"]))
+        plan["packages"] = ["gameskills", "gameskills-ui"]
+        workflow.create_queue(plan, self.root, self.config)
+        tree = self.worktree("one")
+        changed = copy.deepcopy(self.config)
+        changed["packages"] = ["gameskills"]
+        self.assert_unchanged_error(lambda: self.mutate("start", worktree=tree, config=changed), "not selected")
+        view = workflow.queue_status("wave", self.root, changed)
+        self.assertEqual(view["active_workers"], 0)
+        self.assertTrue(any("gameskills-ui" in reason for reason in view["orders"]["one"]["waiting_reasons"]))
+        self.mutate("start", worktree=tree)
+        self.mutate("block", payload={"reason": "Pause before continuing", "checks_running": False})
+        self.assert_unchanged_error(lambda: self.mutate("resume", worktree=tree, config=changed), "not selected")
+        self.assertEqual(len(self.read()["orders"]["one"]["attempts"]), 1)
+        self.mutate("resume", worktree=tree)
+        self.assertEqual(self.read()["orders"]["one"]["state"], "running")
+
+    def test_reported_human_predecessor_allows_only_sequenced_consumers(self):
+        human = self.order("human", owner={"kind": "human", "name": "Contributor"},
+                           files=[{"path": "shared.rs"}], resources=["gpu"])
+        consumer = self.order("after", files=human["files"], resources=["gpu"], dispatch_blockers=["human"])
+        unrelated = self.order("unrelated", resources=["gpu"])
+        self.create(human, consumer, unrelated)
+        human_tree = self.worktree("human")
+        consumer_tree = self.worktree("after")
+        unrelated_tree = self.worktree("unrelated")
+        self.assert_unchanged_error(lambda: self.mutate("start", "after", worktree=consumer_tree), "held by human")
+        self.mutate("start", "human", worktree=human_tree)
+        self.assert_unchanged_error(lambda: self.mutate("start", "after", worktree=consumer_tree), "held by human")
+        head = self.commit(human_tree, "shared.rs", "human result")
+        self.report(human_tree, "human")
+        self.assert_unchanged_error(lambda: self.mutate("start", "unrelated", worktree=unrelated_tree), "held by human")
+        self.assert_unchanged_error(lambda: self.mutate("start", "after", worktree=consumer_tree), "does not contain")
+        self.git("merge", "--ff-only", head, cwd=consumer_tree)
+        self.mutate("block", "human", payload={"reason": "Human reviewing follow-up", "checks_running": False})
+        self.assert_unchanged_error(lambda: self.mutate("start", "after", worktree=consumer_tree), "held by human")
+        self.mutate("resume", "human", worktree=human_tree)
+        self.report(human_tree, "human")
+        (human_tree / "shared.rs").write_text("unreported human edit")
+        self.assert_unchanged_error(lambda: self.mutate("start", "after", worktree=consumer_tree), "changed since its report")
+        self.git("restore", "shared.rs", cwd=human_tree)
+        self.mutate("start", "after", worktree=consumer_tree)
+        self.assertEqual(self.read()["orders"]["human"]["state"], "reported")
+        self.assertEqual(self.read()["orders"]["after"]["state"], "running")
 
     def test_checkout_must_be_isolated_same_repository_and_unique(self):
         self.create(self.order("one"), self.order("two"))

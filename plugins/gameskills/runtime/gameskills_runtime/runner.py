@@ -166,6 +166,12 @@ def _repository(root: Path) -> dict:
         "git_dir": str(Path(os.fsdecode(_git(canonical, "rev-parse", "--absolute-git-dir")).strip()).resolve()),
         "common_dir": str(Path(os.fsdecode(_git(canonical, "rev-parse", "--path-format=absolute", "--git-common-dir")).strip()).resolve()),
         "head": _git(canonical, "rev-parse", "--verify", "HEAD").decode().strip(),
+        "head_ref": _git(canonical, "rev-parse", "--symbolic-full-name", "HEAD").decode().strip(),
+        # Base-sensitive checks can change without a source-tree or HEAD change.
+        # Include all actual ref tips conservatively until commands can declare
+        # narrower Git inputs; loose/packed storage must not affect identity.
+        "refs_digest": hashlib.sha256(_git(canonical, "for-each-ref", "--sort=refname",
+                                           "--format=%(refname)%00%(objectname)%00%(symref)")).hexdigest(),
     }
 
 

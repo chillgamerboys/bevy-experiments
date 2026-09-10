@@ -155,12 +155,20 @@ self-dependencies, duplicate IDs, and cycles across either kind are rejected.
 
 File overlap is allowed only when a transitive dispatch dependency establishes
 sequencing. A merge blocker alone does not make simultaneous file ownership safe.
+A reported human predecessor permits its dispatch-dependent consumer to start
+before integration, provided the returned source is unchanged and the consumer
+contains its returned HEAD. Pending, running and blocked human streams retain
+their existing reservations; unrelated work cannot borrow a reported human
+stream's territory or resources without the established dispatch dependency.
 A blocked agent with outstanding checks cannot release a slot: first collect or
 stop the actual checks, then explicitly report `checks_running: false`.
 
 Agent starts require `dispatch.enabled = true`. The active worker cap defaults to
 5 and must be 1–5. A project can choose fewer slots. Human starts do not consume
-slots. Workers require distinct, actual linked Git worktrees in the same common
+slots. Every start and resume rechecks that the order's packages remain selected
+in current project configuration; missing selections block the transition without
+changing the queue. Restore the intended selection or coordinate a revised plan.
+Workers require distinct, actual linked Git worktrees in the same common
 repository and cannot use the coordinator checkout. The worktree HEAD must
 descend from the plan's source and base. Resume rechecks these identities and uses
 the original worktree. A worktree already used by an unfinished stream is unavailable, including blocked

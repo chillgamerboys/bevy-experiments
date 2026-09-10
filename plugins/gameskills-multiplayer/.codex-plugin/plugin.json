@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-multiplayer",
+  "version": "0.1.0-dev.1",
+  "description": "Design and verify authority, sessions and multiplayer transports.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills Multiplayer",
+    "shortDescription": "Design and verify authority, sessions and multiplayer transports.",
+    "longDescription": "Design and verify authority, sessions and multiplayer transports.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

@@ -310,6 +310,48 @@ class GameSkillsRunnerTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertFalse(self.evidence(result["run_id"])["ok"])
 
+    def test_base_ref_change_invalidates_evidence_with_unchanged_head(self) -> None:
+        head = self.git("rev-parse", "HEAD")
+        self.git("branch", "review-base", head)
+        advanced = self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                            "commit-tree", "HEAD^{tree}", "-p", head, "-m", "advance review base")
+        self.config["commands"]["base-current"] = {
+            "argv": ["git", "merge-base", "--is-ancestor", "refs/heads/review-base", "HEAD"]}
+        result = self.run_checks("base-current")
+        self.assertTrue(result["ok"], result)
+        prior = self.record_path(result["run_id"]).read_bytes()
+        self.git("update-ref", "refs/heads/review-base", advanced)
+        self.assertEqual(self.git("rev-parse", "HEAD"), head)
+        self.assertEqual(self.git("diff", "HEAD"), "")
+        self.assertFalse(self.evidence(result["run_id"])["ok"])
+        with self.assertRaisesRegex(ValueError, "inputs changed"):
+            self.run_checks("base-current", "--resume", result["run_id"])
+        fresh = self.run_checks("base-current")
+        self.assertFalse(fresh["ok"])
+        self.assertEqual(fresh["results"]["base-current"]["exit_code"], 1)
+        self.assertEqual(self.record_path(result["run_id"]).read_bytes(), prior)
+
+    def test_unrelated_refs_and_symbolic_head_are_conservative_inputs(self) -> None:
+        self.command("a", "print('ok')")
+        initial = self.run_checks("a")
+        head = self.git("rev-parse", "HEAD")
+        self.git("branch", "unrelated", head)
+        self.assertFalse(self.evidence(initial["run_id"])["ok"])
+        current = self.run_checks("a")
+        self.assertTrue(current["ok"], current)
+        self.git("pack-refs", "--all", "--prune")
+        self.assertTrue(self.evidence(current["run_id"])["ok"])
+        self.git("checkout", "--quiet", "unrelated")
+        self.assertEqual(self.git("rev-parse", "HEAD"), head)
+        self.assertFalse(self.evidence(current["run_id"])["ok"])
+
+    def test_ref_change_during_a_command_marks_run_stale(self) -> None:
+        self.config["commands"]["new-ref"] = {"argv": ["git", "update-ref", "refs/heads/new-ref", "HEAD"]}
+        result = self.run_checks("new-ref")
+        self.assertEqual(result["results"]["new-ref"]["status"], "passed")
+        self.assertEqual(result["status"], "stale")
+        self.assertFalse(self.evidence(result["run_id"])["ok"])
+
     def test_resume_reruns_graph_preserves_failed_record_and_rejects_new_inputs(self) -> None:
         self.command("retry", "from pathlib import Path; import sys; p=Path('.gameskills/retry-marker'); ready=p.exists(); p.write_text('attempt'); sys.exit(0 if ready else 3)")
         failed = self.run_checks("retry")

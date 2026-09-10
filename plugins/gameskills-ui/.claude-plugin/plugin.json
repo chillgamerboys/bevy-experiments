@@ -1,0 +1,10 @@
+{
+  "name": "gameskills-ui",
+  "version": "0.1.0-dev.1",
+  "description": "Build and verify native Bevy and GameKit user interfaces.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

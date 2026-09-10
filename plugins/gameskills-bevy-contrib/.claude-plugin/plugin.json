@@ -1,0 +1,10 @@
+{
+  "name": "gameskills-bevy-contrib",
+  "version": "0.1.0-dev.1",
+  "description": "Investigate engine defects and substantial gaps for human-reviewed contributions.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

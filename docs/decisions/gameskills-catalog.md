@@ -1,7 +1,8 @@
 # GameSkills catalog and execution model
 
-Status: proposed offering for discussion, September 10, 2026. These are intended
-skill names and contracts, not installed or released commands. The [framework
+Status: initial offering approved for implementation, September 10, 2026.
+The catalog describes workflow contracts; the [implementation guide](../gameskills.md)
+records supported mechanisms and remaining validation. The [framework
 direction](gameskills-framework.md) owns the mission, creative levels, selective
 Bevy contribution boundary and development sequence.
 
@@ -30,10 +31,10 @@ remains supported without forcing a fresh planning cycle.
 package. A missing setup is surfaced before dependent execution; a read-only
 readiness check does not silently install packages or rewrite project settings.
 
-## Complete proposed first-release catalog
+## Initial catalog
 
-The catalog contains 12 core skills and 9 optional skills in five packages.
-Consumers install the core and choose relevant packages. Each skill has a focused
+The default installation contains **12 core skills**. Five optional packages offer
+nine additional skills, selected explicitly for the project. Each skill has a focused
 body with conditional references; installing 21 skills does not mean loading 21
 bodies on every task. Names below are logical names. Native invocation syntax and
 package metadata must be verified independently in Codex and Claude.

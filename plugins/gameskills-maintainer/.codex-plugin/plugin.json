@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-maintainer",
+  "version": "0.1.0-dev.1",
+  "description": "Develop reusable GameKit capabilities and evaluate GameSkills.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills Maintainer",
+    "shortDescription": "Develop reusable GameKit capabilities and evaluate GameSkills.",
+    "longDescription": "Develop reusable GameKit capabilities and evaluate GameSkills.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

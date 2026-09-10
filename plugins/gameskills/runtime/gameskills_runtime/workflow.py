@@ -5,7 +5,6 @@ import argparse
 import contextlib
 import copy
 import datetime as dt
-import fcntl
 import hashlib
 import json
 import os
@@ -13,6 +12,11 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import tempfile
+
+try:
+    import fcntl
+except ImportError:  # Windows can inspect skills/config, but cannot mutate queues.
+    fcntl = None
 
 
 class WorkflowError(ValueError):
@@ -275,6 +279,8 @@ def validate_plan(plan: dict, root: Path, config: dict) -> dict:
 
 @contextlib.contextmanager
 def _locked(root, create=False):
+    if fcntl is None:
+        _fail("queue operations require POSIX advisory locking; Windows is unsupported")
     directory = Path(root) / ".gameskills" / "queues"
     for path in (directory.parent, directory):
         if path.is_symlink():
@@ -365,6 +371,9 @@ def _blockers(queue, order_id, config):
     entry = queue["orders"][order_id]
     spec = entry["spec"]
     reasons = []
+    missing_packages = sorted(set(spec["packages"]) - set(config.get("packages", [])))
+    if missing_packages:
+        reasons.append("order packages are not selected in current configuration: " + ", ".join(missing_packages))
     for dep in spec["dispatch_blockers"]:
         if queue["orders"][dep]["state"] not in {"reported", "integrated"}:
             reasons.append(f"dispatch dependency {dep} has no returned work")
@@ -381,6 +390,11 @@ def _blockers(queue, order_id, config):
         if other["state"] == "running" or other["spec"]["owner"]["kind"] == "human":
             # A future human stream explicitly sequenced after this one has not reserved its resources yet.
             if other["state"] == "pending" and _depends(_specs(queue), name, order_id):
+                continue
+            # A returned human predecessor permits its explicitly sequenced
+            # consumer, just like an agent predecessor. _checkout still verifies
+            # the reported source and that the consumer contains the returned HEAD.
+            if other["state"] == "reported" and _depends(_specs(queue), order_id, name):
                 continue
             if _file_conflict(spec, other["spec"]):
                 reasons.append(f"file ownership held by {name}")

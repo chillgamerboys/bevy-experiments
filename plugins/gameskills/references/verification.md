@@ -94,8 +94,13 @@ that survives SIGKILL still prevents a competing run or immediate resume. Progra
 that deliberately close those descriptors or detach children are outside that
 recovery protection.
 
-The source identity includes canonical worktree and Git directories, HEAD,
-staged changes, file modes and contents of tracked and nonignored untracked
+The source identity includes canonical worktree and Git directories, HEAD and its
+symbolic branch identity, and a digest of actual Git ref names, tips and symbolic
+targets. Ref storage as loose files or packed refs does not change this identity.
+Advancing a review base invalidates prior evidence even when HEAD is unchanged.
+This is conservative: creating or changing unrelated branches/tags can also
+invalidate evidence until commands support narrower declared Git inputs.
+The identity also includes staged changes, file modes and contents of tracked and nonignored untracked
 files, and nested Git identities for populated submodules. Generated
 `.gameskills/` state is excluded. `gameskills.toml` and `gameskills.lock.json`
 have separate raw-file digests; effective project configuration and the selected

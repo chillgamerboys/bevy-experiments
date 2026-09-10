@@ -1,6 +1,7 @@
 # Local builds, evidence and scratch; never admission credentials.
 /target/
 /.context/
+/.gameskills/
 __pycache__/
 *.py[cod]
 .DS_Store

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "version": "0.1.0-dev.1",
+  "packages": {
+    "gameskills": {
+      "skills": [
+        "setup",
+        "plan",
+        "dispatch",
+        "debug",
+        "test",
+        "playtest",
+        "review",
+        "update-docs",
+        "create-pr",
+        "audit-pr",
+        "merge-pr",
+        "release"
+      ],
+      "requires": [],
+      "description": "Plan and deliver Bevy games with measured evidence and bounded coordination."
+    },
+    "gameskills-ui": {
+      "skills": [
+        "build-ui",
+        "verify-ui"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Build and verify native Bevy and GameKit user interfaces."
+    },
+    "gameskills-turn-based": {
+      "skills": [
+        "model-rules"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Model game-owned rules, legal actions and deterministic replay."
+    },
+    "gameskills-multiplayer": {
+      "skills": [
+        "design-multiplayer",
+        "verify-multiplayer"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Design and verify authority, sessions and multiplayer transports."
+    },
+    "gameskills-maintainer": {
+      "skills": [
+        "evolve-gamekit",
+        "author-skill",
+        "evaluate-skills"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Develop reusable GameKit capabilities and evaluate GameSkills."
+    },
+    "gameskills-bevy-contrib": {
+      "skills": [
+        "prepare-contribution"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Investigate engine defects and substantial gaps for human-reviewed contributions."
+    }
+  }
+}

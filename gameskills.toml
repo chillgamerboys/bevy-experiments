@@ -1,0 +1,64 @@
+# Project-owned choices. Core-only adoption is the distribution default.
+schema_version = 1
+packages = ["gameskills", "gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer", "gameskills-maintainer"]
+clients = ["codex", "claude"]
+
+[project]
+name = "Bevy Experiments"
+delivery_target = "pr"
+
+[creative]
+default_level = 2
+
+[dispatch]
+# Owner approved parallel implementation with at most five workers.
+enabled = true
+max_workers = 5
+
+[targets.labyrinth]
+path = "games/labyrinth"
+packages = ["gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer"]
+
+[targets.deckbuilder]
+path = "games/deckbuilder_ui"
+packages = ["gameskills-ui", "gameskills-multiplayer"]
+
+[targets.carterfight]
+path = "games/carterfight"
+packages = ["gameskills-ui"]
+
+[targets.gamekit]
+path = "crates"
+packages = ["gameskills-maintainer"]
+
+[commands.repo-check]
+argv = ["python3", "scripts/check_repo.py"]
+timeout_seconds = 60
+
+[commands.skills-validate]
+argv = ["python3", "skills/scripts/validate_gameskills.py"]
+timeout_seconds = 60
+
+[commands.skills-test]
+argv = ["python3", "-m", "unittest", "discover", "-s", "skills/tests", "-v"]
+timeout_seconds = 600
+resources = ["project:skills-tests"]
+requires = ["skills-validate"]
+
+[commands.repo-test]
+argv = ["python3", "-m", "unittest", "discover", "-s", "scripts/tests", "-v"]
+timeout_seconds = 180
+
+[commands.rust-format]
+argv = ["cargo", "fmt", "--all", "--", "--check"]
+timeout_seconds = 120
+
+[commands.ui-test]
+argv = ["cargo", "test", "-p", "bevy_game_ui", "--profile", "ci"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+
+[commands.rules-test]
+argv = ["cargo", "test", "-p", "labyrinth_rules", "--profile", "ci"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]

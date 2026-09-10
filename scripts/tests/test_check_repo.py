@@ -25,6 +25,7 @@ class RepositoryChecks(unittest.TestCase):
     def test_valid_workspace_and_ignored_output(self):
         self.write("README.md", "[Game](games/example/Cargo.toml)\n```sh\n[x](absent)\n```\n")
         self.write("target/README.md", "[broken](absent)")
+        self.write(".gameskills/bundles/candidate/README.md", "[external package link](absent)")
         self.assertEqual(check(self.root), [])
 
     def test_missing_and_escaping_links(self):

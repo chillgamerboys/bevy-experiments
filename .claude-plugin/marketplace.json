@@ -1,0 +1,38 @@
+{
+  "name": "gameskills",
+  "owner": {
+    "name": "GameKit contributors"
+  },
+  "plugins": [
+    {
+      "name": "gameskills",
+      "source": "./plugins/gameskills",
+      "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-ui",
+      "source": "./plugins/gameskills-ui",
+      "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-turn-based",
+      "source": "./plugins/gameskills-turn-based",
+      "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-multiplayer",
+      "source": "./plugins/gameskills-multiplayer",
+      "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-maintainer",
+      "source": "./plugins/gameskills-maintainer",
+      "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-bevy-contrib",
+      "source": "./plugins/gameskills-bevy-contrib",
+      "version": "0.1.0-dev.1"
+    }
+  ]
+}

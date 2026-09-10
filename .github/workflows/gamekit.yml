@@ -27,6 +27,7 @@ jobs:
       - run: python scripts/check_repo.py
       - run: python -m unittest discover -s scripts/tests -v
       - run: python skills/scripts/validate_skills.py
+      - run: python skills/scripts/validate_gameskills.py
       - run: python -m unittest discover -s skills/tests -v
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Linux window-system dependencies

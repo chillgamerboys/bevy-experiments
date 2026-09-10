@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-bevy-contrib",
+  "version": "0.1.0-dev.1",
+  "description": "Investigate engine defects and substantial gaps for human-reviewed contributions.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gameskills Bevy Contrib",
+    "shortDescription": "Investigate engine defects and substantial gaps for human-reviewed contributions.",
+    "longDescription": "Investigate engine defects and substantial gaps for human-reviewed contributions.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

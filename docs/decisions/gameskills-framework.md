@@ -1,8 +1,10 @@
 # GameSkills and GameKit: a companion to Bevy
 
-Status: draft for discussion, September 10, 2026. The priorities below are agreed;
-the milestone boundaries, skill inventory and documentation layout are proposals.
-This document does not claim that the framework refactor or a release is complete.
+Status: direction and initial skill catalog approved, September 10, 2026.
+Foundation implementation is underway with up to five workers authorized. The
+documentation layout and playable-release scope remain future collaborative work.
+See [current installation and runtime boundaries](../gameskills.md); this decision
+does not claim that the full refactor or a release is complete.
 
 ## Agreed direction
 
@@ -44,6 +46,7 @@ our internal refactor. See the deferred [Port Vila pilot](port-vila-adoption.md)
 | Stage | Work | Evidence needed to move on |
 |---|---|---|
 | 1. Working skills foundation | Redesign the core and optional offerings, migrate useful lessons, and adopt an installable pinned candidate in this repository | Real tasks in Codex and Claude demonstrate useful selection, correct execution, accurate evidence and complete delivery; installation and source ownership are explicit |
+| 1b. Rust CLI follow-up | Replace the initial Python helpers with independent Rust development tooling using the accepted contracts | Language-neutral behavior checks, native client invocation and an adopter update work without Python; see the [migration decision](gameskills-rust-cli.md) |
 | 2. Documentation refactor | Use those skills to inventory, reconcile and restructure the documentation | One maintained owner per topic; working links and references; current commands and status; historical decisions remain recoverable |
 | 3. GameKit and game refinement | Use the skills for bounded changes across Labyrinth and Deckbuilder | Both consumers retain their own rules and presentation; affected contracts and user paths are verified |
 | 4. Playable candidate and packaging | Complete the agreed Labyrinth play loop, develop Deckbuilder alongside it, and prepare reproducible game/library/skill artifacts | Fresh game builds can be installed and played; library and skills can be consumed from the actual candidate artifacts |
@@ -359,14 +362,16 @@ Its feedback can improve this repository immediately; adoption remains subject
 to that project's review and release process. A delayed adopter PR must not be
 reported as a failed library contract or as completed integration.
 
-## Decisions to settle next
+## Decisions settled and still ahead
 
-1. The core workflow boundaries, first optional packages and real evaluation tasks.
-2. The creative-involvement levels and defaults for planning and playtesting.
-3. The native packaging and compatibility contract demonstrated in both clients,
-   including how current installations migrate without losing local ownership.
-4. The first playable release audience, platform/mode scope and delivery channel.
-5. The documentation ownership map, followed by the exact directory layout.
+The initial offering is 12 core skills, with nine optional skills across five
+packages. `plan` is the default entry, level 2 is the creative default, and the
+initial dispatch cap is five workers. The owner authorized implementation.
+
+Native compatibility and workflow effectiveness need actual candidate evidence.
+The first playable release audience, platform/mode scope and delivery channel,
+and the documentation ownership map/layout remain later decisions. They do not
+block implementation of this foundation.
 
 ## References and confidence
 
