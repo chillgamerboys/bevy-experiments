@@ -12,6 +12,13 @@ Gamekit is a set of capabilities, not a combat engine. Extract reusable contract
 from Labyrinth, not all of Labyrinth's features. A shared algorithm must not depend
 on Labyrinth's entities, abilities, screen organization, rules or content.
 
+The agreed priority is to implement and adopt GameSkills before the broad
+documentation and code refactors. The [draft framework sequence](decisions/gameskills-framework.md)
+proposes the milestones and keeps the capability work below as scoped follow-on
+work. Labyrinth's playable release and Deckbuilder's companion development lead;
+the existing-game [Port Vila pilot](decisions/port-vila-adoption.md) is deferred
+until after the internal refactor and candidate packaging.
+
 ## Implementation sequence and acceptance
 
 ### 1. Consumer and distribution boundary — implemented
@@ -26,7 +33,7 @@ on Labyrinth's entities, abilities, screen organization, rules or content.
 - CI runs this probe on macOS, Linux and Windows. This is source-consumption
   evidence, not a published-registry install or native-network play test.
 
-### 2. Shared UI and application mechanics — next migration slice
+### 2. Shared UI and application mechanics — after the skills/docs foundation
 
 Audit existing menu, tooltip, feed, focus and input contracts against both Labyrinth
 and Deckbuilder before moving more code. Consolidate only repeated mechanics such

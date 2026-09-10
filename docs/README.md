@@ -1,5 +1,7 @@
 # Development documentation
 
+- [Draft: GameSkills framework and skills-first development sequence](decisions/gameskills-framework.md)
+- [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)
 - [Architecture and ownership](architecture.md)
 - [Current agent handoff and review findings](handoff.md)
 - [Handoff follow-up implementation plan](handoff-followup-plan.md)
