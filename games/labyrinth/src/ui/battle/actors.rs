@@ -81,8 +81,8 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         .id();
     let control = world
         .spawn((
-            bevy_game_ui::button(format!("Actor {}", actor.id.0)),
-            bevy_game_ui::UiFocusId::new("labyrinth-actors", actor.id.0.to_string()),
+            bevy_gamekit::ui::button(format!("Actor {}", actor.id.0)),
+            bevy_gamekit::ui::UiFocusId::new("labyrinth-actors", actor.id.0.to_string()),
             crate::scene::SceneActorAnchor { actor: actor.id },
             crate::scene::SceneActorLayout(art_layout),
             crate::scene::SceneActorEmphasis::default(),
@@ -331,8 +331,8 @@ pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnap
     let (entity, text) = existing.unwrap_or_else(|| {
         let entity = world
             .spawn((
-                bevy_game_ui::button(format!("Actor {} Effects", actor.id.0)),
-                bevy_game_ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
+                bevy_gamekit::ui::button(format!("Actor {} Effects", actor.id.0)),
+                bevy_gamekit::ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
                 Action::Status(actor.id, status.id),
                 ChildOf(parent),
             ))
@@ -388,11 +388,11 @@ pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnap
         .get_resource::<LabyrinthAppearance>()
         .cloned()
         .unwrap_or_default();
-    let help = bevy_game_ui::UiContextHelp {
+    let help = bevy_gamekit::ui::UiContextHelp {
         title: format!("{} effects", actor.name()),
         body: status_accessibility(actor),
     };
-    if world.get::<bevy_game_ui::UiContextHelp>(entity) != Some(&help) {
+    if world.get::<bevy_gamekit::ui::UiContextHelp>(entity) != Some(&help) {
         world.entity_mut(entity).insert(help);
     }
     paint_marker(world, entity, appearance.accent);
@@ -572,7 +572,7 @@ pub(super) fn present(
         if world.get::<AccessibleLabel>(control).map(|value| &value.0) != Some(&label.0) {
             world
                 .entity_mut(control)
-                .insert(bevy_game_ui::UiContextHelp {
+                .insert(bevy_gamekit::ui::UiContextHelp {
                     title: format!("{identity} · {}", actor.name()),
                     body: label.0.clone(),
                 });
@@ -712,9 +712,9 @@ fn sync_unknown_status(world: &mut World, parent: Entity, actor: &ActorSnapshot,
     } else if unknown {
         let entity = world
             .spawn((
-                bevy_game_ui::button(format!("Actor {} Unknown Effects", actor.id.0)),
-                bevy_game_ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
-                bevy_game_ui::UiContextHelp {
+                bevy_gamekit::ui::button(format!("Actor {} Unknown Effects", actor.id.0)),
+                bevy_gamekit::ui::UiFocusId::new("labyrinth-effects", actor.id.0.to_string()),
+                bevy_gamekit::ui::UiContextHelp {
                     title: "Unknown effects".to_owned(),
                     body: "Conditions have not been disclosed to this viewer.".to_owned(),
                 },
@@ -755,7 +755,7 @@ fn sync_unknown_status(world: &mut World, parent: Entity, actor: &ActorSnapshot,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_game_test::{run_frames, HeadlessUiPlugin};
+    use bevy_gamekit::testing::{run_frames, HeadlessUiPlugin};
     use labyrinth_rules::{Combat, HeroSetup, StatusKind, DEFAULT_HERO_ROSTER};
 
     fn status(actor: ActorId, kind: StatusKind, id: u64) -> StatusInstance {

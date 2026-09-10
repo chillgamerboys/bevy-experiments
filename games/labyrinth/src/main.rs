@@ -1,8 +1,8 @@
 //! Native Labyrinth executable.
 
 use bevy::prelude::*;
-use bevy_game_multiplayer::{AtomicFileReconnectCredentialStore, ReconnectCredentialStorage};
-use bevy_game_ui::GameUiPlugin;
+use bevy_gamekit::multiplayer::{AtomicFileReconnectCredentialStore, ReconnectCredentialStorage};
+use bevy_gamekit::ui::GameUiPlugin;
 use labyrinth::{
     profile::{LaunchError, LaunchOptions, ProfileGuard},
     ui::LabyrinthUiConfig,

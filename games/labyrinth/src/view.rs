@@ -1,7 +1,7 @@
 //! Immutable application projections and local intents, independent of network authority.
 
 use bevy::prelude::*;
-use bevy_game_session::SessionId;
+use bevy_gamekit::session::SessionId;
 use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroClass};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;

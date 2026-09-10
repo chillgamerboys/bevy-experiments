@@ -93,7 +93,7 @@ route and build. Passing deterministic CI is not a substitute for these manual g
 
 ## Local menu and history acceptance
 
-- Hover the log toggle, then activate it by pointer or keyboard. No tooltip is
+- Hover the game-menu and log toggles, then activate them by pointer or keyboard. No tooltip is
   shown for this control. Actor/ability cards avoid the visible log surface.
 - Hover/click the empty column above a character: it must not highlight, inspect,
   or select them. The body hit rectangle follows fitted sprite bounds (with a

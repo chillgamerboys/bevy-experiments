@@ -6,9 +6,9 @@ use crate::ui::glyphs::Glyph;
 pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiViewportClass) {
     let root = world
         .spawn((
-            bevy_game_ui::screen_root("Labyrinth Battlefield"),
+            bevy_gamekit::ui::screen_root("Labyrinth Battlefield"),
             BattleRoot,
-            bevy_game_ui::UiTooltipHost,
+            bevy_gamekit::ui::UiTooltipHost,
         ))
         .id();
     world.entity_mut(root).insert(Node {
@@ -43,14 +43,9 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         ),
     ] {
         let control = dock::glyph_control(world, hud, key, "", title, "", glyph, action);
-        if key == "Battle Log Toggle" {
-            world
-                .entity_mut(control)
-                .remove::<bevy_game_ui::UiContextHelp>();
-        }
         world
             .entity_mut(control)
-            .insert(bevy_game_ui::UiTooltipDismissOnActivate);
+            .remove::<bevy_gamekit::ui::UiContextHelp>();
     }
     let timeline = timeline::mount(world, root, snapshot);
     if let Some(mut node) = world.get_mut::<Node>(timeline) {

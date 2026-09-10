@@ -11,6 +11,8 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 bevy = { version = "0.19", default-features = false, features = ["std", "async_executor", "bevy_state"] }
+bevy_gamekit = { package = "bevy-gamekit", path = "crates/bevy_gamekit", default-features = false }
+bevy_game_hex = { path = "crates/bevy_game_hex" }
 bevy_game_discovery = { path = "crates/bevy_game_discovery" }
 bevy_game_multiplayer = { path = "crates/bevy_game_multiplayer" }
 bevy_game_session = { path = "crates/bevy_game_session" }

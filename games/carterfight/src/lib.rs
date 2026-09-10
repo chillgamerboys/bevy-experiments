@@ -4,7 +4,7 @@
 //! narration, projections and scene; Gamekit supplies optional UI mechanics.
 
 use bevy::prelude::*;
-use bevy_game_ui::{GameUiPlugin, GameUiSkinPlugin};
+use bevy_gamekit::ui::{GameUiPlugin, GameUiSkinPlugin};
 
 pub mod backend;
 mod frontend;

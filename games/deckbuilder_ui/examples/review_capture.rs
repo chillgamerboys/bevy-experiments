@@ -8,7 +8,7 @@ use bevy::camera::RenderTarget;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::render::view::screenshot::{save_to_disk, Screenshot, ScreenshotCaptured};
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     resolve_ui_metrics, GameUiPlugin, GameUiSystems, ResolvedUiMetrics, UiScaleMode,
     UiScalePreference,
 };

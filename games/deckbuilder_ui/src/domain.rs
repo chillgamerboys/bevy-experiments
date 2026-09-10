@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy::prelude::{Message, Resource};
-use bevy_game_turns::TurnOrder;
+use bevy_gamekit::turns::TurnOrder;
 use serde::{Deserialize, Serialize};
 
 const STARTING_ENERGY: u8 = 3;

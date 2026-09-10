@@ -1,7 +1,7 @@
 //! Bounded admission and cleanup tied to actual connection entities.
 
 use super::*;
-use bevy_game_discovery::SessionPassword;
+use bevy_gamekit::discovery::SessionPassword;
 
 pub(super) fn host_messages(world: &mut World) {
     let lost = std::mem::take(&mut world.resource_mut::<DisconnectQueue>().0);
@@ -135,7 +135,7 @@ pub(super) fn host_messages(world: &mut World) {
                 let result = hosted.security.begin(entity.to_bits(), credential, at);
                 match result {
                     Ok(offer) => offer_peer(world, &mut hosted, entity, offer),
-                    Err(bevy_game_session::AdmissionFlowError::PeerLimit) => {
+                    Err(bevy_gamekit::session::AdmissionFlowError::PeerLimit) => {
                         refuse(world, &mut hosted, entity, Refused::Full)
                     }
                     Err(_) => refuse(world, &mut hosted, entity, Refused::Admission),
@@ -319,7 +319,7 @@ fn refuse(world: &mut World, hosted: &mut Hosted, entity: Entity, reason: Refuse
     hosted.rejected.insert(entity, Instant::now());
 }
 
-fn cleanup(world: &mut World, cleanup: bevy_game_session::AdmissionCleanup) {
+fn cleanup(world: &mut World, cleanup: bevy_gamekit::session::AdmissionCleanup) {
     for peer in cleanup.released_peers {
         world.resource_mut::<PartyAuthority>().release(peer);
     }

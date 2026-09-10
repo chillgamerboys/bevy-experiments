@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::ui::glyphs::{self, Glyph};
-use bevy_game_ui::{UiContextHelp, UiControlMetrics};
+use bevy_gamekit::ui::{UiContextHelp, UiControlMetrics};
 
 pub(super) struct DockNodes {
     pub skills: Entity,
@@ -37,17 +37,17 @@ pub(super) fn glyph_control(
     let appearance = world.resource::<LabyrinthAppearance>().clone();
     let entity = world
         .spawn((
-            bevy_game_ui::button(name),
+            bevy_gamekit::ui::button(name),
             UiSkin::Control,
             appearance.control(false),
             UiControlMetrics::default(),
-            bevy_game_ui::UiFocusId::new("labyrinth", name),
+            bevy_gamekit::ui::UiFocusId::new("labyrinth", name),
             UiContextHelp {
                 title: title.to_owned(),
                 body: body.to_owned(),
             },
             DockControl,
-            bevy_game_ui::UiInspectable,
+            bevy_gamekit::ui::UiInspectable,
             action,
             ChildOf(parent),
         ))
@@ -305,10 +305,10 @@ pub(super) fn mount_skills(world: &mut World, parent: Entity, loadout: &[SkillId
         );
         world
             .entity_mut(entity)
-            .insert(bevy_game_ui::UiTooltipSource(
+            .insert(bevy_gamekit::ui::UiTooltipSource(
                 super::tooltips::ability_subject(skill),
             ))
-            .insert(bevy_game_ui::UiFocusId::new(
+            .insert(bevy_gamekit::ui::UiFocusId::new(
                 "labyrinth-skills",
                 format!("{skill:?}"),
             ));

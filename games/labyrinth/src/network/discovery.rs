@@ -1,7 +1,7 @@
 //! Game-owned provider composition; listing never grants admission.
 
 use super::*;
-use bevy_game_discovery::{
+use bevy_gamekit::discovery::{
     Compatibility, DiscoveryObservation, DiscoveryProviderId, DiscoverySource, MdnsAdvertiser,
     MdnsBrowser, MdnsSessionAdvertisement, TailnetBrowser, TailnetResponder, TailscaleCli,
     TailscaleStatusTask,

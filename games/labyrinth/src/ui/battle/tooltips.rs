@@ -1,7 +1,7 @@
 //! Labyrinth's disclosed explanations. Shared inspection never imports these rules.
 
 use super::*;
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     UiTooltipCatalog, UiTooltipContent, UiTooltipLink, UiTooltipSource, UiTooltipSubject,
 };
 use labyrinth_rules::{Effect, StatusKind};
@@ -104,11 +104,11 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 .get::<ComputedNode>(host)
                 .map_or(0.0, |node| node.size().x * node.inverse_scale_factor);
             if width > 0.0 && bottom > 100.0 {
-                let bounds = bevy_game_ui::UiTooltipBounds(Rect::from_corners(
+                let bounds = bevy_gamekit::ui::UiTooltipBounds(Rect::from_corners(
                     Vec2::new(0.0, 60.0),
                     Vec2::new(width, bottom),
                 ));
-                if world.get::<bevy_game_ui::UiTooltipBounds>(host) != Some(&bounds) {
+                if world.get::<bevy_gamekit::ui::UiTooltipBounds>(host) != Some(&bounds) {
                     world.entity_mut(host).insert(bounds);
                 }
             }
@@ -216,7 +216,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         if opens {
             world
                 .entity_mut(entity)
-                .insert(bevy_game_ui::UiTooltipOpen(key));
+                .insert(bevy_gamekit::ui::UiTooltipOpen(key));
         }
     }
     entries.insert(subject("ranks"), UiTooltipContent {
@@ -316,7 +316,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         );
         world.entity_mut(entity).insert((
             UiTooltipSource(key.clone()),
-            bevy_game_ui::UiTooltipOpen(key),
+            bevy_gamekit::ui::UiTooltipOpen(key),
         ));
     }
     world
@@ -404,12 +404,12 @@ fn skillbook(world: &mut World, shown: bool, book: Vec<(SkillId, UiTooltipConten
         let key = ability_subject(*skill);
         let entity = world
             .spawn((
-                bevy_game_ui::button(format!("Read {}", content.title)),
+                bevy_gamekit::ui::button(format!("Read {}", content.title)),
                 UiSkin::Control,
-                bevy_game_ui::UiControlMetrics::default(),
-                bevy_game_ui::UiFocusId::new("labyrinth-skillbook", format!("{skill:?}")),
+                bevy_gamekit::ui::UiControlMetrics::default(),
+                bevy_gamekit::ui::UiFocusId::new("labyrinth-skillbook", format!("{skill:?}")),
                 UiTooltipSource(key.clone()),
-                bevy_game_ui::UiTooltipOpen(key),
+                bevy_gamekit::ui::UiTooltipOpen(key),
                 ChildOf(panel),
             ))
             .id();

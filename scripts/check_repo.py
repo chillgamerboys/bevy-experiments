@@ -88,6 +88,9 @@ def check(root: Path) -> list[str]:
             destination = (base / dependency.get("path", ".")).resolve()
             if target in games or destination.is_relative_to(root / "games"):
                 failures.append(f"{relative}: capability depends on game {target}")
+            if (package.get("package", {}).get("name") != "bevy-gamekit"
+                    and target == "bevy-gamekit"):
+                failures.append(f"{relative}: capability depends on facade; dependency direction is reversed")
     return failures
 
 

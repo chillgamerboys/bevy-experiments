@@ -1,12 +1,11 @@
 //! Replaceable native presentation over the domain-neutral inspection lifecycle.
 
 use super::*;
-use crate::{UiControlMetrics, UiFonts, UiSkin, UiTextRole};
+use crate::{UiFonts, UiSkin, UiTextRole};
 use bevy::input_focus::{tab_navigation::TabGroup, FocusCause};
 
 #[derive(Component, Clone)]
 pub(super) enum TooltipAction {
-    Pin,
     Close(usize),
     Link(usize, UiTooltipSubject),
 }
@@ -22,34 +21,56 @@ pub(super) struct TooltipView {
     focus: Option<Entity>,
     rendered: Vec<(UiTooltipSubject, UiTooltipContent)>,
     keyboard: bool,
+    pinned: bool,
 }
 
-fn label(world: &mut World, parent: Entity, name: &str, value: String, role: UiTextRole) {
+fn label(world: &mut World, parent: Entity, name: &str, value: String, role: UiTextRole) -> Entity {
     let fonts = world.resource::<UiFonts>().clone();
-    world.spawn((
-        crate::text(&fonts, role, value),
-        Name::new(name.to_owned()),
-        UiSkin::Text,
-        Node {
-            width: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            ..default()
-        },
-        ChildOf(parent),
-    ));
+    world
+        .spawn((
+            crate::text(&fonts, role, value),
+            Name::new(name.to_owned()),
+            UiSkin::Text,
+            bevy::ui::FocusPolicy::Pass,
+            Node {
+                width: Val::Percent(100.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            ChildOf(parent),
+        ))
+        .id()
 }
 
 fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction) -> Entity {
+    let role = if matches!(action, TooltipAction::Close(_)) {
+        UiTextRole::Title
+    } else {
+        UiTextRole::Body
+    };
     let entity = world
         .spawn((
             crate::button(format!("Tooltip {title}")),
             UiSkin::Control,
-            UiControlMetrics::default(),
             action,
             ChildOf(parent),
         ))
         .id();
-    world.entity_mut(entity).insert(Node {
+    world.entity_mut(entity).insert(action_node());
+    label(
+        world,
+        entity,
+        "Tooltip Control Label",
+        title.to_owned(),
+        role,
+    );
+    entity
+}
+
+// Identical content geometry for inert related terms and their locked buttons.
+// Changing interactivity must not change measurement or floating placement.
+fn action_node() -> Node {
+    Node {
         min_width: Val::Px(44.0),
         min_height: Val::Px(44.0),
         padding: UiRect::axes(Val::Px(8.0), Val::Px(4.0)),
@@ -57,15 +78,7 @@ fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction)
         align_items: AlignItems::Center,
         flex_shrink: 0.0,
         ..default()
-    });
-    label(
-        world,
-        entity,
-        "Tooltip Control Label",
-        title.to_owned(),
-        UiTextRole::Body,
-    );
-    entity
+    }
 }
 
 pub(super) fn render(world: &mut World) {
@@ -75,6 +88,7 @@ pub(super) fn render(world: &mut World) {
         .min();
     let state = world.resource::<UiTooltipState>();
     let keyboard = state.keyboard;
+    let pinned = state.pinned;
     let wanted = state
         .chain
         .iter()
@@ -83,6 +97,7 @@ pub(super) fn render(world: &mut World) {
     world.resource_scope(|world, mut view: Mut<TooltipView>| {
         if view.host != host
             || view.rendered != wanted
+            || view.pinned != pinned
             || view
                 .root
                 .is_some_and(|entity| world.get_entity(entity).is_err())
@@ -94,6 +109,7 @@ pub(super) fn render(world: &mut World) {
             view.focus = None;
             view.rendered.clone_from(&wanted);
             view.host = host;
+            view.pinned = pinned;
             if let Some(host) = host.filter(|_| !wanted.is_empty()) {
                 let root = world
                     .spawn((
@@ -127,29 +143,80 @@ pub(super) fn render(world: &mut World) {
                                 padding: UiRect::all(Val::Px(12.0)),
                                 row_gap: Val::Px(6.0),
                                 overflow: Overflow::scroll_y(),
-                                border: UiRect::all(Val::Px(1.0)),
+                                border: UiRect::all(Val::Px(2.0)),
                                 ..default()
                             },
                             UiSkin::Panel,
                             GlobalZIndex(80 + i32::try_from(depth).unwrap_or(0)),
                             TooltipSurface,
                             Visibility::Inherited,
-                            Interaction::None,
-                            bevy::ui::FocusPolicy::Block,
+                            if pinned {
+                                bevy::ui::FocusPolicy::Block
+                            } else {
+                                bevy::ui::FocusPolicy::Pass
+                            },
                             Pickable {
-                                should_block_lower: true,
-                                is_hoverable: true,
+                                should_block_lower: pinned,
+                                is_hoverable: pinned,
                             },
                             ChildOf(root),
                         ))
                         .id();
+                    if pinned {
+                        world.entity_mut(card).insert(Interaction::None);
+                    }
+                    let heading = world
+                        .spawn((
+                            Node {
+                                min_height: Val::Px(44.0),
+                                padding: UiRect::right(Val::Px(44.0)),
+                                flex_shrink: 0.0,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            Pickable::IGNORE,
+                            bevy::ui::FocusPolicy::Pass,
+                            ChildOf(card),
+                        ))
+                        .id();
                     label(
                         world,
-                        card,
+                        heading,
                         "Tooltip Title",
                         content.title.clone(),
                         UiTextRole::Title,
                     );
+                    if pinned {
+                        let close = action(world, heading, "×", TooltipAction::Close(depth));
+                        world.entity_mut(close).insert((
+                            Name::new("Tooltip Close"),
+                            AccessibleLabel::new("Close tooltip"),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                right: Val::Px(0.0),
+                                top: Val::Px(0.0),
+                                width: Val::Px(44.0),
+                                height: Val::Px(44.0),
+                                min_width: Val::Px(44.0),
+                                min_height: Val::Px(44.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            crate::UiSkinOverrides {
+                                background: Some(Color::NONE),
+                                border: Some(Color::NONE),
+                                ..default()
+                            },
+                        ));
+                        if let Some(children) = world.get::<Children>(close) {
+                            let labels = children.to_vec();
+                            for child in labels {
+                                world.entity_mut(child).insert(Node::default());
+                            }
+                        }
+                        view.focus = Some(close);
+                    }
                     for fact in &content.facts {
                         label(world, card, "Tooltip Fact", fact.clone(), UiTextRole::Body);
                     }
@@ -170,28 +237,33 @@ pub(super) fn render(world: &mut World) {
                             .0
                             .contains_key(&link.subject)
                         {
-                            action(
-                                world,
-                                card,
-                                &format!("{} ›", link.label),
-                                TooltipAction::Link(depth, link.subject.clone()),
-                            );
+                            if pinned {
+                                action(
+                                    world,
+                                    card,
+                                    &format!("{} ›", link.label),
+                                    TooltipAction::Link(depth, link.subject.clone()),
+                                );
+                            } else {
+                                let row = world
+                                    .spawn((
+                                        action_node(),
+                                        Pickable::IGNORE,
+                                        bevy::ui::FocusPolicy::Pass,
+                                        ChildOf(card),
+                                    ))
+                                    .id();
+                                label(
+                                    world,
+                                    row,
+                                    "Tooltip Related Term",
+                                    format!("{} ›", link.label),
+                                    UiTextRole::Body,
+                                );
+                            }
                         }
                     }
-                    let controls = world
-                        .spawn((
-                            Node {
-                                column_gap: Val::Px(6.0),
-                                flex_shrink: 0.0,
-                                ..default()
-                            },
-                            ChildOf(card),
-                        ))
-                        .id();
-                    let pin = action(world, controls, "Pin · T", TooltipAction::Pin);
-                    action(world, controls, "Close", TooltipAction::Close(depth));
                     view.cards.push(card);
-                    view.focus = Some(pin);
                 }
             }
         }
@@ -227,30 +299,25 @@ pub(super) fn render(world: &mut World) {
         }
         view.keyboard = keyboard;
     });
-    let pinned = world.resource::<UiTooltipState>().is_pinned();
-    let pins = world
-        .query::<(Entity, &TooltipAction)>()
-        .iter(world)
-        .filter_map(|(entity, action)| matches!(action, TooltipAction::Pin).then_some(entity))
-        .collect::<Vec<_>>();
-    for entity in pins {
-        let title = if pinned { "Unpin" } else { "Pin" };
-        let children = world
-            .get::<Children>(entity)
-            .map(|children| children.to_vec())
-            .unwrap_or_default();
-        for child in children {
-            if let Some(mut text) = world.get_mut::<Text>(child) {
-                if text.0 != title {
-                    text.0 = title.to_owned();
-                }
-            }
+    let border = {
+        let theme = world.resource::<crate::UiTheme>();
+        if pinned {
+            theme.accent
+        } else {
+            theme.edge
         }
-        if world
-            .get::<AccessibleLabel>(entity)
-            .is_none_or(|label| label.0 != title)
-        {
-            world.entity_mut(entity).insert(AccessibleLabel::new(title));
+    };
+    let cards = world
+        .query_filtered::<Entity, With<TooltipSurface>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    for entity in cards {
+        let value = crate::UiSkinOverrides {
+            border: Some(border),
+            ..default()
+        };
+        if world.get::<crate::UiSkinOverrides>(entity) != Some(&value) {
+            world.entity_mut(entity).insert(value);
         }
     }
 }

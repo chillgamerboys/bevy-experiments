@@ -12,9 +12,6 @@ fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation() {
         )
         .expect("toolbar geometry")
         .center();
-        app.world_mut()
-            .resource_mut::<bevy_game_ui::UiTooltipSettings>()
-            .show_delay = std::time::Duration::ZERO;
         if keyboard {
             assert!(focus_action(app.world_mut(), toolbar));
         } else {
@@ -23,7 +20,7 @@ fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation() {
         run_frames(&mut app, 3);
         assert!(app
             .world()
-            .resource::<bevy_game_ui::UiTooltipState>()
+            .resource::<bevy_gamekit::ui::UiTooltipState>()
             .subjects()
             .is_empty());
         if keyboard {
@@ -35,7 +32,51 @@ fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation() {
         assert!(find_named(app.world_mut(), "Combat History").is_some());
         assert!(app
             .world()
-            .resource::<bevy_game_ui::UiTooltipState>()
+            .resource::<bevy_gamekit::ui::UiTooltipState>()
+            .subjects()
+            .is_empty());
+        assert!(find_named(app.world_mut(), "Tooltip Card 0").is_none());
+    }
+}
+
+#[test]
+fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection() {
+    use bevy_gamekit::ui::{UiContextHelp, UiTooltipRequest, UiTooltipState};
+    for keyboard in [false, true] {
+        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let toolbar = find_named(app.world_mut(), "Battle Settings").expect("game menu");
+        assert!(app.world().get::<UiContextHelp>(toolbar).is_none());
+        let source = find_named(app.world_mut(), "Skill 0").expect("ability");
+        assert!(focus_action(app.world_mut(), source));
+        tap_key(&mut app, KeyCode::KeyT);
+        assert!(app.world().resource::<UiTooltipState>().is_pinned());
+        // Return keyboard arbitration to the game, then open a mouse-locked card.
+        app.world_mut().write_message(UiTooltipRequest::Dismiss);
+        run_frames(&mut app, 1);
+        let subject = app
+            .world()
+            .get::<bevy_gamekit::ui::UiTooltipSource>(source)
+            .expect("source")
+            .0
+            .clone();
+        app.world_mut()
+            .write_message(UiTooltipRequest::Open(subject));
+        run_frames(&mut app, 1);
+        if keyboard {
+            assert!(focus_action(app.world_mut(), toolbar));
+            tap_key(&mut app, KeyCode::Enter);
+        } else {
+            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+            let point = visible_control_rect(app.world(), toolbar, viewport)
+                .expect("menu")
+                .center();
+            overlay_stability::native_pointer_click(&mut app, point);
+        }
+        run_frames(&mut app, 8);
+        assert!(find_named(app.world_mut(), "Game Menu Title").is_some());
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
             .subjects()
             .is_empty());
         assert!(find_named(app.world_mut(), "Tooltip Card 0").is_none());
@@ -175,7 +216,7 @@ fn expanding_an_action_and_its_ability_is_inspection_not_gameplay() {
     let ability = find_named(app.world_mut(), "History Ability 1").expect("disclosed ability");
     let subject = app
         .world()
-        .get::<bevy_game_ui::UiTooltipOpen>(ability)
+        .get::<bevy_gamekit::ui::UiTooltipOpen>(ability)
         .expect("ability link")
         .0
         .clone();
@@ -183,11 +224,11 @@ fn expanding_an_action_and_its_ability_is_inspection_not_gameplay() {
     run_frames(&mut app, 3);
     assert!(app
         .world()
-        .resource::<bevy_game_ui::UiTooltipState>()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
         .is_pinned());
     assert_eq!(
         app.world()
-            .resource::<bevy_game_ui::UiTooltipState>()
+            .resource::<bevy_gamekit::ui::UiTooltipState>()
             .subjects(),
         &[subject]
     );
@@ -215,7 +256,7 @@ fn expanding_an_action_and_its_ability_is_inspection_not_gameplay() {
     assert!(find_named(app.world_mut(), "History Ability 1").is_none());
     assert!(app
         .world()
-        .resource::<bevy_game_ui::UiTooltipState>()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
         .subjects()
         .is_empty());
 }

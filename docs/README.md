@@ -1,10 +1,11 @@
 # Development documentation
 
 - [Architecture and ownership](architecture.md)
+- [Gamekit consolidation and balance infrastructure](gamekit-consolidation.md)
 - [Run, build and add a game](development.md)
 - [Testing and evidence](testing.md)
 - [Multiplayer operations and diagnostics](multiplayer.md)
-- [Future private library extraction](extraction.md)
+- [Library distribution and optional future extraction](extraction.md)
 - [Canonical skill pack](../skills/README.md)
 - [Focused-workspace decision and recovery baseline](decisions/0001-focused-workspace.md)
 

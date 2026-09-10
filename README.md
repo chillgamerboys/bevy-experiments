@@ -26,7 +26,8 @@ The CI profile optimizes compile time; normal `cargo run` uses the dev profile.
 Switching profiles/features can compile additional artifacts. Generated builds and
 review captures live under `target/`; do not commit them or admission credentials.
 
-- `crates/`: independent geometry, turns, UI, testing, session, discovery and transport.
+- `crates/`: the [bevy-gamekit facade](crates/bevy_gamekit/README.md) and independent
+  geometry, turns, UI, testing, session, discovery and transport capabilities.
 - `games/`: each game owns its composition root, rules, presentation and assets.
 - `skills/`: the canonical seven-skill Bevy pack and deterministic maintainer tools.
 - [Documentation](docs/README.md): architecture, onboarding, testing and diagnostics.
@@ -34,3 +35,6 @@ review captures live under `target/`; do not commit them or admission credential
 Gamekit is not a shared engine. Reuse stable algorithms and infrastructure without
 moving genre rules or orchestration into the library. New games go in `games/`
 following the [adopter checklist](docs/development.md), not into a shared game plugin.
+The [consolidation plan](docs/gamekit-consolidation.md) tracks the library boundary,
+adopter validation and upcoming pure balance harness. Games stay in this repository
+but are excluded from library distribution.

@@ -3,7 +3,7 @@
 use super::tests::{pump_until, socket_app};
 use super::*;
 use bevy::ecs::system::RunSystemOnce as _;
-use bevy_game_multiplayer::{CredentialStoreError, ReconnectCredentialStore};
+use bevy_gamekit::multiplayer::{CredentialStoreError, ReconnectCredentialStore};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -110,11 +110,11 @@ fn faults(app: &mut App, drop_offer: bool) {
         PreUpdate,
         discard_offer
             .before(receive_offer)
-            .in_set(bevy_game_multiplayer::MultiplayerSystems::Receive),
+            .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Receive),
     )
     .add_systems(
         PostUpdate,
-        discard_ack.in_set(bevy_game_multiplayer::MultiplayerSystems::Send),
+        discard_ack.in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Send),
     );
 }
 
@@ -473,13 +473,13 @@ fn fake_discovery_password_join_uses_the_same_acknowledged_path_and_keeps_two_se
     let mut guest = socket_app();
     let route = {
         let hosted = host.world().resource::<HostedSession>();
-        let mut registry = bevy_game_discovery::DiscoveryRegistry::default();
+        let mut registry = bevy_gamekit::discovery::DiscoveryRegistry::default();
         registry.apply(
             DiscoveryObservation::Found {
                 metadata: hosted.metadata.clone(),
-                route: bevy_game_discovery::DiscoveryRoute::new(
-                    bevy_game_discovery::DiscoveryProviderId::FAKE,
-                    bevy_game_discovery::DiscoverySource::Service,
+                route: bevy_gamekit::discovery::DiscoveryRoute::new(
+                    bevy_gamekit::discovery::DiscoveryProviderId::FAKE,
+                    bevy_gamekit::discovery::DiscoverySource::Service,
                     hosted.target.clone(),
                     Duration::from_secs(60),
                 ),
@@ -729,7 +729,7 @@ fn closing_host_revokes_old_connections_before_solo_or_replacement_gameplay() {
         assert!(host.world().get::<AuthorizedClient>(old_entity).is_none());
         assert!(host
             .world()
-            .get::<bevy_game_multiplayer::AuthenticatedPeer>(old_entity)
+            .get::<bevy_gamekit::multiplayer::AuthenticatedPeer>(old_entity)
             .is_none());
 
         let new_entity = if replacement_host {

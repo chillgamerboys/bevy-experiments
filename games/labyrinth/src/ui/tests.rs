@@ -1,11 +1,11 @@
 //! Structural/native-input evidence only: no renderer or desktop interaction claim.
 
 use super::*;
-use bevy_game_test::{
+use bevy_gamekit::testing::{
     click_action, find_named, focus_action, run_frames, tap_key, ui_tree_snapshot,
     visible_control_rect, HeadlessUiPlugin,
 };
-use bevy_game_ui::{activation_eligible, UiAction, UiDisabled};
+use bevy_gamekit::ui::{activation_eligible, UiAction, UiDisabled};
 use labyrinth_rules::{
     AbilityLoadout, ActorKind, Combat, HeroSetup, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER,
     MAX_EQUIPPED_ABILITIES,
@@ -185,7 +185,7 @@ fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
     assert!(app.world().get::<UiDisabled>(confirm).is_some());
     assert!(app
         .world()
-        .get::<bevy_game_ui::UiContextHelp>(confirm)
+        .get::<bevy_gamekit::ui::UiContextHelp>(confirm)
         .expect("disabled explanation")
         .body
         .contains("Waiting for your turn"));
@@ -827,7 +827,7 @@ fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_s
             tap_key(&mut app, KeyCode::Escape);
             assert!(app
                 .world()
-                .resource::<bevy_game_ui::UiTooltipState>()
+                .resource::<bevy_gamekit::ui::UiTooltipState>()
                 .subjects()
                 .is_empty());
         }
@@ -972,7 +972,7 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
     );
     assert_eq!(
         app.world()
-            .get::<bevy_game_ui::UiFeedScroll>(scroll)
+            .get::<bevy_gamekit::ui::UiFeedScroll>(scroll)
             .expect("feed")
             .unread(),
         1
@@ -982,7 +982,7 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
     run_frames(&mut app, 3);
     assert_eq!(
         app.world()
-            .get::<bevy_game_ui::UiFeedScroll>(scroll)
+            .get::<bevy_gamekit::ui::UiFeedScroll>(scroll)
             .expect("feed")
             .unread(),
         0

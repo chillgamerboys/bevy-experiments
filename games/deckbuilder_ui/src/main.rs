@@ -1,7 +1,7 @@
 //! Interactive executable for the deckbuilder Gamekit adopter.
 
 use bevy::prelude::*;
-use bevy_game_ui::GameUiPlugin;
+use bevy_gamekit::ui::GameUiPlugin;
 use deckbuilder_ui::DeckbuilderPlugin;
 
 fn main() {

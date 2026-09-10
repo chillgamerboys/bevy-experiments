@@ -15,18 +15,18 @@ use aeronet::io::{
     server::Close,
 };
 use bevy::prelude::*;
-use bevy_game_discovery::{
+use bevy_gamekit::discovery::{
     DiscoveryJoinRoute, DiscoveryObservation, DiscoveryPlugin, ExpectedSession, MdnsAdvertiser,
     MdnsBrowser, MdnsSessionAdvertisement, SessionMetadata, SessionPassword,
     SessionPasswordVerifier, TailnetBrowser, TailnetResponder, TailscaleCli, TailscaleStatusTask,
 };
-use bevy_game_multiplayer::{
+use bevy_gamekit::multiplayer::{
     local_network_addresses, AtomicFileReconnectCredentialStore, GameMultiplayerPlugin,
     MemoryReconnectCredentialStore, PreparedDirectHost, PreparedDirectJoin,
     PreparedDirectReconnect, ReconnectCredentialStorage, ReconnectEndpointBinding,
     StoredReconnectCredential,
 };
-use bevy_game_session::{
+use bevy_gamekit::session::{
     AdmissionCleanup, AdmissionCredential, AdmissionFlowError, AdmissionLimits,
     DirectConnectionCode, DirectEndpoint, DiscoveredDirectTarget, EncodedConnectionCode,
     InviteToken, PeerId, ReconnectCredential, SessionAdmissionAuthority, SessionId,
@@ -87,7 +87,7 @@ impl Plugin for DeckNetworkPlugin {
                     receive_closed,
                 )
                     .chain()
-                    .in_set(bevy_game_multiplayer::MultiplayerSystems::Receive),
+                    .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Receive),
             )
             .add_systems(
                 PreUpdate,
@@ -98,15 +98,15 @@ impl Plugin for DeckNetworkPlugin {
                     handle_remote_requests,
                 )
                     .chain()
-                    .in_set(bevy_game_multiplayer::MultiplayerSystems::GameAuthority),
+                    .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::GameAuthority),
             )
             .add_systems(
                 PostUpdate,
-                send_pending_hello.in_set(bevy_game_multiplayer::MultiplayerSystems::Send),
+                send_pending_hello.in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Send),
             )
             .add_systems(
                 Update,
-                poll_discovery.before(bevy_game_discovery::DiscoverySystems::Maintain),
+                poll_discovery.before(bevy_gamekit::discovery::DiscoverySystems::Maintain),
             )
             .add_systems(Update, poll_host_discovery)
             .add_systems(Update, finish_pending_server_close)
@@ -572,7 +572,7 @@ fn endpoint_is_loopback(endpoint: &DirectEndpoint) -> bool {
 fn retarget(
     target: &DiscoveredDirectTarget,
     address: IpAddr,
-) -> Result<DiscoveredDirectTarget, bevy_game_session::ConnectionCodeError> {
+) -> Result<DiscoveredDirectTarget, bevy_gamekit::session::ConnectionCodeError> {
     Ok(DiscoveredDirectTarget {
         session_id: target.session_id,
         endpoint: DirectEndpoint::new(address.to_string(), target.endpoint.port())?,
@@ -598,7 +598,7 @@ pub(crate) fn start_browser(world: &mut World, discover_tailnet: bool) {
             let reason = format!("LAN discovery unavailable: {error}");
             bevy::log::warn!("{reason}");
             world.write_message(DiscoveryObservation::Unavailable {
-                provider: bevy_game_discovery::DiscoveryProviderId::MDNS,
+                provider: bevy_gamekit::discovery::DiscoveryProviderId::MDNS,
                 reason: reason.clone(),
             });
             notices.push(reason);
@@ -642,10 +642,10 @@ pub(crate) fn start_discovered_join(
 ) -> Result<(), String> {
     let password = SessionPassword::new(password).map_err(|error| error.to_string())?;
     let wire = PasswordWire(password.expose_for_encrypted_transport().to_owned());
-    let Some(bevy_game_discovery::DiscoveryEndpoint::Direct(target)) = route.endpoint(0) else {
+    let Some(bevy_gamekit::discovery::DiscoveryEndpoint::Direct(target)) = route.endpoint(0) else {
         return Err("This game has no transport adapter for that service provider.".to_owned());
     };
-    let prepared = bevy_game_multiplayer::PreparedDirectDiscoveryJoin::new(target)
+    let prepared = bevy_gamekit::multiplayer::PreparedDirectDiscoveryJoin::new(target)
         .map_err(|error| error.to_string())?;
     disconnect_guest(world);
     let entity = prepared.connect(world);
@@ -777,7 +777,7 @@ pub(crate) fn close_session(world: &mut World) {
             world.entity_mut(entity).remove::<(
                 DeckAuthorized,
                 AuthorizedClient,
-                bevy_game_multiplayer::AuthenticatedPeer,
+                bevy_gamekit::multiplayer::AuthenticatedPeer,
             )>();
         }
         for (entity, attempt) in &hosted.attempts {
@@ -993,7 +993,7 @@ fn receive_welcome(
         }
         commands
             .entity(guest.0)
-            .insert(bevy_game_multiplayer::AuthenticatedPeer {
+            .insert(bevy_gamekit::multiplayer::AuthenticatedPeer {
                 peer: welcome.peer_id,
                 reconnected: welcome.reconnected,
             });
@@ -1285,7 +1285,7 @@ fn poll_discovery(
                 let reason = format!("LAN discovery stopped: {error}");
                 bevy::log::warn!("{reason}");
                 observations.write(DiscoveryObservation::Failed {
-                    provider: bevy_game_discovery::DiscoveryProviderId::MDNS,
+                    provider: bevy_gamekit::discovery::DiscoveryProviderId::MDNS,
                     reason: reason.clone(),
                 });
                 state.notice = Some(reason);
@@ -1307,11 +1307,10 @@ fn poll_discovery(
         browser.next_tailnet_refresh = time.elapsed() + TAILSCALE_REFRESH;
         let result = result.and_then(|status| {
             if browser.tailnet.is_none() {
-                let address = status
-                    .local_addresses
-                    .first()
-                    .copied()
-                    .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)?;
+                let address =
+                    status.local_addresses.first().copied().ok_or(
+                        bevy_gamekit::discovery::TailnetDiscoveryError::ClientDisconnected,
+                    )?;
                 browser.tailnet = Some(TailnetBrowser::bind(address)?);
             }
             if let Some(tailnet) = browser.tailnet.as_mut() {
@@ -1323,7 +1322,7 @@ fn poll_discovery(
             browser.tailnet = None;
             let reason = format!("Tailnet discovery unavailable: {error}");
             observations.write(DiscoveryObservation::Unavailable {
-                provider: bevy_game_discovery::DiscoveryProviderId::TAILSCALE,
+                provider: bevy_gamekit::discovery::DiscoveryProviderId::TAILSCALE,
                 reason: reason.clone(),
             });
             state.notice = Some(reason);
@@ -1339,7 +1338,7 @@ fn poll_discovery(
             Err(error) => {
                 let reason = format!("Tailnet discovery stopped: {error}");
                 observations.write(DiscoveryObservation::Failed {
-                    provider: bevy_game_discovery::DiscoveryProviderId::TAILSCALE,
+                    provider: bevy_gamekit::discovery::DiscoveryProviderId::TAILSCALE,
                     reason: reason.clone(),
                 });
                 state.notice = Some(reason);
@@ -1361,9 +1360,10 @@ fn poll_host_discovery(hosted: Option<ResMut<HostedSession>>, mut state: ResMut<
                 .local_addresses
                 .first()
                 .copied()
-                .ok_or(bevy_game_discovery::TailnetDiscoveryError::ClientDisconnected)?;
-            let target = retarget(&hosted.target, address)
-                .map_err(|_| bevy_game_discovery::TailnetDiscoveryError::MalformedAnnouncement)?;
+                .ok_or(bevy_gamekit::discovery::TailnetDiscoveryError::ClientDisconnected)?;
+            let target = retarget(&hosted.target, address).map_err(|_| {
+                bevy_gamekit::discovery::TailnetDiscoveryError::MalformedAnnouncement
+            })?;
             TailnetResponder::bind(address, hosted.metadata.clone(), target)
         });
         match result {
@@ -1406,8 +1406,8 @@ mod admission_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_game_multiplayer::{InMemorySessionLink, ReconnectCredentialStore as _};
-    use bevy_game_test::TestAppBuilder;
+    use bevy_gamekit::multiplayer::{InMemorySessionLink, ReconnectCredentialStore as _};
+    use bevy_gamekit::testing::TestAppBuilder;
 
     #[test]
     fn wire_snapshots_are_target_specific() {
@@ -1468,10 +1468,10 @@ mod tests {
     }
 
     #[derive(Resource, Default)]
-    struct LifecycleEvidence(Vec<bevy_game_multiplayer::MultiplayerLifecycle>);
+    struct LifecycleEvidence(Vec<bevy_gamekit::multiplayer::MultiplayerLifecycle>);
 
     fn record_lifecycle(
-        mut events: MessageReader<bevy_game_multiplayer::MultiplayerLifecycle>,
+        mut events: MessageReader<bevy_gamekit::multiplayer::MultiplayerLifecycle>,
         mut evidence: ResMut<LifecycleEvidence>,
     ) {
         evidence.0.extend(events.read().cloned());
@@ -1497,13 +1497,13 @@ mod tests {
         )
         .expect("host");
         let hosted = host.world().resource::<HostedSession>();
-        let mut registry = bevy_game_discovery::DiscoveryRegistry::default();
+        let mut registry = bevy_gamekit::discovery::DiscoveryRegistry::default();
         registry.apply(
             DiscoveryObservation::Found {
                 metadata: hosted.metadata.clone(),
-                route: bevy_game_discovery::DiscoveryRoute::new(
-                    bevy_game_discovery::DiscoveryProviderId::FAKE,
-                    bevy_game_discovery::DiscoverySource::Service,
+                route: bevy_gamekit::discovery::DiscoveryRoute::new(
+                    bevy_gamekit::discovery::DiscoveryProviderId::FAKE,
+                    bevy_gamekit::discovery::DiscoverySource::Service,
                     hosted.target.clone(),
                     Duration::from_secs(60),
                 ),
@@ -1574,7 +1574,9 @@ mod tests {
         let target = DiscoveredDirectTarget {
             session_id: SessionId::from_bytes([1; 16]),
             endpoint: DirectEndpoint::new("192.168.1.20", 7777).expect("fixture endpoint"),
-            certificate_fingerprint: bevy_game_session::CertificateFingerprint::from_bytes([2; 32]),
+            certificate_fingerprint: bevy_gamekit::session::CertificateFingerprint::from_bytes(
+                [2; 32],
+            ),
             certificate_expires_unix_seconds: 2_000_000_000,
         };
         let route = retarget(
@@ -1737,7 +1739,7 @@ mod tests {
             .snapshot(Seat::Guest)
             .own_hand;
         let old_entity = guest.world().resource::<GuestConnection>().0;
-        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_game_multiplayer::MultiplayerLifecycle::Authenticated { entity, reconnected: false, .. } if *entity == old_entity)));
+        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_gamekit::multiplayer::MultiplayerLifecycle::Authenticated { entity, reconnected: false, .. } if *entity == old_entity)));
         close_session(guest.world_mut());
         assert!(pump_until(
             &mut host,
@@ -1754,7 +1756,7 @@ mod tests {
             }
         ));
         assert!(guest.world().get_entity(old_entity).is_err());
-        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_game_multiplayer::MultiplayerLifecycle::Disconnected { entity, .. } if *entity == old_entity)));
+        assert!(guest.world().resource::<LifecycleEvidence>().0.iter().any(|event| matches!(event, bevy_gamekit::multiplayer::MultiplayerLifecycle::Disconnected { entity, .. } if *entity == old_entity)));
         drop(guest);
         let mut guest = socket_app();
         guest.insert_resource(ReconnectCredentialStorage::new(
@@ -1790,7 +1792,7 @@ mod tests {
             .iter()
             .any(|event| matches!(
                 event,
-                bevy_game_multiplayer::MultiplayerLifecycle::Authenticated {
+                bevy_gamekit::multiplayer::MultiplayerLifecycle::Authenticated {
                     reconnected: true,
                     ..
                 }
@@ -1799,12 +1801,12 @@ mod tests {
 
     #[test]
     fn credential_store_round_trip() {
-        let store = bevy_game_multiplayer::MemoryReconnectCredentialStore::default();
+        let store = bevy_gamekit::multiplayer::MemoryReconnectCredentialStore::default();
         let stored = StoredReconnectCredential {
             session_id: SessionId::from_bytes([1; 16]),
             endpoint_binding: ReconnectEndpointBinding::new(
                 DirectEndpoint::new("host.local", 7777).expect("endpoint"),
-                bevy_game_session::CertificateFingerprint::from_bytes([2; 32]),
+                bevy_gamekit::session::CertificateFingerprint::from_bytes([2; 32]),
                 2_000_000_000,
             )
             .expect("binding"),

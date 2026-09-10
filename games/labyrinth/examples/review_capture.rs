@@ -7,7 +7,7 @@ use bevy::render::{
     view::screenshot::{save_to_disk, Screenshot, ScreenshotCaptured},
 };
 use bevy::{app::AppExit, asset::RenderAssetUsages, camera::RenderTarget, prelude::*};
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     resolve_ui_metrics, GameUiPlugin, GameUiSystems, ResolvedUiMetrics, UiContextHelp,
     UiContextHelpState, UiContextHelpSystems, UiScaleMode, UiScalePreference,
 };
@@ -196,7 +196,7 @@ fn main() {
             Update,
             help_fixture
                 .after(UiContextHelpSystems::Resolve)
-                .before(bevy_game_ui::UiTooltipSystems::Resolve)
+                .before(bevy_gamekit::ui::UiTooltipSystems::Resolve)
                 .before(labyrinth::ui::LabyrinthUiSystems::Present),
         )
         .run();
@@ -206,16 +206,27 @@ fn main() {
 // help state for pixel review; production input routing is verified separately.
 fn help_fixture(
     capture: Res<Capture>,
-    controls: Query<(Entity, &Name, &UiContextHelp)>,
+    mut controls: Query<(Entity, &Name, &UiContextHelp, &mut Interaction)>,
     mut help: ResMut<UiContextHelpState>,
+    mut settings: ResMut<bevy_gamekit::ui::UiTooltipSettings>,
 ) {
     let source = match capture.route.as_str() {
-        "help" => "Skill 0",
+        "help" | "help-locked" => "Skill 0",
         "history-actor" => "Actor 105",
         _ => return,
     };
-    if let Some((entity, _, content)) = controls.iter().find(|(_, name, _)| name.as_str() == source)
+    // Freeze a presentation state, not an input/timing test. Production timing
+    // and native pointer dismissal are covered by the per-frame UI tests.
+    settings.lock_delay = if capture.route == "help-locked" {
+        std::time::Duration::ZERO
+    } else {
+        std::time::Duration::MAX
+    };
+    if let Some((entity, _, content, mut interaction)) = controls
+        .iter_mut()
+        .find(|(_, name, _, _)| name.as_str() == source)
     {
+        *interaction = Interaction::Hovered;
         help.entity = Some(entity);
         help.content = Some(content.clone());
     }

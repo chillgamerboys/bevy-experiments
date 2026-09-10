@@ -11,7 +11,7 @@ pub use appearance::LabyrinthAppearance;
 use bevy::ecs::message::MessageCursor;
 use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
-use bevy_game_ui::{
+use bevy_gamekit::ui::{
     GameUiSkinPlugin, GameUiSystems, GameUiTooltipPlugin, ResolvedUiMetrics, UiActivated, UiFonts,
     UiInsets, UiMotionPreference, UiScaleMode, UiScalePreference, UiSkin, UiSkinOverrides, UiSpace,
     UiSpacing, UiTextChanged, UiTextField, UiTextRole, UiTheme,
@@ -50,7 +50,7 @@ impl Plugin for LabyrinthUiPlugin {
         app.add_plugins((
             GameUiSkinPlugin,
             GameUiTooltipPlugin,
-            bevy_game_ui::GameUiFeedPlugin,
+            bevy_gamekit::ui::GameUiFeedPlugin,
             crate::scene::LabyrinthScenePlugin,
         ))
         .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
@@ -82,7 +82,7 @@ impl Plugin for LabyrinthUiPlugin {
             (LabyrinthUiSystems::Input, LabyrinthUiSystems::Present)
                 .chain()
                 .after(GameUiSystems::EmitActivations)
-                .after(bevy_game_ui::UiTooltipSystems::Resolve),
+                .after(bevy_gamekit::ui::UiTooltipSystems::Resolve),
         )
         .add_systems(
             Update,
@@ -98,7 +98,7 @@ impl Plugin for LabyrinthUiPlugin {
         .add_systems(Update, glyphs::refresh.after(LabyrinthUiSystems::Present))
         .configure_sets(
             Update,
-            LabyrinthUiSystems::Present.after(bevy_game_ui::UiContextHelpSystems::Resolve),
+            LabyrinthUiSystems::Present.after(bevy_gamekit::ui::UiContextHelpSystems::Resolve),
         )
         .add_systems(Update, present.in_set(LabyrinthUiSystems::Present));
     }
@@ -158,7 +158,7 @@ struct UiState {
     target: Option<ActorId>,
     decision: Option<(u64, ActorId)>,
     encounter: Option<u64>,
-    menus: bevy_game_ui::UiMenuStack<MenuPage>,
+    menus: bevy_gamekit::ui::UiMenuStack<MenuPage>,
     log_mode: LogMode,
     expanded_log: std::collections::BTreeSet<u64>,
     show_skillbook: bool,
@@ -169,7 +169,7 @@ struct UiState {
     code: SecretText,
     lan: bool,
     tailnet: bool,
-    selected_session: Option<bevy_game_session::SessionId>,
+    selected_session: Option<bevy_gamekit::session::SessionId>,
     local_notice: Option<String>,
     shell_key: Option<String>,
     overlay_key: Option<String>,
@@ -183,7 +183,7 @@ enum Action {
     JoinCode,
     Browse,
     JoinDiscovered,
-    Session(bevy_game_session::SessionId),
+    Session(bevy_gamekit::session::SessionId),
     Reconnect,
     Leave,
     ConfirmLeave,
@@ -261,7 +261,7 @@ fn collect_actions(world: &mut World, mut cursor: Local<MessageCursor<UiActivate
 
 fn keyboard_shortcuts(world: &mut World) {
     if world
-        .resource::<bevy_game_ui::UiTooltipState>()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
         .captures_keyboard()
     {
         return;
@@ -434,13 +434,13 @@ fn apply_action(world: &mut World, action: Action) {
                     None
                 }
                 Action::InspectActor(actor) => {
-                    world.write_message(bevy_game_ui::UiTooltipRequest::Open(
+                    world.write_message(bevy_gamekit::ui::UiTooltipRequest::Open(
                         battle::actor_subject(view.encounter, actor),
                     ));
                     None
                 }
                 Action::Status(actor, _status) => {
-                    world.write_message(bevy_game_ui::UiTooltipRequest::Open(
+                    world.write_message(bevy_gamekit::ui::UiTooltipRequest::Open(
                         battle::effects_subject(view.encounter, actor),
                     ));
                     None
@@ -537,7 +537,7 @@ fn apply_action(world: &mut World, action: Action) {
                     None
                 }
                 Action::LatestLog => {
-                    let mut query = world.query::<&mut bevy_game_ui::UiFeedScroll>();
+                    let mut query = world.query::<&mut bevy_gamekit::ui::UiFeedScroll>();
                     for mut feed in query.iter_mut(world) {
                         feed.jump_to_latest();
                     }
@@ -627,7 +627,7 @@ fn label(
     role: UiTextRole,
 ) -> Entity {
     let fonts = world.resource::<UiFonts>();
-    let bundle = bevy_game_ui::text(fonts, role, value);
+    let bundle = bevy_gamekit::ui::text(fonts, role, value);
     world
         .spawn((
             Name::new(name.to_owned()),
@@ -650,13 +650,13 @@ fn control(
     let value = value.into();
     let entity = world
         .spawn((
-            bevy_game_ui::button(key.clone()),
+            bevy_gamekit::ui::button(key.clone()),
             UiSkin::Control,
             UiSpacing {
                 padding: Some(UiInsets::axes(UiSpace::Units(1.0), UiSpace::Units(0.5))),
                 ..default()
             },
-            bevy_game_ui::UiFocusId::new("labyrinth", key),
+            bevy_gamekit::ui::UiFocusId::new("labyrinth", key),
             action,
             ChildOf(parent),
         ))
@@ -665,7 +665,9 @@ fn control(
         .entity_mut(entity)
         .insert(AccessibleLabel::new(value.clone()));
     if disabled {
-        world.entity_mut(entity).insert(bevy_game_ui::UiDisabled);
+        world
+            .entity_mut(entity)
+            .insert(bevy_gamekit::ui::UiDisabled);
     }
     label(world, entity, "Control Label", value, UiTextRole::Body);
     entity
@@ -684,7 +686,7 @@ fn set_text(world: &mut World, entity: Entity, value: String) {
             text.0.clone_from(&value);
             // A dynamic skill/actor label must not leave its accessible name stale.
             if let Some(parent) = parent {
-                if world.get::<bevy_game_ui::UiAction>(parent).is_some() {
+                if world.get::<bevy_gamekit::ui::UiAction>(parent).is_some() {
                     world.entity_mut(parent).insert(AccessibleLabel::new(value));
                 }
             }
@@ -693,11 +695,13 @@ fn set_text(world: &mut World, entity: Entity, value: String) {
 }
 
 fn set_disabled(world: &mut World, entity: Entity, disabled: bool) {
-    if disabled && world.get::<bevy_game_ui::UiDisabled>(entity).is_none() {
-        world.entity_mut(entity).insert(bevy_game_ui::UiDisabled);
-    } else if !disabled && world.get::<bevy_game_ui::UiDisabled>(entity).is_some() {
+    if disabled && world.get::<bevy_gamekit::ui::UiDisabled>(entity).is_none() {
         world
             .entity_mut(entity)
-            .remove::<bevy_game_ui::UiDisabled>();
+            .insert(bevy_gamekit::ui::UiDisabled);
+    } else if !disabled && world.get::<bevy_gamekit::ui::UiDisabled>(entity).is_some() {
+        world
+            .entity_mut(entity)
+            .remove::<bevy_gamekit::ui::UiDisabled>();
     }
 }

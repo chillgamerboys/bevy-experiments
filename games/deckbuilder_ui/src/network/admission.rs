@@ -189,7 +189,7 @@ pub(super) fn handle_persistence(
             state.latest = Some(authority.snapshot(Seat::Host));
             commands.entity(connection).insert((
                 AuthorizedClient,
-                bevy_game_multiplayer::AuthenticatedPeer {
+                bevy_gamekit::multiplayer::AuthenticatedPeer {
                     peer: grant.peer,
                     reconnected: grant.reconnected,
                 },

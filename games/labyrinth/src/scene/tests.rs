@@ -2,7 +2,7 @@
 
 use super::*;
 use bevy::camera::{ComputedCameraValues, RenderTargetInfo, Viewport};
-use bevy_game_test::{run_frames, HeadlessUiPlugin};
+use bevy_gamekit::testing::{run_frames, HeadlessUiPlugin};
 use labyrinth_rules::{ActorKind, Combat, EnemyKind, HeroClass, DEFAULT_HERO_ROSTER};
 
 fn close(actual: Vec2, expected: Vec2) {

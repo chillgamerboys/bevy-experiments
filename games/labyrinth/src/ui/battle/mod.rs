@@ -19,7 +19,7 @@ pub(super) use inspection::{select_skill_slot, selected_action, skills_disclosed
 use layout::mount;
 
 use super::*;
-use bevy_game_ui::{UiRegionRole, UiViewportClass};
+use bevy_gamekit::ui::{UiRegionRole, UiViewportClass};
 use labyrinth_rules::{
     skill_definition, status_definition, ActorKind, ActorSnapshot, CombatEventKind, CombatOutcome,
     CombatSnapshot, DamageKind, Team,
@@ -72,7 +72,7 @@ pub(super) fn clear(world: &mut World) {
     despawn_marked::<BattleRoot>(world);
     world.remove_resource::<BattleNodes>();
     world
-        .resource_mut::<bevy_game_ui::UiTooltipCatalog>()
+        .resource_mut::<bevy_gamekit::ui::UiTooltipCatalog>()
         .0
         .retain(|key, _| !key.0.starts_with("labyrinth/"));
 }

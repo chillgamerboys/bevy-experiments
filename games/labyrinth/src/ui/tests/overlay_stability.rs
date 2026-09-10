@@ -4,7 +4,7 @@ use super::*;
 use crate::scene::{SceneActorAnchor, SceneAppearance};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
-use bevy_game_ui::UiContextHelp;
+use bevy_gamekit::ui::UiContextHelp;
 use labyrinth_rules::{skill_definition, CombatSnapshot};
 use std::collections::BTreeMap;
 
@@ -171,6 +171,11 @@ fn keyboard_control(app: &mut App, name: &str) {
 }
 
 pub(super) fn hover_at(app: &mut App, point: Vec2) {
+    move_pointer(app, point);
+    run_frames(app, 8);
+}
+
+fn move_pointer(app: &mut App, point: Vec2) {
     let (window, mut value) = app
         .world_mut()
         .query::<(Entity, &mut Window)>()
@@ -187,7 +192,6 @@ pub(super) fn hover_at(app: &mut App, point: Vec2) {
                 delta: None,
             },
         ));
-    run_frames(app, 8);
 }
 
 pub(super) fn native_pointer_click(app: &mut App, point: Vec2) {
@@ -224,9 +228,6 @@ fn hover_control(app: &mut App, entity: Entity, viewport: Rect) {
 fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log() {
     for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
         let mut app = scene_app(width, height, UiScaleMode::Auto);
-        app.world_mut()
-            .resource_mut::<bevy_game_ui::UiTooltipSettings>()
-            .show_delay = std::time::Duration::ZERO;
         let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
         let actor = find_named(app.world_mut(), "Actor 105").expect("actor");
         let layout = app
@@ -262,7 +263,7 @@ fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
         );
         assert!(app
             .world()
-            .resource::<bevy_game_ui::UiTooltipState>()
+            .resource::<bevy_gamekit::ui::UiTooltipState>()
             .subjects()
             .is_empty());
         native_pointer_click(&mut app, empty);
@@ -270,7 +271,8 @@ fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
         native_pointer_click(&mut app, hit.center());
         assert_eq!(app.world().resource::<UiState>().target, Some(ActorId(105)));
         let toggle = find_named(app.world_mut(), "Battle Log Toggle").expect("log");
-        assert!(click_action(&mut app, toggle));
+        let toggle_rect = visible_control_rect(app.world(), toggle, viewport).expect("toggle");
+        native_pointer_click(&mut app, toggle_rect.center());
         run_frames(&mut app, 3);
         hover_at(&mut app, hit.center());
         let panel = find_named(app.world_mut(), "Combat History").expect("history");
@@ -398,9 +400,9 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free() {
         run_frames(&mut app, 5);
         for (index, skill) in skills.iter().enumerate() {
             let control = find_named(app.world_mut(), &format!("Skill {index}")).expect("ability");
-            assert!(focus_action(app.world_mut(), control));
-            run_frames(&mut app, 8);
-            let title = find_named(app.world_mut(), "Tooltip Title").expect("delayed card");
+            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1920.0, 1080.0));
+            hover_control(&mut app, control, viewport);
+            let title = find_named(app.world_mut(), "Tooltip Title").expect("hover card");
             assert_eq!(
                 app.world().get::<Text>(title).expect("title").0,
                 skill_definition(*skill).name
@@ -433,15 +435,92 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free() {
     run_frames(&mut app, 4);
     assert!(app
         .world()
-        .resource::<bevy_game_ui::UiTooltipState>()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
         .is_pinned());
     assert_eq!(app.world().resource::<UiState>().selected, selection);
     assert_eq!(app.world().resource::<CapturedCombatIntents>().0, 0);
 }
 
 #[test]
+fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry() {
+    use bevy_gamekit::ui::UiTooltipState;
+    let mut app = scene_app(1280, 720, UiScaleMode::Auto);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+    let source = find_named(app.world_mut(), "Skill 0").expect("source");
+    let point = visible_control_rect(app.world(), source, viewport)
+        .expect("source geometry")
+        .center();
+    move_pointer(&mut app, point);
+    app.update();
+    let preview = find_named(app.world_mut(), "Tooltip Card 0").expect("visible immediately");
+    assert!(app
+        .world()
+        .get::<InheritedVisibility>(preview)
+        .expect("visibility")
+        .get());
+    assert!(find_named(app.world_mut(), "Tooltip Close").is_none());
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    move_pointer(&mut app, Vec2::new(5.0, 5.0));
+    app.update();
+    assert!(
+        find_named(app.world_mut(), "Tooltip Card 0").is_none(),
+        "no leave grace"
+    );
+    move_pointer(&mut app, point);
+    app.update();
+    let preview = find_named(app.world_mut(), "Tooltip Card 0").expect("preview");
+    let before = visible_control_rect(app.world(), preview, viewport).expect("preview geometry");
+    for frame in 0..12 {
+        app.update();
+        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("continuous card");
+        assert!(app
+            .world()
+            .get::<InheritedVisibility>(card)
+            .expect("visibility")
+            .get());
+        let rect = visible_control_rect(app.world(), card, viewport).expect("placed card");
+        assert_eq!(
+            rect, before,
+            "locking should not resize/move the card on frame {frame}"
+        );
+    }
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    let close = find_named(app.world_mut(), "Tooltip Close").expect("locked close");
+    let close_rect = visible_control_rect(app.world(), close, viewport).expect("close fits");
+    assert!(before.contains(close_rect.center()));
+    move_pointer(&mut app, Vec2::new(5.0, 5.0));
+    run_frames(&mut app, 15);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    hover_at(&mut app, close_rect.center());
+    assert_eq!(
+        app.world().get::<Interaction>(close),
+        Some(&Interaction::Hovered),
+        "close is reachable"
+    );
+    native_pointer_click(&mut app, close_rect.center());
+    assert!(
+        find_named(app.world_mut(), "Tooltip Card 0").is_none(),
+        "after closing: {:?}",
+        app.world().resource::<UiTooltipState>().subjects()
+    );
+    run_frames(&mut app, 15);
+    assert!(
+        find_named(app.world_mut(), "Tooltip Card 0").is_none(),
+        "uncovered actor cannot reopen under a stationary cursor"
+    );
+    move_pointer(&mut app, point);
+    app.update();
+    assert!(
+        find_named(app.world_mut(), "Tooltip Card 0").is_some(),
+        "fresh pointer movement restores hover"
+    );
+}
+
+#[test]
 fn tooltip_is_never_visible_at_unplaced_geometry() {
-    use bevy_game_ui::{UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject};
+    use bevy_gamekit::ui::{
+        UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject,
+    };
 
     let mut app = scene_app(1280, 720, UiScaleMode::Auto);
     let subject = UiTooltipSubject("placement-regression".to_owned());
@@ -486,7 +565,7 @@ fn tooltip_is_never_visible_at_unplaced_geometry() {
             );
             let bounds = app
                 .world_mut()
-                .query::<&bevy_game_ui::UiTooltipBounds>()
+                .query::<&bevy_gamekit::ui::UiTooltipBounds>()
                 .single(app.world())
                 .expect("safe area")
                 .0;
@@ -507,7 +586,9 @@ fn tooltip_is_never_visible_at_unplaced_geometry() {
 
 #[test]
 fn tooltip_resize_is_placed_before_clipping_in_the_same_frame() {
-    use bevy_game_ui::{UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject};
+    use bevy_gamekit::ui::{
+        UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject,
+    };
     let mut app = scene_app(1920, 1080, UiScaleMode::Auto);
     let subject = UiTooltipSubject("resize-regression".into());
     app.world_mut().resource_mut::<UiTooltipCatalog>().0.insert(
@@ -572,6 +653,7 @@ fn opening_a_link_keeps_the_parent_tooltip_visible() {
     let mut app = scene_app(1280, 720, UiScaleMode::Auto);
     let source = find_named(app.world_mut(), "Skill 0").expect("ability");
     assert!(focus_action(app.world_mut(), source));
+    tap_key(&mut app, KeyCode::KeyT);
     run_frames(&mut app, 10);
     let card = find_named(app.world_mut(), "Tooltip Card 0").expect("root");
     let before = *app
@@ -582,7 +664,7 @@ fn opening_a_link_keeps_the_parent_tooltip_visible() {
     // This test concerns layout continuity at the activation boundary; pointer
     // routing is exercised separately by the native-input fixture.
     app.world_mut()
-        .write_message(bevy_game_ui::UiActivated { entity: link });
+        .write_message(bevy_gamekit::ui::UiActivated { entity: link });
     for frame in 0..6 {
         app.update();
         let card = find_named(app.world_mut(), "Tooltip Card 0").expect("root");
@@ -610,7 +692,7 @@ fn opening_a_link_keeps_the_parent_tooltip_visible() {
 
 #[test]
 fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters() {
-    use bevy_game_ui::{UiTooltipRequest, UiTooltipState};
+    use bevy_gamekit::ui::{UiTooltipRequest, UiTooltipState};
     for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
         let mut app = scene_app(width, height, UiScaleMode::Auto);
         let expected = geometry(&mut app);
@@ -623,6 +705,8 @@ fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters() {
         let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
         let source = find_named(app.world_mut(), "Skill 0").expect("ability");
         hover_control(&mut app, source, viewport);
+        run_frames(&mut app, 8);
+        assert!(app.world().resource::<UiTooltipState>().is_pinned());
         let card = find_named(app.world_mut(), "Tooltip Card 0").expect("card");
         let rect = visible_control_rect(app.world(), card, viewport).expect("visible card");
         assert!(
@@ -635,7 +719,7 @@ fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters() {
         );
         let bounds = app
             .world_mut()
-            .query::<&bevy_game_ui::UiTooltipBounds>()
+            .query::<&bevy_gamekit::ui::UiTooltipBounds>()
             .single(app.world())
             .expect("safe area")
             .0;
@@ -656,6 +740,7 @@ fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters() {
             body: ["Waiting spends a turn without changing formation."; 128].join("\n"),
         });
         assert!(focus_action(app.world_mut(), wait));
+        tap_key(&mut app, KeyCode::KeyT);
         run_frames(&mut app, 8);
         let card = find_named(app.world_mut(), "Tooltip Card 0").expect("long card");
         let rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");

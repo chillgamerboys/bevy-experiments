@@ -25,12 +25,12 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
     }
     let root = world
         .spawn((
-            bevy_game_ui::menu_overlay("Labyrinth Blocking Overlay"),
+            bevy_gamekit::ui::menu_overlay("Labyrinth Blocking Overlay"),
             OverlayRoot,
         ))
         .id();
     let panel = world
-        .spawn((bevy_game_ui::menu_panel("Overlay Panel"), ChildOf(root)))
+        .spawn((bevy_gamekit::ui::menu_panel("Overlay Panel"), ChildOf(root)))
         .id();
     if ui.menus.current() == Some(&MenuPage::Leave) {
         label(

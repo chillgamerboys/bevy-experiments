@@ -42,6 +42,11 @@ class RepositoryChecks(unittest.TestCase):
         self.write("games/example/Cargo.toml", '[workspace]\nmembers = []\n')
         self.assertEqual(len(check(self.root)), 3)
 
+    def test_capability_cannot_depend_back_on_facade(self):
+        self.write("Cargo.toml", '[workspace]\nmembers = []\n[workspace.dependencies]\nbevy_gamekit = { package = "bevy-gamekit", path = "crates/bevy_gamekit" }\n')
+        self.write("crates/cap/Cargo.toml", '[package]\nname = "cap"\nversion = "0.1.0"\n[target.\'cfg(unix)\'.build-dependencies]\nbevy_gamekit.workspace = true\n')
+        self.assertTrue(any("depends on facade" in error for error in check(self.root)))
+
 
 if __name__ == "__main__":
     unittest.main()

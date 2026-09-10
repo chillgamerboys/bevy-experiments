@@ -1,7 +1,7 @@
 //! Labyrinth wire vocabulary, distinct from transport and pure combat rules.
 
 use bevy::prelude::*;
-use bevy_game_session::{InviteToken, PeerId, ReconnectCredential, SessionId};
+use bevy_gamekit::session::{InviteToken, PeerId, ReconnectCredential, SessionId};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 

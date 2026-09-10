@@ -3,9 +3,9 @@
 
 use std::{path::Path, thread};
 
-use bevy_game_discovery::{DiscoveryEndpoint, FakeDiscoveryProvider};
-use bevy_game_multiplayer::{CredentialStoreError, ReconnectCredentialStore};
-use bevy_game_test::TestAppBuilder;
+use bevy_gamekit::discovery::{DiscoveryEndpoint, FakeDiscoveryProvider};
+use bevy_gamekit::multiplayer::{CredentialStoreError, ReconnectCredentialStore};
+use bevy_gamekit::testing::TestAppBuilder;
 use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, HeroClass, StatusKind, Team};
 
 use super::*;
@@ -20,7 +20,7 @@ const LAST_GUEST: usize = TEST_PLAYERS - 1;
 fn socket_ui_app() -> App {
     let mut app = App::new();
     app.insert_resource(bevy::time::TimeUpdateStrategy::Automatic)
-        .add_plugins(bevy_game_test::HeadlessUiPlugin::new(1280, 720))
+        .add_plugins(bevy_gamekit::testing::HeadlessUiPlugin::new(1280, 720))
         .insert_resource(ReconnectCredentialStorage::new(
             MemoryReconnectCredentialStore::default(),
         ))
@@ -40,12 +40,14 @@ fn real_udp_host_and_guest_menus_do_not_suspend_authority_or_snapshot_delivery()
     let before = wait_for_hero(&mut apps);
     for index in [0, 1] {
         let world = app(&mut apps, index).world_mut();
-        let menu = bevy_game_test::find_named(world, "Battle Settings").expect("menu control");
-        world.write_message(bevy_game_ui::UiActivated { entity: menu });
+        let menu =
+            bevy_gamekit::testing::find_named(world, "Battle Settings").expect("menu control");
+        world.write_message(bevy_gamekit::ui::UiActivated { entity: menu });
     }
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
         [0, 1].into_iter().all(|index| {
-            bevy_game_test::find_named(app(apps, index).world_mut(), "Game Menu Title").is_some()
+            bevy_gamekit::testing::find_named(app(apps, index).world_mut(), "Game Menu Title")
+                .is_some()
         })
     }));
     assert!(!host_snapshot(&mut apps).paused);
@@ -63,10 +65,11 @@ fn real_udp_host_and_guest_menus_do_not_suspend_authority_or_snapshot_delivery()
         combat(apps).turn_id != before.turn_id && converged(apps)
     }));
     for index in [0, 1] {
-        assert!(
-            bevy_game_test::find_named(app(&mut apps, index).world_mut(), "Game Menu Title")
-                .is_some()
-        );
+        assert!(bevy_gamekit::testing::find_named(
+            app(&mut apps, index).world_mut(),
+            "Game Menu Title"
+        )
+        .is_some());
     }
     assert!(!host_snapshot(&mut apps).paused);
 }
