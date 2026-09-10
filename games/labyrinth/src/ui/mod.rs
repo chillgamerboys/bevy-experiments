@@ -50,6 +50,7 @@ impl Plugin for LabyrinthUiPlugin {
         app.add_plugins((
             GameUiSkinPlugin,
             GameUiTooltipPlugin,
+            bevy_game_ui::GameUiFeedPlugin,
             crate::scene::LabyrinthScenePlugin,
         ))
         .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
@@ -119,10 +120,18 @@ fn load_default_font(mut assets: ResMut<Assets<Font>>, mut fonts: ResMut<UiFonts
 enum Form {
     #[default]
     Menu,
+    Multiplayer,
     Host,
     Direct,
     Browser,
     Password,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MenuPage {
+    Game,
+    Settings,
+    Leave,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,19 +143,24 @@ enum Choice {
     Wait,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum LogMode {
+    #[default]
+    Hidden,
+    Compact,
+    History,
+}
+
 #[derive(Resource, Default)]
 struct UiState {
     form: Form,
     selected: Option<Choice>,
     target: Option<ActorId>,
-    inspected: Option<ActorId>,
-    inspected_status: Option<(ActorId, u64)>,
     decision: Option<(u64, ActorId)>,
     encounter: Option<u64>,
-    settings: bool,
-    show_log: bool,
-    show_timeline: bool,
-    show_inspector: bool,
+    menus: bevy_game_ui::UiMenuStack<MenuPage>,
+    log_mode: LogMode,
+    expanded_log: std::collections::BTreeSet<u64>,
     show_skillbook: bool,
     session_name: String,
     address: String,
@@ -172,6 +186,8 @@ enum Action {
     Session(bevy_game_session::SessionId),
     Reconnect,
     Leave,
+    ConfirmLeave,
+    GameMenu,
     ToggleLan,
     ToggleTailnet,
     Ready(bool),
@@ -191,8 +207,9 @@ enum Action {
     ReducedMotion,
     Scale,
     ToggleLog,
-    ToggleTimeline,
-    ToggleInspector,
+    ExpandLog(u64),
+    LatestLog,
+    SetLogMode(LogMode),
     ToggleSkillbook,
     ScrollDetails(i8),
 }
@@ -254,7 +271,7 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     let keys = world.resource::<ButtonInput<KeyCode>>();
-    if keys.just_pressed(KeyCode::KeyK) {
+    if keys.just_pressed(KeyCode::KeyK) && !world.resource::<UiState>().menus.is_open() {
         apply_action(world, Action::ToggleSkillbook);
         return;
     }
@@ -262,11 +279,11 @@ fn keyboard_shortcuts(world: &mut World) {
         apply_action(world, Action::Cancel);
         return;
     }
-    if world.resource::<UiState>().settings || world.resource::<LabyrinthView>().paused {
+    if world.resource::<UiState>().menus.is_open() || world.resource::<LabyrinthView>().paused {
         return;
     }
     let ui = world.resource::<UiState>();
-    let details_open = ui.show_inspector || ui.show_log || ui.show_timeline || ui.show_skillbook;
+    let details_open = ui.show_skillbook;
     {
         let keys = world.resource::<ButtonInput<KeyCode>>();
         let page = if keys.just_pressed(KeyCode::PageUp) {
@@ -309,219 +326,241 @@ fn apply_action(world: &mut World, action: Action) {
     let view = world.resource::<LabyrinthView>().clone();
     let seed = world.resource::<LabyrinthUiConfig>().seed;
     world.resource_scope(|world, mut ui: Mut<UiState>| {
-        let intent = match action {
-            Action::Form(form) => {
-                if view.mode == ViewMode::Menu
-                    && form == Form::Menu
-                    && matches!(ui.form, Form::Host | Form::Direct | Form::Password)
-                {
-                    // Closing a form also cancels its asynchronous host/join attempt.
-                    world.write_message(LabyrinthIntent::Leave);
-                }
-                if matches!(ui.form, Form::Browser | Form::Password) {
-                    world.write_message(LabyrinthIntent::StopBrowsing);
-                }
-                ui.password = SecretText::default();
-                ui.code = SecretText::default();
-                ui.form = form;
-                ui.local_notice = None;
-                if form == Form::Browser {
-                    Some(LabyrinthIntent::Browse {
-                        tailnet: ui.tailnet,
-                    })
-                } else {
-                    None
-                }
-            }
-            Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
-            Action::Host => {
-                let port = if ui.port.is_empty() {
-                    Ok(7777)
-                } else {
-                    ui.port.parse::<u16>()
-                };
-                match port {
-                    Ok(port) if port > 0 => Some(LabyrinthIntent::Host(HostSettings {
-                        name: if ui.session_name.trim().is_empty() {
-                            "The Lantern Company".to_owned()
-                        } else {
-                            ui.session_name.clone()
-                        },
-                        password: std::mem::take(&mut ui.password),
-                        address: ui.address.clone(),
-                        port,
-                        lan: ui.lan,
-                        tailnet: ui.tailnet,
-                        seed,
-                    })),
-                    _ => {
-                        ui.local_notice = Some("Game port must be between 1 and 65535.".to_owned());
+        let intent =
+            match action {
+                Action::Form(form) => {
+                    if view.mode == ViewMode::Menu
+                        && form == Form::Menu
+                        && matches!(ui.form, Form::Host | Form::Direct | Form::Password)
+                    {
+                        // Closing a form also cancels its asynchronous host/join attempt.
+                        world.write_message(LabyrinthIntent::Leave);
+                    }
+                    if matches!(ui.form, Form::Browser | Form::Password) {
+                        world.write_message(LabyrinthIntent::StopBrowsing);
+                    }
+                    ui.password = SecretText::default();
+                    ui.code = SecretText::default();
+                    ui.form = form;
+                    ui.local_notice = None;
+                    if form == Form::Browser {
+                        Some(LabyrinthIntent::Browse {
+                            tailnet: ui.tailnet,
+                        })
+                    } else {
                         None
                     }
                 }
-            }
-            Action::JoinCode => Some(LabyrinthIntent::JoinCode(std::mem::take(&mut ui.code))),
-            Action::Browse => Some(LabyrinthIntent::Browse {
-                tailnet: ui.tailnet,
-            }),
-            Action::Session(session) => {
-                ui.selected_session = Some(session);
-                ui.form = Form::Password;
-                None
-            }
-            Action::JoinDiscovered => {
-                ui.selected_session
-                    .map(|session| LabyrinthIntent::JoinDiscovered {
-                        session,
-                        password: std::mem::take(&mut ui.password),
-                    })
-            }
-            Action::Reconnect => Some(LabyrinthIntent::Reconnect),
-            Action::Leave => {
-                ui.settings = false;
-                ui.form = Form::Menu;
-                Some(LabyrinthIntent::Leave)
-            }
-            Action::ToggleLan => {
-                ui.lan = !ui.lan;
-                None
-            }
-            Action::ToggleTailnet => {
-                ui.tailnet = !ui.tailnet;
-                if ui.form == Form::Browser {
-                    Some(LabyrinthIntent::Browse {
-                        tailnet: ui.tailnet,
-                    })
-                } else {
+                Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
+                Action::Host => {
+                    let port = if ui.port.is_empty() {
+                        Ok(7777)
+                    } else {
+                        ui.port.parse::<u16>()
+                    };
+                    match port {
+                        Ok(port) if port > 0 => Some(LabyrinthIntent::Host(HostSettings {
+                            name: if ui.session_name.trim().is_empty() {
+                                "The Lantern Company".to_owned()
+                            } else {
+                                ui.session_name.clone()
+                            },
+                            password: std::mem::take(&mut ui.password),
+                            address: ui.address.clone(),
+                            port,
+                            lan: ui.lan,
+                            tailnet: ui.tailnet,
+                            seed,
+                        })),
+                        _ => {
+                            ui.local_notice =
+                                Some("Game port must be between 1 and 65535.".to_owned());
+                            None
+                        }
+                    }
+                }
+                Action::JoinCode => Some(LabyrinthIntent::JoinCode(std::mem::take(&mut ui.code))),
+                Action::Browse => Some(LabyrinthIntent::Browse {
+                    tailnet: ui.tailnet,
+                }),
+                Action::Session(session) => {
+                    ui.selected_session = Some(session);
+                    ui.form = Form::Password;
                     None
                 }
-            }
-            Action::Ready(ready) => Some(LabyrinthIntent::Ready(ready)),
-            Action::Hero(hero) => Some(LabyrinthIntent::SelectHero(hero)),
-            Action::Start => Some(LabyrinthIntent::StartEncounter),
-            Action::Rematch => Some(LabyrinthIntent::Rematch),
-            Action::Copy(index) => Some(LabyrinthIntent::CopyInvite(index)),
-            Action::Reissue(index) => Some(LabyrinthIntent::ReissueInvite(index)),
-            Action::Actor(actor) => {
-                ui.inspected = Some(actor);
-                ui.inspected_status = None;
-                ui.target = Some(actor);
-                None
-            }
-            Action::InspectActor(actor) => {
-                ui.inspected = Some(actor);
-                ui.inspected_status = None;
-                ui.show_inspector = true;
-                ui.show_log = false;
-                ui.show_timeline = false;
-                None
-            }
-            Action::Status(actor, status) => {
-                ui.inspected = Some(actor);
-                ui.inspected_status = Some((actor, status));
-                ui.show_inspector = true;
-                ui.show_log = false;
-                ui.show_timeline = false;
-                None
-            }
-            Action::Choice(choice) => {
-                ui.inspected_status = None;
-                ui.selected = Some(choice);
-                None
-            }
-            Action::SkillSlot(index) => {
-                if battle::skills_disclosed(
-                    &view,
-                    world.resource::<crate::presentation::CombatDisclosure>(),
-                ) {
-                    battle::select_skill_slot(&view, &mut ui, index);
+                Action::JoinDiscovered => {
+                    ui.selected_session
+                        .map(|session| LabyrinthIntent::JoinDiscovered {
+                            session,
+                            password: std::mem::take(&mut ui.password),
+                        })
                 }
-                None
-            }
-            Action::Confirm => battle::selected_action(&view, &ui)
-                .ok()
-                .map(|(actor, action)| LabyrinthIntent::Combat {
-                    actor,
-                    action,
-                    encounter: view.encounter,
-                    decision: view.combat.as_ref().map_or(0, |snapshot| snapshot.turn_id),
-                }),
-            Action::ToggleSkillbook => {
-                ui.show_skillbook = !ui.show_skillbook;
-                None
-            }
-            Action::Cancel => {
-                if ui.show_skillbook {
-                    ui.show_skillbook = false;
-                    return;
+                Action::Reconnect => Some(LabyrinthIntent::Reconnect),
+                Action::Leave => {
+                    ui.menus.open(MenuPage::Leave);
+                    None
                 }
-                let cancel_attempt = !ui.settings
-                    && ui.selected.is_none()
-                    && view.mode == ViewMode::Menu
-                    && matches!(ui.form, Form::Host | Form::Direct | Form::Password);
-                let stop_browser = view.mode == ViewMode::Menu
-                    && matches!(ui.form, Form::Browser | Form::Password);
-                if ui.settings {
-                    ui.settings = false;
-                } else if ui.show_inspector || ui.show_log || ui.show_timeline {
-                    ui.show_inspector = false;
-                    ui.show_log = false;
-                    ui.show_timeline = false;
-                } else if ui.selected.is_some() {
-                    ui.selected = None;
-                    ui.target = None;
-                } else if view.mode == ViewMode::Menu {
+                Action::GameMenu => {
+                    ui.menus.open(MenuPage::Game);
+                    None
+                }
+                Action::ConfirmLeave => {
+                    ui.menus.close();
                     ui.form = Form::Menu;
-                    ui.password = SecretText::default();
-                    ui.code = SecretText::default();
-                }
-                if cancel_attempt {
                     Some(LabyrinthIntent::Leave)
-                } else {
-                    stop_browser.then_some(LabyrinthIntent::StopBrowsing)
                 }
-            }
-            Action::Settings => {
-                ui.settings = !ui.settings;
-                None
-            }
-            Action::ReducedMotion => {
-                let mut preference = world.resource_mut::<UiMotionPreference>();
-                preference.reduced = !preference.reduced;
-                None
-            }
-            Action::Scale => {
-                let mut scale = world.resource_mut::<UiScalePreference>();
-                scale.0 = if scale.0 == UiScaleMode::Percent200 {
-                    UiScaleMode::Auto
-                } else {
-                    UiScaleMode::Percent200
-                };
-                None
-            }
-            Action::ToggleLog => {
-                ui.show_log = !ui.show_log;
-                ui.show_inspector = false;
-                ui.show_timeline = false;
-                None
-            }
-            Action::ToggleInspector => {
-                ui.show_inspector = !ui.show_inspector;
-                ui.show_log = false;
-                ui.show_timeline = false;
-                None
-            }
-            Action::ToggleTimeline => {
-                ui.show_timeline = !ui.show_timeline;
-                ui.show_inspector = false;
-                ui.show_log = false;
-                None
-            }
-            Action::ScrollDetails(direction) => {
-                battle::scroll_details(world, direction);
-                None
-            }
-        };
+                Action::ToggleLan => {
+                    ui.lan = !ui.lan;
+                    None
+                }
+                Action::ToggleTailnet => {
+                    ui.tailnet = !ui.tailnet;
+                    if ui.form == Form::Browser {
+                        Some(LabyrinthIntent::Browse {
+                            tailnet: ui.tailnet,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Action::Ready(ready) => Some(LabyrinthIntent::Ready(ready)),
+                Action::Hero(hero) => Some(LabyrinthIntent::SelectHero(hero)),
+                Action::Start => Some(LabyrinthIntent::StartEncounter),
+                Action::Rematch => Some(LabyrinthIntent::Rematch),
+                Action::Copy(index) => Some(LabyrinthIntent::CopyInvite(index)),
+                Action::Reissue(index) => Some(LabyrinthIntent::ReissueInvite(index)),
+                Action::Actor(actor) => {
+                    ui.target = Some(actor);
+                    None
+                }
+                Action::InspectActor(actor) => {
+                    world.write_message(bevy_game_ui::UiTooltipRequest::Open(
+                        battle::actor_subject(view.encounter, actor),
+                    ));
+                    None
+                }
+                Action::Status(actor, _status) => {
+                    world.write_message(bevy_game_ui::UiTooltipRequest::Open(
+                        battle::effects_subject(view.encounter, actor),
+                    ));
+                    None
+                }
+                Action::Choice(choice) => {
+                    ui.selected = Some(choice);
+                    None
+                }
+                Action::SkillSlot(index) => {
+                    if battle::skills_disclosed(
+                        &view,
+                        world.resource::<crate::presentation::CombatDisclosure>(),
+                    ) {
+                        battle::select_skill_slot(&view, &mut ui, index);
+                    }
+                    None
+                }
+                Action::Confirm => {
+                    battle::selected_action(&view, &ui)
+                        .ok()
+                        .map(|(actor, action)| LabyrinthIntent::Combat {
+                            actor,
+                            action,
+                            encounter: view.encounter,
+                            decision: view.combat.as_ref().map_or(0, |snapshot| snapshot.turn_id),
+                        })
+                }
+                Action::ToggleSkillbook => {
+                    ui.show_skillbook = !ui.show_skillbook;
+                    None
+                }
+                Action::Cancel => {
+                    if ui.show_skillbook && !ui.menus.is_open() {
+                        ui.show_skillbook = false;
+                        return;
+                    }
+                    let cancel_attempt = !ui.menus.is_open()
+                        && ui.selected.is_none()
+                        && view.mode == ViewMode::Menu
+                        && matches!(ui.form, Form::Host | Form::Direct | Form::Password);
+                    let stop_browser = !ui.menus.is_open()
+                        && view.mode == ViewMode::Menu
+                        && matches!(ui.form, Form::Browser | Form::Password);
+                    if ui.menus.is_open() {
+                        ui.menus.back();
+                    } else if ui.log_mode != LogMode::Hidden {
+                        ui.log_mode = LogMode::Hidden;
+                    } else if ui.selected.is_some() {
+                        ui.selected = None;
+                        ui.target = None;
+                    } else if view.mode == ViewMode::Menu {
+                        ui.form = Form::Menu;
+                        ui.password = SecretText::default();
+                        ui.code = SecretText::default();
+                    } else {
+                        ui.menus.open(MenuPage::Game);
+                    }
+                    if cancel_attempt {
+                        Some(LabyrinthIntent::Leave)
+                    } else {
+                        stop_browser.then_some(LabyrinthIntent::StopBrowsing)
+                    }
+                }
+                Action::Settings => {
+                    ui.menus.open(MenuPage::Settings);
+                    None
+                }
+                Action::ReducedMotion => {
+                    let mut preference = world.resource_mut::<UiMotionPreference>();
+                    preference.reduced = !preference.reduced;
+                    None
+                }
+                Action::Scale => {
+                    let mut scale = world.resource_mut::<UiScalePreference>();
+                    scale.0 = if scale.0 == UiScaleMode::Percent200 {
+                        UiScaleMode::Auto
+                    } else {
+                        UiScaleMode::Percent200
+                    };
+                    None
+                }
+                Action::ToggleLog => {
+                    ui.log_mode = if ui.log_mode == LogMode::History {
+                        LogMode::Hidden
+                    } else {
+                        LogMode::History
+                    };
+                    None
+                }
+                Action::ExpandLog(id) => {
+                    if !ui.expanded_log.remove(&id) {
+                        ui.expanded_log.insert(id);
+                    }
+                    None
+                }
+                Action::LatestLog => {
+                    let mut query = world.query::<&mut bevy_game_ui::UiFeedScroll>();
+                    for mut feed in query.iter_mut(world) {
+                        feed.jump_to_latest();
+                    }
+                    None
+                }
+                Action::SetLogMode(mode) => {
+                    ui.log_mode = mode;
+                    if let Some(entity) = world.query::<(Entity, &Action)>().iter(world).find_map(
+                        |(entity, action)| matches!(action, Action::ToggleLog).then_some(entity),
+                    ) {
+                        world
+                            .resource_mut::<InputFocus>()
+                            .set(entity, bevy::input_focus::FocusCause::Navigated);
+                    }
+                    None
+                }
+                Action::ScrollDetails(direction) => {
+                    if ui.log_mode == LogMode::History {
+                        battle::scroll_history(world, direction);
+                    }
+                    None
+                }
+            };
         if let Some(intent) = intent {
             if matches!(
                 intent,
@@ -562,7 +601,6 @@ fn present(world: &mut World) {
             battle::clear(world);
             ui.selected = None;
             ui.target = None;
-            ui.inspected_status = None;
             ui.decision = None;
             ui.encounter = None;
             shell::present(world, &view, &mut ui, metrics);

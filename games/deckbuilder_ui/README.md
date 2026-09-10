@@ -13,7 +13,10 @@ cargo test -p deckbuilder_ui --profile ci
 
 No `--all-features` is needed for ordinary play. Use pointer or Tab/Shift+Tab and
 Enter/Space. Start a local match, select a card, play it, end the turn, or open the
-pause/settings controls. Inspect disabled/selected states and the activity feed.
+local Game menu. Escape opens it or returns to the previous page. Back to game
+closes it; returning to the main menu requires confirmation. The match and
+networking continue while the menu is open. Inspect disabled/selected states and
+the activity feed. Menu navigation/layout uses shared Gamekit primitives.
 
 ## Two-player checks
 

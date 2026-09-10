@@ -10,7 +10,7 @@ use labyrinth_rules::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::view::{PlayerView, PresentedEvent};
+use crate::view::{CombatInterruption, PlayerView, PresentedEvent};
 
 #[cfg(test)]
 mod tests;
@@ -94,6 +94,7 @@ pub(crate) struct SessionSnapshot {
     pub log: Vec<String>,
     pub events: Vec<PresentedEvent>,
     pub paused: bool,
+    pub interruption: CombatInterruption,
 }
 
 #[derive(Deserialize)]
@@ -106,6 +107,7 @@ struct UncheckedSessionSnapshot {
     log: Vec<String>,
     events: Vec<PresentedEvent>,
     paused: bool,
+    interruption: CombatInterruption,
 }
 
 impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
@@ -121,6 +123,7 @@ impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
             log: value.log,
             events: value.events,
             paused: value.paused,
+            interruption: value.interruption,
         };
         snapshot.validate()?;
         Ok(snapshot)
@@ -130,6 +133,17 @@ impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
 impl SessionSnapshot {
     /// Validate owner identity separately from class and mutable formation rank.
     pub fn validate(&self) -> Result<(), &'static str> {
+        if self.interruption == CombatInterruption::Reconnecting
+            || self.paused != (self.interruption != CombatInterruption::None)
+        {
+            return Err("Invalid host suspension reason.");
+        }
+        let disconnected = self.combat.is_some() && self.players.iter().any(|p| !p.connected);
+        if (self.interruption == CombatInterruption::WaitingForPlayers && !disconnected)
+            || (self.combat.is_none() && self.interruption != CombatInterruption::None)
+        {
+            return Err("Suspension reason does not match the encounter.");
+        }
         if self.revision == 0
             || self.next_sequence == 0
             || self.players.len() != PARTY_SIZE
@@ -368,11 +382,21 @@ impl PartyAuthority {
             log: self.log.iter().cloned().collect(),
             events: self.events.iter().cloned().collect(),
             paused: self.paused(),
+            interruption: self.interruption(),
         }
     }
     pub fn paused(&self) -> bool {
-        self.faulted
-            || (self.combat.is_some() && !self.local && self.players.iter().any(|p| !p.connected))
+        self.interruption() != CombatInterruption::None
+    }
+    fn interruption(&self) -> CombatInterruption {
+        if self.faulted {
+            CombatInterruption::Halted
+        } else if self.combat.is_some() && !self.local && self.players.iter().any(|p| !p.connected)
+        {
+            CombatInterruption::WaitingForPlayers
+        } else {
+            CombatInterruption::None
+        }
     }
     pub fn apply(&mut self, slot: u8, request: GameRequest) -> RequestResult {
         if let Some(result) = self.results.get(&slot).and_then(|cache| {
@@ -480,7 +504,12 @@ impl PartyAuthority {
             }
             SessionCommand::Act { actor, action } => {
                 if self.paused() {
-                    return Err("Combat is paused for a disconnected player.".into());
+                    return Err(if self.faulted {
+                        "Encounter halted; return to the lobby."
+                    } else {
+                        "Combat is waiting for disconnected players."
+                    }
+                    .into());
                 }
                 if !self.local && actor != player.actor {
                     return Err("That is not your hero.".into());

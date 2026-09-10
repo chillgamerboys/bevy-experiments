@@ -33,6 +33,20 @@ pub enum ViewMode {
     Combat,
 }
 
+/// Why combat input is unavailable. Local menu navigation is deliberately absent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CombatInterruption {
+    /// No session interruption.
+    #[default]
+    None,
+    /// The host is waiting for reserved players.
+    WaitingForPlayers,
+    /// This client is recovering admission; never sent as a host pause reason.
+    Reconnecting,
+    /// A rules failure requires host recovery, not a reconnect.
+    Halted,
+}
+
 /// One player reservation displayed in the lobby and combat HUD.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlayerView {
@@ -85,8 +99,10 @@ pub struct LabyrinthView {
     pub player: Option<u8>,
     /// Local admission completed.
     pub admitted: bool,
-    /// Combat is waiting for reserved players.
+    /// Combat input is suspended by the session/connection, never by a local menu.
     pub paused: bool,
+    /// Typed explanation, separate from local settings and menu state.
+    pub interruption: CombatInterruption,
     /// Monotonic projection revision.
     pub revision: u64,
     /// Encounter identity captured with a confirmed action, never guessed at send time.

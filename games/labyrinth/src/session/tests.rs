@@ -3,6 +3,40 @@
 use super::*;
 use labyrinth_rules::{CombatOutcome, Team};
 
+#[test]
+fn multiple_disconnects_and_faults_have_distinct_validated_suspension_reasons() {
+    let (mut authority, peers) = started_party();
+    let a = *peers.first().expect("first guest");
+    let b = *peers.get(1).expect("second guest");
+    authority.connected(a, false);
+    authority.connected(b, false);
+    assert_eq!(
+        authority.snapshot(0).interruption,
+        CombatInterruption::WaitingForPlayers
+    );
+    authority.connected(a, true);
+    assert!(
+        authority.paused(),
+        "one remaining disconnect still suspends combat"
+    );
+    authority.faulted = true;
+    authority.connected(b, true);
+    assert_eq!(
+        authority.snapshot(0).interruption,
+        CombatInterruption::Halted
+    );
+    assert!(!authority.advance_enemy());
+    let mut invalid = authority.snapshot(0);
+    invalid.interruption = CombatInterruption::Reconnecting;
+    assert!(
+        invalid.validate().is_err(),
+        "local admission state is not host authority"
+    );
+    invalid.interruption = CombatInterruption::WaitingForPlayers;
+    assert!(invalid.validate().is_err(), "do not invent missing players");
+    assert!(authority.snapshot(0).validate().is_ok());
+}
+
 fn peer(value: u8) -> PeerId {
     PeerId::from_bytes([value; PeerId::BYTE_LENGTH])
 }

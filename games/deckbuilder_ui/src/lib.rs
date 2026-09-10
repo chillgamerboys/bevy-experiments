@@ -78,10 +78,6 @@ fn button(name: impl Into<String>) -> impl Bundle {
     )
 }
 
-fn modal(name: impl Into<String>) -> impl Bundle {
-    (bevy_game_ui::modal(name), UiSkin::Modal)
-}
-
 fn text(fonts: &UiFonts, role: UiTextRole, value: impl Into<String>) -> impl Bundle {
     (bevy_game_ui::text(fonts, role, value), UiSkin::Text)
 }
@@ -122,6 +118,7 @@ impl Plugin for DeckbuilderPlugin {
             (
                 collect_activations.after(GameUiSystems::EmitActivations),
                 collect_text,
+                menu_keyboard.after(bevy_game_ui::UiTooltipSystems::Resolve),
                 apply_pending_actions,
                 synchronize_network_screen,
                 mark_discovery_change,
@@ -160,9 +157,36 @@ struct DeckbuilderUi {
     selected_session: Option<SessionId>,
     selected_target: Option<DiscoveryJoinRoute>,
     selected_card: Option<CardKind>,
-    paused: bool,
+    menus: bevy_game_ui::UiMenuStack<DeckMenu>,
     share_code: Option<String>,
     local_notice: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeckMenu {
+    Game,
+    Leave,
+}
+
+fn menu_keyboard(world: &mut World) {
+    if world
+        .resource::<bevy_game_ui::UiTooltipState>()
+        .captures_keyboard()
+        || !world
+            .resource::<ButtonInput<KeyCode>>()
+            .just_pressed(KeyCode::Escape)
+    {
+        return;
+    }
+    if world.resource::<DeckbuilderUi>().screen == Screen::Match {
+        let mut ui = world.resource_mut::<DeckbuilderUi>();
+        if ui.menus.is_open() {
+            ui.menus.back();
+        } else {
+            ui.menus.open(DeckMenu::Game);
+        }
+        world.resource_mut::<UiDirty>().0 = true;
+    }
 }
 
 impl std::fmt::Debug for DeckbuilderUi {
@@ -197,7 +221,7 @@ impl Default for DeckbuilderUi {
             selected_session: None,
             selected_target: None,
             selected_card: None,
-            paused: false,
+            menus: bevy_game_ui::UiMenuStack::default(),
             share_code: None,
             local_notice: None,
         }
@@ -241,8 +265,9 @@ enum DeckbuilderAction {
     SelectCard(CardKind),
     PlaySelected,
     EndTurn,
-    Pause,
-    Resume,
+    Menu,
+    CloseMenu,
+    RequestLeave,
     ReturnToMenu,
 }
 
@@ -389,15 +414,22 @@ fn apply_action(world: &mut World, action: DeckbuilderAction) {
             network::submit_command(world, GameCommand::EndTurn);
             world.resource_mut::<DeckbuilderUi>().selected_card = None;
         }
-        DeckbuilderAction::Pause => world.resource_mut::<DeckbuilderUi>().paused = true,
-        DeckbuilderAction::Resume => world.resource_mut::<DeckbuilderUi>().paused = false,
+        DeckbuilderAction::Menu => world
+            .resource_mut::<DeckbuilderUi>()
+            .menus
+            .open(DeckMenu::Game),
+        DeckbuilderAction::CloseMenu => world.resource_mut::<DeckbuilderUi>().menus.back(),
+        DeckbuilderAction::RequestLeave => world
+            .resource_mut::<DeckbuilderUi>()
+            .menus
+            .open(DeckMenu::Leave),
         DeckbuilderAction::ReturnToMenu => {
             network::stop_browser(world);
             network::close_session(world);
             let mut ui = world.resource_mut::<DeckbuilderUi>();
             ui.screen = Screen::Menu;
             ui.previous = Screen::Menu;
-            ui.paused = false;
+            ui.menus.close();
             ui.passphrase.zeroize();
             ui.direct_code.zeroize();
             ui.selected_target = None;
@@ -1128,11 +1160,11 @@ fn spawn_match(
                         DeckbuilderAction::EndTurn,
                         !own_turn,
                     );
-                    spawn_action(actions, fonts, "Pause", DeckbuilderAction::Pause, false);
+                    spawn_action(actions, fonts, "Game menu", DeckbuilderAction::Menu, false);
                 });
             spawn_notices(root, fonts, ui, state);
-            if ui.paused {
-                spawn_pause_modal(root, fonts);
+            if ui.menus.is_open() {
+                spawn_game_menu(root, fonts, ui.menus.current() == Some(&DeckMenu::Leave));
             }
         });
 }
@@ -1231,20 +1263,51 @@ fn spawn_notices(
     }
 }
 
-fn spawn_pause_modal(parent: &mut ChildSpawnerCommands, fonts: &UiFonts) {
-    parent.spawn(modal("Pause Modal")).with_children(|overlay| {
-        overlay.spawn(panel("Pause Panel")).with_children(|pause| {
-            pause.spawn(text(fonts, UiTextRole::Title, "Paused"));
-            spawn_action(pause, fonts, "Resume", DeckbuilderAction::Resume, false);
-            spawn_action(
-                pause,
-                fonts,
-                "Return to Menu",
-                DeckbuilderAction::ReturnToMenu,
-                false,
-            );
+fn spawn_game_menu(parent: &mut ChildSpawnerCommands, fonts: &UiFonts, leaving: bool) {
+    parent
+        .spawn(bevy_game_ui::menu_overlay("Game Menu Modal"))
+        .with_children(|overlay| {
+            overlay
+                .spawn(bevy_game_ui::menu_panel("Game Menu Panel"))
+                .with_children(|pause| {
+                    pause.spawn(text(
+                        fonts,
+                        UiTextRole::Title,
+                        if leaving {
+                            "Leave the match?"
+                        } else {
+                            "Game menu"
+                        },
+                    ));
+                    pause.spawn(text(
+                        fonts,
+                        UiTextRole::Body,
+                        if leaving {
+                            "Leaving as host closes the session for everyone."
+                        } else {
+                            "Local menu only. The shared match continues."
+                        },
+                    ));
+                    spawn_action(
+                        pause,
+                        fonts,
+                        if leaving { "Stay" } else { "Back to game" },
+                        DeckbuilderAction::CloseMenu,
+                        false,
+                    );
+                    spawn_action(
+                        pause,
+                        fonts,
+                        "Return to Menu",
+                        if leaving {
+                            DeckbuilderAction::ReturnToMenu
+                        } else {
+                            DeckbuilderAction::RequestLeave
+                        },
+                        false,
+                    );
+                });
         });
-    });
 }
 
 #[cfg(test)]
@@ -1310,19 +1373,56 @@ mod tests {
     }
 
     #[test]
-    fn pause_modal_traps_and_restores_focus() {
+    fn game_menu_traps_and_restores_focus() {
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         start_solo(&mut app);
-        let pause = find_named(app.world_mut(), "Pause").expect("Pause exists");
+        let pause = find_named(app.world_mut(), "Game menu").expect("Game menu exists");
         assert!(focus_action(app.world_mut(), pause));
         assert!(click_action(&mut app, pause));
         run_frames(&mut app, 3);
-        let resume = find_named(app.world_mut(), "Resume").expect("Resume exists");
+        let resume = find_named(app.world_mut(), "Back to game").expect("Back exists");
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(resume));
         assert!(click_action(&mut app, resume));
         run_frames(&mut app, 3);
-        let restored = find_named(app.world_mut(), "Pause").expect("Pause restored");
+        let restored = find_named(app.world_mut(), "Game menu").expect("Game menu restored");
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(restored));
+    }
+
+    #[test]
+    fn escape_backs_out_of_leave_confirmation_without_pausing_or_leaving() {
+        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+        start_solo(&mut app);
+        tap_key(&mut app, KeyCode::Escape);
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().menus.current(),
+            Some(&DeckMenu::Game)
+        );
+        assert!(!app.world().resource::<Time<Virtual>>().is_paused());
+        let leave = find_named(app.world_mut(), "Return to Menu").expect("request leave");
+        assert!(click_action(&mut app, leave));
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().menus.current(),
+            Some(&DeckMenu::Leave)
+        );
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().screen,
+            Screen::Match
+        );
+        tap_key(&mut app, KeyCode::Escape);
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().menus.current(),
+            Some(&DeckMenu::Game)
+        );
+        tap_key(&mut app, KeyCode::Escape);
+        run_frames(&mut app, 3);
+        assert!(!app.world().resource::<DeckbuilderUi>().menus.is_open());
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().screen,
+            Screen::Match
+        );
     }
 
     #[test]

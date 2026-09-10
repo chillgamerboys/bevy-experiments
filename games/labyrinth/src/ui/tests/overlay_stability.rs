@@ -170,7 +170,7 @@ fn keyboard_control(app: &mut App, name: &str) {
     run_frames(app, 3);
 }
 
-fn hover_at(app: &mut App, point: Vec2) {
+pub(super) fn hover_at(app: &mut App, point: Vec2) {
     let (window, mut value) = app
         .world_mut()
         .query::<(Entity, &mut Window)>()
@@ -190,7 +190,7 @@ fn hover_at(app: &mut App, point: Vec2) {
     run_frames(app, 8);
 }
 
-fn native_pointer_click(app: &mut App, point: Vec2) {
+pub(super) fn native_pointer_click(app: &mut App, point: Vec2) {
     use bevy::input::{mouse::MouseButtonInput, ButtonState};
     hover_at(app, point);
     let window = app
@@ -218,6 +218,70 @@ fn hover_control(app: &mut App, entity: Entity, viewport: Rect) {
         app.world().get::<Interaction>(entity),
         Some(&Interaction::Hovered)
     );
+}
+
+#[test]
+fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log() {
+    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
+        let mut app = scene_app(width, height, UiScaleMode::Auto);
+        app.world_mut()
+            .resource_mut::<bevy_game_ui::UiTooltipSettings>()
+            .show_delay = std::time::Duration::ZERO;
+        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+        let actor = find_named(app.world_mut(), "Actor 105").expect("actor");
+        let layout = app
+            .world()
+            .get::<crate::scene::SceneActorLayout>(actor)
+            .expect("layout anchor")
+            .0;
+        let column = visible_control_rect(app.world(), layout, viewport).expect("column");
+        let hit = visible_control_rect(app.world(), actor, viewport).expect("hit area");
+        let kind = app
+            .world()
+            .resource::<LabyrinthView>()
+            .combat
+            .as_ref()
+            .expect("combat")
+            .actor(ActorId(105))
+            .expect("actor")
+            .kind;
+        let art =
+            crate::scene::actor_art_size(app.world(), kind, column.size()).expect("loaded art");
+        assert!(
+            (hit.size() - art.max(Vec2::splat(44.0)).min(column.size()))
+                .abs()
+                .max_element()
+                < 1.0
+        );
+        let empty = Vec2::new(column.center().x, column.min.y + 12.0);
+        assert!(!hit.contains(empty));
+        hover_at(&mut app, empty);
+        assert_eq!(
+            app.world().get::<Interaction>(actor),
+            Some(&Interaction::None)
+        );
+        assert!(app
+            .world()
+            .resource::<bevy_game_ui::UiTooltipState>()
+            .subjects()
+            .is_empty());
+        native_pointer_click(&mut app, empty);
+        assert_eq!(app.world().resource::<UiState>().target, None);
+        native_pointer_click(&mut app, hit.center());
+        assert_eq!(app.world().resource::<UiState>().target, Some(ActorId(105)));
+        let toggle = find_named(app.world_mut(), "Battle Log Toggle").expect("log");
+        assert!(click_action(&mut app, toggle));
+        run_frames(&mut app, 3);
+        hover_at(&mut app, hit.center());
+        let panel = find_named(app.world_mut(), "Combat History").expect("history");
+        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("actor tooltip");
+        let panel_rect = visible_control_rect(app.world(), panel, viewport).expect("log bounds");
+        let card_rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");
+        assert!(
+            panel_rect.intersect(card_rect).is_empty(),
+            "tooltip covers log at {width}x{height}"
+        );
+    }
 }
 
 #[test]
@@ -274,11 +338,12 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters() {
                 }
                 let selection = app.world().resource::<UiState>().selected;
                 let target = app.world().resource::<UiState>().target;
-                for toggle in ["Inspector Toggle", "Battle Log Toggle", "Timeline Toggle"] {
+                {
+                    let toggle = "Battle Log Toggle";
                     let button = find_named(app.world_mut(), toggle).expect("drawer toggle");
                     pointer_control(&mut app, button, Vec2::new(width as f32, height as f32));
                     let ui = app.world().resource::<UiState>();
-                    assert!(ui.show_inspector || ui.show_log || ui.show_timeline);
+                    assert_eq!(ui.log_mode, LogMode::History);
                     unchanged(&mut app, &expected, &snapshot, toggle);
                     tap_key(&mut app, KeyCode::Escape);
                     unchanged(
@@ -290,7 +355,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters() {
                     let ui = app.world().resource::<UiState>();
                     assert_eq!(ui.selected, selection);
                     assert_eq!(ui.target, target);
-                    assert!(!ui.show_inspector && !ui.show_log && !ui.show_timeline);
+                    assert_eq!(ui.log_mode, LogMode::Hidden);
                 }
                 keyboard_control(&mut app, "Cancel Combat Selection");
                 assert!(app.world().resource::<UiState>().selected.is_none());
@@ -405,9 +470,10 @@ fn tooltip_is_never_visible_at_unplaced_geometry() {
                 .get::<InheritedVisibility>(card)
                 .expect("visibility")
                 .get();
-            if !visible {
-                continue;
-            }
+            assert!(
+                visible,
+                "measured card must be placed and visible on frame {frame}"
+            );
             visible_frames += 1;
             let node = app.world().get::<ComputedNode>(card).expect("layout");
             let transform = app
@@ -428,16 +494,76 @@ fn tooltip_is_never_visible_at_unplaced_geometry() {
                 rect.min.cmpge(bounds.min).all() && rect.max.cmple(bounds.max + Vec2::ONE).all(),
                 "visible before placement on frame {frame}: {rect:?}, safe area {bounds:?}"
             );
-            let style = app.world().get::<Node>(card).expect("style");
-            let (left, top) = match (style.left, style.top) {
-                (Val::Px(left), Val::Px(top)) => Some((left, top)),
-                _ => None,
-            }
-            .expect("visible card has a position");
-            assert!(rect.min.distance(Vec2::new(left, top)) < 1.0,
-                "visible geometry must have consumed placement: frame {frame}, {rect:?}, {left}, {top}");
+            // Native layout measures at the origin. The floating placement
+            // pass must move both the surface and its interactive descendants.
+            let title = find_named(app.world_mut(), "Tooltip Title").expect("title");
+            let title_rect = visible_control_rect(app.world(), title, bounds)
+                .expect("text is clipped at final placement, not the layout origin");
+            assert!(rect.contains(title_rect.center()));
         }
         assert!(visible_frames > 0, "card must eventually appear");
+    }
+}
+
+#[test]
+fn tooltip_resize_is_placed_before_clipping_in_the_same_frame() {
+    use bevy_game_ui::{UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject};
+    let mut app = scene_app(1920, 1080, UiScaleMode::Auto);
+    let subject = UiTooltipSubject("resize-regression".into());
+    app.world_mut().resource_mut::<UiTooltipCatalog>().0.insert(
+        subject.clone(),
+        UiTooltipContent {
+            title: "Resize regression".into(),
+            body: "A measured floating card".into(),
+            ..default()
+        },
+    );
+    app.world_mut()
+        .write_message(UiTooltipRequest::Open(subject));
+    app.update();
+    for (width, height) in [(1280, 720), (3840, 2160), (1920, 1080)] {
+        app.world_mut()
+            .query::<&mut Window>()
+            .single_mut(app.world_mut())
+            .expect("window")
+            .resolution
+            .set_physical_resolution(width, height);
+        // HeadlessUiPlugin supplies camera target geometry without a renderer.
+        app.world_mut()
+            .query::<&mut Camera>()
+            .single_mut(app.world_mut())
+            .expect("camera")
+            .computed
+            .target_info
+            .as_mut()
+            .expect("target")
+            .physical_size = UVec2::new(width, height);
+        app.update();
+        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("card");
+        assert!(
+            app.world()
+                .get::<InheritedVisibility>(card)
+                .expect("visibility")
+                .get(),
+            "no hidden resize frame at {width}x{height}"
+        );
+        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+        let node = app.world().get::<ComputedNode>(card).expect("node");
+        let visible = visible_control_rect(app.world(), card, viewport)
+            .expect("card remains inside viewport");
+        assert!(
+            (visible.size() - node.size() * node.inverse_scale_factor)
+                .abs()
+                .max_element()
+                < 1.0
+        );
+        let title = find_named(app.world_mut(), "Tooltip Title").expect("title");
+        let title_rect =
+            visible_control_rect(app.world(), title, viewport).expect("translated text");
+        assert!(
+            visible.contains(title_rect.center()),
+            "descendant translation matches card"
+        );
     }
 }
 

@@ -586,6 +586,11 @@ fn publish(world: &mut World) {
         view.players = snapshot.players.iter().map(|p| p.view()).collect();
         view.combat = snapshot.combat;
         view.paused = snapshot.paused || !data.2;
+        view.interruption = if !data.2 {
+            crate::view::CombatInterruption::Reconnecting
+        } else {
+            snapshot.interruption
+        };
         view.log = snapshot.log;
         view.events = snapshot.events;
     } else {
@@ -594,6 +599,7 @@ fn publish(world: &mut World) {
         view.players.clear();
         view.events.clear();
         view.paused = false;
+        view.interruption = crate::view::CombatInterruption::None;
     }
 }
 

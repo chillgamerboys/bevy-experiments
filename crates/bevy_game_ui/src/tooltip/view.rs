@@ -87,21 +87,6 @@ pub(super) fn render(world: &mut World) {
                 .root
                 .is_some_and(|entity| world.get_entity(entity).is_err())
         {
-            // Seed rebuilt cards from their previous layout. In particular,
-            // opening a child must not blink an unchanged parent off/on.
-            let previous_nodes = if view.host == host {
-                view.rendered
-                    .iter()
-                    .zip(&view.cards)
-                    .filter_map(|((key, _), entity)| {
-                        world
-                            .get::<Node>(*entity)
-                            .map(|node| (key.clone(), node.clone()))
-                    })
-                    .collect::<BTreeMap<_, _>>()
-            } else {
-                BTreeMap::new()
-            };
             if let Some(root) = view.root.take() {
                 let _ = world.despawn(root);
             }
@@ -128,19 +113,16 @@ pub(super) fn render(world: &mut World) {
                     ))
                     .id();
                 view.root = Some(root);
-                for (depth, (subject, content)) in wanted.iter().enumerate() {
-                    let previous = previous_nodes.get(subject);
+                for (depth, (_, content)) in wanted.iter().enumerate() {
                     let card = world
                         .spawn((
                             Name::new(format!("Tooltip Card {depth}")),
                             Node {
                                 position_type: PositionType::Absolute,
-                                left: previous.map_or(Val::Auto, |node| node.left),
-                                top: previous.map_or(Val::Auto, |node| node.top),
+                                left: Val::Px(0.0),
+                                top: Val::Px(0.0),
                                 width: Val::Px(340.0),
                                 max_width: Val::Percent(92.0),
-                                max_height: previous
-                                    .map_or(Val::Percent(65.0), |node| node.max_height),
                                 flex_direction: FlexDirection::Column,
                                 padding: UiRect::all(Val::Px(12.0)),
                                 row_gap: Val::Px(6.0),
@@ -151,9 +133,7 @@ pub(super) fn render(world: &mut World) {
                             UiSkin::Panel,
                             GlobalZIndex(80 + i32::try_from(depth).unwrap_or(0)),
                             TooltipSurface,
-                            // Layout must measure the card before we can place
-                            // it. Hidden retains layout without flashing at (0,0).
-                            Visibility::Hidden,
+                            Visibility::Inherited,
                             Interaction::None,
                             bevy::ui::FocusPolicy::Block,
                             Pickable {
@@ -297,20 +277,107 @@ pub(super) fn scroll(world: &mut World, direction: i8) {
         .insert(ScrollPosition(Vec2::new(0.0, next)));
 }
 
-/// Prefer above the source; then below, with every edge clamped to the viewport.
-fn placement(anchor: Rect, size: Vec2, viewport: Vec2) -> Vec2 {
+/// Prefer above/below, then either side. Minimize overlap with the source after
+/// clamping, so a tall character hit region cannot spawn a card under its cursor.
+fn placement(anchor: Rect, size: Vec2, viewport: Vec2, avoid: &[Rect]) -> Vec2 {
     let margin = 8.0;
-    let preferred_y = if anchor.min.y >= size.y + margin * 2.0 {
-        anchor.min.y - size.y - margin
-    } else {
-        anchor.max.y + margin
-    };
-    Vec2::new(anchor.center().x - size.x * 0.5, preferred_y).clamp(
-        Vec2::splat(margin),
-        (viewport - size - Vec2::splat(margin)).max(Vec2::splat(margin)),
-    )
+    let centered_x = anchor.center().x - size.x * 0.5;
+    let centered_y = anchor.center().y - size.y * 0.5;
+    let mut candidates = vec![
+        Vec2::new(centered_x, anchor.min.y - size.y - margin),
+        Vec2::new(centered_x, anchor.max.y + margin),
+        Vec2::new(anchor.max.x + margin, centered_y),
+        Vec2::new(anchor.min.x - size.x - margin, centered_y),
+    ];
+    for region in avoid {
+        candidates.extend([
+            Vec2::new(region.min.x - size.x - margin, centered_y),
+            Vec2::new(region.max.x + margin, centered_y),
+            Vec2::new(centered_x, region.min.y - size.y - margin),
+            Vec2::new(centered_x, region.max.y + margin),
+        ]);
+    }
+    let mut best = Vec2::splat(margin);
+    let mut overlap = (f32::INFINITY, f32::INFINITY);
+    for candidate in candidates {
+        let position = candidate.clamp(
+            Vec2::splat(margin),
+            (viewport - size - Vec2::splat(margin)).max(Vec2::splat(margin)),
+        );
+        let intersection = Rect::from_corners(position, position + size).intersect(anchor);
+        let area = if intersection.is_empty() {
+            0.0
+        } else {
+            intersection.width() * intersection.height()
+        };
+        let blocked = avoid
+            .iter()
+            .map(|region| {
+                let intersection = Rect::from_corners(position, position + size).intersect(*region);
+                if intersection.is_empty() {
+                    0.0
+                } else {
+                    intersection.width() * intersection.height()
+                }
+            })
+            .sum::<f32>();
+        if (blocked, area) < overlap {
+            best = position;
+            overlap = (blocked, area);
+        }
+    }
+    best
 }
 
+fn safe_bounds(world: &World, host: Entity, viewport: Vec2) -> Rect {
+    let full = Rect::from_corners(Vec2::ZERO, viewport);
+    let requested = world
+        .get::<UiTooltipBounds>(host)
+        .map_or(full, |bounds| bounds.0)
+        .intersect(full);
+    if requested.is_empty() || !requested.min.is_finite() || !requested.max.is_finite() {
+        full
+    } else {
+        requested
+    }
+}
+
+/// Apply size constraints before native measurement, using this frame's render
+/// target information rather than last frame's computed card geometry.
+pub(super) fn constrain(world: &mut World) {
+    let view = world.resource::<TooltipView>();
+    let Some(host) = view.host else { return };
+    let viewport = world
+        .get::<ComputedUiRenderTargetInfo>(host)
+        .map(ComputedUiRenderTargetInfo::logical_size)
+        .filter(|size| size.min_element() > 0.0)
+        .or_else(|| {
+            world
+                .get::<ComputedNode>(host)
+                .map(|node| node.size() * node.inverse_scale_factor)
+        });
+    let Some(viewport) = viewport else { return };
+    let bounds = safe_bounds(world, host, viewport);
+    let cards = view.cards.clone();
+    for entity in cards {
+        if let Some(mut node) = world.get_mut::<Node>(entity) {
+            let height = Val::Px((bounds.height() - 16.0).max(44.0));
+            let width = Val::Px((bounds.width() - 16.0).max(44.0));
+            if node.max_height != height {
+                node.max_height = height;
+            }
+            if node.max_width != width {
+                node.max_width = width;
+            }
+        }
+    }
+}
+
+/// Floating cards do not participate in the screen's flow. Native layout owns
+/// their measurement and internal geometry; this pass owns their final screen
+/// translation. Move all descendants before PostLayout computes clipping, so
+/// rendering, text, scrolling, and next frame's picking use the same geometry.
+/// Never write Node offsets here: they are inputs to a future layout pass.
 pub(super) fn place(world: &mut World) {
     let view = world.resource::<TooltipView>();
     let Some(host) = view.host else {
@@ -321,17 +388,7 @@ pub(super) fn place(world: &mut World) {
     };
     let scale = computed.inverse_scale_factor;
     let viewport = computed.size() * scale;
-    let full = Rect::from_corners(Vec2::ZERO, viewport);
-    let requested = world
-        .get::<UiTooltipBounds>(host)
-        .map_or(full, |bounds| bounds.0)
-        .intersect(full);
-    let bounds = if requested.is_empty() || !requested.min.is_finite() || !requested.max.is_finite()
-    {
-        full
-    } else {
-        requested
-    };
+    let bounds = safe_bounds(world, host, viewport);
     let origin = world
         .get::<UiGlobalTransform>(host)
         .map_or(Vec2::ZERO, |transform| {
@@ -351,6 +408,25 @@ pub(super) fn place(world: &mut World) {
         .unwrap_or_else(|| Rect::from_center_size(viewport * Vec2::new(0.5, 0.8), Vec2::ZERO));
     let cards = view.cards.clone();
     let mut previous = None::<Rect>;
+    let avoid = world
+        .query_filtered::<(Entity, &ComputedNode, &UiGlobalTransform), With<UiTooltipAvoid>>()
+        .iter(world)
+        .filter_map(|(entity, node, transform)| {
+            let mut ancestor = entity;
+            while ancestor != host {
+                ancestor = world.get::<ChildOf>(ancestor)?.parent();
+            }
+            if node.size().min_element() <= 0.0
+                || world.get::<Visibility>(entity) == Some(&Visibility::Hidden)
+            {
+                return None;
+            }
+            Some(Rect::from_center_size(
+                transform.translation * scale - origin - bounds.min,
+                node.size() * scale,
+            ))
+        })
+        .collect::<Vec<_>>();
     for entity in cards {
         let Some(computed) = world.get::<ComputedNode>(entity) else {
             continue;
@@ -362,6 +438,7 @@ pub(super) fn place(world: &mut World) {
                     Rect::from_corners(anchor.min - bounds.min, anchor.max - bounds.min),
                     size,
                     bounds.size(),
+                    &avoid,
                 ) + bounds.min
             },
             |parent| {
@@ -370,38 +447,41 @@ pub(super) fn place(world: &mut World) {
                 } else {
                     parent.min.x - size.x - 8.0
                 };
-                Vec2::new(x, parent.min.y).clamp(
+                let preferred = Vec2::new(x, parent.min.y).clamp(
                     bounds.min + Vec2::splat(8.0),
                     (bounds.max - size - Vec2::splat(8.0)).max(bounds.min + Vec2::splat(8.0)),
-                )
+                );
+                if avoid.iter().any(|region| {
+                    !Rect::from_corners(preferred - bounds.min, preferred - bounds.min + size)
+                        .intersect(*region)
+                        .is_empty()
+                }) {
+                    placement(
+                        Rect::from_corners(parent.min - bounds.min, parent.max - bounds.min),
+                        size,
+                        bounds.size(),
+                        &avoid,
+                    ) + bounds.min
+                } else {
+                    preferred
+                }
             },
         );
         let laid_out_position = world
             .get::<UiGlobalTransform>(entity)
             .map(|transform| transform.translation * scale - origin - size * 0.5);
-        let mut pending_layout = size.min_element() <= 0.0
+        let invalid_geometry = size.min_element() <= 0.0
             || !size.is_finite()
-            // Layout rounds physical edges. Compare per axis with one physical
-            // pixel of tolerance (converted to logical units), not Euclidean
-            // half-pixel distance, which can leave valid cards hidden forever.
-            || laid_out_position.is_none_or(|actual| {
-                (actual - position).abs().max_element() > scale.max(f32::EPSILON)
-            });
-        if let Some(mut node) = world.get_mut::<Node>(entity) {
-            let maximum = Val::Px((bounds.height() - 16.0).max(44.0));
-            if node.max_height != maximum {
-                node.max_height = maximum;
-                pending_layout = true;
-            }
-            if node.left != Val::Px(position.x) || node.top != Val::Px(position.y) {
-                node.left = Val::Px(position.x);
-                node.top = Val::Px(position.y);
-            }
+            || !scale.is_finite()
+            || scale <= 0.0
+            || laid_out_position.is_none_or(|actual| !actual.is_finite());
+        if !invalid_geometry {
+            let delta = (position - laid_out_position.expect("validated geometry")) / scale;
+            translate_subtree(world, entity, delta);
         }
-        // Node offsets are inputs to NEXT frame's layout, not a transform for
-        // this frame. Reveal only when computed geometry has consumed them.
-        // This also guards content resizing and viewport/bounds changes.
-        let visibility = if pending_layout {
+        // This only guards unavailable/invalid geometry, never a timed wait or
+        // a position mismatch. Valid measured cards are placed this frame.
+        let visibility = if invalid_geometry {
             Visibility::Hidden
         } else {
             Visibility::Inherited
@@ -413,9 +493,46 @@ pub(super) fn place(world: &mut World) {
     }
 }
 
+fn translate_subtree(world: &mut World, root: Entity, delta: Vec2) {
+    if delta == Vec2::ZERO {
+        return;
+    }
+    let mut pending = vec![root];
+    while let Some(entity) = pending.pop() {
+        if let Some(children) = world.get::<Children>(entity) {
+            pending.extend(children.iter());
+        }
+        if let Some(mut transform) = world.get_mut::<UiGlobalTransform>(entity) {
+            let mut affine = transform.affine();
+            affine.translation += delta;
+            *transform = affine.into();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn protected_surfaces_take_priority_over_source_proximity() {
+        let log = Rect::from_corners(Vec2::new(900.0, 100.0), Vec2::new(1270.0, 500.0));
+        let anchor = Rect::from_corners(Vec2::new(1100.0, 600.0), Vec2::new(1200.0, 700.0));
+        let size = Vec2::new(340.0, 300.0);
+        let position = placement(anchor, size, Vec2::new(1280.0, 720.0), &[log]);
+        let card = Rect::from_corners(position, position + size);
+        assert!(card.intersect(log).is_empty());
+        assert!(card.intersect(anchor).is_empty());
+    }
+
+    #[test]
+    fn tall_sources_use_side_placement_without_occluding_their_hit_region() {
+        let anchor = Rect::from_corners(Vec2::new(900.0, 100.0), Vec2::new(1100.0, 900.0));
+        let size = Vec2::new(340.0, 300.0);
+        let position = placement(anchor, size, Vec2::new(1280.0, 600.0), &[]);
+        assert!(Rect::from_corners(position, position + size)
+            .intersect(anchor)
+            .is_empty());
+    }
     #[test]
     fn placement_keeps_cards_inside_every_viewport_edge() {
         for size in [Vec2::new(1280.0, 720.0), Vec2::new(1920.0, 1080.0)] {
@@ -430,6 +547,7 @@ mod tests {
                     Rect::from_center_size(anchor, Vec2::splat(44.0)),
                     card,
                     size,
+                    &[],
                 );
                 assert!(position.cmpge(Vec2::splat(8.0)).all());
                 assert!((position + card).cmple(size - Vec2::splat(8.0)).all());

@@ -69,7 +69,10 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
             let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
             assert!(
                 activation_eligible(app.world_mut(), confirm),
-                "confirm eligibility"
+                "confirm eligibility: keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, tooltip={:?}",
+                app.world().resource::<UiState>().selected,
+                app.world().resource::<UiState>().target,
+                app.world().resource::<bevy_game_ui::UiTooltipState>().subjects()
             );
             activate(&mut app, confirm, keyboard);
             let diagnostics = app
@@ -149,7 +152,12 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                 let content = state.content.as_ref().expect("current medic help");
                 assert!(content.title.contains(heading) || content.body.contains(heading));
                 run_frames(&mut app, 8);
-                let title = find_named(app.world_mut(), "Tooltip Title").expect("current tooltip");
+                let title = find_named(app.world_mut(), "Tooltip Title");
+                assert!(title.is_some(), "current tooltip: {name}, keyboard={keyboard}, scale={scale:?}, source={:?}, state={:?}, help={:?}",
+                    app.world().get::<bevy_game_ui::UiTooltipSource>(button),
+                    app.world().resource::<bevy_game_ui::UiTooltipState>().subjects(),
+                    app.world().resource::<UiContextHelpState>());
+                let title = title.expect("current tooltip");
                 assert!(!text(&app, title).contains(skill_definition(SkillId::BackRankShot).name));
                 assert_eq!(
                     app.world().resource::<LabyrinthView>().combat.as_ref(),

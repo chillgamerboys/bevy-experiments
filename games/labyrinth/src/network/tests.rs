@@ -17,6 +17,60 @@ mod process;
 const TEST_PLAYERS: usize = 6;
 const LAST_GUEST: usize = TEST_PLAYERS - 1;
 
+fn socket_ui_app() -> App {
+    let mut app = App::new();
+    app.insert_resource(bevy::time::TimeUpdateStrategy::Automatic)
+        .add_plugins(bevy_game_test::HeadlessUiPlugin::new(1280, 720))
+        .insert_resource(ReconnectCredentialStorage::new(
+            MemoryReconnectCredentialStore::default(),
+        ))
+        .add_plugins(crate::LabyrinthPlugin);
+    app.finish();
+    app.cleanup();
+    app
+}
+
+#[test]
+fn real_udp_host_and_guest_menus_do_not_suspend_authority_or_snapshot_delivery() {
+    let mut apps = vec![socket_ui_app(), socket_ui_app()];
+    apps.extend((2..TEST_PLAYERS).map(|_| socket_app(None)));
+    open_host(&mut apps, "");
+    join_codes(&mut apps);
+    begin_encounter(&mut apps);
+    let before = wait_for_hero(&mut apps);
+    for index in [0, 1] {
+        let world = app(&mut apps, index).world_mut();
+        let menu = bevy_game_test::find_named(world, "Battle Settings").expect("menu control");
+        world.write_message(bevy_game_ui::UiActivated { entity: menu });
+    }
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        [0, 1].into_iter().all(|index| {
+            bevy_game_test::find_named(app(apps, index).world_mut(), "Game Menu Title").is_some()
+        })
+    }));
+    assert!(!host_snapshot(&mut apps).paused);
+    assert!(apps
+        .iter()
+        .all(|app| !app.world().resource::<Time<Virtual>>().is_paused()));
+    // A game command from the current owner still crosses transport/authority
+    // while both menus remain open. Local UI input blocking is tested separately.
+    send_action(
+        &mut apps,
+        before.active_actor.expect("actor"),
+        CombatAction::Wait,
+    );
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        combat(apps).turn_id != before.turn_id && converged(apps)
+    }));
+    for index in [0, 1] {
+        assert!(
+            bevy_game_test::find_named(app(&mut apps, index).world_mut(), "Game Menu Title")
+                .is_some()
+        );
+    }
+    assert!(!host_snapshot(&mut apps).paused);
+}
+
 fn socket_app(path: Option<&Path>) -> App {
     let mut builder = TestAppBuilder::new().with_minimal_plugins();
     let store = path.map_or_else(
