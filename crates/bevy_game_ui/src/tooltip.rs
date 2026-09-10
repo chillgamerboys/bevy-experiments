@@ -27,6 +27,12 @@ pub struct UiTooltipSource(pub UiTooltipSubject);
 #[derive(Component, Debug, Clone)]
 pub struct UiTooltipOpen(pub UiTooltipSubject);
 
+/// Dismiss a passive hint when its control activates, and suppress it until
+/// hover/focus leaves. Useful for toggles that open the surface the hint labels.
+/// Does not close pinned/nested inspection or override [`UiTooltipOpen`].
+#[derive(Component)]
+pub struct UiTooltipDismissOnActivate;
+
 #[derive(Component)]
 pub(crate) struct TooltipOrigin(pub Entity);
 
@@ -67,6 +73,11 @@ pub struct UiTooltipHost;
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct UiTooltipBounds(pub Rect);
 
+/// A visible UI surface that floating tooltip placement should avoid covering.
+/// Attach within the tooltip host's hierarchy (for example to an activity log).
+#[derive(Component)]
+pub struct UiTooltipAvoid;
+
 /// Timing is driven by Bevy's real-time clock, not wall-clock sleeps or simulation time.
 #[derive(Resource, Debug, Clone)]
 pub struct UiTooltipSettings {
@@ -85,7 +96,7 @@ pub struct UiTooltipSettings {
 impl Default for UiTooltipSettings {
     fn default() -> Self {
         Self {
-            show_delay: Duration::from_millis(350),
+            show_delay: Duration::from_millis(150),
             leave_grace: Duration::from_millis(450),
             max_depth: 4,
             inspect_key: Some(KeyCode::KeyT),
@@ -201,6 +212,9 @@ pub enum UiTooltipSystems {
     Resolve,
     /// Reconcile native cards after game presentation has updated its content.
     Render,
+    /// Position measured floating cards before native clipping. Custom hit-region
+    /// geometry must be updated before this set so anchors are current.
+    Place,
 }
 
 /// Adds delayed previews, sticky reading, explicit pinning, linked cards, and a
@@ -238,8 +252,16 @@ impl Plugin for GameUiTooltipPlugin {
             )
             .add_systems(
                 PostUpdate,
+                view::constrain
+                    .after(bevy::ui::UiSystems::Propagate)
+                    .before(bevy::ui::UiSystems::Content),
+            )
+            .add_systems(
+                PostUpdate,
                 view::place
-                    .after(bevy::ui::UiSystems::PostLayout)
+                    .in_set(UiTooltipSystems::Place)
+                    .after(bevy::ui::UiSystems::Layout)
+                    .before(bevy::ui::UiSystems::PostLayout)
                     .before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate),
             );
     }
@@ -398,7 +420,7 @@ fn resolve(
         let host_changed = state.host.is_some() && state.host != host;
         state.host = host;
         state.consumed = false;
-        if page != 0 && !editing && !state.chain.is_empty() {
+        if page != 0 && !editing && !state.chain.is_empty() && (state.keyboard || over_card) {
             view::scroll(world, page);
             state.consumed = true;
         }
@@ -415,6 +437,22 @@ fn resolve(
         if let Some((key, _, anchor)) = &candidate {
             if state.chain.first() == Some(key) && !state.pinned {
                 state.anchor = Some(*anchor);
+            }
+        }
+        // Adopters identify controls whose hint has served its purpose on use.
+        // Keep it suppressed until hover/focus leaves, including clicks that
+        // happen before the initial dwell completes. Inspection actions and
+        // deliberately pinned/nested reading sessions retain their lifecycle.
+        if let Some((subject, _, entity)) = &candidate {
+            if activated.contains(entity)
+                && world.get::<UiTooltipDismissOnActivate>(*entity).is_some()
+                && world.get::<UiTooltipOpen>(*entity).is_none()
+                && !state.pinned
+                && !state.keyboard
+                && state.chain.len() <= 1
+            {
+                state.dismiss();
+                state.suppressed = Some(subject.clone());
             }
         }
         for (entity, subject) in opened {
@@ -478,8 +516,12 @@ fn resolve(
             }
         }
         if escape && !state.chain.is_empty() && !editing {
+            // Passive hints do not own navigation. Dismiss them alongside the
+            // game's Back action; pinned/nested reading still closes first.
+            let owns_navigation =
+                state.keyboard || state.pinned || state.chain.len() > 1 || over_card;
             state.chain.pop();
-            state.consumed = true;
+            state.consumed |= owns_navigation;
             state.suppressed = state.candidate.clone();
         }
         // The catalog is the disclosure boundary, not the source entity's lifetime.

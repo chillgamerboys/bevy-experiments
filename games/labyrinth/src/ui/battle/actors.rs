@@ -63,24 +63,39 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
             ..default()
         },
     );
-    // Only this artwork hit area anchors the world sprite. Numeric overlays are
-    // siblings below it, so text scaling never paints labels over character art.
+    // Layout owns the full formation column; input owns only the fitted art.
+    // Keeping these separate prevents empty air above a sprite from targeting it.
+    let art_layout = world
+        .spawn((
+            Name::new(format!("Actor {} Art Layout", actor.id.0)),
+            Node {
+                width: Val::Percent(100.0),
+                min_height: Val::Px(44.0),
+                flex_basis: Val::Px(0.0),
+                flex_grow: 1.0,
+                ..default()
+            },
+            Pickable::IGNORE,
+            ChildOf(entity),
+        ))
+        .id();
     let control = world
         .spawn((
             bevy_game_ui::button(format!("Actor {}", actor.id.0)),
             bevy_game_ui::UiFocusId::new("labyrinth-actors", actor.id.0.to_string()),
             crate::scene::SceneActorAnchor { actor: actor.id },
+            crate::scene::SceneActorLayout(art_layout),
             crate::scene::SceneActorEmphasis::default(),
             Action::Actor(actor.id),
-            ChildOf(entity),
+            ChildOf(art_layout),
         ))
         .id();
     world.entity_mut(control).insert(Node {
-        width: Val::Percent(100.0),
+        position_type: PositionType::Absolute,
+        width: Val::Px(44.0),
+        height: Val::Px(44.0),
         min_width: Val::Px(44.0),
         min_height: Val::Px(44.0),
-        flex_basis: Val::Px(0.0),
-        flex_grow: 1.0,
         border: UiRect::bottom(Val::Px(3.0)),
         ..default()
     });
@@ -89,7 +104,7 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         .insert(BackgroundColor(Color::NONE));
     let cue = label(
         world,
-        control,
+        art_layout,
         &format!("Actor {} Formation Cue", actor.id.0),
         "",
         UiTextRole::Body,

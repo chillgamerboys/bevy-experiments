@@ -15,7 +15,8 @@ cargo run -p labyrinth -- --local
 
 Local mode controls all six heroes and opens no game transport. The default seed
 is 42; use `--seed 91` to try a different reproducible fight. Plain
-`cargo run -p labyrinth` opens the multiplayer menu; no `--all-features` is needed.
+`cargo run -p labyrinth` opens the main menu; choose **Play with friends** for
+hosting, discovery, direct joining or reconnection. No `--all-features` is needed.
 
 For six instances on one computer, build once, then run the resulting binary in
 six terminals with distinct profiles:
@@ -78,10 +79,28 @@ the selected action cannot currently be submitted. Escape dismisses local overla
 
 The battlefield uses replaceable 2D sprites with a minimal native overlay. H1–H6
 and E1–E6 are stable actor labels, not ranks. The starred hero is yours in co-op.
-Select a character, then **Inspect** for its name, owner, rank, exact health and
-effects. **Order** expands this round's rolls; **Log** shows recent outcomes.
-Detail drawers trap focus: Escape/Close returns to combat, Page Up/Down and Home/End
-scroll their content. Skills 1–8 remain inspectable off-turn; only Confirm commits.
+Hover/focus a character for its name, owner, rank, disclosed health and speed.
+Click an initiative portrait to pin that character's card without changing the
+selected target; it includes this round's speed, d8 roll, total and turn state.
+Click a conditions badge for current effects and links to their definitions.
+There are no separate Inspect or initiative-details menus. These cards do not
+block combat confirmation; T enters keyboard reading and Escape closes the card.
+Skills 1–8 remain inspectable off-turn; only Confirm commits.
+
+The log starts **hidden**. Its toolbar icon opens **History**, a non-blocking,
+scrollable list of retained actions with expandable outcomes and ability links.
+**Compact** switches to just two recent outcome summaries; its × control fully
+hides the log. **Hide** in history or Escape also removes the panel entirely.
+The toolbar reopens history, and incoming events never reopen a hidden log.
+In history, the wheel and Page Up/Down or Home/End browse older entries.
+New events do not pull you away while reading; **Latest** returns to the newest
+entry. History is bounded to the session's recent 80 events, not a saved transcript.
+
+The **Game menu** and its Settings page are local. They block your combat input,
+but the encounter and networking continue. Escape backs out of menus; outside a
+menu it dismisses active inspection/selection before opening the Game menu.
+Leaving requires confirmation and explains whether it closes the hosted company,
+releases a lobby seat, or leaves a reserved combat hero waiting for reconnection.
 The command dock groups equipped abilities and utility actions as flat glyph
 controls. Hover or keyboard-focus an ability for its explanation; this never
 changes the pending command. Descriptions float in the upper battlefield, outside
@@ -93,7 +112,8 @@ retargeting. The paired six-rank diagrams face the same direction as the formati
 
 An ability shows authored base power before targeting. Selecting a valid target
 adds an immediate HP forecast on that character's health bar and in the dock;
-Inspect expands damage modifiers, capped healing, movement and status outcomes.
+The target's contextual card expands the immediate forecast; ability and condition
+cards explain base effects and their rules.
 Forecasts do not advance combat or predict the next turn's damage. Bleed is shown
 as conditional ticks, not guaranteed future damage. The prototype palette and
 glyph strokes are game-owned `LabyrinthAppearance` tokens, not fixed Gamekit styling.
@@ -141,15 +161,17 @@ or host-side kick in this slice. Return to the lobby and have a connected guest
 leave to release its seat, or start a new company. Host process restart deliberately
 ends the session; stored guest credentials cannot recover a lost host world.
 
-The six-rank rules and snapshot schema are incompatible with earlier four-player
-builds. All participants must update together and start a new hosted company;
+The current Labyrinth protocol is **v3**, including typed connection/encounter
+interruption reasons. Menus never clear a missing-player or rules-failure suspension.
+This schema is incompatible with earlier builds (including six-player v2).
+All participants must update together and start a new hosted company;
 old credentials are not deleted or migrated into an unrelated session.
 
 ## Engineering boundaries
 
 `rules/` is a pure Rust package: no Bevy, network, window, or filesystem dependency.
 It owns rules and content. `src/session.rs` owns players, readiness, replay policy,
-pause, and encounter lifecycle. `src/network/` composes opt-in Gamekit capabilities.
+disconnect/fault suspension, and encounter lifecycle. `src/network/` composes opt-in Gamekit capabilities.
 `src/ui/` projects snapshots and sends typed intents; it never mutates authority.
 `src/presentation.rs` owns viewer facts and immediate forecast formatting. Its
 unknown-information fixtures conceal exact HP, effects and inspection details;

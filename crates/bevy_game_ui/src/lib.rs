@@ -52,7 +52,11 @@ mod context_help;
 #[cfg(test)]
 mod contracts;
 mod focus;
+mod menu;
 mod metrics;
+pub use menu::*;
+mod feed;
+pub use feed::*;
 mod style;
 mod tooltip;
 

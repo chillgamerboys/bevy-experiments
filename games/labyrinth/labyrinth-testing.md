@@ -42,7 +42,7 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 ```
 
 Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
-Routes include `menu`, `host`, `lobby`, `combat`, `help`, `effects`, `inspect`, `order` and
+Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
 `paused`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
@@ -90,6 +90,45 @@ Keep artifacts in a private temporary directory and redact codes and credentials
 
 Cross-machine LAN/tailnet and interactive results must be recorded with the tested
 route and build. Passing deterministic CI is not a substitute for these manual gates.
+
+## Local menu and history acceptance
+
+- Hover the log toggle, then activate it by pointer or keyboard. No tooltip is
+  shown for this control. Actor/ability cards avoid the visible log surface.
+- Hover/click the empty column above a character: it must not highlight, inspect,
+  or select them. The body hit rectangle follows fitted sprite bounds (with a
+  minimum target size); the non-interactive layout column never receives input.
+- Tooltip regressions inspect the first measured frame, content replacement,
+  child-card opening, and viewport resizing: surface/text geometry must be placed
+  before clipping with no hidden settling frame. Native pointer tests also check
+  that a tall actor's own preview cannot intercept the target click. Static
+  captures establish presentation only; desktop motion still needs visual review.
+- Open host and guest menus/settings during a live encounter: snapshots and peer
+  lifecycle processing continue. Only the menu owner's gameplay input is blocked.
+  The socket regression uses six real Apps with full UI stacks on host and one
+  guest; direct test intents advance authority while both local menus remain open.
+- Navigate Game menu → Settings → Back, then close to restore combat focus and
+  selection. Leave opens a confirmation; cancel emits no leave request. Async
+  notices and unrelated discovery updates must not recreate focused join fields.
+- Disconnect two players. Reconnecting one must not resume combat. Closing a local
+  menu cannot dismiss a connection interruption; a rules fault has its own reason
+  and persists after reconnection.
+- Expand history without disabling ability → target → Confirm. Expand an action
+  and open its ability tooltip without emitting gameplay. Scroll to old entries,
+  receive events, verify position/unread state, then activate Latest. Stable rows
+  survive snapshot updates and the dock/actor anchors never move.
+- Start with no log panel. Switch History → Compact → Hidden and reopen through
+  the toolbar. Compact contains only two outcome summaries, not action expansion
+  or Latest controls. Hidden has no focus/pointer surface; events remain retained
+  and new arrivals cannot reopen it. Portrait, character and effects cards replace
+  the old initiative/Inspect drawers without changing targeting or confirmation.
+- Review main menu, settings, leave and history at normal scale, with pointer,
+  keyboard and resizing. Automated layout tests are not an interactive walk.
+
+The menu pass has static captures under `target/review/menus-*.png`. Native desktop
+inspection currently returns `cgWindowNotFound`, including for the review app
+bundle; a completed interactive walk is not claimed. Cross-machine network routes
+also remain separate manual evidence.
 
 ## Six-player foundation review
 

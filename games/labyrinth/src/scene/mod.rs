@@ -55,6 +55,10 @@ pub(crate) struct SceneActorAnchor {
     pub actor: ActorId,
 }
 
+/// Non-interactive layout space from which artwork and its tight hit region are derived.
+#[derive(Component)]
+pub(crate) struct SceneActorLayout(pub Entity);
+
 /// Local targeting emphasis, not permission to issue a combat command.
 #[derive(Component, Default)]
 pub(crate) struct SceneActorEmphasis {
@@ -82,12 +86,66 @@ fn fit_actor_art(area: Vec2, cell: Vec2) -> Vec2 {
     cell * ((area * Vec2::new(0.94, 0.93)) / cell).min_element()
 }
 
+/// Derive input geometry from the same measured column and atlas fit as rendering.
+/// These transparent controls have no children: position/size are finalized before
+/// clipping and picking, without modifying next frame's layout or sprite anchors.
+fn fit_actor_hit_regions(world: &mut World) {
+    let Some(snapshot) = world
+        .get_resource::<LabyrinthView>()
+        .and_then(|view| view.combat.clone())
+    else {
+        return;
+    };
+    let regions = world
+        .query::<(Entity, &SceneActorAnchor, &SceneActorLayout)>()
+        .iter(world)
+        .filter_map(|(entity, anchor, layout)| {
+            let actor = snapshot.actor(anchor.actor)?;
+            let node = world.get::<ComputedNode>(layout.0)?;
+            let transform = world.get::<UiGlobalTransform>(layout.0)?;
+            let inverse = node.inverse_scale_factor;
+            let area = node.size() * inverse;
+            if area.min_element() <= 0.0 || !area.is_finite() {
+                return None;
+            }
+            let (size, center_y) = actor_art_size(world, actor.kind, area)
+                .map_or((area * Vec2::new(0.48, 0.785), area.y * 0.0425), |art| {
+                    (art, area.y * 0.46 - art.y * 0.5)
+                });
+            let size = size.max(Vec2::splat(44.0)).min(area);
+            let mut affine = transform.affine();
+            affine.translation = transform.transform_point2(Vec2::new(0.0, center_y / inverse));
+            Some((
+                entity,
+                size / inverse,
+                inverse,
+                UiGlobalTransform::from(affine),
+            ))
+        })
+        .collect::<Vec<_>>();
+    for (entity, size, inverse, transform) in regions {
+        if let Some(mut node) = world.get_mut::<ComputedNode>(entity) {
+            node.size = size;
+            node.unrounded_size = size;
+            node.inverse_scale_factor = inverse;
+        }
+        world.entity_mut(entity).insert(transform);
+    }
+}
+
 pub(crate) struct LabyrinthScenePlugin;
 
 impl Plugin for LabyrinthScenePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SceneAppearance>()
             .init_resource::<SceneState>()
+            .add_systems(
+                PostUpdate,
+                fit_actor_hit_regions
+                    .after(bevy::ui::UiSystems::Layout)
+                    .before(bevy_game_ui::UiTooltipSystems::Place)
+                    .before(bevy::ui::UiSystems::PostLayout),
+            )
             .add_systems(
                 PostUpdate,
                 present
@@ -279,7 +337,12 @@ fn present(world: &mut World) {
         .filter_map(|(entity, anchor)| {
             Some(ActorAnchor {
                 actor: anchor.actor,
-                frame: frame_for(world, entity)?,
+                frame: frame_for(
+                    world,
+                    world
+                        .get::<SceneActorLayout>(entity)
+                        .map_or(entity, |layout| layout.0),
+                )?,
                 selected: world
                     .get::<SceneActorEmphasis>(entity)
                     .is_some_and(|state| state.selected),

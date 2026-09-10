@@ -30,18 +30,6 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
     });
     for (key, title, glyph, action) in [
         (
-            "Timeline Toggle",
-            "Initiative details",
-            Glyph::Order,
-            Action::ToggleTimeline,
-        ),
-        (
-            "Inspector Toggle",
-            "Inspect selected actor and ability",
-            Glyph::Inspect,
-            Action::ToggleInspector,
-        ),
-        (
             "Battle Log Toggle",
             "Combat log",
             Glyph::Book,
@@ -49,12 +37,20 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         ),
         (
             "Battle Settings",
-            "Readability and motion settings",
+            "Game menu",
             Glyph::Settings,
-            Action::Settings,
+            Action::GameMenu,
         ),
     ] {
-        dock::glyph_control(world, hud, key, "", title, "", glyph, action);
+        let control = dock::glyph_control(world, hud, key, "", title, "", glyph, action);
+        if key == "Battle Log Toggle" {
+            world
+                .entity_mut(control)
+                .remove::<bevy_game_ui::UiContextHelp>();
+        }
+        world
+            .entity_mut(control)
+            .insert(bevy_game_ui::UiTooltipDismissOnActivate);
     }
     let timeline = timeline::mount(world, root, snapshot);
     if let Some(mut node) = world.get_mut::<Node>(timeline) {
@@ -104,126 +100,6 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
             actor,
         );
     }
-    // Secondary detail floats over the scene; it never pushes actors off-screen.
-    let drawer = column(
-        world,
-        root,
-        "Battle Detail Drawer",
-        Node {
-            position_type: PositionType::Absolute,
-            right: Val::Px(16.0),
-            top: Val::Px(110.0),
-            width: Val::Percent(48.0),
-            height: Val::Percent(55.0),
-            flex_direction: FlexDirection::Column,
-            overflow: Overflow::clip(),
-            padding: UiRect::all(Val::Px(16.0)),
-            ..default()
-        },
-    );
-    let detail_color = world.resource::<LabyrinthAppearance>().detail;
-    world.entity_mut(drawer).insert((
-        GlobalZIndex(50),
-        bevy_game_ui::UiModalScope,
-        bevy::input_focus::tab_navigation::TabGroup::modal(),
-        BackgroundColor(detail_color),
-        bevy::ui::FocusPolicy::Block,
-    ));
-    let drawer_controls = row(world, drawer, "Detail Controls");
-    control(
-        world,
-        drawer_controls,
-        "Close Details",
-        "Close",
-        Action::Cancel,
-        false,
-    );
-    dock::glyph_control(
-        world,
-        drawer_controls,
-        "Combat Leave",
-        "Menu",
-        "Return to menu",
-        "Leave this encounter and return to the main menu.",
-        Glyph::Exit,
-        Action::Leave,
-    );
-    control(
-        world,
-        drawer_controls,
-        "Previous Detail Page",
-        "Page up",
-        Action::ScrollDetails(-1),
-        false,
-    );
-    control(
-        world,
-        drawer_controls,
-        "Next Detail Page",
-        "Page down",
-        Action::ScrollDetails(1),
-        false,
-    );
-    let drawer_body = column(
-        world,
-        drawer,
-        "Detail Scroll",
-        Node {
-            width: Val::Percent(100.0),
-            flex_grow: 1.0,
-            min_height: Val::Px(0.0),
-            flex_direction: FlexDirection::Column,
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },
-    );
-    let inspector = column(
-        world,
-        drawer_body,
-        "Actor Inspector",
-        Node {
-            width: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            flex_shrink: 0.0,
-            ..default()
-        },
-    );
-    text_slot(
-        world,
-        inspector,
-        "Inspector Text",
-        Slot::Inspector,
-        UiTextRole::Supporting,
-    );
-    let log = column(
-        world,
-        drawer_body,
-        "Combat Log",
-        Node {
-            width: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            ..default()
-        },
-    );
-    world.entity_mut(log).insert(UiRegionRole::ActivityFeed);
-    text_slot(world, log, "Log Text", Slot::Log, UiTextRole::Supporting);
-    let order = column(
-        world,
-        drawer_body,
-        "Initiative Details",
-        Node {
-            width: Val::Percent(100.0),
-            flex_shrink: 0.0,
-            ..default()
-        },
-    );
-    text_slot(
-        world,
-        order,
-        "Initiative Rolls",
-        Slot::Order,
-        UiTextRole::Supporting,
-    );
     let dock = dock::mount(world, root, formations);
     world.insert_resource(BattleNodes {
         heroes,
@@ -233,11 +109,6 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         confirm: dock.confirm,
         rematch: dock.rematch,
         dock,
-        inspector,
-        log,
-        drawer,
-        drawer_body,
-        order,
         viewport,
         last_event: None,
         was_paused: false,

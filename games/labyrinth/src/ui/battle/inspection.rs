@@ -1,10 +1,9 @@
 //! Local action inspection and legality explanations; never mutates authority.
 
 use super::*;
-use crate::presentation::{BattlePresentation, CombatDisclosure, ForecastDisplay};
+use crate::presentation::{CombatDisclosure, ForecastDisplay};
 
 pub(crate) fn select_skill_slot(view: &LabyrinthView, ui: &mut UiState, index: usize) {
-    ui.inspected_status = None;
     if let Some(actor) = display_actor(view) {
         if let Some(skill) = actor.skills().get(index) {
             ui.selected = Some(Choice::Skill(*skill));
@@ -61,11 +60,20 @@ pub(crate) fn selected_action(
     view: &LabyrinthView,
     ui: &UiState,
 ) -> Result<(ActorId, CombatAction), String> {
-    if ui.settings || ui.show_inspector || ui.show_log || ui.show_timeline {
-        return Err("Close the open details before confirming.".to_owned());
+    if ui.menus.is_open() {
+        return Err("Close the game menu before confirming.".to_owned());
     }
     if view.paused {
-        return Err("The company is waiting for a disconnected player.".to_owned());
+        return Err(match view.interruption {
+            crate::view::CombatInterruption::Halted => {
+                "The encounter halted. The host can return to the lobby."
+            }
+            crate::view::CombatInterruption::Reconnecting => {
+                "Reconnect and complete admission before acting."
+            }
+            _ => "The company is waiting for disconnected players.",
+        }
+        .to_owned());
     }
     if !view.admitted {
         return Err("Admission is not complete.".to_owned());
@@ -95,19 +103,6 @@ pub(crate) fn selected_action(
         .validate_action(actor.id, &action)
         .map_err(|error| error.to_string())?;
     Ok((actor.id, action))
-}
-
-pub(super) fn rank_mask(mask: u8) -> String {
-    (1..=PARTY_SIZE)
-        .map(|rank| {
-            if mask & (1 << (rank - 1)) != 0 {
-                rank.to_string()
-            } else {
-                "-".to_owned()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("")
 }
 
 pub(super) fn choice_title(choice: Option<Choice>) -> &'static str {
@@ -160,7 +155,6 @@ pub(super) fn slot_value(
             });
             format!("Round {} · {}", snapshot.round, ending.unwrap_or(&actor))
         }
-        Slot::Order => timeline::disclosed_value(snapshot, disclosure, true),
         Slot::Feedback => String::new(),
         Slot::Reason => {
             let target = ui
@@ -179,8 +173,8 @@ pub(super) fn slot_value(
             }
             let reason = selected_action(view, ui).map_or_else(
                 |reason| {
-                    if ui.settings || ui.show_inspector || ui.show_log || ui.show_timeline {
-                        "Close details to confirm".to_owned()
+                    if ui.menus.is_open() {
+                        "Close menu to confirm".to_owned()
                     } else if view.paused {
                         "Waiting for reconnection".to_owned()
                     } else if !view.admitted {
@@ -206,97 +200,5 @@ pub(super) fn slot_value(
             );
             format!("Target: {target} · {reason}")
         }
-        Slot::Inspector => {
-            let Some(actor) = ui
-                .inspected
-                .and_then(|id| snapshot.actor(id))
-                .or_else(|| display_actor(view))
-            else {
-                return "Choose an actor or a status badge to inspect it.".to_owned();
-            };
-            let owner = view
-                .players
-                .iter()
-                .find(|player| player.actor == actor.id)
-                .map_or("Host AI", |player| player.name.as_str());
-            let presentation = BattlePresentation::new(snapshot, disclosure);
-            let Some(presented) = presentation.actor(actor.id) else {
-                return String::new();
-            };
-            let health = presented.health.as_known().map_or_else(
-                || "HP unknown".to_owned(),
-                |health| format!("{} / {} HP", health.current, health.maximum),
-            );
-            let speed = presented.details.as_known().map_or_else(
-                || "Speed unknown".to_owned(),
-                |details| format!("Speed {}", details.speed),
-            );
-            let mut value = format!(
-                "{} · {}\n{health} · {speed}\n{}",
-                actors::token(snapshot, actor),
-                actor_label(snapshot, actor),
-                if view.local && actor.team() == Team::Heroes {
-                    "Local control"
-                } else {
-                    owner
-                }
-            );
-            if let Some(Choice::Skill(skill)) = ui.selected {
-                let definition = skill_definition(skill);
-                value.push_str(&format!(
-                    "\n\n{}\nFrom ranks [{}] → target ranks [{}]\n{}",
-                    definition.name,
-                    rank_mask(definition.source_ranks),
-                    rank_mask(definition.target_ranks),
-                    definition.description
-                ));
-            }
-            if let Some(source) = display_actor(view) {
-                if let Some(choice) = ui.selected {
-                    if let Ok(action) = action_for(choice, ui.target) {
-                        if let Ok(forecast) =
-                            ForecastDisplay::build(snapshot, disclosure, source.id, &action)
-                        {
-                            value.push_str(&format!("\n\nACTION PREVIEW\n{}\n{}\nImmediate effects only; future turns are not committed by this preview.", forecast.base, forecast.summary));
-                        }
-                    }
-                }
-            }
-            if let Some(statuses) = presented.statuses.as_known() {
-                for status in statuses {
-                    let definition = status_definition(status.kind);
-                    value.push_str(&format!(
-                        "\n\n{} · potency {} · {} boundaries left. {}",
-                        definition.name, status.potency, status.remaining, definition.description
-                    ));
-                }
-            } else {
-                value.push_str("\n\nStatus effects unknown.");
-            }
-            value
-        }
-        Slot::Log => {
-            if disclosure.has_unknown() {
-                "Combat details are concealed in this view.".to_owned()
-            } else if view.log.is_empty() {
-                "No outcomes yet. Combat events appear here in host order.".to_owned()
-            } else {
-                view.log
-                    .iter()
-                    .rev()
-                    .take(12)
-                    .rev()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            }
-        }
     }
-}
-
-fn actor_label(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
-    let rank = snapshot
-        .rank(actor.id)
-        .map_or_else(|| "out".to_owned(), |rank| rank.to_string());
-    format!("{} | rank {rank} | #{}", actor.name(), actor.id.0)
 }

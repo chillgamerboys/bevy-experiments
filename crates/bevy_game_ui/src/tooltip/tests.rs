@@ -6,7 +6,10 @@ fn key(value: &str) -> UiTooltipSubject {
 
 #[test]
 fn dwell_grace_pinning_and_deepest_first_are_deterministic() {
-    let settings = UiTooltipSettings::default();
+    let settings = UiTooltipSettings {
+        show_delay: Duration::from_millis(350),
+        ..default()
+    };
     let mut state = UiTooltipState::default();
     state.hover(
         Some(key("ability")),
@@ -136,6 +139,63 @@ fn step(app: &mut App, millis: u64) {
     *app.world_mut().resource_mut::<ButtonInput<KeyCode>>() = ButtonInput::default();
 }
 
+#[test]
+fn using_a_control_suppresses_its_hint_until_hover_leaves() {
+    for initial_dwell in [1, 400] {
+        let (mut app, anchor) = app();
+        app.world_mut()
+            .entity_mut(anchor)
+            .insert(UiTooltipDismissOnActivate);
+        app.world_mut()
+            .entity_mut(anchor)
+            .remove::<UiTooltipSource>()
+            .insert(UiContextHelp {
+                title: "Combat log".to_owned(),
+                body: String::new(),
+            });
+        app.world_mut()
+            .entity_mut(anchor)
+            .insert(Interaction::Hovered);
+        step(&mut app, initial_dwell);
+        app.world_mut()
+            .write_message(UiActivated { entity: anchor });
+        step(&mut app, 1);
+        step(&mut app, 2000);
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty());
+        app.world_mut().entity_mut(anchor).insert(Interaction::None);
+        step(&mut app, 500);
+        app.world_mut()
+            .entity_mut(anchor)
+            .insert(Interaction::Hovered);
+        step(&mut app, 400);
+        assert_eq!(app.world().resource::<UiTooltipState>().subjects().len(), 1);
+    }
+}
+
+#[test]
+fn using_a_control_preserves_deliberately_pinned_inspection() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(UiTooltipDismissOnActivate);
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    step(&mut app, 400);
+    app.world_mut().write_message(UiTooltipRequest::Pin);
+    step(&mut app, 1);
+    app.world_mut()
+        .write_message(UiActivated { entity: anchor });
+    step(&mut app, 1);
+    let state = app.world().resource::<UiTooltipState>();
+    assert!(state.is_pinned());
+    assert_eq!(state.subjects(), &[key("root")]);
+}
+
 // These lifecycle-only fixtures do not install the layout engine. Supply
 // measured geometry explicitly, just as we do for the source, and run the real
 // placement/reveal code. Labyrinth's per-frame test separately uses real layout.
@@ -225,6 +285,41 @@ fn disabled_inspection_never_emits_activation_and_hidden_sources_disappear() {
         .resource::<UiTooltipState>()
         .subjects()
         .is_empty());
+}
+
+#[test]
+fn passive_preview_does_not_consume_page_or_escape_navigation() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    step(&mut app, 400);
+    assert_eq!(
+        app.world().resource::<UiTooltipState>().subjects(),
+        &[key("root")]
+    );
+    for code in [
+        KeyCode::Home,
+        KeyCode::End,
+        KeyCode::PageUp,
+        KeyCode::PageDown,
+    ] {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(code);
+        step(&mut app, 1);
+        assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
+    }
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Escape);
+    step(&mut app, 1);
+    let state = app.world().resource::<UiTooltipState>();
+    assert!(state.subjects().is_empty());
+    assert!(
+        !state.captures_keyboard(),
+        "the game's Back action also receives Escape"
+    );
 }
 
 #[test]

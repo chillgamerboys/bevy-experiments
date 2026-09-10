@@ -12,6 +12,8 @@ use labyrinth_rules::{
 };
 
 mod dock;
+mod history;
+mod menus;
 mod overlay_stability;
 mod turn_refresh;
 
@@ -144,8 +146,14 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
     assert!(click_action(&mut app, badge));
     run_frames(&mut app, 2);
     let tree = ui_tree_snapshot(app.world_mut()).to_string();
-    assert!(tree.contains("next 3 turns"));
     assert!(tree.contains("2 boundaries left"));
+    let definition =
+        find_named(app.world_mut(), "Tooltip Bleed ›").expect("condition definition link");
+    assert!(click_action(&mut app, definition));
+    run_frames(&mut app, 3);
+    assert!(ui_tree_snapshot(app.world_mut())
+        .to_string()
+        .contains("next 3 turns"));
 }
 
 #[test]
@@ -256,6 +264,8 @@ fn native_forms_clear_secret_buffers_and_emit_only_typed_intents() {
     let mut app = app(1280, 720, UiScaleMode::Percent200);
     *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
     run_frames(&mut app, 3);
+    apply_action(app.world_mut(), Action::Form(Form::Multiplayer));
+    run_frames(&mut app, 2);
     let direct = find_named(app.world_mut(), "Join Direct").expect("direct menu");
     click_action(&mut app, direct);
     run_frames(&mut app, 3);
@@ -806,7 +816,7 @@ fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_s
                 );
                 rectangles.push((entity, rect));
             }
-            apply_action(app.world_mut(), Action::ToggleInspector);
+            apply_action(app.world_mut(), Action::InspectActor(ActorId(1)));
             run_frames(&mut app, 3);
             for (entity, before) in rectangles {
                 assert_eq!(
@@ -814,8 +824,12 @@ fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_s
                     Some(before)
                 );
             }
-            apply_action(app.world_mut(), Action::Cancel);
-            assert!(!app.world().resource::<UiState>().show_inspector);
+            tap_key(&mut app, KeyCode::Escape);
+            assert!(app
+                .world()
+                .resource::<bevy_game_ui::UiTooltipState>()
+                .subjects()
+                .is_empty());
         }
     }
 }
@@ -852,7 +866,7 @@ fn pointer_control(app: &mut App, entity: Entity, viewport: Vec2) {
 }
 
 #[test]
-fn drawer_and_modal_block_pointer_fallthrough_to_world_anchored_actor_controls() {
+fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls() {
     let mut app = app(1280, 720, UiScaleMode::Auto);
     let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
     let target = find_named(app.world_mut(), "Actor 103").expect("target");
@@ -867,17 +881,6 @@ fn drawer_and_modal_block_pointer_fallthrough_to_world_anchored_actor_controls()
     );
     apply_action(app.world_mut(), Action::Cancel);
     app.world_mut().resource_mut::<UiState>().target = None;
-    apply_action(app.world_mut(), Action::ToggleInspector);
-    run_frames(&mut app, 3);
-    let drawer = find_named(app.world_mut(), "Battle Detail Drawer").expect("drawer");
-    let drawer_rect = visible_control_rect(app.world(), drawer, viewport).expect("drawer bounds");
-    let hit = point.clamp(
-        drawer_rect.min + Vec2::splat(2.0),
-        drawer_rect.max - Vec2::splat(2.0),
-    );
-    pointer_at(&mut app, hit);
-    assert_eq!(app.world().resource::<UiState>().target, None);
-    apply_action(app.world_mut(), Action::Cancel);
     apply_action(app.world_mut(), Action::Settings);
     run_frames(&mut app, 3);
     pointer_at(&mut app, point);
@@ -885,23 +888,37 @@ fn drawer_and_modal_block_pointer_fallthrough_to_world_anchored_actor_controls()
 }
 
 #[test]
-fn detail_scope_traps_focus_restores_selection_and_keyboard_scrolls_last_content() {
+fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
     let mut app = app(1280, 720, UiScaleMode::Percent200);
     let actor = find_named(app.world_mut(), "Actor 1").expect("actor");
     assert!(focus_action(app.world_mut(), actor));
-    let before = app.world().resource::<UiState>().selected;
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-        view.log = (0..12).map(|i| format!("Log entry {i}: a long outcome description that must remain fully inspectable at large text size.")).collect();
+        view.events = (1..=24)
+            .map(|id| crate::view::PresentedEvent {
+                id,
+                event: labyrinth_rules::CombatEvent {
+                    id,
+                    kind: labyrinth_rules::CombatEventKind::Action {
+                        actor: ActorId(1),
+                        action: CombatAction::Wait,
+                    },
+                },
+            })
+            .collect();
     }
     apply_action(app.world_mut(), Action::ToggleLog);
     run_frames(&mut app, 4);
-    assert!(!activation_eligible(app.world_mut(), actor));
-    let close = find_named(app.world_mut(), "Close Details").expect("close");
+    assert!(activation_eligible(app.world_mut(), actor));
+    let close = find_named(app.world_mut(), "History Toggle").expect("collapse");
     assert!(activation_eligible(app.world_mut(), close));
-    tap_key(&mut app, KeyCode::Digit1);
-    assert_eq!(app.world().resource::<UiState>().selected, before);
-    let scroll = find_named(app.world_mut(), "Detail Scroll").expect("scroll");
+    apply_action(app.world_mut(), Action::Choice(Choice::Wait));
+    assert!(battle::selected_action(
+        app.world().resource::<LabyrinthView>(),
+        app.world().resource::<UiState>()
+    )
+    .is_ok());
+    let scroll = find_named(app.world_mut(), "History Scroll").expect("scroll");
     tap_key(&mut app, KeyCode::End);
     run_frames(&mut app, 3);
     let node = app.world().get::<ComputedNode>(scroll).expect("computed");
@@ -927,6 +944,57 @@ fn detail_scope_traps_focus_restores_selection_and_keyboard_scrolls_last_content
             .y,
         0.0
     );
+    let retained = find_named(app.world_mut(), "History Entry 1").expect("stable old entry");
+    app.world_mut()
+        .resource_mut::<LabyrinthView>()
+        .events
+        .push(crate::view::PresentedEvent {
+            id: 25,
+            event: labyrinth_rules::CombatEvent {
+                id: 25,
+                kind: labyrinth_rules::CombatEventKind::Action {
+                    actor: ActorId(2),
+                    action: CombatAction::Wait,
+                },
+            },
+        });
+    run_frames(&mut app, 3);
+    assert_eq!(
+        find_named(app.world_mut(), "History Entry 1"),
+        Some(retained)
+    );
+    assert_eq!(
+        app.world()
+            .get::<ScrollPosition>(scroll)
+            .expect("position")
+            .y,
+        0.0
+    );
+    assert_eq!(
+        app.world()
+            .get::<bevy_game_ui::UiFeedScroll>(scroll)
+            .expect("feed")
+            .unread(),
+        1
+    );
+    let latest = find_named(app.world_mut(), "History Latest").expect("latest");
+    assert!(click_action(&mut app, latest));
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world()
+            .get::<bevy_game_ui::UiFeedScroll>(scroll)
+            .expect("feed")
+            .unread(),
+        0
+    );
+    assert!(
+        app.world()
+            .get::<ScrollPosition>(scroll)
+            .expect("position")
+            .y
+            > 100.0
+    );
+    assert!(focus_action(app.world_mut(), actor));
     tap_key(&mut app, KeyCode::Escape);
     run_frames(&mut app, 3);
     assert!(activation_eligible(app.world_mut(), actor));

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
 pub(super) const GAME_ID: &str = "gamekit-labyrinth";
-pub(super) const PROTOCOL: &str = "2";
+pub(super) const PROTOCOL: &str = "3";
 pub(super) const SCHEMA: &str = "labyrinth/v2;six-seats;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
 
 #[derive(Serialize)]

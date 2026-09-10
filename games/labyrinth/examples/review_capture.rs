@@ -14,7 +14,7 @@ use bevy_game_ui::{
 use labyrinth::{
     presentation::{ActorDisclosure, CombatDisclosure},
     ui::{LabyrinthAppearance, LabyrinthUiPlugin},
-    view::{LabyrinthView, PlayerView, ViewMode},
+    view::{CombatInterruption, LabyrinthView, PlayerView, PresentedEvent, ViewMode},
 };
 use labyrinth_rules::{
     ActorId, Combat, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER, PARTY_SIZE,
@@ -56,12 +56,13 @@ fn main() {
         .cloned()
         .unwrap_or_else(|| "combat".to_owned());
     let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("review fixture");
+    let mut events = Vec::new();
     for _ in 0..PARTY_SIZE * 2 {
         let Some(action) = combat.ai_action() else {
             break;
         };
         if let Some(actor) = combat.snapshot().active_actor {
-            combat.apply(actor, action).expect("legal fixture AI");
+            events.extend(combat.apply(actor, action).expect("legal fixture AI"));
         }
     }
     let mut snapshot = combat.snapshot();
@@ -103,6 +104,18 @@ fn main() {
         session_name: "The Lantern Company".to_owned(),
         combat: Some(snapshot),
         paused: route == "paused",
+        interruption: if route == "paused" {
+            CombatInterruption::WaitingForPlayers
+        } else {
+            CombatInterruption::None
+        },
+        events: events
+            .into_iter()
+            .map(|event| PresentedEvent {
+                id: event.id,
+                event,
+            })
+            .collect(),
         players: DEFAULT_HERO_ROSTER
             .into_iter()
             .enumerate()
@@ -196,12 +209,12 @@ fn help_fixture(
     controls: Query<(Entity, &Name, &UiContextHelp)>,
     mut help: ResMut<UiContextHelpState>,
 ) {
-    if capture.route != "help" {
-        return;
-    }
-    if let Some((entity, _, content)) = controls
-        .iter()
-        .find(|(_, name, _)| name.as_str() == "Skill 0")
+    let source = match capture.route.as_str() {
+        "help" => "Skill 0",
+        "history-actor" => "Actor 105",
+        _ => return,
+    };
+    if let Some((entity, _, content)) = controls.iter().find(|(_, name, _)| name.as_str() == source)
     {
         help.entity = Some(entity);
         help.content = Some(content.clone());
@@ -252,13 +265,22 @@ fn capture(
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
-        ("host", 4) => Some("Host Company"),
+        ("host", 4) => Some("Multiplayer"),
+        ("host", 7) => Some("Host Company"),
+        ("game-menu", 4) => Some("Battle Settings"),
+        ("leave", 4) => Some("Battle Settings"),
+        ("leave", 7) => Some("Menu Leave"),
+        ("settings", 4) => Some("Battle Settings"),
+        ("settings", 7) => Some("Game Settings"),
+        ("history" | "history-actor", 4) => Some("Battle Log Toggle"),
         ("combat" | "help", 4) => Some("Skill 0"),
         ("combat", 7) => Some("Actor 105"),
         ("unknown" | "alternate", 4) => Some("Skill 0"),
         ("unknown" | "alternate", 7) => Some("Actor 105"),
         ("inspect", 4) => Some("Actor 1 Effects"),
-        ("order", 4) => Some("Timeline Toggle"),
+        ("order", 4) => Some("Initiative Actor 4"),
+        ("compact", 4) => Some("Battle Log Toggle"),
+        ("compact", 7) => Some("History Toggle"),
         _ => None,
     };
     if let Some(click) = click {

@@ -10,6 +10,17 @@ fn text_named(app: &mut App, name: &str) -> String {
     app.world().get::<Text>(entity).expect("text").0.clone()
 }
 
+fn actor_card_text(app: &App, actor: ActorId) -> String {
+    let view = app.world().resource::<LabyrinthView>();
+    let card = app
+        .world()
+        .resource::<bevy_game_ui::UiTooltipCatalog>()
+        .0
+        .get(&battle::actor_subject(view.encounter, actor))
+        .expect("actor card");
+    format!("{card:?}")
+}
+
 fn no_combat_intent(app: &mut App) {
     assert!(!app
         .world_mut()
@@ -63,8 +74,31 @@ fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target() 
         let ui = app.world().resource::<UiState>();
         assert_eq!(ui.target, Some(ActorId(103)));
         assert_eq!(ui.selected, Some(Choice::Wait));
-        assert_eq!(ui.inspected, Some(ActorId(2)));
-        assert!(ui.show_inspector);
+        assert!(
+            battle::selected_action(app.world().resource::<LabyrinthView>(), ui).is_ok(),
+            "portrait inspection must not block an otherwise legal confirmation"
+        );
+        let roll = before
+            .as_ref()
+            .expect("combat")
+            .initiative
+            .iter()
+            .find(|entry| entry.actor == ActorId(2))
+            .expect("rolled actor");
+        assert!(actor_card_text(&app, ActorId(2)).contains(&format!(
+            "rolled Speed {} + d8 {} = {}",
+            roll.speed, roll.roll, roll.total
+        )));
+        assert!(app
+            .world()
+            .resource::<bevy_game_ui::UiTooltipState>()
+            .is_pinned());
+        assert_eq!(
+            app.world()
+                .resource::<bevy_game_ui::UiTooltipState>()
+                .subjects(),
+            &[battle::actor_subject(1, ActorId(2))]
+        );
         no_combat_intent(&mut app);
         tap_key(&mut app, KeyCode::Escape);
         run_frames(&mut app, 3);
@@ -404,12 +438,11 @@ fn concealed_state_changes_do_not_leak_through_text_accessibility_or_context_hel
     app.insert_resource(disclosure);
     apply_action(app.world_mut(), Action::SkillSlot(0));
     apply_action(app.world_mut(), Action::Actor(target));
-    apply_action(app.world_mut(), Action::ToggleInspector);
     app.world_mut().resource_mut::<LabyrinthView>().log =
         vec!["CONCEALED-OUTCOME-ALPHA".to_owned()];
     apply_action(app.world_mut(), Action::InspectActor(source));
     run_frames(&mut app, 3);
-    let partial_before = text_named(&mut app, "Inspector Text");
+    let partial_before = actor_card_text(&app, source);
     assert!(partial_before.contains("Speed unknown"));
     assert!(partial_before.contains("Status effects unknown"));
     assert!(!partial_before.contains("HP unknown"));
@@ -457,7 +490,7 @@ fn concealed_state_changes_do_not_leak_through_text_accessibility_or_context_hel
     assert_eq!(presented_strings(&mut app), before, "Concealed facts must not change any generated text, accessible label, or help content, even on hidden surfaces.");
     apply_action(app.world_mut(), Action::InspectActor(source));
     run_frames(&mut app, 3);
-    assert_eq!(text_named(&mut app, "Inspector Text"), partial_before);
+    assert_eq!(actor_card_text(&app, source), partial_before);
     let forecast = find_named(app.world_mut(), "Actor 103 HP Forecast").expect("forecast bar");
     assert_eq!(
         app.world().get::<Node>(forecast).expect("node").display,

@@ -11,27 +11,100 @@ pub(super) use settings::overlays;
 use super::*;
 use bevy_game_ui::{panel, screen_root, text_field, UiFocusId, UiViewportClass};
 
+#[derive(Component)]
+struct ShellNotice;
+
+#[derive(Component)]
+struct ShellBackdrop;
+
+fn backdrop(world: &mut World) {
+    let Some(root) = world
+        .query_filtered::<Entity, With<ShellRoot>>()
+        .iter(world)
+        .next()
+    else {
+        return;
+    };
+    let Some(handle) = world
+        .resource::<crate::scene::SceneAppearance>()
+        .backdrop_image
+        .clone()
+    else {
+        return;
+    };
+    if world
+        .query_filtered::<Entity, With<ShellBackdrop>>()
+        .iter(world)
+        .next()
+        .is_some()
+    {
+        return;
+    }
+    let mut image = ImageNode::new(handle);
+    image.color = Color::srgb(0.42, 0.42, 0.42);
+    world.spawn((
+        Name::new("Menu Environment"),
+        ShellBackdrop,
+        image,
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            ..default()
+        },
+        GlobalZIndex(1),
+        Pickable::IGNORE,
+        bevy::ui::FocusPolicy::Pass,
+        ChildOf(root),
+    ));
+}
+
+fn notices(world: &mut World, view: &LabyrinthView, ui: &UiState) {
+    let value = ui
+        .local_notice
+        .as_ref()
+        .or(view.notice.as_ref())
+        .into_iter()
+        .chain(view.provider_notices.iter())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut query = world.query_filtered::<&mut Text, With<ShellNotice>>();
+    for mut text in query.iter_mut(world) {
+        if text.0 != value {
+            text.0.clone_from(&value);
+        }
+    }
+}
+
 pub(super) fn present(
     world: &mut World,
     view: &LabyrinthView,
     ui: &mut UiState,
     metrics: ResolvedUiMetrics,
 ) {
+    // Notices and background discovery updates must not recreate an active
+    // admission field, lose its cursor, or reset keyboard focus.
+    notices(world, view, ui);
+    backdrop(world);
+    let lobby_data = (view.mode == ViewMode::Lobby).then_some((
+        &view.players,
+        &view.invite_labels,
+        &view.session_name,
+    ));
+    let listings = (ui.form == Form::Browser).then_some(&view.listings);
     let key = format!(
-        "{:?}:{:?}:{:?}:{}:{}:{:?}:{:?}:{:?}:{:?}:{:?}:{:?}:{}:{}:{:?}",
+        "{:?}:{:?}:{:?}:{}:{}:{:?}:{:?}:{}:{:?}",
         view.mode,
         ui.form,
         metrics.viewport,
         ui.lan,
         ui.tailnet,
-        view.players,
-        view.invite_labels,
-        view.listings,
-        view.notice,
-        ui.local_notice,
-        view.provider_notices,
+        lobby_data,
+        listings,
         view.admitted,
-        view.session_name,
         view.player
     );
     if ui.shell_key.as_ref() == Some(&key) {
@@ -57,6 +130,7 @@ pub(super) fn present(
         "Menu Content",
         Node {
             width: Val::Percent(100.0),
+            align_items: AlignItems::Center,
             max_width: Val::Px(if metrics.viewport == UiViewportClass::Wide {
                 1600.0
             } else {
@@ -68,6 +142,8 @@ pub(super) fn present(
             ..default()
         },
     );
+    world.entity_mut(content).insert(GlobalZIndex(2));
+    backdrop(world);
     label(
         world,
         content,
@@ -87,30 +163,16 @@ pub(super) fn present(
     } else {
         match ui.form {
             Form::Menu => menu(world, content),
+            Form::Multiplayer => multiplayer_menu(world, content),
             Form::Host => host_form(world, content, ui),
             Form::Direct => direct_form(world, content, ui),
             Form::Browser => browser(world, content, view, ui),
             Form::Password => password_form(world, content, ui),
         }
     }
-    if let Some(notice) = ui.local_notice.as_ref().or(view.notice.as_ref()) {
-        label(
-            world,
-            content,
-            "Session Notice",
-            notice.clone(),
-            UiTextRole::Body,
-        );
-    }
-    for (index, notice) in view.provider_notices.iter().enumerate() {
-        label(
-            world,
-            content,
-            &format!("Provider Notice {index}"),
-            notice.clone(),
-            UiTextRole::Supporting,
-        );
-    }
+    let notice = label(world, content, "Session Notice", "", UiTextRole::Body);
+    world.entity_mut(notice).insert(ShellNotice);
+    notices(world, view, ui);
     ui.shell_key = Some(key);
 }
 
@@ -147,7 +209,69 @@ fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
 }
 
 fn menu(world: &mut World, parent: Entity) {
-    let main = surface(world, parent, "Expedition Menu");
+    let main = world
+        .spawn((bevy_game_ui::menu_panel("Expedition Menu"), ChildOf(parent)))
+        .insert(Node {
+            max_height: Val::Auto,
+            flex_shrink: 0.0,
+            ..bevy_game_ui::menu_panel_node()
+        })
+        .id();
+    label(
+        world,
+        main,
+        "Menu Title",
+        "Enter the Labyrinth",
+        UiTextRole::Title,
+    );
+    let actions = column(
+        world,
+        main,
+        "Main Actions",
+        bevy_game_ui::menu_actions_node(),
+    );
+    control(
+        world,
+        actions,
+        "Start Local",
+        "Play locally",
+        Action::StartLocal,
+        false,
+    );
+    control(
+        world,
+        actions,
+        "Multiplayer",
+        "Play with friends",
+        Action::Form(Form::Multiplayer),
+        false,
+    );
+    control(
+        world,
+        actions,
+        "Menu Settings",
+        "Settings",
+        Action::Settings,
+        false,
+    );
+    label(
+        world,
+        main,
+        "Local Play Advice",
+        "Local play controls all six heroes. Play with friends hosts or joins a company.",
+        UiTextRole::Supporting,
+    );
+}
+
+fn multiplayer_menu(world: &mut World, parent: Entity) {
+    let main = world
+        .spawn((bevy_game_ui::menu_panel("Company Menu"), ChildOf(parent)))
+        .insert(Node {
+            max_height: Val::Auto,
+            flex_shrink: 0.0,
+            ..bevy_game_ui::menu_panel_node()
+        })
+        .id();
     label(
         world,
         main,
@@ -155,8 +279,12 @@ fn menu(world: &mut World, parent: Entity) {
         "THE LANTERN COMPANY",
         UiTextRole::Title,
     );
-    label(world, main, "Menu Description", "An original cooperative positional battle. Each player commands one hero; the host directs the enemy. No campaign, no permanent loss: just one encounter worth solving together.", UiTextRole::Body);
-    let actions = row(world, main, "Main Actions");
+    let actions = column(
+        world,
+        main,
+        "Company Actions",
+        bevy_game_ui::menu_actions_node(),
+    );
     control(
         world,
         actions,
@@ -189,30 +317,12 @@ fn menu(world: &mut World, parent: Entity) {
         Action::Reconnect,
         false,
     );
-    let local = surface(world, parent, "Local Workshop");
-    label(
-        world,
-        local,
-        "Workshop Title",
-        "LOCAL WORKSHOP",
-        UiTextRole::Title,
-    );
-    label(world, local, "Workshop Description", "Control all six heroes with no sockets. Useful for learning ranks and testing rules; this is not a multiplayer test.", UiTextRole::Supporting);
-    let actions = row(world, local, "Workshop Actions");
     control(
         world,
         actions,
-        "Start Local",
-        "Play locally | all six heroes",
-        Action::StartLocal,
-        false,
-    );
-    control(
-        world,
-        actions,
-        "Menu Settings",
-        "Readability & motion",
-        Action::Settings,
+        "Company Back",
+        "Back",
+        Action::Form(Form::Menu),
         false,
     );
 }

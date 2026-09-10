@@ -20,6 +20,14 @@ pub(super) fn ability_subject(skill: SkillId) -> UiTooltipSubject {
     subject(format!("ability/{skill:?}"))
 }
 
+pub(crate) fn actor_subject(encounter: u64, actor: ActorId) -> UiTooltipSubject {
+    subject(format!("encounter/{encounter}/actor/{}/details", actor.0))
+}
+
+pub(crate) fn effects_subject(encounter: u64, actor: ActorId) -> UiTooltipSubject {
+    subject(format!("encounter/{encounter}/actor/{}/effects", actor.0))
+}
+
 fn condition_subject(kind: StatusKind) -> UiTooltipSubject {
     subject(format!("condition/{kind:?}"))
 }
@@ -76,8 +84,11 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
             .query::<&ActorTile>()
             .iter(world)
             .filter_map(|tile| {
-                let node = world.get::<ComputedNode>(tile.control)?;
-                let transform = world.get::<UiGlobalTransform>(tile.control)?;
+                let layout = world
+                    .get::<crate::scene::SceneActorLayout>(tile.control)
+                    .map_or(tile.control, |layout| layout.0);
+                let node = world.get::<ComputedNode>(layout)?;
+                let transform = world.get::<UiGlobalTransform>(layout)?;
                 let actor = view.combat.as_ref()?.actor(tile.actor)?;
                 let area = node.size() * node.inverse_scale_factor;
                 let bottom = transform.translation.y * node.inverse_scale_factor + area.y * 0.46;
@@ -115,6 +126,99 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         .and_then(|actor| actor.details.as_known())
         .map_or_else(Vec::new, |actor| actor.skills.clone());
     let mut entries = BTreeMap::new();
+    for actor in &snapshot.actors {
+        let Some(facts) = projection.actor(actor.id) else {
+            continue;
+        };
+        let health = facts.health.as_known().map_or_else(
+            || "HP unknown".into(),
+            |hp| format!("{} / {} HP", hp.current, hp.maximum),
+        );
+        let speed = facts.details.as_known().map_or_else(
+            || "Speed unknown".into(),
+            |details| format!("Speed {}", details.speed),
+        );
+        let rank = snapshot
+            .rank(actor.id)
+            .map_or_else(|| "Out of formation".into(), |rank| format!("Rank {rank}"));
+        let owner = if view.local && actor.team() == Team::Heroes {
+            "Local control"
+        } else {
+            view.players
+                .iter()
+                .find(|p| p.actor == actor.id)
+                .map_or("Host AI", |p| p.name.as_str())
+        };
+        let mut rows = vec![format!("{health} · {rank}"), format!("{speed} · {owner}")];
+        if let Some(roll) = snapshot
+            .initiative
+            .iter()
+            .find(|roll| roll.actor == actor.id)
+        {
+            let state = if snapshot.active_actor == Some(actor.id) {
+                "Acting now"
+            } else if roll.completed {
+                "Completed this round"
+            } else {
+                "Waiting this round"
+            };
+            rows.push(if facts.details.as_known().is_some() {
+                format!(
+                    "{state} · rolled Speed {} + d8 {} = {}",
+                    roll.speed, roll.roll, roll.total
+                )
+            } else {
+                format!("{state} · initiative details unknown")
+            });
+        }
+        let mut links = Vec::new();
+        match facts.statuses.as_known() {
+            Some(statuses) if statuses.is_empty() => rows.push("No active conditions".into()),
+            Some(statuses) => {
+                rows.push(format!("{} active conditions", statuses.len()));
+                links.push(UiTooltipLink {
+                    label: "Current conditions".into(),
+                    subject: effects_subject(view.encounter, actor.id),
+                });
+            }
+            None => rows.push("Status effects unknown".into()),
+        }
+        if ui.target == Some(actor.id) {
+            if let Some(preview) = inspection::forecast_display(world, view, ui) {
+                rows.push(format!("Selected action · {}", preview.summary));
+            }
+        }
+        entries.insert(
+            actor_subject(view.encounter, actor.id),
+            UiTooltipContent {
+                title: format!("{} · {}", actors::token(snapshot, actor), actor.name()),
+                facts: rows,
+                links,
+                ..default()
+            },
+        );
+    }
+    let anchors = world
+        .query::<(Entity, &Action)>()
+        .iter(world)
+        .filter_map(|(entity, action)| match action {
+            Action::Actor(actor) => Some((entity, actor_subject(view.encounter, *actor), false)),
+            Action::InspectActor(actor) => {
+                Some((entity, actor_subject(view.encounter, *actor), true))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    for (entity, key, opens) in anchors {
+        world
+            .entity_mut(entity)
+            .insert(UiTooltipSource(key.clone()));
+        if opens {
+            world
+                .entity_mut(entity)
+                .insert(bevy_game_ui::UiTooltipOpen(key));
+        }
+    }
     entries.insert(subject("ranks"), UiTooltipContent {
         title: "Formation ranks".to_owned(), body: "Rank 1 is nearest the breach. Each side has six linear positions. Lit numbers show where an ability can be used and which target ranks it can reach. H1–H6 and E1–E6 identify actors, not their changing rank.".to_owned(), ..default()
     });
@@ -148,6 +252,22 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
     for (skill, content) in &book {
         entries.insert(ability_subject(*skill), content.clone());
     }
+    if !world
+        .resource::<crate::presentation::CombatDisclosure>()
+        .has_unknown()
+    {
+        for event in &view.events {
+            if let CombatEventKind::Action {
+                action: CombatAction::Skill { skill, .. },
+                ..
+            } = event.event.kind
+            {
+                entries
+                    .entry(ability_subject(skill))
+                    .or_insert_with(|| ability_content(skill));
+            }
+        }
+    }
     // Instance cards are viewer/encounter scoped and disappear when disclosure or
     // the condition changes. They are never sourced from hidden authority state.
     let badges = world
@@ -166,10 +286,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         else {
             continue;
         };
-        let key = subject(format!(
-            "encounter/{}/actor/{}/effects",
-            view.encounter, actor_id.0
-        ));
+        let key = effects_subject(view.encounter, actor_id);
         let facts = statuses
             .iter()
             .map(|status| {
@@ -197,7 +314,10 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 ..default()
             },
         );
-        world.entity_mut(entity).insert(UiTooltipSource(key));
+        world.entity_mut(entity).insert((
+            UiTooltipSource(key.clone()),
+            bevy_game_ui::UiTooltipOpen(key),
+        ));
     }
     world
         .resource_mut::<UiTooltipCatalog>()

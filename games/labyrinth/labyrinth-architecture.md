@@ -126,11 +126,30 @@ UI post-layout precedes scene synchronization, which precedes visibility/bounds.
 The camera conversion accounts for viewport offsets, device scale, pan and zoom.
 
 Organization remains game-owned: one facing formation, compact rolled-order strip,
-equipped-ability rail, target/legality line and explicit confirmation. Detailed
-inspection, initiative rolls and history share a bounded modal drawer. It traps
-focus, suppresses combat shortcuts and supports PageUp/PageDown/Home/End plus page
-buttons. Closing restores prior focus. The primary battlefield never scrolls;
+equipped-ability rail, target/legality line and explicit confirmation. Actor,
+condition and current-round initiative details use the shared contextual-card
+system, with encounter/actor-scoped subjects and disclosure-filtered content.
+Portrait activation pins a card without changing the selected target; there is no
+separate inspection/initiative drawer. The primary battlefield never scrolls;
 overflowing ability loadouts scroll horizontally and focus brings controls into view.
+
+Local game/settings/leave pages compose Gamekit's `UiMenuStack` and menu templates.
+They never gate network schedules, pause Bevy time, or change host authority.
+`CombatInterruption` distinguishes missing players, local reconnect admission and
+halted rules. The validated host snapshot excludes local reconnect/menu state and
+checks its compatibility `paused` flag against the authoritative reason. One player
+returning does not resume combat while another is missing, and reconnection does
+not clear a rules fault.
+
+Log mode is a local Hidden/Compact/History enum, initially Hidden. Hidden removes
+the entire input surface but retains authoritative events. Compact shows two
+outcome summaries without history navigation; History provides the non-modal
+scrollable overlay. It groups typed authoritative events by
+action and turn boundaries, handles a partially retained first action explicitly,
+and reuses unchanged rows by event identity. New encounters reset local expansion
+and reading state. Gamekit only supplies follow-latest scrolling; game-local code
+owns summaries, detail links, bounded retention and disclosure. As elsewhere,
+concealing a history panel does not remove facts already sent over the network.
 
 Statuses use one stable effects control per actor, with priority derived from the
 effect definition. A compact name/potency/clock and overflow count are backed by

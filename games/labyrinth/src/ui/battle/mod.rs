@@ -5,10 +5,13 @@ use std::collections::BTreeMap;
 mod actors;
 mod dock;
 mod feedback;
+mod history;
+pub(super) use history::scroll as scroll_history;
 mod inspection;
 mod layout;
 mod timeline;
 mod tooltips;
+pub(super) use tooltips::{actor_subject, effects_subject};
 
 use actors::{formation, mount_actor, reorder};
 use inspection::slot_value;
@@ -46,11 +49,8 @@ struct StatusBadge {
 #[derive(Component, Clone, Copy)]
 enum Slot {
     Hud,
-    Order,
     Feedback,
     Reason,
-    Inspector,
-    Log,
 }
 
 #[derive(Resource)]
@@ -62,11 +62,6 @@ struct BattleNodes {
     confirm: Entity,
     rematch: Entity,
     dock: dock::DockNodes,
-    inspector: Entity,
-    log: Entity,
-    drawer: Entity,
-    drawer_body: Entity,
-    order: Entity,
     viewport: UiViewportClass,
     last_event: Option<u64>,
     was_paused: bool,
@@ -80,43 +75,6 @@ pub(super) fn clear(world: &mut World) {
         .resource_mut::<bevy_game_ui::UiTooltipCatalog>()
         .0
         .retain(|key, _| !key.0.starts_with("labyrinth/"));
-}
-
-pub(super) fn scroll_details(world: &mut World, direction: i8) {
-    let Some(entity) = world.get_resource::<BattleNodes>().and_then(|nodes| {
-        if world
-            .get::<Node>(nodes.drawer)
-            .is_some_and(|node| node.display != Display::None)
-        {
-            Some(nodes.drawer_body)
-        } else {
-            None
-        }
-    }) else {
-        return;
-    };
-    if world
-        .get::<Node>(entity)
-        .is_none_or(|node| node.display == Display::None)
-    {
-        return;
-    }
-    let Some(node) = world.get::<ComputedNode>(entity) else {
-        return;
-    };
-    let height = node.size().y * node.inverse_scale_factor;
-    let maximum = ((node.content_size().y - node.size().y) * node.inverse_scale_factor).max(0.0);
-    let current = world
-        .get::<ScrollPosition>(entity)
-        .map_or(0.0, |position| position.0.y);
-    world.entity_mut(entity).insert(ScrollPosition(Vec2::new(
-        0.0,
-        match direction {
-            100.. => maximum,
-            ..=-100 => 0.0,
-            _ => (current + f32::from(direction) * height * 0.85).clamp(0.0, maximum),
-        },
-    )));
 }
 
 fn text_slot(
@@ -178,16 +136,6 @@ pub(super) fn present(
         }
         feedback::update(&mut nodes, view, time);
         nodes.viewport = metrics.viewport;
-        if let Some(mut node) = world.get_mut::<Node>(nodes.drawer) {
-            let width = Val::Percent(if metrics.content_scale > 1.25 {
-                84.0
-            } else {
-                48.0
-            });
-            if node.width != width {
-                node.width = width;
-            }
-        }
         // Both front ranks face the breach; presentation order is not actor identity.
         let facing_heroes = snapshot
             .hero_formation
@@ -209,22 +157,6 @@ pub(super) fn present(
             } else {
                 Display::None
             };
-        }
-        for (entity, shown) in [
-            (
-                nodes.drawer,
-                ui.show_inspector || ui.show_log || ui.show_timeline,
-            ),
-            (nodes.inspector, ui.show_inspector),
-            (nodes.log, ui.show_log),
-            (nodes.order, ui.show_timeline),
-        ] {
-            if let Some(mut node) = world.get_mut::<Node>(entity) {
-                let display = if shown { Display::Flex } else { Display::None };
-                if node.display != display {
-                    node.display = display;
-                }
-            }
         }
         dock::update(world, &nodes.dock, view, ui);
     });
@@ -264,4 +196,5 @@ pub(super) fn present(
         };
         set_text(world, entity, value);
     }
+    history::present(world, view, ui);
 }
