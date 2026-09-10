@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     skill_definition, skills_for, status_definition, AbilityLoadout, RemovalReason, Stat,
-    StatusInstance, StatusKind, TargetRule, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, MAX_ACTORS,
-    MAX_STATUSES, PARTY_SIZE,
+    StatusInstance, StatusKind, TargetRule, MAX_ACTORS, MAX_STATUSES, PARTY_SIZE,
 };
 
 /// Stable nonzero character identity, independent of player, class, and rank.
@@ -27,7 +26,7 @@ pub enum Team {
     Enemies,
 }
 
-/// Four original playable archetypes. Repeated classes are allowed in a party.
+/// Playable archetypes. Repeated classes are allowed within formation capacity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum HeroClass {
     /// Durable front-rank fighter.
@@ -38,15 +37,18 @@ pub enum HeroClass {
     Scout,
     /// Healing, cleansing and rescue specialist.
     FieldMedic,
+    /// Two-rank supply keeper and wagon; deliberately weak in combat.
+    LanternWagon,
 }
 
 impl HeroClass {
     /// Complete class catalog and stable lobby choice order, not a party roster.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Gatekeeper,
         Self::Knifehand,
         Self::Scout,
         Self::FieldMedic,
+        Self::LanternWagon,
     ];
 
     /// Human-readable original role name.
@@ -57,6 +59,7 @@ impl HeroClass {
             Self::Knifehand => "Knifehand",
             Self::Scout => "Scout",
             Self::FieldMedic => "Field Medic",
+            Self::LanternWagon => "Lantern Wagon",
         }
     }
 
@@ -68,17 +71,18 @@ impl HeroClass {
             Self::Knifehand => (26, 5),
             Self::Scout => (22, 7),
             Self::FieldMedic => (24, 4),
+            Self::LanternWagon => (30, 1),
         }
     }
 
-    /// Four starter skills for this archetype, not its actor's actual loadout.
+    /// Starter skills for this archetype, not its actor's actual loadout.
     #[must_use]
     pub fn skills(self) -> &'static [SkillId] {
         skills_for(ActorKind::Hero(self))
     }
 }
 
-/// Four enemy archetypes reused by the six-opponent encounter roster.
+/// Enemy archetypes, including a multi-rank encounter prototype.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnemyKind {
     /// Front bruiser.
@@ -89,15 +93,18 @@ pub enum EnemyKind {
     WoundStalker,
     /// Rear ranged attacker.
     HollowArcher,
+    /// Large two-rank midline scavenger with reach over the frontline.
+    OssuaryHauler,
 }
 
 impl EnemyKind {
     /// Complete enemy archetype catalog, not an encounter roster.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::AshBrute,
         Self::IronBrute,
         Self::WoundStalker,
         Self::HollowArcher,
+        Self::OssuaryHauler,
     ];
 
     /// Display name.
@@ -108,6 +115,7 @@ impl EnemyKind {
             Self::IronBrute => "Iron Brute",
             Self::WoundStalker => "Wound Stalker",
             Self::HollowArcher => "Hollow Archer",
+            Self::OssuaryHauler => "Ossuary Hauler",
         }
     }
 
@@ -119,6 +127,7 @@ impl EnemyKind {
             Self::IronBrute => (20, 3),
             Self::WoundStalker => (16, 5),
             Self::HollowArcher => (14, 6),
+            Self::OssuaryHauler => (44, 1),
         }
     }
 }
@@ -133,6 +142,14 @@ pub enum ActorKind {
 }
 
 impl ActorKind {
+    /// Contiguous formation spaces occupied alive, dying, or as a corpse.
+    #[must_use]
+    pub const fn footprint(self) -> u8 {
+        match self {
+            Self::Hero(HeroClass::LanternWagon) | Self::Enemy(EnemyKind::OssuaryHauler) => 2,
+            _ => 1,
+        }
+    }
     /// Display name, never used as identity.
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -200,11 +217,17 @@ pub enum SkillId {
     RaggedCut,
     /// Archer's ranged attack.
     HollowBolt,
+    /// Weak wagon attack, available from any rank.
+    HurledScrap,
+    /// Modest limited wagon assist.
+    SpareBandage,
+    /// Heavy monster attack.
+    CrushingBlow,
 }
 
 impl SkillId {
     /// Complete typed catalog, independent of which abilities presets equip.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 22] = [
         Self::FrontStrike,
         Self::LongReach,
         Self::DrivingBlow,
@@ -224,6 +247,9 @@ impl SkillId {
         Self::BrutalStrike,
         Self::RaggedCut,
         Self::HollowBolt,
+        Self::HurledScrap,
+        Self::SpareBandage,
+        Self::CrushingBlow,
     ];
 }
 
@@ -306,7 +332,7 @@ pub struct InitiativeEntry {
     pub completed: bool,
 }
 
-/// Public character state. Dead enemies remain inspectable but leave formation.
+/// Public character state. Dead identities remain inspectable after corpse removal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ActorSnapshot {
@@ -314,8 +340,10 @@ pub struct ActorSnapshot {
     pub id: ActorId,
     /// Immutable content identity.
     pub kind: ActorKind,
-    /// Current HP; zero means downed for heroes and dead for enemies.
+    /// Living HP, always zero while dying, a corpse, or removed.
     pub hp: u16,
+    /// Explicit life state; corpse durability never restores living HP.
+    pub life: crate::LifeState,
     /// Immutable maximum HP.
     pub max_hp: u16,
     /// Immutable base speed.
@@ -342,7 +370,30 @@ impl ActorSnapshot {
     /// Whether this actor can act or be hit.
     #[must_use]
     pub const fn standing(&self) -> bool {
-        self.hp > 0
+        self.hp > 0 && matches!(self.life, crate::LifeState::Alive)
+    }
+    /// Whether ordinary rescue can recover this hero (never a corpse).
+    #[must_use]
+    pub const fn dying(&self) -> bool {
+        matches!(self.life, crate::LifeState::Dying { .. })
+    }
+    /// Whether damage can affect this occupant.
+    #[must_use]
+    pub const fn damageable(&self) -> bool {
+        self.standing() || self.dying() || self.is_corpse()
+    }
+    /// Whether this identity currently represents remains.
+    #[must_use]
+    pub const fn is_corpse(&self) -> bool {
+        matches!(self.life, crate::LifeState::Corpse { .. })
+    }
+    /// Health to display or forecast, separate from authoritative living HP.
+    #[must_use]
+    pub const fn health(&self) -> (u16, u16) {
+        match self.life {
+            crate::LifeState::Corpse { hp, max_hp, .. } => (hp, max_hp),
+            _ => (self.hp, self.max_hp),
+        }
     }
     /// This actor's actual equipped abilities, not its class starter preset.
     #[must_use]
@@ -397,9 +448,9 @@ pub struct CombatSnapshot {
     pub active_actor: Option<ActorId>,
     /// Every authored actor, including defeated enemies.
     pub actors: Vec<ActorSnapshot>,
-    /// Six hero ranks, front to back; downing does not remove a rank.
+    /// Unique hero occupants, front to back; dying and corpses retain their footprint.
     pub hero_formation: Vec<ActorId>,
-    /// Living enemy ranks, compacted front to back.
+    /// Unique enemy occupants including corpses, packed front to back.
     pub enemy_formation: Vec<ActorId>,
     /// Frozen current-round ordering.
     pub initiative: Vec<InitiativeEntry>,
@@ -452,21 +503,18 @@ impl CombatSnapshot {
     pub fn actor(&self, id: ActorId) -> Option<&ActorSnapshot> {
         self.actors.iter().find(|actor| actor.id == id)
     }
-    /// Current one-based rank, absent for a defeated enemy.
+    /// Leading one-based rank, absent only after remains are removed.
     #[must_use]
     pub fn rank(&self, id: ActorId) -> Option<u8> {
-        self.hero_formation
-            .iter()
-            .position(|entry| *entry == id)
-            .or_else(|| self.enemy_formation.iter().position(|entry| *entry == id))
-            .and_then(|index| u8::try_from(index + 1).ok())
+        self.ranks(id).map(|ranks| *ranks.start())
     }
     /// Validate all trusted projection invariants, including nested derived serde data.
     pub fn validate(&self) -> Result<(), RuleError> {
         if self.round == 0
             || self.turn_id == 0
-            || self.actors.len() != MAX_ACTORS
-            || self.hero_formation.len() != PARTY_SIZE
+            || self.actors.is_empty()
+            || self.actors.len() > MAX_ACTORS
+            || self.hero_formation.len() > PARTY_SIZE
             || self.enemy_formation.len() > PARTY_SIZE
             || self.initiative.is_empty()
             || self.initiative.len() > MAX_ACTORS
@@ -484,15 +532,31 @@ impl CombatSnapshot {
             {
                 return Err(RuleError::InvalidState);
             }
-            match actor.kind {
-                ActorKind::Hero(_) if !DEFAULT_ENEMY_IDS.contains(&actor.id) => {}
-                ActorKind::Enemy(kind)
-                    if DEFAULT_ENEMY_IDS
-                        .iter()
-                        .position(|id| *id == actor.id)
-                        .and_then(|index| DEFAULT_ENEMY_ROSTER.get(index))
-                        == Some(&kind) => {}
-                _ => return Err(RuleError::InvalidState),
+            use crate::LifeState;
+            let valid_life = match actor.life {
+                LifeState::Alive => actor.hp > 0,
+                LifeState::Dying { failures } => {
+                    actor.hp == 0
+                        && actor.team() == Team::Heroes
+                        && failures < crate::DEATH_SAVE_FAILURES
+                }
+                LifeState::Corpse {
+                    hp,
+                    max_hp,
+                    created_round,
+                } => {
+                    actor.hp == 0
+                        && max_hp == actor.max_hp.div_ceil(4)
+                        && hp > 0
+                        && hp <= max_hp
+                        && created_round > 0
+                        && created_round <= self.round
+                        && self.round.saturating_sub(created_round) <= crate::CORPSE_ROUNDS
+                }
+                LifeState::Removed => actor.hp == 0 && actor.statuses.is_empty(),
+            };
+            if !valid_life {
+                return Err(RuleError::InvalidState);
             }
             if actor.skill_uses.iter().any(|(skill, used)| {
                 !actor.skills().contains(skill)
@@ -515,8 +579,8 @@ impl CombatSnapshot {
                     || status.remaining > definition.duration.ticks
                     || status.eligible_boundary == 0
                     || status.eligible_boundary > self.boundary_sequence.saturating_add(1)
-                    || (!actor.standing()
-                        && (definition.remove_on_downed || actor.team() == Team::Enemies))
+                    || (actor.dying() && definition.remove_on_downed)
+                    || (actor.is_corpse() && !definition.persist_on_death)
                 {
                     return Err(RuleError::InvalidState);
                 }
@@ -527,20 +591,24 @@ impl CombatSnapshot {
             .iter()
             .filter(|actor| actor.team() == Team::Heroes)
             .count()
-            != PARTY_SIZE
+            > PARTY_SIZE
         {
             return Err(RuleError::InvalidState);
         }
         let hero_ids: BTreeSet<_> = self
             .actors
             .iter()
-            .filter(|actor| actor.team() == Team::Heroes)
+            .filter(|actor| {
+                actor.team() == Team::Heroes && !matches!(actor.life, crate::LifeState::Removed)
+            })
             .map(|actor| actor.id)
             .collect();
         let enemy_ids: BTreeSet<_> = self
             .actors
             .iter()
-            .filter(|actor| actor.team() == Team::Enemies && actor.standing())
+            .filter(|actor| {
+                actor.team() == Team::Enemies && !matches!(actor.life, crate::LifeState::Removed)
+            })
             .map(|actor| actor.id)
             .collect();
         if self.hero_formation.iter().copied().collect::<BTreeSet<_>>() != hero_ids
@@ -551,8 +619,20 @@ impl CombatSnapshot {
                 .collect::<BTreeSet<_>>()
                 != enemy_ids
             || self.enemy_formation.len() != enemy_ids.len()
+            || self.hero_formation.len() != hero_ids.len()
         {
             return Err(RuleError::InvalidState);
+        }
+        for team in [Team::Heroes, Team::Enemies] {
+            let spaces: usize = self
+                .actors
+                .iter()
+                .filter(|a| a.team() == team)
+                .map(|a| usize::from(a.kind.footprint()))
+                .sum();
+            if spaces == 0 || spaces > PARTY_SIZE {
+                return Err(RuleError::InvalidState);
+            }
         }
         let mut entries = BTreeSet::new();
         let mut tiebreakers = BTreeSet::new();
@@ -583,7 +663,10 @@ impl CombatSnapshot {
             .actors
             .iter()
             .any(|actor| actor.team() == Team::Heroes && actor.standing());
-        let enemies_up = !self.enemy_formation.is_empty();
+        let enemies_up = self
+            .actors
+            .iter()
+            .any(|a| a.team() == Team::Enemies && a.standing());
         match self.outcome {
             None if self.phase == CombatPhase::AwaitingAction
                 && heroes_up
@@ -639,9 +722,7 @@ impl CombatSnapshot {
             CombatAction::Wait | CombatAction::Defend => Ok(()),
             CombatAction::Rescue { ally } => {
                 let target = self.actor(ally).ok_or(RuleError::UnknownActor)?;
-                if source.team() != Team::Heroes
-                    || target.team() != Team::Heroes
-                    || target.standing()
+                if source.team() != Team::Heroes || target.team() != Team::Heroes || !target.dying()
                 {
                     return Err(RuleError::NotDowned);
                 }
@@ -649,14 +730,10 @@ impl CombatSnapshot {
             }
             CombatAction::Reposition { ally } => {
                 let target = self.actor(ally).ok_or(RuleError::UnknownActor)?;
-                if source.team() != target.team() || actor == ally {
+                if source.team() != target.team() || actor == ally || target.is_corpse() {
                     return Err(RuleError::WrongTarget);
                 }
-                if self
-                    .rank(actor)
-                    .zip(self.rank(ally))
-                    .is_none_or(|(left, right)| left.abs_diff(right) != 1)
-                {
+                if !self.adjacent(actor, ally) {
                     return Err(RuleError::NotAdjacent);
                 }
                 Ok(())
@@ -667,8 +744,8 @@ impl CombatSnapshot {
                 }
                 let definition = skill_definition(skill);
                 if self
-                    .rank(actor)
-                    .is_none_or(|rank| !definition.allows_source_rank(rank))
+                    .ranks(actor)
+                    .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_source_rank(rank)))
                 {
                     return Err(RuleError::WrongRank);
                 }
@@ -677,24 +754,29 @@ impl CombatSnapshot {
                 }
                 let recipient = self.actor(target).ok_or(RuleError::UnknownActor)?;
                 if self
-                    .rank(target)
-                    .is_none_or(|rank| !definition.allows_target_rank(rank))
+                    .ranks(target)
+                    .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_target_rank(rank)))
                 {
                     return Err(RuleError::WrongTargetRank);
                 }
                 let valid_target = match definition.target_rule {
                     TargetRule::EnemyStanding => {
-                        source.team() != recipient.team() && recipient.standing()
+                        (source.team() != recipient.team() && recipient.damageable())
+                            || recipient.is_corpse()
                     }
                     TargetRule::AllyStanding => {
                         source.team() == recipient.team() && recipient.standing()
                     }
                     TargetRule::SelfStanding => actor == target && recipient.standing(),
-                    TargetRule::OtherAlly => source.team() == recipient.team() && actor != target,
+                    TargetRule::OtherAlly => {
+                        source.team() == recipient.team()
+                            && actor != target
+                            && (recipient.standing() || recipient.dying())
+                    }
                     TargetRule::AllyDowned => {
                         source.team() == Team::Heroes
                             && recipient.team() == Team::Heroes
-                            && !recipient.standing()
+                            && recipient.dying()
                     }
                 };
                 if valid_target {
@@ -810,6 +892,22 @@ pub struct CombatEvent {
 /// Typed combat outcomes; clients need not infer gameplay from formatted strings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CombatEventKind {
+    /// Provisional death-save resolution; damage while dying has no die roll.
+    DeathSave {
+        /// Dying hero identity.
+        actor: ActorId,
+        /// Seeded d20, or damage-induced automatic failure.
+        roll: Option<u8>,
+        /// Cumulative failures since downing.
+        failures: u8,
+    },
+    /// Remains no longer occupy ranks.
+    CorpseRemoved {
+        /// Original combatant identity.
+        actor: ActorId,
+        /// True for lifetime expiry, false for destruction.
+        expired: bool,
+    },
     /// Initiative has been rolled for a new round.
     RoundStarted {
         /// One-based round.
@@ -859,9 +957,9 @@ pub enum CombatEventKind {
         /// Downed hero.
         actor: ActorId,
     },
-    /// An enemy died and left its formation.
+    /// A combatant died and left a corpse without freeing formation space.
     Defeated {
-        /// Defeated enemy.
+        /// Dead combatant.
         actor: ActorId,
     },
     /// A downed hero was rescued without insertion into initiative.
@@ -920,6 +1018,36 @@ pub enum CombatEventKind {
 impl fmt::Display for CombatEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            CombatEventKind::DeathSave {
+                actor,
+                roll,
+                failures,
+            } => {
+                if let Some(roll) = roll {
+                    write!(
+                        f,
+                        "Character {} death save {roll}: {}, {failures}/3 failures",
+                        actor.0,
+                        if *roll >= crate::DEATH_SAVE_TARGET {
+                            "holds on"
+                        } else {
+                            "failed"
+                        }
+                    )
+                } else {
+                    write!(
+                        f,
+                        "Character {} hit while dying: {failures}/3 failures",
+                        actor.0
+                    )
+                }
+            }
+            CombatEventKind::CorpseRemoved { actor, expired } => write!(
+                f,
+                "Character {} corpse {}",
+                actor.0,
+                if *expired { "expired" } else { "destroyed" }
+            ),
             CombatEventKind::RoundStarted { round } => {
                 write!(f, "Round {round}: initiative rolled")
             }
@@ -958,7 +1086,9 @@ impl fmt::Display for CombatEvent {
                 write!(f, "Character {} recovers {amount} HP", target.0)
             }
             CombatEventKind::Downed { actor } => write!(f, "Character {} is downed", actor.0),
-            CombatEventKind::Defeated { actor } => write!(f, "Character {} is defeated", actor.0),
+            CombatEventKind::Defeated { actor } => {
+                write!(f, "Character {} dies and leaves a corpse", actor.0)
+            }
             CombatEventKind::Rescued { actor, hp, .. } => {
                 write!(f, "Character {} is rescued with {hp} HP", actor.0)
             }

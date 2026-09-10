@@ -1,6 +1,7 @@
 # Development documentation
 
 - [Architecture and ownership](architecture.md)
+- [Current agent handoff and review findings](handoff.md)
 - [Gamekit consolidation and balance infrastructure](gamekit-consolidation.md)
 - [Run, build and add a game](development.md)
 - [Testing and evidence](testing.md)

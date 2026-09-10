@@ -4,6 +4,113 @@ use super::*;
 use labyrinth_rules::{CombatOutcome, Team};
 
 #[test]
+fn wagon_capacity_preserves_players_and_reconnect_ownership() {
+    let mut a = PartyAuthority::with_roster(42, false, &DEFAULT_HERO_ROSTER)
+        .expect("explicit six-human fixture");
+    let original = a.snapshot(0);
+    assert!(request(
+        &mut a,
+        0,
+        SessionCommand::ChooseHero(HeroClass::LanternWagon)
+    )
+    .rejection
+    .is_none());
+    let selected = a.snapshot(0);
+    selected.validate().expect("valid five-member company");
+    selected
+        .validate_successor(&original)
+        .expect("lobby capacity change");
+    assert_eq!(a.capacity(), 5);
+    assert!(
+        request(&mut a, 0, SessionCommand::ChooseHero(HeroClass::Gatekeeper))
+            .rejection
+            .is_none()
+    );
+    let restored = a.snapshot(0);
+    restored.validate().expect("six spaces restored");
+    restored
+        .validate_successor(&selected)
+        .expect("empty seat restored");
+    assert_eq!(a.capacity(), 6);
+    assert!(request(
+        &mut a,
+        0,
+        SessionCommand::ChooseHero(HeroClass::LanternWagon)
+    )
+    .rejection
+    .is_none());
+    for p in 1..5 {
+        let id = peer(p);
+        a.reserve(id).expect("guest fits");
+        a.connected(id, true);
+    }
+    let before = a.snapshot(1);
+    assert!(request(
+        &mut a,
+        1,
+        SessionCommand::ChooseHero(HeroClass::LanternWagon)
+    )
+    .rejection
+    .is_some());
+    assert_eq!(
+        a.snapshot(1).players,
+        before.players,
+        "never evict an admitted player"
+    );
+    for slot in 0..5 {
+        assert!(request(&mut a, slot, SessionCommand::Ready(true))
+            .rejection
+            .is_none());
+    }
+    assert!(request(&mut a, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let before = a.snapshot(0);
+    before.validate().expect("combat ownership valid");
+    assert_eq!(
+        before.combat.as_ref().expect("combat").ranks(ActorId(1)),
+        Some(5..=6)
+    );
+    a.connected(peer(4), false);
+    a.connected(peer(4), true);
+    assert_eq!(
+        a.snapshot(0).combat,
+        before.combat,
+        "reconnection does not move actors or tick effects"
+    );
+}
+
+#[test]
+fn local_prototype_has_four_ordinary_heroes_and_one_weak_wagon() {
+    let mut a = PartyAuthority::new(42, true);
+    let hosted = PartyAuthority::new(42, false);
+    assert_eq!(
+        hosted.players.iter().map(|p| p.hero).collect::<Vec<_>>(),
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER
+    );
+    assert_eq!(
+        a.players.iter().map(|p| p.hero).collect::<Vec<_>>(),
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER
+    );
+    assert!(request(&mut a, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let snapshot = a.snapshot(0);
+    snapshot.validate().expect("local prototype");
+    let combat = snapshot.combat.expect("combat");
+    let wagon = combat.actor(ActorId(5)).expect("wagon");
+    assert_eq!(wagon.kind, ActorKind::Hero(HeroClass::LanternWagon));
+    assert_eq!(
+        wagon.skills(),
+        &[
+            labyrinth_rules::SkillId::HurledScrap,
+            labyrinth_rules::SkillId::SpareBandage
+        ]
+    );
+    assert_eq!(combat.ranks(wagon.id), Some(5..=6));
+}
+
+#[test]
 fn multiple_disconnects_and_faults_have_distinct_validated_suspension_reasons() {
     let (mut authority, peers) = started_party();
     let a = *peers.first().expect("first guest");
@@ -55,7 +162,8 @@ fn request(authority: &mut PartyAuthority, slot: u8, command: SessionCommand) ->
 }
 
 fn admitted_party() -> (PartyAuthority, [PeerId; PARTY_SIZE - 1]) {
-    let mut authority = PartyAuthority::new(42, false);
+    let mut authority = PartyAuthority::with_roster(42, false, &DEFAULT_HERO_ROSTER)
+        .expect("explicit six-human fixture");
     assert_eq!(
         request(
             &mut authority,
@@ -112,7 +220,8 @@ fn advance_to_hero(authority: &mut PartyAuthority) -> (ActorId, u8) {
 
 #[test]
 fn six_unique_reservations_count_pending_and_disconnected_capacity() {
-    let mut authority = PartyAuthority::new(42, false);
+    let mut authority = PartyAuthority::with_roster(42, false, &DEFAULT_HERO_ROSTER)
+        .expect("explicit six-human fixture");
     assert_eq!(authority.occupied(), 1);
     for slot in 1..PLAYER_CAPACITY {
         let identity = peer(slot);
@@ -176,7 +285,8 @@ fn all_six_players_must_be_ready_and_only_host_can_start() {
 
 #[test]
 fn duplicate_cached_request_and_replay_after_eviction_never_reapply() {
-    let mut authority = PartyAuthority::new(42, false);
+    let mut authority = PartyAuthority::with_roster(42, false, &DEFAULT_HERO_ROSTER)
+        .expect("explicit six-human fixture");
     let original = GameRequest {
         sequence: 1,
         encounter: 0,

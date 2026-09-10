@@ -257,7 +257,7 @@ fn loadout_and_use_tampering_is_rejected_on_snapshot_ingress() {
         .expect("authored first enemy");
     let (max_hp, base_speed) = ActorKind::Enemy(EnemyKind::HollowArcher).stats();
     enemy["kind"] = serde_json::json!({"Enemy":"HollowArcher"});
-    enemy["max_hp"] = serde_json::json!(max_hp);
+    enemy["max_hp"] = serde_json::json!(max_hp + 1);
     enemy["hp"] = serde_json::json!(max_hp);
     enemy["base_speed"] = serde_json::json!(base_speed);
     assert!(serde_json::from_value::<CombatSnapshot>(substituted_enemy).is_err());

@@ -6,6 +6,8 @@
 
 mod combat;
 mod content;
+mod formation;
+mod life;
 mod loadout;
 mod model;
 mod preview;
@@ -14,6 +16,7 @@ mod status;
 
 pub use combat::Combat;
 pub use content::{skill_definition, skills_for, SkillDefinition, TargetRule};
+pub use life::{LifeState, CORPSE_ROUNDS, DEATH_SAVE_FAILURES, DEATH_SAVE_TARGET};
 pub use loadout::{AbilityLoadout, HeroSetup};
 pub use model::{
     ActorId, ActorKind, ActorSnapshot, CombatAction, CombatEvent, CombatEventKind, CombatOutcome,
@@ -29,11 +32,11 @@ pub use status::{
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.
-pub const RULES_VERSION: &str = "labyrinth-combat-v2-six-ranks-explicit-actors-equipped-abilities";
+pub const RULES_VERSION: &str = "labyrinth-combat-v3-footprints-corpses-death-saves";
 
-/// Human party size and linear rank capacity per team.
+/// Maximum human seats and linear rank capacity per team (not a required roster length).
 pub const PARTY_SIZE: usize = 6;
-/// Total authored actors, including defeated enemies retained for inspection.
+/// Maximum actors, including dead identities retained for event/source references.
 pub const MAX_ACTORS: usize = PARTY_SIZE * 2;
 /// Maximum distinct equipped abilities per actor; universal actions are separate.
 pub const MAX_EQUIPPED_ABILITIES: usize = 8;
@@ -41,7 +44,23 @@ pub const MAX_EQUIPPED_ABILITIES: usize = 8;
 pub const MAX_STATUSES: usize = 16;
 /// Bounded effect/automatic-phase work for one atomic command.
 pub const MAX_COMBAT_WORK: usize = 1024;
-/// Initial six-hero formation; class catalog order is intentionally independent.
+/// Default playable company: four original roles and one two-rank supply wagon.
+pub const PROTOTYPE_HERO_ROSTER: [HeroClass; 5] = [
+    HeroClass::Gatekeeper,
+    HeroClass::Knifehand,
+    HeroClass::Scout,
+    HeroClass::FieldMedic,
+    HeroClass::LanternWagon,
+];
+/// Default encounter: each original enemy plus one two-rank Hauler, with stable IDs.
+pub const PROTOTYPE_ENEMY_ROSTER: [(ActorId, EnemyKind); 5] = [
+    (ActorId(103), EnemyKind::AshBrute),
+    (ActorId(104), EnemyKind::IronBrute),
+    (ActorId(101), EnemyKind::OssuaryHauler),
+    (ActorId(105), EnemyKind::WoundStalker),
+    (ActorId(106), EnemyKind::HollowArcher),
+];
+/// Six-single-rank fixture for capacity and repeated-class tests, not the playable default.
 pub const DEFAULT_HERO_ROSTER: [HeroClass; PARTY_SIZE] = [
     HeroClass::Gatekeeper,
     HeroClass::Knifehand,
@@ -50,7 +69,7 @@ pub const DEFAULT_HERO_ROSTER: [HeroClass; PARTY_SIZE] = [
     HeroClass::FieldMedic,
     HeroClass::FieldMedic,
 ];
-/// Initial six-enemy formation, with distinct actors sharing content presets.
+/// Six-single-rank fixture with distinct actors sharing content presets.
 pub const DEFAULT_ENEMY_ROSTER: [EnemyKind; PARTY_SIZE] = [
     EnemyKind::AshBrute,
     EnemyKind::IronBrute,
@@ -103,7 +122,13 @@ pub fn rules_fingerprint() -> String {
     .map(status_definition)
     .collect();
     let catalog: Vec<_> = SkillId::ALL.into_iter().map(skill_definition).collect();
-    let rosters = (DEFAULT_HERO_ROSTER, DEFAULT_ENEMY_ROSTER, DEFAULT_ENEMY_IDS);
+    let rosters = (
+        DEFAULT_HERO_ROSTER,
+        DEFAULT_ENEMY_ROSTER,
+        DEFAULT_ENEMY_IDS,
+        PROTOTYPE_HERO_ROSTER,
+        PROTOTYPE_ENEMY_ROSTER,
+    );
     let limits = (
         PARTY_SIZE,
         MAX_ACTORS,
@@ -112,8 +137,11 @@ pub fn rules_fingerprint() -> String {
         MAX_COMBAT_WORK,
         100_u16,
         8_u8,
+        CORPSE_ROUNDS,
+        DEATH_SAVE_TARGET,
+        DEATH_SAVE_FAILURES,
     );
-    let bytes = serde_json::to_vec(&(RULES_VERSION, heroes, enemies, statuses, catalog, rosters, limits, "hero-default-ids:1..6;formation:explicit-array-order;loadout:0..8-unique-catalog-ids;rescue:25%-ceil;reposition:adjacent-swap;defend:brace;wait:consume-turn;enemy-death:compact;hero-down:retain-slot"))
+    let bytes = serde_json::to_vec(&(RULES_VERSION, heroes, enemies, statuses, catalog, rosters, limits, "formation:ordered-unique-occupants;width:Wagon+Hauler=2,others=1;reach:any-occupied-rank;move:whole-footprints-within-rank-budget;loadout:0..8-unique-catalog-ids;rescue:25%-ceil-dying-only;reposition:adjacent-whole-swap;defend:brace;wait:consume-turn;death:corpse-quarter-hp-ceil;corpse:round-end-ticks-before-expiry,creation-round-excluded;dying:d20-success-holds,damage-one-failure;terminal:no-standing-heroes-defeat,no-standing-enemies-victory"))
         .expect("fixed typed catalogs contain only JSON-serializable values");
     format!("{:x}", Sha256::digest(bytes))
 }

@@ -95,6 +95,8 @@ pub const fn skills_for(kind: ActorKind) -> &'static [SkillId] {
         ActorKind::Enemy(EnemyKind::AshBrute | EnemyKind::IronBrute) => &[SkillId::BrutalStrike],
         ActorKind::Enemy(EnemyKind::WoundStalker) => &[SkillId::RaggedCut],
         ActorKind::Enemy(EnemyKind::HollowArcher) => &[SkillId::HollowBolt],
+        ActorKind::Hero(HeroClass::LanternWagon) => &[SkillId::HurledScrap, SkillId::SpareBandage],
+        ActorKind::Enemy(EnemyKind::OssuaryHauler) => &[SkillId::CrushingBlow],
     }
 }
 
@@ -110,6 +112,33 @@ pub const fn skill_definition(id: SkillId) -> SkillDefinition {
         _,
         &'static [Effect],
     ) = match id {
+        SkillId::HurledScrap => (
+            "Hurled Scrap",
+            "Deal 2 damage. Supplies, not fighting, are the wagon's purpose.",
+            ALL_RANKS,
+            ALL_RANKS,
+            TargetRule::EnemyStanding,
+            None,
+            &[Effect::Damage(2)],
+        ),
+        SkillId::SpareBandage => (
+            "Spare Bandage",
+            "Restore 3 HP to a standing ally. 2 uses.",
+            ALL_RANKS,
+            ALL_RANKS,
+            TargetRule::AllyStanding,
+            Some(2),
+            &[Effect::Heal(3)],
+        ),
+        SkillId::CrushingBlow => (
+            "Crushing Blow",
+            "Reach over the frontline to deal 7 damage to a front or middle target.",
+            FRONT_MIDDLE,
+            FRONT_MIDDLE,
+            TargetRule::EnemyStanding,
+            None,
+            &[Effect::Damage(7)],
+        ),
         SkillId::FrontStrike => (
             "Front Strike",
             "Deal 7 damage to a front enemy.",

@@ -58,7 +58,8 @@ fn compare(combat: &Combat, source: ActorId, action: CombatAction) -> ActionPrev
             .state
             .actor(projected.actor)
             .expect("actor retained");
-        assert_eq!(projected.after.hp, actor.hp);
+        assert_eq!(projected.after.hp, actor.health().0);
+        assert_eq!(projected.after.life, actor.life);
         assert_eq!(projected.after.rank, immediate.state.rank(actor.id));
         assert_eq!(
             projected.after.statuses,
@@ -141,14 +142,14 @@ fn direct_hit_separates_base_modifiers_and_remaining_hp_cap() {
     );
     let hit = preview.damage.first().expect("hit");
     assert_eq!((hit.base, hit.effective, hit.hp_loss), (7, 3, 2));
-    assert_eq!(preview.actor(ActorId(101)).expect("target").after.hp, 0);
+    assert_eq!(preview.actor(ActorId(101)).expect("target").after.hp, 5);
     assert_eq!(
         preview.actor(ActorId(101)).expect("target").after.rank,
-        None
+        Some(1)
     );
     assert_eq!(
         preview.actor(ActorId(102)).expect("compacted").after.rank,
-        Some(1)
+        Some(2)
     );
 }
 
@@ -169,7 +170,8 @@ fn lethal_hits_suppress_status_and_movement_followups() {
             },
         );
         let target = preview.actor(ActorId(101)).expect("target");
-        assert_eq!(target.after.hp, 0);
+        assert_eq!(target.after.hp, 5);
+        assert!(matches!(target.after.life, crate::LifeState::Corpse { .. }));
         assert!(target.after.statuses.is_empty());
         assert!(!preview.events.iter().any(|event| matches!(
             event,
@@ -201,6 +203,7 @@ fn healing_and_rescue_use_the_committed_caps_and_rounding() {
         amount: 1
     }));
     combat.actor_mut(ActorId(4)).expect("scout").hp = 0;
+    combat.actor_mut(ActorId(4)).expect("scout").life = crate::LifeState::Dying { failures: 0 };
     let preview = compare(
         &combat,
         ActorId(5),

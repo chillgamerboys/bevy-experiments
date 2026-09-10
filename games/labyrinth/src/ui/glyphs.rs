@@ -133,13 +133,18 @@ pub(super) fn for_skill(skill: SkillId) -> Glyph {
         SkillId::FrontStrike
         | SkillId::DeepStrike
         | SkillId::StaffStrike
-        | SkillId::BrutalStrike => Glyph::Blade,
+        | SkillId::BrutalStrike
+        | SkillId::CrushingBlow => Glyph::Blade,
         SkillId::LongReach => Glyph::Reach,
         SkillId::DrivingBlow => Glyph::Push,
-        SkillId::FieldDressing | SkillId::Mend | SkillId::Rally => Glyph::Heal,
+        SkillId::FieldDressing | SkillId::Mend | SkillId::Rally | SkillId::SpareBandage => {
+            Glyph::Heal
+        }
         SkillId::BleedingCut | SkillId::RaggedCut => Glyph::Bleed,
         SkillId::BackRankShot => Glyph::Aim,
-        SkillId::ThrownKnife | SkillId::SnapShot | SkillId::HollowBolt => Glyph::Arrow,
+        SkillId::ThrownKnife | SkillId::SnapShot | SkillId::HollowBolt | SkillId::HurledScrap => {
+            Glyph::Arrow
+        }
         SkillId::CleanBlade | SkillId::Staunch => Glyph::Clean,
         SkillId::HookShot => Glyph::Hook,
         SkillId::Exchange => Glyph::Swap,

@@ -1,5 +1,24 @@
 # Labyrinth verification
 
+The footprint/corpse milestone adds pure lifecycle tests, a five-App real UDP wagon
+admission/action/fresh-client reconnect test, and native UI geometry/selection tests.
+Existing six-player transport and abrupt-process-restart tests remain in place.
+Capture routes `footprints` and `corpses` show the large units alive and as authored
+corpse presentation fixtures. They are static evidence, not simulated death saves.
+
+Final local macOS verification for this milestone: 51 rules tests and 105 application
+tests pass, plus the explicitly enabled six-process guest-kill/restart test. The full
+workspace all-feature suite (including doctests), strict Clippy, formatting, dependency
+policy and repository ownership/link checks pass. The default formation regression
+requires every enemy to have an in-range attack: Brutes 1–2, Hauler 3–4, Stalker/Archer
+5–6. Five-App encrypted wagon admission/action/fresh-client reconnection is covered
+separately from the explicit six-single-rank capacity fixture.
+
+Rendered review covers the new living lineup and authored corpse layout at 1280×720,
+and living lineup at 1920×1080. Native interaction checked keyboard ability selection,
+focus traversal, pointer target selection and confirmation advancing to the next hero.
+This is not a complete manual death-save playthrough or cross-machine multiplayer test.
+
 Run from the repository root. CI profile uses the same source/features with faster unoptimized
 compilation; ordinary play uses the default development profile.
 

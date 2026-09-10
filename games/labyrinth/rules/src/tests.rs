@@ -52,7 +52,7 @@ fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "01a8c69e0d9ff59fdb3a37c8957038d3f3ce1e3d50c618944f1b404000a999c8"
+        "f0d0d29df109b91386ecd1e1c40480d7aeadadfe5deae795cd1a4b177a0d47d2"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }
@@ -200,7 +200,14 @@ fn overflow_during_round_roll_does_not_consume_rng_or_partial_state() {
 #[test]
 fn all_authored_heroes_have_four_skills_and_displacement_has_legal_fallbacks() {
     for class in HeroClass::ALL {
-        assert_eq!(class.skills().len(), 4);
+        assert_eq!(
+            class.skills().len(),
+            if class == HeroClass::LanternWagon {
+                2
+            } else {
+                4
+            }
+        );
         for skill in class.skills() {
             let definition = skill_definition(*skill);
             assert!(definition.source_ranks > 0 && definition.source_ranks < 64);
@@ -344,7 +351,11 @@ fn source_death_does_not_remove_bleed_from_its_bearer() {
     let mut combat = fixture();
     attach(&mut combat, ActorId(103), ActorId(1), StatusKind::Bleed);
     damage_fixture(&mut combat, ActorId(103), 0);
-    assert!(!combat.state.enemy_formation.contains(&ActorId(103)));
+    assert!(combat
+        .state
+        .actor(ActorId(103))
+        .expect("source")
+        .is_corpse());
     let hp = combat.state.actor(ActorId(1)).expect("hero").hp;
     boundary(&mut combat, Boundary::OwnerTurnStart, Some(ActorId(1)));
     assert_eq!(combat.state.actor(ActorId(1)).expect("hero").hp, hp - 2);
@@ -391,7 +402,7 @@ fn lethal_bleed_consumes_slot_preserves_formation_and_clears_only_requested_stat
             .completed
     );
     assert_eq!(combat.state.hero_formation, original_formation);
-    assert!(status(&combat, target, StatusKind::Bleed).is_none());
+    assert!(status(&combat, target, StatusKind::Bleed).is_some());
     assert!(status(&combat, target, StatusKind::Haste).is_some());
     assert!(observed.iter().any(
         |event| matches!(event.kind, CombatEventKind::TurnSkipped { actor } if actor == target)
@@ -624,10 +635,14 @@ fn rescue_before_pending_slot_can_act_but_after_consumption_cannot_act_twice() {
 fn rescue_of_actor_absent_from_round_never_inserts_a_bonus_entry() {
     let mut combat = fixture();
     damage_fixture(&mut combat, ActorId(1), 0);
-    // Start an explicit fixture round with this hero excluded.
+    // Explicit pruned-order fixture: rescue must never allocate an extra entry.
     combat
         .start_round(&mut Vec::new(), &mut Work(MAX_WORK))
         .expect("next fixture round");
+    combat
+        .state
+        .initiative
+        .retain(|entry| entry.actor != ActorId(1));
     combat
         .seek_decision(&mut Vec::new(), &mut Work(MAX_WORK))
         .expect("decision");
@@ -660,7 +675,7 @@ fn rescue_of_actor_absent_from_round_never_inserts_a_bonus_entry() {
 }
 
 #[test]
-fn killed_enemy_compacts_without_moving_statuses_or_resolving_later_skill_effects() {
+fn killed_enemy_leaves_corpse_without_moving_statuses_or_resolving_later_skill_effects() {
     let mut combat = fixture();
     wait_for(&mut combat, ActorId(1));
     attach(&mut combat, ActorId(2), ActorId(102), StatusKind::Bleed);
@@ -680,6 +695,7 @@ fn killed_enemy_compacts_without_moving_statuses_or_resolving_later_skill_effect
     assert_eq!(
         combat.state.enemy_formation,
         [
+            ActorId(101),
             ActorId(102),
             ActorId(103),
             ActorId(104),
@@ -693,7 +709,7 @@ fn killed_enemy_compacts_without_moving_statuses_or_resolving_later_skill_effect
             .id,
         status_id
     );
-    assert_eq!(combat.state.rank(ActorId(101)), None);
+    assert_eq!(combat.state.rank(ActorId(101)), Some(1));
 }
 
 #[test]

@@ -66,7 +66,7 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
         !view.admitted,
     );
     if view.host {
-        let can_start = view.players.len() == PARTY_SIZE
+        let can_start = !view.players.is_empty()
             && view
                 .players
                 .iter()
@@ -102,7 +102,7 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
             world,
             invites,
             "Invite Title",
-            "FIVE GUESTS | FIVE INVITATIONS",
+            "PRIVATE INVITATIONS | UP TO SIX PLAYERS",
             UiTextRole::Title,
         );
         label(world, invites, "Invite Advice", "Copy one distinct invitation for each friend. Codes stay out of the screen and diagnostics.", UiTextRole::Supporting);

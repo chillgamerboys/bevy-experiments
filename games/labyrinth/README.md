@@ -1,8 +1,8 @@
 # Labyrinth
 
-An original six-player cooperative positional-combat prototype. This first slice
+An original up-to-six-player cooperative positional-combat prototype. This first slice
 is **one battle**, not maze exploration yet. It has HP, per-round initiative,
-rank-constrained abilities, movement, bleed, cleansing, downing and rescue. There
+rank-constrained abilities, multi-rank creatures, bleed, death saves, rescue and corpses. There
 is no stress, PvP, campaign, loot, or host migration.
 
 ## Play
@@ -13,11 +13,13 @@ From the repository root:
 cargo run -p labyrinth -- --local
 ```
 
-Local mode controls all six heroes and opens no game transport. The default seed
+Local mode controls four ordinary heroes plus a two-rank Lantern Wagon and opens no game transport. The default seed
 is 42; use `--seed 91` to try a different reproducible fight. Plain
 `cargo run -p labyrinth` opens the main menu; choose **Play with friends** for
 hosting, discovery, direct joining or reconnection. No `--all-features` is needed.
 
+The default company has five player slots (the wagon occupies two ranks). To test
+six players, change the wagon to a single-rank class in the lobby to open the sixth slot.
 For six instances on one computer, build once, then run the resulting binary in
 six terminals with distinct profiles:
 
@@ -50,11 +52,12 @@ No admission secrets are accepted on the command line.
    LAN discovery (or explicit development tailnet discovery) with an 8–64 character
    printable ASCII temporary passphrase (no leading/trailing spaces), and guests
    select its listing and enter it.
-4. All six players ready up; the host starts. Each player controls one distinct
+4. Every company member readies up; the host starts. Each player controls one distinct
    hero, not a class or whichever hero occupies their original formation rank.
    Classes may repeat. Changing class clears the whole party's readiness so
-   teammates acknowledge the new composition. Co-op requires all six connected
-   players in this milestone; use local mode to control the complete party alone.
+   teammates acknowledge the new composition. A wagon consumes two of the six spaces:
+   select it while an unoccupied space remains. It never displaces an admitted player.
+   Every remaining slot requires a connected player; use local mode to play alone.
 
 The temporary passphrase is **not an account password**. Do not reuse an important
 password. Native Bevy's editable text currently displays typed characters; the form
@@ -122,12 +125,17 @@ and confirmation remain in view. Opening an effects badge reveals all effects;
 for example `Ble2 / 3t+1` means Bleed potency 2, three bearer-turn boundaries left,
 plus one other effect. The inspector gives the exact trigger and duration wording.
 
-The four class presets are Gatekeeper, Knifehand, Scout, and Field Medic; six
-players may choose any combination, including repeats. The default front-to-rear
-party is Gatekeeper, Knifehand, Knifehand, Scout, Field Medic, Field Medic, facing
-six enemies in another **linear formation**, not a hex grid. Starting ranks follow
-the lobby's seat order; choosing a class does not shuffle the party. Move swaps
-adjacent allies. Both teams roll effective Speed + d8 each round; the current
+The presets are Gatekeeper, Knifehand, Scout, Field Medic and Lantern Wagon, with
+repeated classes allowed within six spaces. The wagon has a weak scrap attack and
+small limited heal; future supplies/navigation utility is not implemented yet.
+Local and multiplayer defaults use each original hero once plus the wagon.
+The prototype enemy lineup has a two-rank Ossuary Hauler and one each of Ash Brute,
+Iron Brute, Wound Stalker and Hollow Archer in a **linear formation**,
+not a hex grid. Starting order follows seat order, except wagons start at the rear.
+The Brutes start at enemy ranks 1–2, the Hauler at 3–4, and Stalker/Archer at 5–6.
+The Hauler attacks over the frontline; it does not block the Brutes' attack positions.
+Move swaps adjacent whole combatants, never half a large actor. Both teams roll
+effective Speed + d8 each round; the current
 round's order stays fixed when actors move or speed changes.
 
 Every actor stores its own validated ability loadout and remaining uses. Class
@@ -138,10 +146,19 @@ and hex-themed inventories are future game-owned systems, not implemented gamepl
 
 Bleed deals 2 damage at the affected actor's next three turn starts. Reapplying it
 refreshes duration without stacking damage. Brace reduces direct damage by 2 until
-the owner's next turn starts, but does not reduce bleed. Rescue revives a downed
-ally at 25% maximum HP, rounded up. Hero bodies retain their formation slots; dead
-enemies are removed and remaining enemies compact forward. All heroes down loses;
-all enemies dead wins. The host can return the party to the lobby for another fight.
+the owner's next turn starts, but does not reduce bleed. Rescue recovers a dying
+ally at 25% maximum HP, rounded up. Dying heroes roll a provisional d20 death save
+at their initiative slot: below 10 adds a failure; three failures mean permanent
+death. A nonzero hit while dying adds one failure. Success holds on without healing.
+
+Player and monster corpses preserve all occupied ranks, have separate HP equal to
+one quarter of living maximum HP (rounded up), and retain Bleed without refreshing
+it. Corpse effects tick at round end. Remains can be attacked by either team and
+expire after three full rounds, excluding creation: a round-2 corpse clears at
+round-5 end. Destruction/expiry compacts the formation. Healing/rescue cannot revive
+corpses. All heroes down loses; all living enemies dead wins even with corpses left.
+The host can return to the lobby for a new test encounter; this is not campaign revival.
+See [formation and death contracts](../../docs/decisions/labyrinth-footprints-and-death.md).
 
 ### Disconnect and restart
 
@@ -161,7 +178,7 @@ or host-side kick in this slice. Return to the lobby and have a connected guest
 leave to release its seat, or start a new company. Host process restart deliberately
 ends the session; stored guest credentials cannot recover a lost host world.
 
-The current Labyrinth protocol is **v3**, including typed connection/encounter
+The current Labyrinth protocol is **v4**, including footprint/life states and typed connection/encounter
 interruption reasons. Menus never clear a missing-player or rules-failure suspension.
 This schema is incompatible with earlier builds (including six-player v2).
 All participants must update together and start a new hosted company;
