@@ -21,7 +21,8 @@ use bevy_gamekit::discovery::{
     SessionPasswordVerifier, TailnetBrowser, TailnetResponder, TailscaleCli, TailscaleStatusTask,
 };
 use bevy_gamekit::multiplayer::{
-    local_network_addresses, AtomicFileReconnectCredentialStore, GameMultiplayerPlugin,
+    local_network_addresses, AtomicFileReconnectCredentialStore, GameInboundBudgetPlugin,
+    GameMultiplayerPlugin, InboundLimits, InboundMessageLimit, InboundRejected,
     MemoryReconnectCredentialStore, PreparedDirectHost, PreparedDirectJoin,
     PreparedDirectReconnect, ReconnectCredentialStorage, ReconnectEndpointBinding,
     StoredReconnectCredential,
@@ -69,56 +70,59 @@ impl Plugin for DeckNetworkPlugin {
                 );
             app.insert_resource(storage);
         }
-        app.add_plugins((GameMultiplayerPlugin, DiscoveryPlugin))
-            .init_resource::<DeckNetworkState>()
-            .insert_resource(ExpectedSession {
-                game_id: GAME_ID.to_owned(),
-                protocol_version: PROTOCOL_VERSION.to_owned(),
-                build_id: BUILD_ID.to_owned(),
-            })
-            .add_systems(
-                PreUpdate,
-                (
-                    receive_offer,
-                    receive_welcome,
-                    receive_refusal,
-                    receive_results,
-                    receive_snapshots,
-                    receive_closed,
-                )
-                    .chain()
-                    .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Receive),
+        app.add_plugins((
+            GameMultiplayerPlugin,
+            GameInboundBudgetPlugin,
+            DiscoveryPlugin,
+        ))
+        .init_resource::<DeckNetworkState>()
+        .insert_resource(ExpectedSession {
+            game_id: GAME_ID.to_owned(),
+            protocol_version: PROTOCOL_VERSION.to_owned(),
+            build_id: BUILD_ID.to_owned(),
+        })
+        .add_systems(
+            PreUpdate,
+            (
+                receive_offer,
+                receive_welcome,
+                receive_refusal,
+                receive_results,
+                receive_snapshots,
+                receive_closed,
             )
-            .add_systems(
-                PreUpdate,
-                (
-                    expire_admission,
-                    handle_client_hellos,
-                    handle_persistence,
-                    handle_remote_requests,
-                )
-                    .chain()
-                    .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::GameAuthority),
+                .chain()
+                .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Receive),
+        )
+        .add_systems(
+            PreUpdate,
+            (
+                expire_admission,
+                handle_client_hellos,
+                handle_persistence,
+                handle_remote_requests,
             )
-            .add_systems(
-                PostUpdate,
-                send_pending_hello.in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Send),
-            )
-            .add_systems(
-                Update,
-                poll_discovery.before(bevy_gamekit::discovery::DiscoverySystems::Maintain),
-            )
-            .add_systems(Update, poll_host_discovery)
-            .add_systems(Update, finish_pending_server_close)
-            .add_systems(Update, guest_admission_timeout)
-            .add_systems(
-                PostUpdate,
-                finish_rejected_connections
-                    .after(bevy_replicon::prelude::ServerSystems::SendPackets),
-            )
-            .add_observer(begin_admission_deadline)
-            .add_observer(on_connected_client_removed)
-            .add_observer(on_transport_disconnected);
+                .chain()
+                .in_set(bevy_gamekit::multiplayer::MultiplayerSystems::GameAuthority),
+        )
+        .add_systems(
+            PostUpdate,
+            send_pending_hello.in_set(bevy_gamekit::multiplayer::MultiplayerSystems::Send),
+        )
+        .add_systems(
+            Update,
+            poll_discovery.before(bevy_gamekit::discovery::DiscoverySystems::Maintain),
+        )
+        .add_systems(Update, poll_host_discovery)
+        .add_systems(Update, finish_pending_server_close)
+        .add_systems(Update, guest_admission_timeout)
+        .add_systems(
+            PostUpdate,
+            finish_rejected_connections.after(bevy_replicon::prelude::ServerSystems::SendPackets),
+        )
+        .add_observer(begin_admission_deadline)
+        .add_observer(on_connected_client_removed)
+        .add_observer(on_transport_disconnected);
         register_protocol(app);
     }
 }
@@ -461,6 +465,21 @@ pub(crate) fn start_host(world: &mut World, mut config: HostConfiguration) -> Re
     )
     .map_err(|error| error.to_string())?;
     let server_entity = prepared.open(world);
+    // Client envelopes contain IDs, bounded credentials and our protocol string.
+    world.entity_mut(server_entity).insert(InboundLimits {
+        pending_connections: 8,
+        admitted_connections: 1,
+        pending: InboundMessageLimit {
+            messages: 8,
+            bytes: 4096,
+            message_bytes: 1024,
+        },
+        admitted: InboundMessageLimit {
+            messages: 144,
+            bytes: 65536,
+            message_bytes: 1024,
+        },
+    });
 
     let mut notices = vec![format!(
         "Direct BGN1 route: {}:{}.",
@@ -838,7 +857,7 @@ fn send_pending_hello(
 
 fn handle_remote_requests(
     mut requests: MessageReader<FromClient<DeckRequest>>,
-    clients: Query<&DeckAuthorized, With<AuthorizedClient>>,
+    clients: Query<&DeckAuthorized, (With<AuthorizedClient>, Without<InboundRejected>)>,
     mut authority: Option<ResMut<DeckAuthority>>,
     mut results: MessageWriter<ToClients<DeckResult>>,
     mut snapshots: MessageWriter<ToClients<DeckSnapshot>>,

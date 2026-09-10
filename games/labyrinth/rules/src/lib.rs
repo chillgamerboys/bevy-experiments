@@ -28,7 +28,7 @@ pub use preview::{
 };
 pub use status::{
     status_definition, Boundary, DurationClock, Effect, Modifier, Reapplication, RemovalReason,
-    Stat, StatusDefinition, StatusInstance, StatusKind, StatusTag,
+    Stat, StatusDefinition, StatusInstance, StatusKind, StatusTag, StatusTiming,
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.

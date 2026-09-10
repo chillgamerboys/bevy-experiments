@@ -43,11 +43,35 @@ the passphrase only over the certificate-pinned encrypted connection. Public lis
 metadata carries no admission secrets. Private invitations and established reconnect
 credentials are independent admission routes and bypass the discovery passphrase.
 
+Password verification permits five failures per source IP and 30 globally in an
+inclusive 60-second rolling window. The fifth source failure also starts a
+30-second cooldown. Both conditions must clear before another hash is attempted,
+even for a correct password. Blocked attempts do not extend the limits; successful
+verification clears source history but leaves global failure history intact.
+
 Admission is an offer -> atomic client persistence -> acknowledgement -> authorization
 flow. Transport connection alone must not permit game commands. Storage failure cancels
 the attempt; it is not a successful join with a warning. Credential rotation retains
 the recovery window needed for lost offers/ACKs. Games still own reservation policy,
 expiry, attempt identity and exactly which snapshots each recipient may see.
+
+Labyrinth and Deckbuilder opt into `GameInboundBudgetPlugin` and attach
+`InboundLimits` to their hosted listener. The gate sits after transport reassembly
+and before Replicon decoding. Pending connections allow eight messages / 4 KiB per
+frame; admitted connections allow 144 messages / 64 KiB. Either phase rejects an
+individual envelope larger than 1 KiB. Current client envelopes contain bounded
+credentials, protocol identifiers and fixed game commands. Revisit these limits
+with tests when adding larger client payloads. Upstream transport memory/IO remains
+subject to its own limits; this gate bounds application forwarding and decoding.
+
+Labyrinth retains up to 128 pending requests per admitted physical connection
+(640 across five guest slots), dispatching FIFO within each connection and rotating
+between connections. Per-frame ceilings are 16 per guest and 128 total. Pending or
+unauthorized traffic cannot enter those gameplay queues. Overflow disconnects the
+sender and discards its unprocessed queue without clearing its reservation or
+sequence watermark; reconnect obtains the host's current sequence and decision.
+An already applied command cannot execute again. An admitted player's disconnect
+still pauses a live encounter under the existing game policy.
 
 Native text editing currently shows typed characters in these prototypes. Owned secret
 wrappers, submitted messages and credential serialization buffers redact diagnostics

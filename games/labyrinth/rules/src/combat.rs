@@ -660,26 +660,18 @@ impl Combat {
                 continue;
             };
             let definition = status_definition(instance.kind);
-            let corpse = self
+            let life = self
                 .state
                 .actor(bearer)
-                .is_some_and(ActorSnapshot::is_corpse);
-            let trigger = if corpse {
-                definition.trigger.map(|_| Boundary::RoundEnd)
-            } else {
-                definition.trigger
-            };
-            let duration_boundary = if corpse {
-                Boundary::RoundEnd
-            } else {
-                definition.duration.boundary
-            };
+                .ok_or(RuleError::UnknownActor)?
+                .life;
+            let timing = definition.effective_timing(life);
             // A prior effect may refresh an already-queued ID. That instance is
             // newly activated and must wait for a future boundary just like a new ID.
             if instance.eligible_boundary > sequence {
                 continue;
             }
-            if trigger == Some(boundary) {
+            if timing.trigger == Some(boundary) {
                 self.emit(
                     CombatEventKind::StatusTriggered {
                         actor: bearer,
@@ -710,7 +702,7 @@ impl Combat {
                     }
                 }
             }
-            if duration_boundary == boundary {
+            if timing.duration_boundary == boundary {
                 let expired = if let Some(status) = self
                     .actor_mut(bearer)?
                     .statuses

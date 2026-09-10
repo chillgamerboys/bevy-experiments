@@ -23,8 +23,11 @@ Use explicit `UiFocusId` scope/key pairs for restoration across rebuilds; never
 derive identity from a displayed label. Pointer and keyboard eligibility is shared.
 
 `GameUiTooltipPlugin` is a composition-root choice, installed unconditionally by
-Labyrinth. It adds delayed hover/focus previews, gap-tolerant reading, explicit
-pinning and bounded nested cards. Add `UiTooltipHost` to one full-screen root;
+Labyrinth. Hover previews appear immediately and are pointer-transparent. Leaving
+before `UiTooltipSettings::lock_delay` dismisses the preview immediately; continuous
+hover locks it after one second by default. Locked cards persist across empty space
+until dismissal, source replacement or scope/disclosure changes. They show an accent
+border and corner close control, without a Pin/footer row. Add `UiTooltipHost` to one full-screen root;
 use `UiTooltipBounds` for a game-owned safe area. Timings and inspection keys live
 in `UiTooltipSettings`; the native renderer uses the semantic skin. Games own
 `UiTooltipCatalog` content and stable `UiTooltipSubject` keys; `UiTooltipSource`
@@ -34,8 +37,9 @@ Remove catalog keys when disclosure changes. Never copy hidden state into help.
 disabled-control help with `UiInspectable`, never by enabling the action.
 After `UiTooltipSystems::Resolve`, skip game shortcuts when
 `UiTooltipState::captures_keyboard()` is true. Inspect/pin defaults to T; Escape
-closes deepest-first and restores eligible scoped focus. Pointer previews do not
-steal focus. Test time, visibility, nested input containment, revocation and
+closes deepest-first and restores eligible scoped focus. `UiTooltipRequest::Pin`
+remains available for explicit retention. Retained click focus does not reopen a
+hover preview; keyboard inspection is explicit. Pointer previews do not steal focus. Test time, visibility, nested input containment, revocation and
 keyboard restoration separately from static pixels and a native visual walk.
 
 ## `bevy_game_test`

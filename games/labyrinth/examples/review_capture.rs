@@ -55,7 +55,10 @@ fn main() {
         .get(5)
         .cloned()
         .unwrap_or_else(|| "combat".to_owned());
-    let large = matches!(route.as_str(), "footprints" | "corpses");
+    let large = matches!(
+        route.as_str(),
+        "footprints" | "corpses" | "corpse-forecast" | "corpse-help"
+    );
     let heroes = if large {
         labyrinth_rules::PROTOTYPE_HERO_ROSTER.to_vec()
     } else {
@@ -83,7 +86,44 @@ fn main() {
             events.extend(combat.apply(actor, action).expect("legal fixture AI"));
         }
     }
+    if route == "corpse-forecast" {
+        for _ in 0..24 {
+            let actor = combat.snapshot().active_actor.expect("review decision");
+            if actor == ActorId(3) {
+                break;
+            }
+            events.extend(
+                combat
+                    .apply(actor, labyrinth_rules::CombatAction::Wait)
+                    .expect("review wait"),
+            );
+        }
+    }
     let mut snapshot = combat.snapshot();
+    if matches!(route.as_str(), "corpse-forecast" | "corpse-help") {
+        // Authored rare-state presentation fixture, not a recorded lifecycle walk.
+        let actor = snapshot
+            .actors
+            .iter_mut()
+            .find(|a| a.id == ActorId(103))
+            .expect("Ash Brute");
+        actor.hp = 0;
+        actor.life = labyrinth_rules::LifeState::Corpse {
+            hp: 1,
+            max_hp: 5,
+            created_round: snapshot.round,
+        };
+        actor.statuses = vec![StatusInstance {
+            id: 900,
+            kind: StatusKind::Bleed,
+            source: ActorId(2),
+            bearer: actor.id,
+            potency: 2,
+            remaining: 2,
+            eligible_boundary: snapshot.boundary_sequence + 1,
+        }];
+        snapshot.validate().expect("corpse review state");
+    }
     if route == "corpses" {
         // Authored visual fixture, not evidence of a death-save or damage transition.
         for actor in snapshot
@@ -249,6 +289,7 @@ fn help_fixture(
     let source = match capture.route.as_str() {
         "help" | "help-locked" => "Skill 0",
         "history-actor" => "Actor 105",
+        "corpse-forecast" => "Actor 103",
         _ => return,
     };
     // Freeze a presentation state, not an input/timing test. Production timing
@@ -325,6 +366,9 @@ fn capture(
         ("unknown" | "alternate", 4) => Some("Skill 0"),
         ("unknown" | "alternate", 7) => Some("Actor 105"),
         ("inspect", 4) => Some("Actor 1 Effects"),
+        ("corpse-help", 4) => Some("Actor 103 Effects"),
+        ("corpse-forecast", 4) => Some("Skill 1"),
+        ("corpse-forecast", 7) => Some("Actor 103"),
         ("order", 4) => Some("Initiative Actor 4"),
         ("compact", 4) => Some("Battle Log Toggle"),
         ("compact", 7) => Some("History Toggle"),

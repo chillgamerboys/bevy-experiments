@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 use bevy::prelude::Resource;
 use labyrinth_rules::{
     skill_definition, status_definition, ActorId, ActorKind, Boundary, CombatAction,
-    CombatSnapshot, Effect, PreviewEvent, RuleError, SkillId, StatusInstance, StatusKind,
-    StatusTag,
+    CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, SkillId, StatusInstance,
+    StatusKind, StatusTag,
 };
 
 /// A fact that the current viewer can or cannot know; absence is not zero.
@@ -181,12 +181,27 @@ impl BattlePresentation {
     }
 }
 
+/// Distinguishes depletion of a living pool from damage to permanent remains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ForecastOutcome {
+    /// Ordinary living HP/status/position change.
+    Living,
+    /// Permanent death creates a separate corpse pool.
+    CorpseCreated,
+    /// Existing remains retain some durability.
+    CorpseDamaged,
+    /// Existing remains are destroyed and leave formation.
+    CorpseCleared,
+}
+
 /// A single actor's immediate preview, not its state after the next turn starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorForecast {
     /// Recipient or otherwise affected actor.
     pub actor: ActorId,
-    /// HP after this action only.
+    /// Disclosed outcome and the kind of pool being depleted.
+    pub outcome: Knowledge<ForecastOutcome>,
+    /// HP after this action only, using the before-pool ceiling when it is cleared.
     pub health: Knowledge<Health>,
     /// Concise immediate outcome, or explicit uncertainty.
     pub summary: String,
@@ -233,6 +248,7 @@ impl ForecastDisplay {
                 summary: "Outcome uncertain · undisclosed combat details".to_owned(),
                 actors: vec![ActorForecast {
                     actor: target,
+                    outcome: Knowledge::Unknown,
                     health: Knowledge::Unknown,
                     summary: "Outcome unknown".to_owned(),
                 }],
@@ -258,7 +274,12 @@ impl ForecastDisplay {
                         .iter()
                         .any(|effect| matches!(effect, Effect::StatusDamage(_)))
                     {
-                        let clock = match definition.trigger {
+                        let life = preview
+                            .actor(status.bearer)
+                            .ok_or(RuleError::UnknownActor)?
+                            .after
+                            .life;
+                        let clock = match definition.effective_timing(life).trigger {
                             Some(Boundary::OwnerTurnStart) => "turn start",
                             Some(Boundary::OwnerTurnEnd) => "turn end",
                             Some(Boundary::RoundEnd) => "round end",
@@ -280,9 +301,8 @@ impl ForecastDisplay {
                 }
                 PreviewEvent::Downed { .. } => effects.push("Downed".to_owned()),
                 PreviewEvent::Defeated { .. } => effects.push("Dies; leaves a corpse".to_owned()),
-                PreviewEvent::CorpseRemoved { .. } => {
-                    effects.push("Corpse cleared; formation closes".to_owned())
-                }
+                // The affected actor's typed forecast below explains clearing.
+                PreviewEvent::CorpseRemoved { .. } => {}
                 PreviewEvent::DeathSave { failures, .. } => {
                     effects.push(format!("Death save: {failures}/3 failures"))
                 }
@@ -296,16 +316,20 @@ impl ForecastDisplay {
             .map(|change| {
                 // Formation compaction can affect actors other than the direct target.
                 // Never expose their undisclosed HP through an otherwise known attack.
-                let newly_dead =
-                    matches!(change.after.life, labyrinth_rules::LifeState::Corpse { .. })
-                        && !matches!(
-                            change.before.life,
-                            labyrinth_rules::LifeState::Corpse { .. }
-                        );
+                let outcome = match (change.before.life, change.after.life) {
+                    (LifeState::Corpse { .. }, LifeState::Removed) => {
+                        ForecastOutcome::CorpseCleared
+                    }
+                    (LifeState::Corpse { .. }, _) => ForecastOutcome::CorpseDamaged,
+                    (_, LifeState::Corpse { .. }) => ForecastOutcome::CorpseCreated,
+                    _ => ForecastOutcome::Living,
+                };
+                let newly_dead = outcome == ForecastOutcome::CorpseCreated;
+                let cleared = outcome == ForecastOutcome::CorpseCleared;
                 let health = if disclosure.actor(change.actor).health {
                     Knowledge::Known(Health {
                         current: if newly_dead { 0 } else { change.after.hp },
-                        maximum: if newly_dead {
+                        maximum: if newly_dead || cleared {
                             change.before.max_hp
                         } else {
                             change.after.max_hp
@@ -329,6 +353,23 @@ impl ForecastDisplay {
                         },
                     );
                 }
+                if matches!(
+                    outcome,
+                    ForecastOutcome::CorpseDamaged | ForecastOutcome::CorpseCleared
+                ) {
+                    summary = health.as_known().map_or_else(
+                        || "Corpse durability unknown".into(),
+                        |hp| {
+                            format!(
+                                "Corpse durability {} → {} / {}",
+                                change.before.hp, hp.current, hp.maximum
+                            )
+                        },
+                    );
+                    if cleared {
+                        summary.push_str(" · Corpse cleared; formation closes");
+                    }
+                }
                 if change.before.rank != change.after.rank {
                     if let Some(rank) = change.after.rank {
                         summary.push_str(&format!(" · rank {rank}"));
@@ -336,6 +377,11 @@ impl ForecastDisplay {
                 }
                 ActorForecast {
                     actor: change.actor,
+                    outcome: if disclosure.actor(change.actor).health {
+                        Knowledge::Known(outcome)
+                    } else {
+                        Knowledge::Unknown
+                    },
                     health,
                     summary,
                 }
@@ -354,6 +400,61 @@ impl ForecastDisplay {
             uncertainty: false,
         })
     }
+}
+
+/// Explain a disclosed instance using the exact clocks used by the rules reducer.
+#[must_use]
+pub fn status_description(status: &StatusInstance, life: LifeState) -> String {
+    let definition = status_definition(status.kind);
+    let timing = definition.effective_timing(life);
+    let boundary_name = |boundary| match boundary {
+        Boundary::OwnerTurnStart => "turn start",
+        Boundary::OwnerTurnEnd => "turn end",
+        Boundary::RoundEnd => "round end",
+    };
+    let duration = match timing.duration_boundary {
+        Boundary::OwnerTurnStart => "turn-start",
+        Boundary::OwnerTurnEnd => "turn-end",
+        Boundary::RoundEnd => "round-end",
+    };
+    let ticks = if status.remaining == 1 {
+        "tick"
+    } else {
+        "ticks"
+    };
+    let boundaries = if status.remaining == 1 {
+        "boundary"
+    } else {
+        "boundaries"
+    };
+    let mut text = if let Some(trigger) = timing.trigger.filter(|_| {
+        definition
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::StatusDamage(_)))
+    }) {
+        format!(
+            "{} · {} damage at {}; up to {} {duration} {ticks} if retained",
+            definition.name,
+            status.potency,
+            boundary_name(trigger),
+            status.remaining
+        )
+    } else {
+        format!(
+            "{} · potency {} · expires after {} {duration} {boundaries}",
+            definition.name, status.potency, status.remaining
+        )
+    };
+    match life {
+        LifeState::Corpse { .. } => text
+            .push_str(". Corpses never take turns; clocks use round end while the corpse remains"),
+        LifeState::Dying { .. } => {
+            text.push_str(". Turn start is the dying hero's initiative slot; it chooses no action")
+        }
+        _ => {}
+    }
+    text
 }
 
 /// Public authored effects, before any actor-specific calculation.
@@ -397,6 +498,196 @@ pub fn base_description(action: &CombatAction) -> String {
 mod tests {
     use super::*;
     use labyrinth_rules::{Combat, DEFAULT_HERO_ROSTER};
+
+    #[test]
+    fn corpse_forecasts_preserve_durability_and_disclosure_through_removal() {
+        for (hp, remaining, outcome) in [
+            (5, 1, ForecastOutcome::CorpseDamaged),
+            (1, 0, ForecastOutcome::CorpseCleared),
+        ] {
+            let mut snapshot = Combat::new(42, DEFAULT_HERO_ROSTER)
+                .expect("combat")
+                .snapshot();
+            let corpse = snapshot
+                .actors
+                .iter_mut()
+                .find(|a| a.id == ActorId(101))
+                .expect("enemy");
+            corpse.hp = 0;
+            corpse.life = LifeState::Corpse {
+                hp,
+                max_hp: 5,
+                created_round: snapshot.round,
+            };
+            snapshot.validate().expect("valid corpse");
+            let before = snapshot.clone();
+            let action = CombatAction::Skill {
+                skill: SkillId::SnapShot,
+                target: ActorId(101),
+            };
+            let preview = snapshot
+                .preview_action(ActorId(4), &action)
+                .expect("preview");
+            let target = preview.actor(ActorId(101)).expect("corpse");
+            assert_eq!((target.after.hp, target.after.max_hp), (remaining, 5));
+            let mut disclosure = CombatDisclosure::default();
+            disclosure.actors.insert(
+                ActorId(102),
+                ActorDisclosure {
+                    health: false,
+                    ..Default::default()
+                },
+            );
+            let forecast = ForecastDisplay::build(&snapshot, &disclosure, ActorId(4), &action)
+                .expect("forecast");
+            let target = forecast
+                .actors
+                .iter()
+                .find(|a| a.actor == ActorId(101))
+                .expect("target");
+            assert_eq!(
+                target.health,
+                Knowledge::Known(Health {
+                    current: remaining,
+                    maximum: 5
+                })
+            );
+            assert_eq!(target.outcome, Knowledge::Known(outcome));
+            assert!(target
+                .summary
+                .contains(&format!("Corpse durability {hp} → {remaining} / 5")));
+            if remaining == 0 {
+                assert!(target.summary.contains("Corpse cleared"));
+                let bystander = forecast
+                    .actors
+                    .iter()
+                    .find(|a| a.actor == ActorId(102))
+                    .expect("compacted neighbor");
+                assert_eq!(bystander.health, Knowledge::Unknown);
+                assert!(bystander.summary.contains("HP unknown"));
+            }
+            disclosure.actors.insert(
+                ActorId(101),
+                ActorDisclosure {
+                    health: false,
+                    ..Default::default()
+                },
+            );
+            let hidden = ForecastDisplay::build(&snapshot, &disclosure, ActorId(4), &action)
+                .expect("hidden forecast");
+            assert!(hidden.uncertainty);
+            assert_eq!(
+                hidden.actors.first().expect("target").health,
+                Knowledge::Unknown
+            );
+            assert_eq!(
+                hidden.actors.first().expect("target").outcome,
+                Knowledge::Unknown
+            );
+            assert_eq!(snapshot, before, "inspection does not mutate state");
+        }
+    }
+
+    #[test]
+    fn dying_hero_death_and_rescue_forecast_separate_living_and_corpse_pools() {
+        let mut snapshot = Combat::new(42, DEFAULT_HERO_ROSTER)
+            .expect("combat")
+            .snapshot();
+        let target = if snapshot.active_actor == Some(ActorId(1)) {
+            ActorId(2)
+        } else {
+            ActorId(1)
+        };
+        let hero = snapshot
+            .actors
+            .iter_mut()
+            .find(|a| a.id == target)
+            .expect("hero");
+        let maximum = hero.max_hp;
+        hero.hp = 0;
+        hero.life = LifeState::Dying { failures: 2 };
+        snapshot.validate().expect("dying fixture");
+        let death = ForecastDisplay::build(
+            &snapshot,
+            &CombatDisclosure::default(),
+            ActorId(101),
+            &CombatAction::Skill {
+                skill: SkillId::BrutalStrike,
+                target,
+            },
+        )
+        .expect("death forecast");
+        let hero = death
+            .actors
+            .iter()
+            .find(|a| a.actor == target)
+            .expect("hero");
+        assert_eq!(
+            hero.outcome,
+            Knowledge::Known(ForecastOutcome::CorpseCreated)
+        );
+        assert_eq!(
+            hero.health,
+            Knowledge::Known(Health {
+                current: 0,
+                maximum
+            })
+        );
+        assert!(hero
+            .summary
+            .contains(&format!("corpse {0}/{0} HP", maximum.div_ceil(4))));
+        let rescue = ForecastDisplay::build(
+            &snapshot,
+            &CombatDisclosure::default(),
+            ActorId(5),
+            &CombatAction::Rescue { ally: target },
+        )
+        .expect("rescue forecast");
+        let hero = rescue
+            .actors
+            .iter()
+            .find(|a| a.actor == target)
+            .expect("hero");
+        assert_eq!(hero.outcome, Knowledge::Known(ForecastOutcome::Living));
+        assert_eq!(
+            hero.health,
+            Knowledge::Known(Health {
+                current: maximum.div_ceil(4),
+                maximum
+            })
+        );
+    }
+
+    #[test]
+    fn status_help_explains_effective_ticks_and_modifier_expiry() {
+        let mut status = StatusInstance {
+            id: 99,
+            kind: StatusKind::Bleed,
+            bearer: ActorId(1),
+            source: ActorId(101),
+            potency: 2,
+            remaining: 2,
+            eligible_boundary: 1,
+        };
+        let living = status_description(&status, LifeState::Alive);
+        assert!(living.contains("2 damage at turn start; up to 2 turn-start ticks if retained"));
+        let dying = status_description(&status, LifeState::Dying { failures: 1 });
+        assert!(dying.contains("initiative slot; it chooses no action"));
+        let corpse = status_description(
+            &status,
+            LifeState::Corpse {
+                hp: 3,
+                max_hp: 5,
+                created_round: 1,
+            },
+        );
+        assert!(corpse.contains("2 damage at round end; up to 2 round-end ticks if retained"));
+        assert!(!corpse.contains("at turn start"));
+        status.kind = StatusKind::Brace;
+        let modifier = status_description(&status, LifeState::Alive);
+        assert!(modifier.contains("expires after 2 turn-start boundaries"));
+        assert!(!modifier.contains("damage at"));
+    }
 
     #[test]
     fn unknown_health_and_modifiers_never_become_exact_forecasts() {
