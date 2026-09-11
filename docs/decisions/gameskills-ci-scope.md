@@ -1,17 +1,19 @@
 # Proposed CI scope and bounded GameSkills trials
 
-Status: planning proposal, September 10, 2026, after the foundation merged in
-[PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24). No CI routing
-change is implemented by this document. This is the proposed first refinement
-task before the [Rust CLI migration](gameskills-rust-cli.md).
+Status: refinement sequence accepted after the foundation merged in
+[PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24). CI routing is
+implemented in [scripts/ci.py](../../scripts/ci.py); trial evaluation and delivery
+are in progress. [Testing guidance](../testing.md#ci-selection) owns current
+commands. The rationale and acceptance criteria below guide the bounded trials
+before the [Rust CLI migration](gameskills-rust-cli.md).
 
 ## Problem and intended result
 
-The current [workflow](../../.github/workflows/gamekit.yml) runs on every PR and
-push to `main`. Every change receives the three-OS Python and full Rust/game test
+The foundation's workflow ran on every PR and push to `main`. Every change received
+the three-OS Python and full Rust/game test
 matrix, external consumer checks, Labyrinth's six-process restart test, and an
 Ubuntu policy job covering formatting, Clippy, dependencies and capability graphs.
-Even narrative documentation changes receive all of those checks.
+Even narrative documentation changes received all of those checks.
 
 The final foundation [CI run](https://github.com/chillgamerboys/bevy-experiments/actions/runs/34541177767)
 used approximately 4m23s on Linux, 3m45s on macOS, 7m50s on Windows and 1m17s for
@@ -54,8 +56,8 @@ execution tests must remain distinct from demonstrated Windows runtime support.
 
 ## Selection and final-result contract
 
-1. Record exact base/head revisions and changed paths. For PRs, use the PR's actual
-   comparison base and head; for pushes, compare the event's before/after revisions.
+1. Record exact base/head revisions and changed paths. For PRs, compare the event's
+   base commit with the tested merge tree; for pushes, compare before/after revisions.
    Handle renames and deletions using both paths. Fetch required history; if the
    comparison is unavailable, run the full suite rather than treating it as empty.
 2. Map files to owners using the longest matching package path. In particular,
@@ -121,6 +123,11 @@ Use the installed, pinned GameSkills candidate and `plan` as the entry point.
 Record the actual bundle/client versions and any deliberate update. The five-worker
 ceiling remains, limited by available host capacity; use workers only for useful
 independent tasks with explicit ownership and serial integration.
+
+Accepted operating defaults: small tasks receive a brief conversational plan;
+save a durable plan for work spanning sessions, significant dependencies or
+coordinated workers. Balance completion time and total usage, including planning
+and integration overhead; the worker ceiling is not a target.
 
 | Trial | Work and skills to exercise | Completion evidence |
 |---|---|---|

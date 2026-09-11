@@ -12,12 +12,49 @@ python3 scripts/check_repo.py
 python3 scripts/check_distribution.py
 python3 -m unittest discover -s scripts/tests -v
 python3 skills/scripts/validate_skills.py
+python3 skills/scripts/validate_gameskills.py
 python3 -m unittest discover -s skills/tests -v
 ```
 
-Use `cargo test -p <package> --profile ci` for focused iteration. Preserve three-OS
-CI, minimal-feature capability checks and browser-core compile checks. `cargo deny`
-is a separately installed dependency-policy tool.
+Use `cargo test -p <package> --profile ci` for focused iteration. The list above is
+the broad validation set, not a requirement to rebuild all games for narrative
+documentation. `cargo deny` is a separately installed dependency-policy tool.
+
+## CI selection
+
+[The workflow](../.github/workflows/gamekit.yml) always checks repository layout,
+local links and the routing regressions, then selects component jobs through
+[scripts/ci.py](../scripts/ci.py). Narrative docs avoid Rust and skill-runtime
+jobs; skill instructions and tooling receive the Python/skill matrix; a game edit
+receives its package tests and Clippy. Shared libraries also select their reverse
+consumers and applicable distribution, minimal-feature and browser-core checks.
+Selected Rust and skill jobs retain macOS/Linux/Windows coverage. Python repository
+tool tests also run on those platforms with the skills job when tooling changes.
+
+The selector reads committed base and tested-tree manifests, including normal,
+development, build and target-specific local dependencies. PR checks compare the
+event's base commit with the tested GitHub merge tree; main pushes compare their
+before/after commits. Renames and deletions retain old owners. Root dependency,
+workflow/classifier and unknown-input changes select the full suite. Static Rust
+file inclusions count as build inputs; dynamic includes/build scripts prevent the
+documentation shortcut. Each run's summary reports selected packages and reasons.
+
+The final `ci` job rejects failed, cancelled, missing or unexpectedly skipped
+selected jobs. It does not alter repository branch-protection settings. A manual
+Gamekit workflow dispatch runs the full suite; use that on release candidates.
+Labyrinth changes retain the six-process restart regression. Finer exclusions
+inside its networking/UI source are deferred until their inputs are mapped.
+
+To inspect selection locally, supply full committed object IDs:
+
+```sh
+python3 scripts/ci.py select --base BASE_COMMIT --head HEAD_COMMIT
+python3 scripts/ci.py select --full
+```
+
+Selection reads committed objects, not uncommitted edits, and runs no game checks.
+Structural skill tests do not replace bounded native/model evaluations of changed
+guidance; those remain separately recorded acceptance evidence.
 
 `check_distribution.py` asks Cargo for each library package's file list, rejects
 escapes/symlinks, and stages those sources without `games/`. It builds an unrelated
