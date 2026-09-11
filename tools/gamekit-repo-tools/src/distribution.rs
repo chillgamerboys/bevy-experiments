@@ -648,20 +648,26 @@ pub fn inspect_archive(
     if !portable_relative(&prefix) || prefix.contains('/') {
         return Err("invalid archive package identity".into());
     }
-    ordinary(archive)?;
-    if destination.exists() {
-        return Err("archive extraction destination already exists".into());
+    let metadata = std::fs::symlink_metadata(archive).map_err(|error| error.to_string())?;
+    if !metadata.file_type().is_file() {
+        return Err("archive input must be an ordinary file".into());
+    }
+    match std::fs::symlink_metadata(destination) {
+        Ok(_) => return Err("archive extraction destination already exists".into()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
     }
     for ancestor in destination.ancestors().skip(1) {
-        if ancestor.exists() {
-            ordinary(ancestor)?;
+        match std::fs::symlink_metadata(ancestor) {
+            Ok(metadata) if !metadata.file_type().is_dir() => {
+                return Err("archive extraction ancestor must be an ordinary directory".into());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
         }
     }
-    if std::fs::metadata(archive)
-        .map_err(|error| error.to_string())?
-        .len()
-        > 64 * 1024 * 1024
-    {
+    if metadata.len() > 64 * 1024 * 1024 {
         return Err("compressed library archive exceeds inspection limits".into());
     }
     let compressed = std::fs::read(archive).map_err(|error| error.to_string())?;

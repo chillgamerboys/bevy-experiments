@@ -461,3 +461,58 @@ fn cargo_failure_is_reported_and_temporary_sources_are_cleaned() -> Result<(), B
     assert!(temporary.is_some_and(|path| !path.exists()));
     Ok(())
 }
+
+#[test]
+fn inspection_rejects_nonfiles_and_existing_destinations() -> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path().canonicalize()?;
+    let path = artifact(
+        &root,
+        &[
+            (
+                "probe-0.1.0/Cargo.toml",
+                MANIFEST.as_bytes(),
+                tar::EntryType::Regular,
+            ),
+            (
+                "probe-0.1.0/src/lib.rs",
+                b"// source",
+                tar::EntryType::Regular,
+            ),
+        ],
+    )?;
+    assert!(inspect_archive(&root, "probe", "0.1.0", &root.join("extract")).is_err());
+    write(&root, "occupied", b"keep me")?;
+    assert!(inspect_archive(&path, "probe", "0.1.0", &root.join("occupied")).is_err());
+    assert_eq!(std::fs::read(root.join("occupied"))?, b"keep me");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        symlink(&path, root.join("linked.crate"))?;
+        assert!(inspect_archive(
+            &root.join("linked.crate"),
+            "probe",
+            "0.1.0",
+            &root.join("extract")
+        )
+        .is_err());
+        symlink(root.join("missing-target"), root.join("dangling"))?;
+        assert!(inspect_archive(&path, "probe", "0.1.0", &root.join("dangling")).is_err());
+        symlink(&root, root.join("linked-parent"))?;
+        assert!(
+            inspect_archive(&path, "probe", "0.1.0", &root.join("linked-parent/extract")).is_err()
+        );
+        let status = Command::new("mkfifo")
+            .arg(root.join("pipe.crate"))
+            .status()?;
+        assert!(status.success());
+        assert!(inspect_archive(
+            &root.join("pipe.crate"),
+            "probe",
+            "0.1.0",
+            &root.join("extract")
+        )
+        .is_err());
+    }
+    Ok(())
+}
