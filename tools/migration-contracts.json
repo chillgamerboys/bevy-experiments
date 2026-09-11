@@ -40,7 +40,7 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve execution, cleanup, resource ownership and truthful evidence semantics.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "plugins/gameskills/runtime/gameskills_runtime/workflow.py",
@@ -160,7 +160,7 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve observable compiled child processes, resource locks and actual evidence records; replace interpreter-based fixtures with Rust probes.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "skills/tests/test_gameskills_workflow.py",
@@ -1101,8 +1101,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: active run cannot be resumed.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::active_run_cannot_be_resumed; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_arguments_are_not_interpreted_by_a_shell",
@@ -1112,8 +1112,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: arguments are not interpreted by a shell.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::arguments_are_not_interpreted_by_a_shell; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_base_ref_change_invalidates_evidence_with_unchanged_head",
@@ -1123,8 +1123,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: base ref change invalidates evidence with unchanged head.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::base_ref_change_invalidates_evidence_with_unchanged_head; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_changed_external_executable_invalidates_evidence",
@@ -1134,8 +1134,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: changed external executable invalidates evidence.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::changed_external_executable_invalidates_evidence; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_changed_worktree_untracked_file_index_head_config_lock_and_environment_invalidate",
@@ -1145,8 +1145,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: changed worktree untracked file index head config lock and environment invalidate.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::changed_worktree_untracked_index_head_config_lock_and_environment_invalidate; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_concurrency_is_useful_and_shared_resources_do_not_overlap",
@@ -1156,8 +1156,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: concurrency is useful and shared resources do not overlap.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::concurrency_is_useful_and_shared_resources_do_not_overlap; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_configured_worker_cap_is_enforced",
@@ -1167,19 +1167,19 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: configured worker cap is enforced.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::configured_worker_cap_is_enforced; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_cwd_swap_after_open_cannot_redirect_process_outside_repository",
       "source": "skills/tests/test_gameskills_runner.py",
       "symbol": "GameSkillsRunnerTests.test_cwd_swap_after_open_cannot_redirect_process_outside_repository",
-      "destination": "tools/gameskills-cli/tests/runner.rs",
+      "destination": "tools/gameskills-cli/src/runner/process.rs",
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: cwd swap after open cannot redirect process outside repository.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/src/runner/process.rs::tests::cwd_swap_after_open_cannot_redirect_process_outside_repository; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_cwd_symlink_is_rejected_and_real_subdirectory_is_used",
@@ -1189,8 +1189,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: cwd symlink is rejected and real subdirectory is used.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::cwd_symlink_is_rejected_and_real_subdirectory_is_used; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_deterministic_dag_runs_shared_dependency_once_and_captures_output",
@@ -1200,8 +1200,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: deterministic dag runs shared dependency once and captures output.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::deterministic_dag_runs_shared_dependency_once_and_captures_output; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_evidence_list_is_read_only_and_missing_setup_does_not_create_state",
@@ -1211,8 +1211,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: evidence list is read only and missing setup does not create state.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::evidence_list_is_read_only_and_missing_setup_does_not_create_state; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_evidence_path_traversal_is_rejected",
@@ -1222,8 +1222,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: evidence path traversal is rejected.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::evidence_path_traversal_is_rejected; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_failure_preserves_logs_and_skips_dependents_but_runs_independent_work",
@@ -1233,8 +1233,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: failure preserves logs and skips dependents but runs independent work.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::failure_preserves_logs_and_skips_dependents_but_runs_independent_work; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_hard_killed_runner_cannot_be_resumed_while_command_retains_active_lock",
@@ -1244,8 +1244,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: hard killed runner cannot be resumed while command retains active lock.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::hard_killed_runner_cleans_descendants_and_releases_locks_only_after_cleanup; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_input_change_during_successful_command_marks_run_stale",
@@ -1255,8 +1255,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: input change during successful command marks run stale.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::input_change_during_successful_command_marks_run_stale; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_invalid_graphs_and_traversal_are_rejected_before_writing",
@@ -1266,8 +1266,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: invalid graphs and traversal are rejected before writing.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::invalid_graphs_and_traversal_are_rejected_before_writing; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_missing_executable_is_failed_observation_with_real_error_log",
@@ -1277,8 +1277,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: missing executable is failed observation with real error log.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::missing_executable_is_failed_observation_with_real_error_log; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_modified_record_and_modified_log_never_validate",
@@ -1288,8 +1288,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: modified record and modified log never validate.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::modified_record_and_modified_log_never_validate; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_record_relocated_to_another_run_or_repository_is_invalid",
@@ -1299,8 +1299,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: record relocated to another run or repository is invalid.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::record_relocated_to_another_run_or_repository_is_invalid; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_ref_change_during_a_command_marks_run_stale",
@@ -1310,8 +1310,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: ref change during a command marks run stale.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::ref_change_during_a_command_marks_run_stale; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_relative_path_entry_resolves_from_actual_command_cwd",
@@ -1321,8 +1321,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: relative path entry resolves from actual command cwd.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::relative_path_entry_resolves_from_actual_command_cwd; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_resource_initialization_failure_preserves_a_failed_record",
@@ -1332,8 +1332,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: resource initialization failure preserves a failed record.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::resource_initialization_failure_preserves_a_failed_record; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_resource_locks_coordinate_separate_runner_processes",
@@ -1343,8 +1343,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: resource locks coordinate separate runner processes.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::resource_locks_coordinate_separate_runner_processes; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_resource_wait_expiry_is_skipped_not_a_pass_and_does_not_block_unrelated_command",
@@ -1354,8 +1354,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: resource wait expiry is skipped not a pass and does not block unrelated command.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::resource_wait_expiry_is_skipped_and_does_not_block_unrelated_work; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_resume_reruns_graph_preserves_failed_record_and_rejects_new_inputs",
@@ -1365,8 +1365,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: resume reruns graph preserves failed record and rejects new inputs.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::resume_reruns_graph_preserves_failed_record_and_rejects_new_inputs; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_sigterm_cleans_descendants_records_interruption_and_skips_pending",
@@ -1376,8 +1376,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: sigterm cleans descendants records interruption and skips pending.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::sigterm_cleans_descendants_records_interruption_and_skips_pending; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_state_symlinks_record_symlinks_hardlinks_and_fifo_are_rejected",
@@ -1387,8 +1387,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: state symlinks record symlinks hardlinks and fifo are rejected.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::state_symlinks_record_symlinks_hardlinks_and_fifo_are_rejected; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_successful_leader_cannot_leave_background_descendants",
@@ -1398,19 +1398,19 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: successful leader cannot leave background descendants.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::successful_leader_cannot_leave_background_descendants; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_swapped_state_directory_does_not_redirect_atomic_record_writes",
       "source": "skills/tests/test_gameskills_runner.py",
       "symbol": "GameSkillsRunnerTests.test_swapped_state_directory_does_not_redirect_atomic_record_writes",
-      "destination": "tools/gameskills-cli/tests/runner.rs",
+      "destination": "tools/gameskills-cli/src/runner/state.rs",
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: swapped state directory does not redirect atomic record writes.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/src/runner/state.rs::tests::swapped_state_directory_does_not_redirect_atomic_record_writes; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_timeout_kills_descendant_and_preserves_partial_output",
@@ -1420,8 +1420,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: timeout kills descendant and preserves partial output.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::timeout_kills_descendant_and_preserves_partial_output; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_tracked_parent_replaced_by_symlink_is_not_followed_during_fingerprinting",
@@ -1431,8 +1431,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: tracked parent replaced by symlink is not followed during fingerprinting.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::tracked_parent_replaced_by_symlink_is_not_followed_during_fingerprinting; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_runner:GameSkillsRunnerTests.test_unrelated_refs_and_symbolic_head_are_conservative_inputs",
@@ -1442,8 +1442,8 @@
       "stage": "R5",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: unrelated refs and symbolic head are conservative inputs.",
-      "evidence": "Rust regression using compiled child processes, resource locks and actual evidence records; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gameskills-cli/tests/runner.rs::unix::unrelated_refs_and_symbolic_head_are_conservative_inputs; real installed-fixture Rust process/unit regression observed passing on macOS, with compiled probes.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_workflow:WorkflowTests.test_checkout_must_be_isolated_same_repository_and_unique",
@@ -1925,6 +1925,13 @@
       "after": "CI runs the Rust CLI and repository-tool tests; cutover accounting rejects incomplete destinations and tracked Python sources.",
       "rationale": "One maintained implementation; accounting is structurally checked separately from executed tests.",
       "evidence": "tools/gamekit-repo-tools/tests/contracts.rs; tools/gamekit-repo-tools/tests/ci_checks.rs; hosted CI for the final runtime PR."
+    },
+    {
+      "id": "r5-supervised-execution",
+      "before": "Python command groups retained active/resource locks, recorded schema-1 evidence and resumed by rerunning checks.",
+      "after": "Rust supervisors receive anchored cwd/state/lock descriptors over a bounded Unix handshake, retain locks through cleanup and observe coordinator EOF. Schema-2 records bind runtime, canonical JSON, actual executable/source/environment identity; historical Python records remain read-only and cannot validate/resume. Registration always rechecks installed configuration under setup.lock.",
+      "rationale": "Keep passing observations honest across cancellation, coordinator death, resource contention and source changes; POSIX process-group support is explicit, and Windows execution remains unsupported.",
+      "evidence": "tools/gameskills-cli/tests/runner.rs and src/runner unit regressions; 37 real-installation tests and4 unit tests pass, including actual coordinator SIGKILL cleanup/resume."
     }
   ]
 }
