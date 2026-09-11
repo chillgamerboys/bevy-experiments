@@ -11,6 +11,7 @@ pub(super) struct Directory {
     file: File,
     path: PathBuf,
 }
+
 static NONCE: AtomicU64 = AtomicU64::new(0);
 
 pub(super) fn relative(name: &str) -> Result<(), String> {
@@ -353,5 +354,29 @@ impl Directory {
         let mut out = std::collections::BTreeMap::new();
         walk(self, self, "", &mut out, &mut 0)?;
         Ok(out)
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    #[test]
+    fn nested_removal_does_not_follow_a_symbolic_parent() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let root = tempfile::tempdir()?;
+        let outside = tempfile::tempdir()?;
+        let victim = outside.path().join("journal.json");
+        std::fs::write(&victim, "owned outside the installation")?;
+        std::os::unix::fs::symlink(outside.path(), root.path().join("alias"))?;
+        let directory = super::Directory::open(root.path())?;
+        assert!(directory.remove("alias/journal.json").is_err());
+        assert_eq!(
+            std::fs::read_to_string(&victim)?,
+            "owned outside the installation"
+        );
+        directory.child("state", true)?;
+        directory.write("state/journal.json", Some(b"completed"))?;
+        directory.remove("state/journal.json")?;
+        assert!(!root.path().join("state/journal.json").exists());
+        Ok(())
     }
 }
