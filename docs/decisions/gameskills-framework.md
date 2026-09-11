@@ -1,8 +1,10 @@
 # GameSkills and GameKit: a companion to Bevy
 
 Status: direction and initial skill catalog approved, September 10, 2026.
-Foundation implementation is underway with up to five workers authorized. The
-documentation layout and playable-release scope remain future collaborative work.
+The foundation merged in [PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24),
+with up to five workers authorized. Bounded workflow trials and Rust migration
+sequencing are proposed next; the documentation layout and playable-release scope
+remain future collaborative work.
 See [current installation and runtime boundaries](../gameskills.md); this decision
 does not claim that the full refactor or a release is complete.
 
@@ -45,8 +47,9 @@ our internal refactor. See the deferred [Port Vila pilot](port-vila-adoption.md)
 
 | Stage | Work | Evidence needed to move on |
 |---|---|---|
-| 1. Working skills foundation | Redesign the core and optional offerings, migrate useful lessons, and adopt an installable pinned candidate in this repository | Real tasks in Codex and Claude demonstrate useful selection, correct execution, accurate evidence and complete delivery; installation and source ownership are explicit |
-| 1b. Rust CLI follow-up | Replace the initial Python helpers with independent Rust development tooling using the accepted contracts | Language-neutral behavior checks, native client invocation and an adopter update work without Python; see the [migration decision](gameskills-rust-cli.md) |
+| 1. Working skills foundation | Merged: core and optional offerings, support tooling and a pinned candidate adopted in this repository | Helper checks and Codex planning evidence exist; full delivery trials and Claude behavioral validation remain open |
+| 1a. Bounded workflow refinement (proposed) | CI scoping, one small docs cleanup and one shared UI change through the installed skills | Actual delivery and scoped checks; concrete workflow findings resolved; see the [trial and CI plan](gameskills-ci-scope.md) |
+| 1b. Rust CLI follow-up | Freeze the refined contracts and replace the initial Python helpers with independent Rust development tooling | Language-neutral behavior checks, native client invocation and an adopter update work without Python; see the [migration plan](gameskills-rust-cli.md) |
 | 2. Documentation refactor | Use those skills to inventory, reconcile and restructure the documentation | One maintained owner per topic; working links and references; current commands and status; historical decisions remain recoverable |
 | 3. GameKit and game refinement | Use the skills for bounded changes across Labyrinth and Deckbuilder | Both consumers retain their own rules and presentation; affected contracts and user paths are verified |
 | 4. Playable candidate and packaging | Complete the agreed Labyrinth play loop, develop Deckbuilder alongside it, and prepare reproducible game/library/skill artifacts | Fresh game builds can be installed and played; library and skills can be consumed from the actual candidate artifacts |
