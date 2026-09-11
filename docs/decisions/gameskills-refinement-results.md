@@ -1,9 +1,9 @@
 # GameSkills refinement observations
 
-Status: implementation, review and bounded native walkthrough observations,
-September 10, 2026. Human player feedback and the scrolling follow-up remain
-incomplete. This record does not
-declare the trials finished or authorize the Rust migration. The
+Status: the owner accepted the implementation and native walkthrough results,
+authorized merging the refinement stack and requested the Rust refactor plan on
+September 10, 2026. The bounded trials are accepted; the scrolling follow-up and
+client/platform release evidence remain open. The
 [refinement plan](gameskills-ci-scope.md) owns their scope.
 
 ## Delivery slices and observed behavior
@@ -129,11 +129,13 @@ focus restoration in both games, with no placement change when a preview locks.
 This is an open shared-renderer usability refinement before release acceptance;
 no implementation of that follow-up is claimed here.
 
-## Remaining acceptance
+## Owner acceptance and remaining release work
 
-Human feedback must establish whether the explanations and secondary Inspect
-controls are clear and useful. Current hosted CI results must match each PR's
-actual source/base before acceptance or an authorized merge. Native Claude
-behavior remains unverified because the foundation trial encountered HTTP 401;
-this work does not establish cross-client parity or a release. Resolve material
-trial findings before freezing contracts for the [Rust port](gameskills-rust-cli.md).
+The owner reviewed the reported work, said it looked good and authorized merging.
+This accepts the bounded refinement scope; it does not establish a broad player
+study or release readiness. Keep the scrolling correction as a separate UI task.
+Current hosted CI results must match each PR's actual source/base before merging.
+Native Claude behavior remains unverified because the foundation trial encountered
+HTTP 401; this work does not establish cross-client parity or a release. Carry the
+documented workflow lessons and client/platform limits into the
+[Rust migration](gameskills-rust-cli.md).
