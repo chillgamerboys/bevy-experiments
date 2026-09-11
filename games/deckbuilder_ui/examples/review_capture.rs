@@ -132,8 +132,14 @@ fn drive_capture(
     }
 
     let click = match (plan.route.as_str(), plan.frame) {
-        ("match", 3) => Some("Start Solo"),
+        ("match" | "help-energy" | "help-played" | "help-turn", 3) => Some("Start Solo"),
         ("match", 7) => Some("Card Spark"),
+        ("help-energy", 7) => Some("Inspect Comet"),
+        ("help-played", 7) => Some("Card Spark"),
+        ("help-played", 11) => Some("Play Selected"),
+        ("help-played", 15) => Some("Inspect Spark"),
+        ("help-turn", 7) => Some("End Turn"),
+        ("help-turn", 11) => Some("Inspect Ward"),
         ("multiplayer" | "host" | "browser", 3) => Some("Multiplayer"),
         ("host", 7) => Some("Host Session"),
         ("browser", 7) => Some("Find Sessions"),

@@ -62,6 +62,9 @@ cargo run -p deckbuilder_ui --example review_capture --profile ci -- \
 ```
 
 Use `200` for semantic scaling and `match`, `multiplayer`, `host` or `browser` for
-the route. Review all three supported viewport sizes at Auto/200%, then separately
+the route. `help-energy`, `help-played` and `help-turn` capture the corresponding
+card restriction through the existing production UI actions. These authored
+captures do not establish native keyboard/pointer interaction or hover timing.
+Review all three supported viewport sizes at Auto/200%, then separately
 walk keyboard/pointer, focus, modal, scrolling and resizing. Screenshots are not
 gameplay or interaction assertions.
