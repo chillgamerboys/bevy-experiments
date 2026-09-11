@@ -1862,6 +1862,13 @@
       "after": "Require typed version-one selection, reject unknown fields and recursive duplicate keys, preserve GitHub selection/boolean outputs, and emit versioned diagnostics. ci run streams child output before final JSON, uses literal argv and returns failure immediately on a child error.",
       "rationale": "Malformed selections, classifier failures and missing/cancelled/unexpectedly skipped jobs cannot produce a passing gate.",
       "evidence": "tools/gamekit-repo-tools/tests/ci_cli.rs; tests/ci_checks.rs::runner_stops_at_first_failed_child_and_reports_its_position; tests/ci_cli.rs::actual_cargo_child_failure_streams_logs_and_stops_the_job"
+    },
+    {
+      "id": "r2b-windows-controller-isolation",
+      "before": "Running the CI controller from the workspace CI target locks its executable on Windows; workspace tests can need to replace it after feature unification.",
+      "after": "CI bootstraps its controller in target/ci-controller while child commands retain their ordinary workspace target and cache. Local Cargo invocation documentation uses that same separate directory.",
+      "rationale": "Retain Windows checks and ordinary Cargo artifact reuse without replacing the running executable.",
+      "evidence": "tools/gamekit-repo-tools/tests/ci_cli.rs::isolated_controller_allows_cargo_to_rebuild_the_tested_binary; initial Windows CI run 34612173371 established the collision."
     }
   ]
 }

@@ -90,7 +90,10 @@ Literal `include!`, `include_str!` and `include_bytes!` calls are tokenized as R
 including raw/escaped strings, raw identifiers, comments, whitespace and all three
 delimiters.
 Uncertain glob/path/manifest inputs select the full suite. `ci run skills|rust|policy`
-reads `CI_SELECTION`, requires matching checkout HEAD, streams ordered child logs
+reads `CI_SELECTION`. Build that controller with `--target-dir target/ci-controller`
+as the workflow does; its Cargo children retain the ordinary target directory,
+so Windows can rebuild the tested binary without replacing a running executable.
+It requires matching checkout HEAD, streams ordered child logs
 and stops on the first failure. Its final line is versioned JSON; for local skill
 runs use `--python python3` if the interpreter is not named `python`. `ci gate` reads
 `CI_SELECTION` and `CI_NEEDS`; malformed/duplicate JSON and missing results fail.

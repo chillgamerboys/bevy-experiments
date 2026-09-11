@@ -62,7 +62,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: repository-validation
-      - run: cargo run --locked -p gamekit-repo-tools --profile ci -- ci run skills
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run skills
 
   rust:
     needs: classify
@@ -94,7 +94,7 @@ jobs:
       - name: Verify the repository tool Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
         run: cargo package --locked -p gamekit-repo-tools
-      - run: cargo run --locked -p gamekit-repo-tools --profile ci -- ci run rust
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run rust
 
   policy:
     needs: classify
@@ -111,7 +111,7 @@ jobs:
       - name: Install Linux window-system dependencies
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
-      - run: cargo run --locked -p gamekit-repo-tools --profile ci -- ci run policy
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run policy
 
   ci:
     if: always()

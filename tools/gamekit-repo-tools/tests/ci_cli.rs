@@ -435,3 +435,74 @@ fn actual_cargo_child_failure_streams_logs_and_stops_the_job() {
         .and_then(Value::as_str)
         .is_some_and(|message| message.contains("rust command 1")));
 }
+
+#[test]
+fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
+    let repo = Repo::new();
+    let root = repo.directory.path();
+    // Integration tests make Cargo build the same named executable that the CI
+    // controller is running. Windows rejects replacement if both use one target.
+    std::fs::write(root.join("crates/core/src/main.rs"), "fn main() {}\n").expect("fixture binary");
+    std::fs::write(root.join("crates/core/Cargo.toml"),
+        "[package]\nname = 'core'\nversion = '0.1.0'\n[[bin]]\nname = 'gamekit-repo'\npath = 'src/main.rs'\n").expect("binary manifest");
+    std::fs::create_dir(root.join("crates/core/tests")).expect("integration test directory");
+    std::fs::write(root.join("crates/core/tests/binary.rs"),
+        "#[test] fn compiled_binary_runs() { assert!(std::process::Command::new(env!(\"CARGO_BIN_EXE_gamekit-repo\")).status().expect(\"compiled binary\").success()); }\n").expect("binary consumer");
+    git(root, &["add", "."]);
+    git(root, &["commit", "--quiet", "-m", "binary regression"]);
+    let mut selection = repo.selection();
+    selection.full = false;
+    selection.packages = vec!["core".into()];
+    selection.distribution = false;
+    selection.rust = true;
+    let controller = root
+        .join("target/ci-controller/ci")
+        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX));
+    std::fs::create_dir_all(controller.parent().expect("controller parent"))
+        .expect("controller directory");
+    let original = std::fs::read(env!("CARGO_BIN_EXE_gamekit-repo")).expect("controller source");
+    std::fs::copy(env!("CARGO_BIN_EXE_gamekit-repo"), &controller).expect("isolated controller");
+    let cargo = std::env::var_os("CARGO").expect("Cargo executable");
+    let mut paths = vec![Path::new(&cargo)
+        .parent()
+        .expect("Cargo parent")
+        .to_path_buf()];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    let mut command = Command::new(&controller);
+    command
+        .arg("--root")
+        .arg(root)
+        .args(["ci", "run", "rust"])
+        .current_dir(std::env::temp_dir())
+        .env(
+            "CI_SELECTION",
+            serde_json::to_string(&selection).expect("selection"),
+        )
+        .env("PATH", std::env::join_paths(paths).expect("test PATH"))
+        .env("CARGO_TARGET_DIR", root.join("target"))
+        .env("CARGO_NET_OFFLINE", "true")
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS");
+    let output = command.output().expect("run isolated controller");
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout");
+    assert!(stdout.contains("compiled_binary_runs"), "{stdout}");
+    let result: Value =
+        serde_json::from_str(stdout.lines().last().expect("final line")).expect("final result");
+    assert_eq!(result.get("commands_completed"), Some(&json!(2)));
+    assert_eq!(
+        std::fs::read(controller).expect("preserved controller"),
+        original
+    );
+    assert!(root
+        .join("target/ci")
+        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX))
+        .is_file());
+}

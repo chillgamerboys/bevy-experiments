@@ -52,6 +52,17 @@ Rust literal includes, and writes the GitHub outputs/step summary when configure
 entrypoints are full-suite inputs; narrative docs and isolated game changes retain
 their scoped routing.
 
+Build the controller separately from the Cargo commands it launches:
+
+```sh
+cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run rust
+```
+
+The workflow uses this separate directory for every `ci run` job. Its children
+retain the ordinary workspace target directory and caches. This avoids Windows
+locking the running controller when workspace tests rebuild that same binary;
+an installed controller outside the workspace target also works.
+
 `ci run skills|rust|policy` reads `CI_SELECTION`, checks the current HEAD and runs
 ordered literal argument vectors, stopping at the first failed child. Python is
 used only for the remaining skill runtime tests; `--python python3` selects an
