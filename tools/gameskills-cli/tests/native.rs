@@ -102,7 +102,9 @@ mod posix {
             activate_codex(&self.bundle, &self.root, &self.executable, timeout)
         }
         fn dead(&self) -> Result {
-            let pid: i32 = fs::read_to_string(self.root.join("pid"))?.parse()?;
+            let pid: i32 = fs::read_to_string(self.root.join("pid"))?
+                .parse()
+                .map_err(|error| format!("invalid peer PID observation: {error}"))?;
             assert!(nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_err());
             Ok(())
         }
@@ -435,7 +437,9 @@ mod posix {
             fs::read_to_string(fixture.root.join("stopped-draining"))?,
             "true"
         );
-        let sent: u64 = fs::read_to_string(fixture.root.join("response-count"))?.parse()?;
+        let sent: u64 = fs::read_to_string(fixture.root.join("response-count"))?
+            .parse()
+            .map_err(|error| format!("invalid response count observation: {error}"))?;
         assert!(
             sent >= 4,
             "probe did not exercise repeated incomplete discovery"

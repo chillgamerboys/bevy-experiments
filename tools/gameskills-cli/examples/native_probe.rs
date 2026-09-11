@@ -3,10 +3,19 @@ use serde_json::{json, Value};
 use std::{
     fs,
     io::{BufRead, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     time::Duration,
 };
+
+fn observation(root: &Path, name: &str, value: impl AsRef<[u8]>) -> std::io::Result<()> {
+    // The supervisor can kill this peer at any instruction. Readers must see
+    // the previous complete observation or the new one, never a truncated file.
+    let next = root.join(format!("{name}.next"));
+    fs::write(&next, value)?;
+    fs::rename(next, root.join(name))
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args();
     while let Some(arg) = args.next() {
@@ -24,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("probe directory")?
         .to_owned();
     let scenario: Value = serde_json::from_slice(&fs::read(root.join("scenario.json"))?)?;
-    fs::write(root.join("pid"), std::process::id().to_string())?;
+    observation(&root, "pid", std::process::id().to_string())?;
     let mode = scenario
         .get("mode")
         .and_then(Value::as_str)
@@ -92,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let child = Command::new(std::env::current_exe()?)
                         .arg("--hold-stdout")
                         .spawn()?;
-                    fs::write(root.join("child-pid"), child.id().to_string())?;
+                    observation(&root, "child-pid", child.id().to_string())?;
                     std::process::exit(0);
                 }
                 seen += 1;
@@ -121,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 signal_hook::consts::SIGPIPE,
                 std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
             )?;
-            fs::write(root.join("stopped-draining"), "true")?;
+            observation(&root, "stopped-draining", "true")?;
             let mut next = id.as_u64().ok_or("request id")? + 1;
             loop {
                 let result = json!({"data":[{"cwd":request.pointer("/params/cwds/0"),"skills":[],"errors":[]}]});
@@ -131,11 +140,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Even if the bounded response reader closes its pipe, keep
                     // stdin open and undrained. Cleanup must not depend on the
                     // peer exiting cooperatively after a broken stdout pipe.
-                    fs::write(root.join("output-closed"), "true")?;
+                    observation(&root, "output-closed", "true")?;
                     std::thread::sleep(Duration::from_secs(60));
                     return Ok(());
                 }
-                fs::write(root.join("response-count"), (next - 1).to_string())?;
+                observation(&root, "response-count", (next - 1).to_string())?;
                 next += 1;
                 std::thread::sleep(Duration::from_millis(100));
             }
