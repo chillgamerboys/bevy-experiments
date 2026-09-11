@@ -1,7 +1,8 @@
 # GameSkills refinement observations
 
-Status: implementation and review observations, September 10, 2026. Native game
-walkthroughs and human player feedback remain incomplete. This record does not
+Status: implementation, review and bounded native walkthrough observations,
+September 10, 2026. Human player feedback and the scrolling follow-up remain
+incomplete. This record does not
 declare the trials finished or authorize the Rust migration. The
 [refinement plan](gameskills-ci-scope.md) owns their scope.
 
@@ -11,7 +12,7 @@ declare the trials finished or authorize the Rust migration. The
 |---|---|---|
 | [CI scope, PR26](https://github.com/chillgamerboys/bevy-experiments/pull/26) | Component selection, reverse consumers, conservative unknown-input fallback and a stable final gate | 35 real-Git/routing/gate tests pass. Independent review found three edge cases and verified their fixes at `d61addbba23bcb300c983b7f9ce1c755030a079f`; hosted PR checks own platform/integration status. |
 | [Documentation entry points, PR27](https://github.com/chillgamerboys/bevy-experiments/pull/27) | Current workflow/direction is separate from resolved historical findings | Local links/layout pass. Hosted docs-only runs pass while deliberately skipping skills, Rust and policy jobs. |
-| [Card inspection, PR28](https://github.com/chillgamerboys/bevy-experiments/pull/28) | Accurate unavailable-card reasons and separate keyboard inspection using existing GameKit mechanics | 37 Deckbuilder tests and scoped strict Clippy pass at worker source `ed02353a1186e802694897d82f6c51c150c99a8d`. Authored restriction captures exist at `fb83817a26a74aaee09b0a447e415413eb8c60c9`; native walks remain pending. |
+| [Card inspection, PR28](https://github.com/chillgamerboys/bevy-experiments/pull/28) | Accurate unavailable-card reasons and separate keyboard inspection using existing GameKit mechanics | 37 Deckbuilder tests and scoped strict Clippy pass at worker source `ed02353a1186e802694897d82f6c51c150c99a8d`. Authored restriction captures exist at `fb83817a26a74aaee09b0a447e415413eb8c60c9`; the bounded native walk below passes. |
 | [Shared tooltip close mark, PR29](https://github.com/chillgamerboys/bevy-experiments/pull/29) | An ordinary ASCII close mark renders with both default and game-owned fonts | Rendered Deckbuilder and Labyrinth captures at `e76197c` show the corrected mark. Shared UI tests pass (47 unit tests and one doctest). This is a small correction discovered during the UI trial, not another feature trial. |
 
 The close-mark captures are `target/review/deckbuilder-close-fixed-1280.png` and
@@ -80,15 +81,55 @@ changes and runner/cache states, not a controlled benchmark, billing estimate or
 promise about future timings. The concrete improvement is the removal of
 unrelated execution from the docs path.
 
-## Remaining acceptance
+## Native walkthrough after unlocking
 
-The native UI tool reported a locked Mac and could not unlock it automatically.
-The owner was asked to unlock it; no native walkthrough is claimed. Resume with
-Deckbuilder's energy, played and off-turn explanations; Tab/Enter inspection,
-T/Escape, modal return, pointer dismissal, scrolling and resizing. Exercise the
-corresponding Labyrinth inspection/confirmation paths using the corrected shared
-renderer. Retain applicable automated scale regressions and the accepted normal-
-scale manual priority.
+The owner unlocked the Mac, and native app control succeeded. Both executables
+were rebuilt from `30d8706cfeecc49da7d9295009bab90077cb52b4` using
+`cargo build -p deckbuilder_ui -p labyrinth --bins --profile ci`. Local app bundles
+under `target/review` contain these binaries. Labyrinth used `--local --seed 42`
+with an isolated `refinement` profile and data directory under local review output.
+The following observations came from actual pointer/keyboard actions, accessibility
+state and window screenshots, independently of the earlier authored captures.
+
+- **Deckbuilder:** started Solo; Comet explained insufficient energy at both 3
+  and 2 energy. Playing Spark reduced energy and added one activity entry; its
+  Inspect control then explained that it had already been played. After End Turn,
+  Ward and Comet explained the off-turn restriction. Tab/Enter reached and opened
+  an unavailable card's Inspect control. T focused the tooltip close control;
+  Escape dismissed help and restored inspection focus. Pointer close also worked.
+  The game menu cleared card help, contained Tab navigation and prevented T from
+  opening background help. Native resizing switched to the stacked layout while
+  keeping explanations and bottom actions visible.
+- **Labyrinth:** Snap Shot help and nested Formation ranks help were readable,
+  with visible close marks. Escape removed the child first, then the parent and
+  restored ability focus. With no target, clicking Confirm and pressing T showed
+  the missing-target explanation without advancing combat. After selecting E5,
+  inspecting the acting hero, Current conditions, Bleed and Condition timing
+  preserved Snap Shot, the selected enemy and its 14-to-10 HP preview. Dismissing
+  all help preserved that choice; explicitly clicking Confirm applied the four
+  damage and advanced to the next hero. Smaller-window scrolling reached the
+  final lines of Condition timing, exposing the follow-up below.
+
+Local native screenshots are `target/review/deckbuilder-native-off-turn-resized.png`,
+`target/review/labyrinth-native-scrolled-help.png` and
+`target/review/labyrinth-native-confirmed-action.png`. They remain local artifacts.
+This is a bounded walkthrough, not exhaustive native scale/hover coverage,
+network verification, screen-reader acceptance or human player feedback.
+
+### Follow-up found by native scrolling
+
+In the shortened Labyrinth window, scrolling Condition timing to its final lines
+also scrolled its heading and close control out of view. Scrolling back restored
+them, and Escape remained available. The renderer currently scrolls the entire
+card, including the heading; the behavior is not a new close-glyph regression.
+
+Keep the heading and close control visible while scrolling the body, facts and
+related links. Verify native wheel and keyboard scrolling, nested dismissal and
+focus restoration in both games, with no placement change when a preview locks.
+This is an open shared-renderer usability refinement before release acceptance;
+no implementation of that follow-up is claimed here.
+
+## Remaining acceptance
 
 Human feedback must establish whether the explanations and secondary Inspect
 controls are clear and useful. Current hosted CI results must match each PR's
