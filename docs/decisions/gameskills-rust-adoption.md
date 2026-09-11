@@ -11,10 +11,10 @@ This record describes private adoption, not publication.
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Final packaged implementation | `558061d14fca113b0bd2addfea9983643905d876` |
+| Final packaged implementation | `dc472ca03e96b1b01ce642cc54c4379a0a39543e` |
 | Local prebuilt target | `aarch64-apple-darwin` |
 | CLI executable SHA-256 | `ded6b5a676ed500807a3f91284afd9e010b3b1613f359a7dfe96bb8a8b5f863a` |
-| Actual Cargo archive SHA-256 | `5fe02ca67e9cd5dc20105ea04861e7a0c3b42b45ddb0284bfcf0eb92d94340e1` |
+| Actual Cargo archive SHA-256 | `bbe46bc6cc349b14b465d2963938119712e8a5675d5a2b15abfe1e272bfe9138` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -60,6 +60,15 @@ three new regressions for update/rollback/recovery, malformed names and unsafe f
 Strict all-target Clippy passed on macOS and for Linux/Windows cross-compilation.
 The actual Cargo archive was rebuilt, installed externally without Python, and
 passed packaged adoption plus the standalone Rust residue probe.
+
+The final `dc472ca` archive also corrects an installation test-harness race observed
+on hosted macOS: in-process locks could briefly be inherited by other tests between
+fork and exec. Installation test operations now use actual CLI processes, matching
+the production lock lifecycle. All 25 installation tests passed five consecutive
+runs, the recovery exclusion test passed, and strict all-target Clippy passed on
+macOS and for Linux/Windows cross-compilation. The archive was rebuilt and externally
+installed again; packaged adoption passed. Its executable is byte-identical to the
+corrected `558061d` candidate because this follow-up changes only tests.
 
 ## Observed checks
 
