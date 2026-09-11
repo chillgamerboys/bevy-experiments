@@ -116,6 +116,10 @@ Distribute the facade and capability packages, plus the canonical skill pack und
 one pinned release tag. Exclude `games/`, game assets and game fixtures. No repository
 split is required. A source archive and a private registry release have different
 requirements; select the channel explicitly before preparing the first release.
+The [distribution proposal](extraction.md) carries this private candidate forward
+into eventual crates.io libraries/CLI and GitHub binary/bundle releases. It defines
+artifact verification and separate runtime/bundle compatibility during the Rust
+migration; public publication remains a later release decision.
 
 Acceptance: library-only builds/tests; reviewed package contents and licensing;
 versioned internal dependencies suitable for the chosen channel; documented feature

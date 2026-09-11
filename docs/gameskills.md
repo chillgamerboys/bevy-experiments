@@ -6,11 +6,13 @@ runner. It precedes the broad documentation/game refactors and the first playabl
 release. The [catalog](decisions/gameskills-catalog.md) owns workflow boundaries;
 this document owns installation and implementation limits.
 
-Python is the initial tooling implementation. The owner requested a
-[Rust CLI migration](decisions/gameskills-rust-cli.md); the foundation has now
-merged. The proposed next step is [bounded workflow trials and CI
-scoping](decisions/gameskills-ci-scope.md) before freezing the migration contracts.
-The skill instructions remain Markdown and GameKit remains Rust throughout.
+Python is the current tooling implementation. The foundation and
+[bounded refinement trials](decisions/gameskills-refinement-results.md) have merged.
+The next work is the [repository-wide Rust migration](decisions/gameskills-rust-cli.md),
+starting with contract capture and two tool packages. That plan also covers CI,
+tests and installable distribution. The commands below describe the current Python
+candidate until their Rust replacements are implemented and verified. Skill
+instructions remain Markdown and GameKit remains Rust throughout.
 
 ## Install a pinned candidate
 

@@ -3,13 +3,14 @@
 Start with [GameSkills](gameskills.md) for the installed workflow and its current
 limits, then [development](development.md) and [testing](testing.md) for commands.
 The [framework decision](decisions/gameskills-framework.md) owns project direction;
-the [refinement plan](decisions/gameskills-ci-scope.md) owns the current bounded
-trials before Rust migration. Game-specific behavior belongs with each game below.
+the [Rust migration plan](decisions/gameskills-rust-cli.md) owns the implementation
+sequence, first PR and acceptance checks after the accepted bounded trials.
+Game-specific behavior belongs with each game below.
 
 - [GameSkills installation and development workflow](gameskills.md)
-- [Proposed CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
-- [Refinement observations and remaining acceptance](decisions/gameskills-refinement-results.md)
-- [Rust GameSkills CLI migration plan](decisions/gameskills-rust-cli.md)
+- [Implemented CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
+- [Accepted refinement observations and follow-ups](decisions/gameskills-refinement-results.md)
+- [Repository-wide Rust tooling migration plan](decisions/gameskills-rust-cli.md)
 - [GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
 - [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)
@@ -20,7 +21,7 @@ trials before Rust migration. Game-specific behavior belongs with each game belo
 - [Run, build and add a game](development.md)
 - [Testing and evidence](testing.md)
 - [Multiplayer operations and diagnostics](multiplayer.md)
-- [Library distribution and optional future extraction](extraction.md)
+- [GameKit and GameSkills distribution proposal](extraction.md)
 - [Canonical skill pack](../skills/README.md)
 - [Focused-workspace decision and recovery baseline](decisions/0001-focused-workspace.md)
 

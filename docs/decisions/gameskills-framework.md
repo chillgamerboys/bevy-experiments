@@ -2,9 +2,9 @@
 
 Status: direction and initial skill catalog approved, September 10, 2026.
 The foundation merged in [PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24),
-with up to five workers authorized. The accepted bounded workflow trials are
-underway before Rust migration; the documentation layout and playable-release scope
-remain future collaborative work.
+with up to five workers authorized. The owner accepted the bounded workflow trials
+and requested the repository-wide Rust tooling plan. Its implementation, the full
+documentation layout and playable-release scope remain future collaborative work.
 See [current installation and runtime boundaries](../gameskills.md); this decision
 does not claim that the full refactor or a release is complete.
 
@@ -47,9 +47,9 @@ our internal refactor. See the deferred [Port Vila pilot](port-vila-adoption.md)
 
 | Stage | Work | Evidence needed to move on |
 |---|---|---|
-| 1. Working skills foundation | Merged: core and optional offerings, support tooling and a pinned candidate adopted in this repository | Helper checks and Codex planning evidence exist; full delivery trials and Claude behavioral validation remain open |
-| 1a. Bounded workflow refinement (in progress) | CI scoping, one small docs cleanup and a UI inspection change through the installed skills | Actual delivery and scoped checks; concrete findings resolved; see the [trial plan](gameskills-ci-scope.md) and [observations/remaining acceptance](gameskills-refinement-results.md) |
-| 1b. Rust CLI follow-up | Freeze the refined contracts and replace the initial Python helpers with independent Rust development tooling | Language-neutral behavior checks, native client invocation and an adopter update work without Python; see the [migration plan](gameskills-rust-cli.md) |
+| 1. Working skills foundation | Merged: core and optional offerings, support tooling and a pinned candidate adopted in this repository | Helper checks and Codex planning evidence exist; the accepted delivery trials are recorded below; Claude behavioral validation remains open |
+| 1a. Bounded workflow refinement (accepted) | CI scoping, one small docs cleanup and a UI inspection change through the installed skills | Scoped CI, reviewed corrections, native walks and owner acceptance; the [observations](gameskills-refinement-results.md) retain a separate tooltip scrolling follow-up and client/platform limits |
+| 1b. Repository-wide Rust migration (planned) | Freeze the refined contracts; replace the CLI, validators, CI routing, distribution checks, legacy helpers and tests with Rust | No maintained Python implementation or interpreter requirement; fresh-consumer and real process evidence; see the [migration plan](gameskills-rust-cli.md) |
 | 2. Documentation refactor | Use those skills to inventory, reconcile and restructure the documentation | One maintained owner per topic; working links and references; current commands and status; historical decisions remain recoverable |
 | 3. GameKit and game refinement | Use the skills for bounded changes across Labyrinth and Deckbuilder | Both consumers retain their own rules and presentation; affected contracts and user paths are verified |
 | 4. Playable candidate and packaging | Complete the agreed Labyrinth play loop, develop Deckbuilder alongside it, and prepare reproducible game/library/skill artifacts | Fresh game builds can be installed and played; library and skills can be consumed from the actual candidate artifacts |

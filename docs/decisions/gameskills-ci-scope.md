@@ -1,11 +1,13 @@
-# Proposed CI scope and bounded GameSkills trials
+# Implemented CI scope and bounded GameSkills trials
 
 Status: refinement sequence accepted after the foundation merged in
 [PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24). CI routing is
-implemented in [scripts/ci.py](../../scripts/ci.py); trial evaluation and delivery
-are in progress. [Testing guidance](../testing.md#ci-selection) owns current
-commands. The rationale and acceptance criteria below guide the bounded trials
-before the [Rust CLI migration](gameskills-rust-cli.md).
+implemented in [scripts/ci.py](../../scripts/ci.py); the owner accepted the trial
+results and authorized their merge on September 10, 2026.
+[Testing guidance](../testing.md#ci-selection) owns current commands. The rationale
+and acceptance criteria below guide the bounded trials
+before the [repository-wide Rust tooling migration](gameskills-rust-cli.md), which
+will also replace the current Python classifier and repository checks.
 
 ## Problem and intended result
 
