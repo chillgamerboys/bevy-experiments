@@ -885,6 +885,119 @@ mod unix {
         Ok(())
     }
     #[test]
+    fn hard_killed_supervisor_leaves_leader_holding_active_and_resource_locks() -> Test {
+        use nix::{
+            errno::Errno,
+            sys::signal::{kill, killpg, Signal},
+            unistd::Pid,
+        };
+        use rustix::fs::{flock, FlockOperation::NonBlockingLockExclusive};
+        use sha2::{Digest, Sha256};
+        struct GroupGuard(Option<Pid>);
+        impl GroupGuard {
+            fn terminate(&mut self) -> Test {
+                if let Some(pid) = self.0 {
+                    match killpg(pid, Signal::SIGKILL) {
+                        Ok(()) | Err(Errno::ESRCH) => self.0 = None,
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+                Ok(())
+            }
+        }
+        impl Drop for GroupGuard {
+            fn drop(&mut self) {
+                let _ = self.terminate();
+            }
+        }
+        let mut f = Fixture::new()?;
+        let ready = f.root.join(".gameskills/lock-holder");
+        let resource = format!("test:{}", f.root.display());
+        f.command(
+            "hold",
+            &["hold-locks", ready.to_str().ok_or("path")?],
+            json!({"resources":[resource]}),
+        )?;
+        f.command(
+            "compete",
+            &["echo", "must not overlap"],
+            json!({"resources":[resource]}),
+        )?;
+        let mut coordinator = f.launch("run", &["hold"])?;
+        f.ready(&ready)?;
+        let pids: Value = serde_json::from_slice(&fs::read(&ready)?)?;
+        let pid = |name: &str| -> Result<Pid, Box<dyn Error>> {
+            Ok(Pid::from_raw(i32::try_from(
+                pids.get(name)
+                    .and_then(Value::as_u64)
+                    .ok_or("missing pid")?,
+            )?))
+        };
+        let leader = pid("leader")?;
+        let mut leader_guard = GroupGuard(Some(leader));
+        kill(pid("supervisor")?, Signal::SIGKILL)?;
+        let (code, result) = coordinator.collect()?;
+        assert_eq!(code, 1, "{result}");
+        assert_eq!(status(&result, "hold"), Some("error"), "{result}");
+        assert!(result
+            .pointer("/results/hold/error")
+            .and_then(Value::as_str)
+            .is_some_and(|error| error.contains("supervisor failed")));
+        kill(leader, None)?;
+        let id = f.id(&result)?;
+        let before = fs::read(f.record(id))?;
+        assert_eq!(
+            f.evidence(id, "show")?.pointer("/record/status"),
+            Some(&json!("failed"))
+        );
+        assert!(!ok(&f.evidence(id, "validate")?));
+        let active = fs::File::open(f.record(id).with_file_name("active.lock"))?;
+        let resource_path = PathBuf::from("/tmp")
+            .canonicalize()?
+            .join(format!(
+                "gameskills-resources-{}",
+                rustix::process::getuid().as_raw()
+            ))
+            .join(format!(
+                "{:x}.lock",
+                Sha256::digest(serde_json::to_vec(&json!(["global", resource]))?)
+            ));
+        let resource_lock = fs::File::open(resource_path)?;
+        for lock in [&active, &resource_lock] {
+            assert_eq!(
+                flock(lock, NonBlockingLockExclusive),
+                Err(rustix::io::Errno::WOULDBLOCK),
+                "surviving command must retain each lock after both owners exit"
+            );
+        }
+        let setup = gameskills_cli::installation::execute(&f.root, "setup", &["--apply".into()]);
+        assert!(setup.err().is_some_and(|error| error.contains("active")));
+        let (resume_code, resume) = f.invoke("run", &["hold", "--resume", id])?;
+        assert_eq!(resume_code, 2, "{resume}");
+        assert!(resume.to_string().contains("active"), "{resume}");
+        let competitor = f.run(&["compete", "--resource-wait-seconds", "0"])?;
+        assert_eq!(status(&competitor, "compete"), Some("skipped"));
+        assert!(!ok(&competitor));
+        kill(leader, None)?;
+        leader_guard.terminate()?;
+        let deadline = Instant::now() + Duration::from_secs(4);
+        for lock in [&active, &resource_lock] {
+            loop {
+                match flock(lock, NonBlockingLockExclusive) {
+                    Ok(()) => break,
+                    Err(rustix::io::Errno::WOULDBLOCK) if Instant::now() < deadline => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+            }
+        }
+        drop((active, resource_lock));
+        assert!(ok(&f.run(&["compete", "--resource-wait-seconds", "0"])?));
+        assert_eq!(fs::read(f.record(id))?, before);
+        Ok(())
+    }
+    #[test]
     fn resource_initialization_failure_preserves_a_failed_record() -> Test {
         use sha2::{Digest, Sha256};
         let mut f = Fixture::new()?;

@@ -103,6 +103,19 @@ fn run() -> Result<Value, String> {
             ));
             std::fs::write(arg(0)?, "escaped").map_err(|e| e.to_string())?;
         }
+        #[cfg(unix)]
+        "hold-locks" => {
+            let ready = Path::new(arg(0)?);
+            let pending = ready.with_extension("pending");
+            let pids = json!({
+                "leader": std::process::id(),
+                "supervisor": nix::unistd::getppid().as_raw(),
+            });
+            std::fs::write(&pending, pids.to_string()).map_err(|e| e.to_string())?;
+            std::fs::rename(pending, ready).map_err(|e| e.to_string())?;
+            writeln!(io::stdout().lock(), "retaining locks").map_err(|e| e.to_string())?;
+            std::thread::sleep(Duration::from_secs(20));
+        }
         "spawn" => {
             let first = !Path::new(arg(0)?).exists();
             let mut child = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
