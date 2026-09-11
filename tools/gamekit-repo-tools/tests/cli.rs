@@ -83,7 +83,7 @@ fn catalog_json_preserves_counts_and_structural_limitations_on_failure() {
 }
 
 #[test]
-fn malformed_arguments_and_unported_ci_fail_explicitly() {
+fn malformed_arguments_and_unavailable_ci_inputs_fail_explicitly() {
     let temporary = tempfile::tempdir().expect("fixture");
     for command in [
         vec!["skills"],

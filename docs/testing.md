@@ -1,6 +1,7 @@
 # Tests and evidence
 
-From the repository root, with Python 3.11 or newer for the standard-library tools:
+From the repository root, with Rust 1.97.1 and Python 3.11 or newer for the
+remaining GameSkills runtime tests:
 
 ```sh
 cargo fmt --all -- --check
@@ -10,7 +11,7 @@ cargo clippy --workspace --all-targets --all-features --profile ci -- -D warning
 cargo deny check
 cargo run --locked -p gamekit-repo-tools --profile ci -- check
 cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
-python3 -m unittest discover -s scripts/tests -v
+cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
 python3 -m unittest discover -s skills/tests -v
@@ -36,26 +37,31 @@ it does not mark those behaviors ported or verified. The fixture suite includes
 test children. Cargo packaging builds the extracted CLI source; public installation,
 complete embedded skills and runner support are separate later gates. The existing
 Python tests remain required for owners not yet ported. R2a replaces the repository,
-distribution and catalog test modules with Rust regressions; the CI router, legacy
-installer and pinned runtime tests remain Python until their respective cutovers.
+distribution and catalog test modules with Rust regressions. R2b replaces the CI
+router and its tests; the legacy installer and pinned runtime tests remain Python
+until their respective cutovers.
 
 ## CI selection
 
 [The workflow](../.github/workflows/gamekit.yml) always checks repository layout,
 local links and the routing regressions, then selects component jobs through
-[scripts/ci.py](../scripts/ci.py). Narrative docs avoid Rust and skill-runtime
+[`gamekit-repo ci`](../tools/gamekit-repo-tools/src/ci/mod.rs). Narrative docs avoid Rust and skill-runtime
 jobs; skill instructions receive the skill matrix with Rust structural validators
 and the remaining Python runtime tests; a game edit
 receives its package tests and Clippy. Shared libraries also select their reverse
 consumers and applicable distribution, minimal-feature and browser-core checks.
-Selected Rust and skill jobs retain macOS/Linux/Windows coverage. Python repository
-tool tests also run on those platforms with the skills job when tooling changes.
-Rust tool packages receive their focused Cargo checks. Repository-tool implementation
-changes also select skill validation and external consumer checks without selecting
-unrelated game tests. Reference verification and Cargo packaging run only when their
+Selected Rust and skill jobs retain macOS/Linux/Windows coverage. The Rust routing,
+command and gate regressions also run on those platforms with the skills job when
+tooling changes.
+Rust tool packages receive their focused Cargo checks. Repository validator implementation
+changes also select skill validation and external consumer checks. CI implementation,
+its tests, and its shared library/CLI/input entrypoints select the full suite. Reference verification and Cargo packaging run only when their
 respective tool package is selected or the full suite is required. All use the same
 pinned toolchain as game builds. The always-run layout check bootstraps only the small
-repository-tool package; a Rust bootstrap failure fails classification and the final gate.
+repository-tool package. The final gate independently builds that same checked-out
+Rust package with the locked dependencies and pinned toolchain; a bootstrap failure
+fails its job, with no older binary or successful fallback. Python setup belongs
+only to the skill matrix for the remaining runtime tests.
 
 The selector reads committed base and tested-tree manifests, including normal,
 development, build and target-specific local dependencies. PR checks compare the
@@ -75,11 +81,27 @@ inside its networking/UI source are deferred until their inputs are mapped.
 To inspect selection locally, supply full committed object IDs:
 
 ```sh
-python3 scripts/ci.py select --base BASE_COMMIT --head HEAD_COMMIT
-python3 scripts/ci.py select --full
+cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --base BASE_COMMIT --head HEAD_COMMIT
+cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --full
 ```
 
 Selection reads committed objects, not uncommitted edits, and runs no game checks.
+Literal `include!`, `include_str!` and `include_bytes!` calls are tokenized as Rust,
+including raw/escaped strings, raw identifiers, comments, whitespace and all three
+delimiters.
+Uncertain glob/path/manifest inputs select the full suite. `ci run skills|rust|policy`
+reads `CI_SELECTION`. Build that controller with `--target-dir target/ci-controller`
+as the workflow does; its Cargo children retain the ordinary target directory,
+so Windows can rebuild the tested binary without replacing a running executable.
+It requires matching checkout HEAD, streams ordered child logs
+and stops on the first failure. Its final line is versioned JSON; for local skill
+runs use `--python python3` if the interpreter is not named `python`. `ci gate` reads
+`CI_SELECTION` and `CI_NEEDS`; malformed/duplicate JSON and missing results fail.
+
+Hosted classification runs real-Git docs-only, tools-only, game-only and shared-input
+fixtures plus executable GitHub-output/final-gate regressions. These verify routing
+and protocol behavior on a runner; observing job skips for a particular PR requires
+that PR’s actual workflow result, not just a passing fixture.
 Structural skill tests do not replace bounded native/model evaluations of changed
 guidance; those remain separately recorded acceptance evidence.
 

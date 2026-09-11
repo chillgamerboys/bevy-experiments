@@ -1,7 +1,7 @@
 //! Repository maintenance executable entrypoint.
 
 use clap::{Parser, Subcommand};
-use gamekit_repo_tools::{catalog, distribution, legacy, repository};
+use gamekit_repo_tools::{catalog, ci, distribution, legacy, repository};
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -39,10 +39,10 @@ enum Operation {
         #[command(subcommand)]
         command: DistributionOperation,
     },
-    /// CI selection and gating (not yet ported).
+    /// Select committed CI inputs, run selected checks and audit final job results.
     Ci {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<std::ffi::OsString>,
+        #[command(subcommand)]
+        command: ci::driver::Operation,
     },
 }
 
@@ -142,10 +142,13 @@ fn execute() -> (u8, String) {
             }
             (0, json!({"schema_version": 1, "ok": true, "scope": "migration_accounting", "source_files": 22, "test_methods": 142, "reference_commit": gamekit_repo_tools::contracts::REFERENCE, "reference_verified": verify_reference, "ports_verified": false}).to_string())
         }
-        _ => failure(
-            "not_implemented",
-            "this repository command has not been ported; retain the current configured check",
-        ),
+        Operation::Ci { command } => {
+            let status = if matches!(command, ci::driver::Operation::Select { .. }) { 2 } else { 1 };
+            match ci::driver::execute(&args.root, command) {
+                Ok(value) => (0, value.to_string()),
+                Err(error) => (status, json!({"schema_version":1,"ok":false,"error":{"code":"ci_failed","message":error}}).to_string()),
+            }
+        },
     }
 }
 

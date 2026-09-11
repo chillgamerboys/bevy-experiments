@@ -76,11 +76,11 @@
     },
     {
       "source": "scripts/ci.py",
-      "destination": "tools/gamekit-repo-tools/src/ci.rs",
+      "destination": "tools/gamekit-repo-tools/src/ci/mod.rs",
       "stage": "R2",
-      "disposition": "retained",
-      "rationale": "Retain Git-backed routing, conservative fallback and stable failing final gates.",
-      "status": "planned"
+      "disposition": "corrected",
+      "rationale": "R2b retains committed routing, ordered selected commands and failing final gates; tokenized includes and strict input corrections are recorded below.",
+      "status": "implemented"
     },
     {
       "source": "scripts/tests/test_check_distribution.py",
@@ -100,11 +100,11 @@
     },
     {
       "source": "scripts/tests/test_ci.py",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
-      "rationale": "Preserve observable actual Git changes, selected commands and final-gate outcomes; replace interpreter-based fixtures with Rust probes.",
-      "status": "planned"
+      "rationale": "R2b preserves 26 frozen tests across ci_routing.rs and ci_checks.rs, plus both R2a additions and executable protocol regressions in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "source": "skills/scripts/skills_tool.py",
@@ -283,287 +283,287 @@
       "id": "test_ci:Results.test_game_commands_exclude_distribution_and_other_games",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_game_commands_exclude_distribution_and_other_games",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: game commands exclude distribution and other games.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::game_commands_exclude_distribution_and_other_games; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_intentional_skip_passes",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_intentional_skip_passes",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: intentional skip passes.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::intentional_skip_passes; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_labyrinth_keeps_real_process_check",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_labyrinth_keeps_real_process_check",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: labyrinth keeps real process check.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::labyrinth_keeps_real_process_check; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_malformed_selection_fails",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_malformed_selection_fails",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: malformed selection fails.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::malformed_selection_fails; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_other_checkout_cannot_reuse_selection",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_other_checkout_cannot_reuse_selection",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: other checkout cannot reuse selection.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::other_checkout_cannot_reuse_selection; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_selected_failure_cancellation_missing_and_skip_fail",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_selected_failure_cancellation_missing_and_skip_fail",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: selected failure cancellation missing and skip fail.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::selected_failure_cancellation_missing_and_skip_fail; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_unselected_failure_not_hidden",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Results.test_unselected_failure_not_hidden",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_checks.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: unselected failure not hidden.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_checks.rs::unselected_failure_not_hidden; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_brace_and_bracket_includes_select_compiled_docs",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_brace_and_bracket_includes_select_compiled_docs",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: brace and bracket includes select compiled docs.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_brace_and_bracket_includes_select_compiled_docs; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_cross_game_asset_keeps_owner_and_include_consumer",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_cross_game_asset_keeps_owner_and_include_consumer",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: cross game asset keeps owner and include consumer.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_cross_game_asset_keeps_owner_and_include_consumer; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_deleted_source_selects_owner",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_deleted_source_selects_owner",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: deleted source selects owner.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_deleted_source_selects_owner; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_docs_avoid_expensive_jobs",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_docs_avoid_expensive_jobs",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: docs avoid expensive jobs.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_docs_avoid_expensive_jobs; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_dynamic_include_also_prevents_asset_shortcut",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_dynamic_include_also_prevents_asset_shortcut",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: dynamic include also prevents asset shortcut.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_dynamic_include_also_prevents_asset_shortcut; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_dynamic_include_prevents_docs_shortcut",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_dynamic_include_prevents_docs_shortcut",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: dynamic include prevents docs shortcut.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_dynamic_include_prevents_docs_shortcut; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_each_game_is_isolated",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_each_game_is_isolated",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: each game is isolated.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_each_game_is_isolated; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_explicit_build_script_prevents_docs_shortcut",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_explicit_build_script_prevents_docs_shortcut",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: explicit build script prevents docs shortcut.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_explicit_build_script_prevents_docs_shortcut; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_included_docs_and_old_graph_consumers",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_included_docs_and_old_graph_consumers",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: included docs and old graph consumers.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_included_docs_and_old_graph_consumers; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_included_skill_keeps_skill_checks",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_included_skill_keeps_skill_checks",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: included skill keeps skill checks.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_included_skill_keeps_skill_checks; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_invalid_head_is_error",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_invalid_head_is_error",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: invalid head is error.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_invalid_head_is_error; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_manual_full_run",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_manual_full_run",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: manual full run.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_manual_full_run; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_missing_history_and_bad_graph_select_full",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_missing_history_and_bad_graph_select_full",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: missing history and bad graph select full.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_missing_history_and_bad_graph_select_full; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_mixed_changes_union_jobs",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_mixed_changes_union_jobs",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: mixed changes union jobs.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_mixed_changes_union_jobs; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_nested_rules_owner_and_consumer",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_nested_rules_owner_and_consumer",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: nested rules owner and consumer.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_nested_rules_owner_and_consumer; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_rename_selects_both_owners",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_rename_selects_both_owners",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: rename selects both owners.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_rename_selects_both_owners; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_reverse_normal_dev_target_build_consumers",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_reverse_normal_dev_target_build_consumers",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: reverse normal dev target build consumers.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_reverse_normal_dev_target_build_consumers; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_shared_unknown_and_routing_inputs_select_full",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_shared_unknown_and_routing_inputs_select_full",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: shared unknown and routing inputs select full.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_shared_unknown_and_routing_inputs_select_full; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Routing.test_skill_markdown_and_runtime_select_skills_only",
       "source": "scripts/tests/test_ci.py",
       "symbol": "Routing.test_skill_markdown_and_runtime_select_skills_only",
-      "destination": "tools/gamekit-repo-tools/tests/ci.rs",
+      "destination": "tools/gamekit-repo-tools/tests/ci_routing.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: skill markdown and runtime select skills only.",
-      "evidence": "Rust regression using actual Git changes, selected commands and final-gate outcomes; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::test_skill_markdown_and_runtime_select_skills_only; actual Git routing or literal command/final-result regression; executable GitHub protocol rejection in ci_cli.rs.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_cli_reports_structural_scope_and_propagates_failure",
@@ -1833,7 +1833,7 @@
       "before": "CI invokes Python validators and routes their old source paths.",
       "after": "CI bootstraps the pinned Rust repository tool, calls its validators, verifies its Cargo package and selects skill/distribution checks for affected repository-tool implementations. Old-path routing remains for historical diffs; docs/game isolation and the Python final gate remain.",
       "rationale": "Cut callers over without losing failure semantics or migrating the R2b selector early.",
-      "evidence": "scripts/tests/test_ci.py; .github/workflows/gamekit.yml"
+      "evidence": "Historical R2a scripts/tests/test_ci.py at 955fdc98b0b8776cd98d50bdf7ef7d64a4910e39; preserved by tests/ci_checks.rs::skills_and_distribution_call_rust_validators and tests/ci_routing.rs::test_repository_tool_changes_keep_owned_validation_without_game_tests in the repository-tool crate."
     },
     {
       "id": "r2a-native-cargo-listing",
@@ -1841,6 +1841,34 @@
       "after": "Normalize separators only at the native Cargo listing boundary before validating relative components and duplicate entries; reject absolute, drive, UNC, dot, empty and parent components. Unix literal backslash names remain rejected.",
       "rationale": "Accept real Windows Cargo output without weakening package containment or allowing alternate spellings to bypass duplicate detection.",
       "evidence": "distribution::tests::native_cargo_separators_are_normalized_before_containment_checks; tests/distribution.rs::windows_cargo_listing_accepts_native_separators_but_rejects_alias_duplicates; hosted Windows consumer check"
+    },
+    {
+      "id": "r2b-ci-owner",
+      "before": "Python owns classification, selected command execution and the final gate.",
+      "after": "Rust ci select/run/gate and package-local tests replace the two Python files; only the skill matrix still installs Python for runtime tests. The final gate builds the checked-out Rust source with locked dependencies and fails if bootstrap fails. CI sources/tests and their shared entrypoints select the full suite.",
+      "rationale": "Preserve full-scope confidence when changing the system that decides which checks run. Archive inspection and bundle preparation remain separate R2 work.",
+      "evidence": ".github/workflows/gamekit.yml; tools/gamekit-repo-tools/tests/ci_checks.rs, ci_routing.rs and ci_cli.rs"
+    },
+    {
+      "id": "r2b-rust-includes",
+      "before": "The regex misses whitespace before an include macro bang and treats comments/string lookalikes as code; raw and escaped strings fall back.",
+      "after": "Tokenize Rust include macros across comments, whitespace, raw identifiers and delimiters; decode ordinary/raw string literals. Dynamic or unparseable inputs select all checks. Git paths remain POSIX on each host; unsupported/escaping paths and uncertain globs also select all checks.",
+      "rationale": "Compiled documentation and assets must not be skipped because of valid Rust spelling.",
+      "evidence": "tools/gamekit-repo-tools/tests/ci_routing.rs::literal_include_whitespace_comments_raw_strings_and_escapes_keep_consumers and include_spelling_in_comments_and_strings_is_not_a_compiled_input; raw_include_identifiers_preserve_literal_and_dynamic_inputs"
+    },
+    {
+      "id": "r2b-ci-input-output",
+      "before": "Python accepts boolean schema_version=1 and duplicate JSON keys, leaves parts of selection shape unchecked, and emits text exceptions.",
+      "after": "Require typed version-one selection, reject unknown fields and recursive duplicate keys, preserve GitHub selection/boolean outputs, and emit versioned diagnostics. ci run streams child output before final JSON, uses literal argv and returns failure immediately on a child error.",
+      "rationale": "Malformed selections, classifier failures and missing/cancelled/unexpectedly skipped jobs cannot produce a passing gate.",
+      "evidence": "tools/gamekit-repo-tools/tests/ci_cli.rs; tests/ci_checks.rs::runner_stops_at_first_failed_child_and_reports_its_position; tests/ci_cli.rs::actual_cargo_child_failure_streams_logs_and_stops_the_job"
+    },
+    {
+      "id": "r2b-windows-controller-isolation",
+      "before": "Running the CI controller from the workspace CI target locks its executable on Windows; workspace tests can need to replace it after feature unification.",
+      "after": "CI bootstraps its controller in target/ci-controller while child commands retain their ordinary workspace target and cache. Local Cargo invocation documentation uses that same separate directory.",
+      "rationale": "Retain Windows checks and ordinary Cargo artifact reuse without replacing the running executable.",
+      "evidence": "tools/gamekit-repo-tools/tests/ci_cli.rs::isolated_controller_allows_cargo_to_rebuild_the_tested_binary; initial Windows CI run 34612173371 established the collision."
     }
   ]
 }

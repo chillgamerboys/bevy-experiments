@@ -29,9 +29,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.97.1'
@@ -39,9 +36,10 @@ jobs:
         with:
           key: repository-validation
       - run: cargo run --locked -p gamekit-repo-tools --profile ci -- check
-      - run: python -m unittest discover -s scripts/tests -v
+      - name: Verify CI routing, selected commands and final-gate failure contracts
+        run: cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
       - id: scope
-        run: python scripts/ci.py select
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- ci select
 
   skills:
     needs: classify
@@ -64,7 +62,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: repository-validation
-      - run: python scripts/ci.py run skills
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run skills
 
   rust:
     needs: classify
@@ -80,9 +78,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.97.1'
@@ -99,7 +94,7 @@ jobs:
       - name: Verify the repository tool Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
         run: cargo package --locked -p gamekit-repo-tools
-      - run: python scripts/ci.py run rust
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run rust
 
   policy:
     needs: classify
@@ -109,9 +104,6 @@ jobs:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.97.1'
@@ -119,7 +111,7 @@ jobs:
       - name: Install Linux window-system dependencies
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
-      - run: python scripts/ci.py run policy
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run policy
 
   ci:
     if: always()
@@ -130,7 +122,11 @@ jobs:
       CI_NEEDS: ${{ toJSON(needs) }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+      - uses: dtolnay/rust-toolchain@master
         with:
-          python-version: '3.13'
-      - run: python scripts/ci.py gate
+          toolchain: '1.97.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: repository-validation
+      - name: Build the checked-out final gate and verify selected job results
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- ci gate

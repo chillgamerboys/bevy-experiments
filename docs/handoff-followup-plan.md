@@ -260,7 +260,7 @@ cargo fmt --all -- --check
 cargo deny check
 cargo run --locked -p gamekit-repo-tools --profile ci -- check
 cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
-python3 -m unittest discover -s scripts/tests -v
+cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 python3 -m unittest discover -s skills/tests -v
 ```
