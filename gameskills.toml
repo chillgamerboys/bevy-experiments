@@ -53,6 +53,21 @@ timeout_seconds = 180
 argv = ["cargo", "fmt", "--all", "--", "--check"]
 timeout_seconds = 120
 
+[commands.tooling-test]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "gamekit-repo-tools", "--profile", "ci"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.migration-contracts]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "contracts", "check", "--verify-reference"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.tooling-lint]
+argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "gamekit-repo-tools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
 [commands.ui-test]
 argv = ["cargo", "test", "-p", "bevy_game_ui", "--profile", "ci"]
 timeout_seconds = 1200

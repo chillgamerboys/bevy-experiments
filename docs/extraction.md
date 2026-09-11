@@ -88,7 +88,9 @@ and `MIT OR Apache-2.0`; no tracked license files were found. Internal library
 dependencies are path-only, and package descriptions, readmes, repository links,
 MSRV and explicit contents need review across the capability crates. The facade's
 current include list covers source, its manifest and README, so license inclusion
-also needs an explicit check. The future Rust CLI has no package manifest yet.
+also needs an explicit check. The Rust CLI foundation now has an unpublished
+`0.1.0-dev.2` manifest and self-contained source packaging; full embedded skills,
+installation and prebuilt distribution remain later migration work.
 
 Before publishing, add reviewed license files/notices and metadata, set versioned
 internal dependencies, and enable publication only for the intended public crates.

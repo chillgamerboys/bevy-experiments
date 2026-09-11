@@ -20,6 +20,22 @@ Use `cargo test -p <package> --profile ci` for focused iteration. The list above
 the broad validation set, not a requirement to rebuild all games for narrative
 documentation. `cargo deny` is a separately installed dependency-policy tool.
 
+For the Rust foundation, use the focused package tests and contract checker:
+
+```sh
+cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
+cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
+cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+cargo package --locked -p gameskills-cli
+```
+
+The contract check accounts for the pinned 22 Python files and 142 test methods;
+it does not mark those behaviors ported or verified. The fixture suite includes
+34 observed configuration cases and a compiled subprocess example, without Python
+test children. Cargo packaging builds the extracted CLI source; public installation,
+complete embedded skills and runner support are separate later gates. The existing
+Python tests remain required during this foundation stage.
+
 ## CI selection
 
 [The workflow](../.github/workflows/gamekit.yml) always checks repository layout,
@@ -30,6 +46,9 @@ receives its package tests and Clippy. Shared libraries also select their revers
 consumers and applicable distribution, minimal-feature and browser-core checks.
 Selected Rust and skill jobs retain macOS/Linux/Windows coverage. Python repository
 tool tests also run on those platforms with the skills job when tooling changes.
+Rust tool packages receive their focused Cargo checks. Reference verification and
+CLI packaging run only when their respective tool package is selected or the full
+suite is required. Both use the same pinned toolchain as game builds.
 
 The selector reads committed base and tested-tree manifests, including normal,
 development, build and target-specific local dependencies. PR checks compare the

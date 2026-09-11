@@ -1,11 +1,18 @@
 # Development and adopter checklist
 
-All commands run from the repository root unless stated otherwise. Use a Rust
-toolchain supporting the locked Bevy 0.19 dependencies. Linux builds need the window,
+All commands run from the repository root unless stated otherwise. The checked-in
+toolchain pins Rust 1.97.1 for the workspace and its locked Bevy 0.19 dependencies.
+Linux builds need the window,
 input and ALSA development libraries installed by CI; live LAN browsing also needs
 Avahi. Native targets are macOS/Linux/Windows. Capability wasm compile checks do not
 promise packaged browser games. Repository/skill tooling uses Python 3.11 or newer
 (standard library only); CI selects Python 3.13 explicitly.
+
+The [Rust tooling foundation](../tools/gameskills-cli/README.md) adds explicit
+configuration validation and [migration accounting](../tools/gamekit-repo-tools/README.md).
+Its new commands run alongside the current Python candidate; installation and
+execution have not switched runtimes. Both tool packages initially declare the
+tested Rust 1.97.1 minimum and remain unpublished.
 
 ```sh
 cargo run                         # Labyrinth multiplayer menu

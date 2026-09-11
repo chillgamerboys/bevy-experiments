@@ -3,7 +3,9 @@
 Status: the owner accepted the refinement work and authorized its merge on
 September 10, 2026, then requested this repository-wide Rust migration plan.
 The implementation sequence and first PR specification below are the current plan.
-Implementation has not started. This replaces the earlier CLI-only proposal,
+R0/R1 implementation is under review: two tool packages, a complete migration
+ledger, observed configuration fixtures, read-only commands and packaging checks.
+R2–R7 have not started. This replaces the earlier CLI-only proposal,
 which explicitly excluded CI routing and repository checks. The final state now
 includes **all repository-owned executable tooling and tests**.
 
@@ -248,8 +250,9 @@ Its review artifact includes the following concrete changes:
    policy, including `unsafe_code = "forbid"`, and reviewed safe dependencies for
    needed OS behavior. Dependency selection and exact versions belong in this PR.
 5. Set the development toolchain deliberately and document each tool package's MSRV.
-   Current hosted Rust jobs use moving `stable` and there is no tracked toolchain
-   pin. Check the chosen minimum against the workspace resolver and dependencies
+   At the R0 baseline, hosted Rust jobs used moving `stable` with no tracked pin.
+   The foundation pins Rust 1.97.1 and initially declares that tested minimum for
+   both tools. Check the minimum against the workspace resolver and dependencies
    before declaring it. Record license/package metadata decisions and preserve
    `publish = false`; public registry names remain provisional until checked.
 6. Package the minimal CLI, inspect its contents, extract it outside the checkout
@@ -368,7 +371,8 @@ requires a successful authenticated evaluation before making that release claim.
   No live queue is silently migrated; stale observations and client/platform limits
   remain visible. No record is upgraded into an unobserved passing claim.
 
-The immediate next implementation is **R0 plus the smallest usable R1 scaffold**.
+**R0 plus the smallest usable R1 scaffold** is implemented for review; after acceptance, continue
+with **R2 repository/CI tooling and R3 installation**, using the dependencies above.
 The full docs restructure, tooltip scrolling correction, playable Labyrinth release,
 companion Deckbuilder development and deferred Port Vila integration remain explicit
 subsequent work. Their delivery should use the Rust framework once it is accepted.
