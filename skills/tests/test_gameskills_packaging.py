@@ -26,12 +26,14 @@ class PackagingTests(unittest.TestCase):
         shutil.copytree(ROOT / "plugins", self.source / "plugins",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         self.git(self.source, "init", "-q")
+        self.disable_automatic_maintenance(self.source)
         self.git(self.source, "add", ".")
         self.commit = self.commit_source()
         self.core = self.source / "plugins/gameskills"
         self.consumer = self.path / "consumer"
         self.consumer.mkdir()
         self.git(self.consumer, "init", "-q")
+        self.disable_automatic_maintenance(self.consumer)
         (self.consumer / "README.md").write_text("A Bevy adopter\n")
         self.git(self.consumer, "add", ".")
         self.git(self.consumer, "-c", "user.name=Test", "-c", "user.email=test@example.test",
@@ -40,6 +42,11 @@ class PackagingTests(unittest.TestCase):
     def git(self, root, *args):
         return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
                               check=True).stdout.strip()
+
+    def disable_automatic_maintenance(self, root):
+        # Keep Git's background lock files from racing the no-writes snapshot.
+        self.git(root, "config", "maintenance.auto", "false")
+        self.git(root, "config", "gc.auto", "0")
 
     def commit_source(self):
         self.git(self.source, "-c", "user.name=Test", "-c", "user.email=test@example.test",
