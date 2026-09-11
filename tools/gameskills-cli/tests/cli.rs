@@ -174,7 +174,7 @@ fn relative_root_native_paths_remain_absolute_after_child_cwd_change() -> Result
             .output()?;
         assert!(
             output.status.success(),
-            "{}",
+            "{tail:?}: {}",
             String::from_utf8_lossy(&output.stdout)
         );
         let value: Value = serde_json::from_slice(&output.stdout)?;

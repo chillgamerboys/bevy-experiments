@@ -46,14 +46,16 @@ fn previous(directory: &files::Directory, name: &str) -> Result<Option<String>, 
 pub(super) fn inactive_history(directory: &files::Directory) -> Result<Option<File>, String> {
     let queues = directory.child(".gameskills/queues", true)?;
     let guard = queues.lock(".lock")?;
-    for (name, bytes) in queues.tree()? {
+    // Windows locks exclude reads through other handles, including our own.
+    // Skip the lock before opening entries; it is ownership, not queue data.
+    for name in queues.names()? {
         if name == ".lock" {
             continue;
         }
         if !name.ends_with(".json") || name.contains('/') {
             return Err("unexpected queue state while checking runtime transition".into());
         }
-        let queue = archive::json(&bytes)?;
+        let queue = archive::json(&queues.read(&name)?)?;
         match queue.get("schema_version").and_then(Value::as_u64) {
             Some(2) if queue.get("runtime").and_then(Value::as_str) == Some("rust") => {
                 let orders = queue

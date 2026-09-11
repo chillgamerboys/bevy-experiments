@@ -279,6 +279,24 @@ fn setup_lock_and_active_runs_exclude_updates() -> Result {
     Ok(())
 }
 #[test]
+fn queue_lock_contents_are_not_read_as_history() -> Result {
+    let root = tempfile::tempdir()?;
+    installed(root.path())?;
+    let path = root.path().join(".gameskills/queues/.lock");
+    // A sparse lock larger than the data limit makes accidental reads fail on
+    // POSIX too. On Windows, the held lock itself forbids the second read.
+    let lock = fs::OpenOptions::new().write(true).open(&path)?;
+    lock.set_len(64 * 1024 * 1024 + 1)?;
+    drop(lock);
+    installed(root.path())?;
+    assert_eq!(fs::metadata(path)?.len(), 64 * 1024 * 1024 + 1);
+    fs::write(root.path().join(".gameskills/queues/unknown"), "owned")?;
+    assert!(call(root.path(), "setup", &["--apply"])
+        .expect_err("unknown history must still block setup")
+        .contains("unexpected queue state"));
+    Ok(())
+}
+#[test]
 fn active_python_and_rust_queues_block_transition_without_relabeling() -> Result {
     for (schema, runtime) in [(1, Value::Null), (2, json!("rust"))] {
         let root = tempfile::tempdir()?;
