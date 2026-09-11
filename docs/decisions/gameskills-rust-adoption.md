@@ -10,10 +10,10 @@ mechanical and visual trial. This record describes private adoption, not publica
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Final packaged implementation | `377fa66ae317f02ab5b3374b46321ea45850b61e` |
+| Final packaged implementation | `1ebfea1c0d91a66772eb40553ca510ee9f7e947a` |
 | Local prebuilt target | `aarch64-apple-darwin` |
-| CLI executable SHA-256 | `1a95469a8e7724b662ebd4ddfeea1e661308617f2311b28b1296a769a611a96c` |
-| Actual Cargo archive SHA-256 | `562f7da3a3d5ac704113ea38d1f7711b4786af28788863eaf673b0ebb4e43bad` |
+| CLI executable SHA-256 | `683d0a8b157110d377ca8b2ab8139a6ab2ba13615d6dc30920168d59d00255f7` |
+| Actual Cargo archive SHA-256 | `8ab1be66331142f4fa26d7eb7be00567c20374081148b58c6720b6cdefae7b2c` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -23,17 +23,24 @@ manifest, lockfile and embedded payload were inspected. The archive was extracte
 outside the workspace and `cargo install --locked --offline --path ...` produced
 the candidate there, with Python excluded from the build PATH. Runtime adoption
 then copied that executable into an environment containing only it and Git.
-The initial behavioral review used `4e991782`. The first hosted run then exposed
-a Unix-only import in the Windows path and a Linux-specific `Stat` comparison.
-The corrected candidate scopes platform imports and matches the missing-file error
-without requiring `Stat: PartialEq`. Strict all-target Clippy passed when compiled
-for both Windows and Linux. Its rebuilt archive was installed again, and packaged
-adoption and actual Codex discovery were repeated. Cross-compilation is not a
-claim of native execution; the final PR carries the hosted platform evidence.
+The initial behavioral review used `4e991782`. Hosted verification identified
+platform-specific imports and a `Stat` comparison, Windows setup reading its own
+mandatory queue lock, and fractional timing values losing precision during JSON
+parsing and invalidating record digests. The corrected candidate skips lock data
+before opening queue entries and enables exact float roundtrips. Regressions verify
+4,096 fractional observations, protected record reload and rejection of a one-ULP
+edit. Resource-scope probes now synchronize explicitly; native write-deadline
+coverage forces actual stdin backpressure with one large request instead of relying
+on retry timing and platform pipe capacity.
+
+Strict all-target Clippy passed for macOS and when compiled for Windows and Linux.
+The rebuilt archive was installed again, and packaged adoption and actual Codex
+discovery were repeated. Cross-compilation is not a claim of native execution;
+the final PR carries the hosted platform evidence.
 
 ## Observed checks
 
-- The combined Rust CLI suite passed **120 tests**, including real installation,
+- The final combined Rust CLI suite passed **124 tests**, including real installation,
   Git worktrees, command descendants, resource contention, coordinator/supervisor
   SIGKILL, recovery and stale evidence. The repository-tool suite passed **156**.
   Both packages passed strict all-target Clippy and formatting.

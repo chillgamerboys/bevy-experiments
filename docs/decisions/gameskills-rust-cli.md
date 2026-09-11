@@ -3,7 +3,7 @@
 Status: the owner authorized completing the remaining migration without per-stage
 approval on September 11, 2026. R0/R1 merged in PR31 and R2a/R2b/R2c merged in
 PRs32–34 with passing hosted checks. R3 installation, R4 queues and R5 supervision
-are implemented and independently reviewed; 120 combined CLI tests passed locally.
+are implemented and independently reviewed; 124 combined CLI tests passed locally.
 R6 packaged installation/adoption and actual Codex discovery passed. R7 uses the Rust installation/configuration/CI path and removes all maintained
 Python. Fresh-checkout checks passed with Python excluded from PATH; final hosted
 checks are attached to the review PR. The [adoption record](gameskills-rust-adoption.md)
