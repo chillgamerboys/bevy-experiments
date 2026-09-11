@@ -34,7 +34,9 @@ pub fn execute(root: &Path, family: &str, args: &[OsString]) -> Result<Value, St
         .collect::<Result<Vec<_>, _>>()?;
     match family {
         "catalog" if args.is_empty() => Ok(archive::embedded()?.catalog),
-        "config" if args.is_empty() => ready_config(root),
+        "config" if args.is_empty() => {
+            ready_config(root).map(|config| json!({"ok":true,"configuration":config}))
+        }
         "status" if args.is_empty() => status(root),
         "setup" => setup::execute(root, &args),
         "bundle" => archive::export(root, &args),

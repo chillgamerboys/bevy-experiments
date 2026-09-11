@@ -163,6 +163,7 @@ fn relative_root_native_paths_remain_absolute_after_child_cwd_change() -> Result
     fs::create_dir(&root)?;
     for tail in [
         vec!["setup", "--apply"],
+        vec!["config"],
         vec!["native", "claude"],
         vec!["native", "codex"],
     ] {
@@ -177,6 +178,13 @@ fn relative_root_native_paths_remain_absolute_after_child_cwd_change() -> Result
             String::from_utf8_lossy(&output.stdout)
         );
         let value: Value = serde_json::from_slice(&output.stdout)?;
+        if tail.first() == Some(&"config") {
+            assert_eq!(
+                value.pointer("/configuration/schema_version"),
+                Some(&Value::from(1))
+            );
+            assert_eq!(value.get("ok"), Some(&Value::Bool(true)));
+        }
         if tail.first() == Some(&"native") {
             assert_eq!(
                 value
