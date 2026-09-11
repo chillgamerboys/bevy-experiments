@@ -106,6 +106,9 @@ enum ContractOperation {
         /// Check frozen source digests and symbols against the original Git objects.
         #[arg(long)]
         verify_reference: bool,
+        /// Enforce completed dispositions, existing Rust owners and no tracked Python/CI setup.
+        #[arg(long)]
+        cutover: bool,
     },
 }
 
@@ -166,7 +169,7 @@ fn execute() -> (u8, String) {
             }
         }
         Operation::Contracts {
-            command: ContractOperation::Check { verify_reference },
+            command: ContractOperation::Check { verify_reference, cutover },
         } => {
             let path = args.root.join("tools/migration-contracts.json");
             let source = match std::fs::symlink_metadata(&path).and_then(|metadata| {
@@ -190,7 +193,12 @@ fn execute() -> (u8, String) {
                     return failure("reference_unavailable_or_changed", error);
                 }
             }
-            (0, json!({"schema_version": 1, "ok": true, "scope": "migration_accounting", "source_files": 22, "test_methods": 142, "reference_commit": gamekit_repo_tools::contracts::REFERENCE, "reference_verified": verify_reference, "ports_verified": false}).to_string())
+            if cutover {
+                if let Err(error) = gamekit_repo_tools::contracts::cutover(&args.root, &source) {
+                    return failure("incomplete_cutover", error);
+                }
+            }
+            (0, json!({"schema_version": 1, "ok": true, "scope": "migration_accounting", "source_files": 22, "test_methods": 142, "reference_commit": gamekit_repo_tools::contracts::REFERENCE, "reference_verified": verify_reference, "cutover_structure_verified": cutover, "ports_verified": false}).to_string())
         }
         Operation::Ci { command } => {
             let status = if matches!(command, ci::driver::Operation::Select { .. }) { 2 } else { 1 };

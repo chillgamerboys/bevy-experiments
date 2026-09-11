@@ -216,6 +216,64 @@ pub fn validate(source: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Enforce final cutover structure without converting ledger declarations into test evidence.
+///
+/// Every original behavior needs a completed or retired disposition and an existing
+/// Rust destination. Tracked interpreter sources and Python CI setup are rejected.
+pub fn cutover(root: &Path, source: &str) -> Result<(), String> {
+    validate(source)?;
+    let inventory: Inventory = serde_json::from_str(source).map_err(|error| error.to_string())?;
+    let contracts = inventory
+        .files
+        .iter()
+        .map(|row| (&row.status, &row.destination))
+        .chain(
+            inventory
+                .tests
+                .iter()
+                .map(|row| (&row.status, &row.destination)),
+        );
+    for (status, destination) in contracts {
+        if !matches!(status.as_str(), "implemented" | "retired") {
+            return Err(format!(
+                "unfinished cutover contract: {destination} ({status})"
+            ));
+        }
+        let path = root.join(destination);
+        let metadata = std::fs::symlink_metadata(&path)
+            .map_err(|error| format!("cutover destination {destination}: {error}"))?;
+        if !metadata.file_type().is_file() || path.extension().is_none_or(|value| value != "rs") {
+            return Err(format!(
+                "cutover destination must be an ordinary Rust file: {destination}"
+            ));
+        }
+    }
+    let paths = git(root, &["ls-files", "-z"])?;
+    for path in paths
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+    {
+        let path = std::str::from_utf8(path).map_err(|error| error.to_string())?;
+        if matches!(
+            Path::new(path)
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref(),
+            Some("py" | "pyc" | "pyo")
+        ) {
+            return Err(format!("tracked interpreter source remains: {path}"));
+        }
+        if path.starts_with(".github/workflows/") {
+            let source = crate::support::read_text(&root.join(path))?;
+            if source.contains("setup-python") {
+                return Err(format!("Python CI setup remains: {path}"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let result = Command::new("git")
         .args(args)

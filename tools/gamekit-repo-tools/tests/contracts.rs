@@ -132,3 +132,59 @@ fn actual_cli_marks_accounting_as_distinct_from_verification() -> Result<(), Box
     assert_eq!(bad_inventory.status.code(), Some(2));
     Ok(())
 }
+
+#[test]
+fn cutover_rejects_unfinished_missing_owners_python_sources_and_ci_setup(
+) -> Result<(), Box<dyn Error>> {
+    use gamekit_repo_tools::contracts::cutover;
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    let mut inventory: Value = serde_json::from_str(&valid()?)?;
+    std::fs::create_dir(root.join("tools"))?;
+    std::fs::write(root.join("tools/fixture.rs"), "//! Synthetic Rust owner.\n")?;
+    let git = |args: &[&str]| -> Result<(), Box<dyn Error>> {
+        let output = std::process::Command::new("git")
+            .current_dir(root)
+            .args(args)
+            .output()?;
+        if !output.status.success() {
+            return Err(String::from_utf8(output.stderr)?.into());
+        }
+        Ok(())
+    };
+    git(&["init", "-q"])?;
+    assert!(cutover(root, &inventory.to_string()).is_err());
+    for group in ["files", "tests"] {
+        for row in inventory
+            .get_mut(group)
+            .and_then(Value::as_array_mut)
+            .ok_or("rows")?
+        {
+            *row.get_mut("status").ok_or("status")? = Value::from("implemented");
+        }
+    }
+    cutover(root, &inventory.to_string())?;
+    std::fs::remove_file(root.join("tools/fixture.rs"))?;
+    assert!(cutover(root, &inventory.to_string()).is_err());
+    std::fs::write(root.join("tools/fixture.rs"), "//! Synthetic Rust owner.\n")?;
+    std::fs::write(
+        root.join("old.py"),
+        "# Historical source that must not remain tracked.\n",
+    )?;
+    git(&["add", "old.py"])?;
+    assert!(cutover(root, &inventory.to_string()).is_err());
+    git(&["rm", "-f", "old.py"])?;
+    std::fs::create_dir_all(root.join(".github/workflows"))?;
+    std::fs::write(
+        root.join(".github/workflows/test.yml"),
+        "steps:\n  - uses: actions/setup-python@v6\n",
+    )?;
+    git(&["add", ".github/workflows/test.yml"])?;
+    assert!(cutover(root, &inventory.to_string()).is_err());
+    std::fs::write(
+        root.join(".github/workflows/test.yml"),
+        "steps:\n  - run: cargo test\n",
+    )?;
+    cutover(root, &inventory.to_string())?;
+    Ok(())
+}
