@@ -2,8 +2,10 @@
 
 Status: Rust migration requested by the owner September 10, 2026. The Python
 foundation merged in [PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24)
-at `67c88c7f36ba96c62a0c6d5986af5bc4010bb4f5`. The sequencing below is a
-recommendation for discussion, not an implemented migration. The owner accepted
+at `67c88c7f36ba96c62a0c6d5986af5bc4010bb4f5`. The owner accepted the bounded
+refinement sequence below; the migration is not implemented. See the
+[trial observations](gameskills-refinement-results.md) before freezing contracts.
+The owner accepted
 Python for the foundation, not as the intended permanent runtime. GameKit remains
 a Rust library; GameSkills' canonical instructions remain portable Markdown with
 native client metadata.
