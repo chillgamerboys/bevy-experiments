@@ -80,7 +80,8 @@ impl Directory {
                 use rustix::fs::{mkdirat, openat, Mode, OFlags};
                 if create {
                     match mkdirat(&current.file, component, Mode::from_raw_mode(0o700)) {
-                        Ok(()) | Err(rustix::io::Errno::EXIST) => {}
+                        Ok(()) => current.file.sync_all().map_err(|e| e.to_string())?,
+                        Err(rustix::io::Errno::EXIST) => {}
                         Err(e) => return Err(e.to_string()),
                     }
                 }
@@ -237,8 +238,6 @@ impl Directory {
                 .and_then(|()| file.sync_all())
                 .map_err(|e| e.to_string())?;
             parent.rename(&temporary, &leaf)?;
-            #[cfg(unix)]
-            parent.file.sync_all().map_err(|e| e.to_string())?;
             Ok(())
         })();
         if result.is_err() {
@@ -247,27 +246,34 @@ impl Directory {
         result
     }
     pub(super) fn rename(&self, old: &str, new: &str) -> Result<(), String> {
-        relative(old)?;
-        relative(new)?;
+        let (source, old) = self.parent(old, false)?;
+        let (destination, new) = self.parent(new, false)?;
         #[cfg(unix)]
         {
-            rustix::fs::renameat(&self.file, old, &self.file, new).map_err(|e| e.to_string())
+            rustix::fs::renameat(&source.file, old, &destination.file, new)
+                .map_err(|e| e.to_string())?;
+            source.file.sync_all().map_err(|e| e.to_string())?;
+            destination.file.sync_all().map_err(|e| e.to_string())
         }
         #[cfg(not(unix))]
         {
-            fs::rename(self.path.join(old), self.path.join(new)).map_err(|e| e.to_string())
+            fs::rename(source.path.join(old), destination.path.join(new)).map_err(|e| e.to_string())
         }
     }
     pub(super) fn remove(&self, leaf: &str) -> Result<(), String> {
-        relative(leaf)?;
+        let (parent, leaf) = self.parent(leaf, false)?;
         #[cfg(unix)]
         let result: Result<(), std::io::Error> =
-            rustix::fs::unlinkat(&self.file, leaf, rustix::fs::AtFlags::empty())
+            rustix::fs::unlinkat(&parent.file, leaf, rustix::fs::AtFlags::empty())
                 .map_err(Into::into);
         #[cfg(not(unix))]
-        let result = fs::remove_file(self.path.join(leaf));
+        let result = fs::remove_file(parent.path.join(leaf));
         match result {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                #[cfg(unix)]
+                parent.file.sync_all().map_err(|e| e.to_string())?;
+                Ok(())
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(e.to_string()),
         }
