@@ -112,6 +112,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         writeln!(std::io::stdout(), "{}", json!({"id":id,"result":result}))?;
         std::io::stdout().flush()?;
+        if mode == "backpressure" && method == "plugin/list" {
+            // Stop reading requests but emit plausible, incomplete discovery
+            // responses. Linux's pipe is reduced to make the boundary portable;
+            // macOS's normal pipe fills with the test's long-cwd requests.
+            #[cfg(target_os = "linux")]
+            nix::fcntl::fcntl(std::io::stdin(), nix::fcntl::FcntlArg::F_SETPIPE_SZ(4096))?;
+            #[cfg(unix)]
+            signal_hook::flag::register(
+                signal_hook::consts::SIGPIPE,
+                std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            )?;
+            fs::write(root.join("stopped-draining"), "true")?;
+            let mut next = id.as_u64().ok_or("request id")? + 1;
+            loop {
+                let result = json!({"data":[{"cwd":request.pointer("/params/cwds/0"),"skills":[],"errors":[]}]});
+                let output = writeln!(std::io::stdout(), "{}", json!({"id":next,"result":result}))
+                    .and_then(|()| std::io::stdout().flush());
+                if output.is_err() {
+                    // Even if the bounded response reader closes its pipe, keep
+                    // stdin open and undrained. Cleanup must not depend on the
+                    // peer exiting cooperatively after a broken stdout pipe.
+                    fs::write(root.join("output-closed"), "true")?;
+                    std::thread::sleep(Duration::from_secs(60));
+                    return Ok(());
+                }
+                fs::write(root.join("response-count"), (next - 1).to_string())?;
+                next += 1;
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
     }
     Ok(())
 }
