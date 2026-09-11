@@ -18,8 +18,9 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-
-[dev-dependencies]
+toml.workspace = true
+toml_edit.workspace = true
+regex.workspace = true
 tempfile.workspace = true
 
 [lints]
