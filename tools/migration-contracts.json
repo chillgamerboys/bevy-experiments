@@ -1883,6 +1883,48 @@
       "after": "Rust bundle prepare/check/export generates and verifies a pinned deterministic instruction-only tarball plus manifest under the CLI package. bundle verify-package compares actual CLI archive bytes; CI checks drift on relevant changes. Default packages remain core-only and activation remains preparation-only.",
       "rationale": "Prepare one canonical source for embedded and standalone artifacts without prematurely activating Python-oriented instructions or replacing R3 installation owners.",
       "evidence": "tools/gamekit-repo-tools/tests/bundle.rs; tools/gameskills-cli/bundle/bundle.json; .github/workflows/gamekit.yml."
+    },
+    {
+      "id": "r3-offline-embedded-installation",
+      "before": "Setup copied a pinned checkout including its Python runtime.",
+      "after": "The Rust executable carries a compatible baseline instruction archive; setup needs no compiler, interpreter, checkout or network fetch. Explicit verified archive/directory updates remain immutable.",
+      "rationale": "Executable and instructions have separate identities; runtime source export accepts only a prepared clean pinned snapshot.",
+      "evidence": "tools/gameskills-cli/tests/installation.rs; tools/gameskills-cli/tests/adoption.rs; actual extracted Cargo artifact rehearsal."
+    },
+    {
+      "id": "r3-legacy-import",
+      "before": "The seven-skill tool installed or synchronized generated client trees.",
+      "after": "Retire install/sync; explicit Rust legacy import validates preserved bases, records provenance and leaves old generated files and user overlays intact.",
+      "rationale": "One active installer avoids accidental overwrite and silently changing historical provenance.",
+      "evidence": "tools/gameskills-cli/tests/legacy.rs"
+    },
+    {
+      "id": "r3-r4-state-identity",
+      "before": "Python installation locks and queues used the original schema.",
+      "after": "Rust installation locks and persisted queues use schema 2/runtime rust; authored plans/config remain schema 1. Active legacy queues block adoption/mutation; historical records remain original.",
+      "rationale": "Do not mutate live cross-runtime work or reinterpret Python observations as Rust.",
+      "evidence": "tools/gameskills-cli/tests/installation.rs; tools/gameskills-cli/tests/workflow.rs"
+    },
+    {
+      "id": "r3-native-boundaries",
+      "before": "Native adapter construction, discovery and authenticated behavior had separate observations.",
+      "after": "Retain session-scoped adapters and bounded hash-checked Codex discovery. Canonicalize root/plugin paths before child cwd changes. Native launch streams client output and returns its process status.",
+      "rationale": "Relative plugin paths must resolve once. Protocol fixtures and discovery do not establish authenticated model behavior.",
+      "evidence": "tools/gameskills-cli/tests/cli.rs; tools/gameskills-cli/tests/native.rs; separately recorded actual client observations."
+    },
+    {
+      "id": "r4-protected-queues",
+      "before": "Python queues used filesystem locks and revision guards.",
+      "after": "Rust retains compare-and-swap, ownership, real worktree checks and five-worker cap with descriptor-anchored POSIX storage, bounded duplicate-key JSON and config freshness under the queue lock.",
+      "rationale": "Preserve concurrent work guarantees and reject stale pre-lock configuration. Queue support on Windows remains explicitly unavailable.",
+      "evidence": "tools/gameskills-cli/tests/workflow.rs"
+    },
+    {
+      "id": "r7-rust-ci",
+      "before": "Skills CI configured Python and ran its unittest modules.",
+      "after": "CI runs the Rust CLI and repository-tool tests; cutover accounting rejects incomplete destinations and tracked Python sources.",
+      "rationale": "One maintained implementation; accounting is structurally checked separately from executed tests.",
+      "evidence": "tools/gamekit-repo-tools/tests/contracts.rs; tools/gamekit-repo-tools/tests/ci_checks.rs; hosted CI for the final runtime PR."
     }
   ]
 }
