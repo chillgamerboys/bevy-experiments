@@ -63,8 +63,8 @@
       "destination": "tools/gamekit-repo-tools/src/distribution.rs",
       "stage": "R2",
       "disposition": "corrected",
-      "rationale": "R2a replaces the Python source-staging command with Rust; actual GameKit archive inspection remains a separate R2 gate.",
-      "status": "partial"
+      "rationale": "R2a replaces source staging; R2c adds genuine Cargo archive inspection and extracted-source consumers. Staged sibling versions, omitted library locks and remaining registry-resolution gates are explicit.",
+      "status": "implemented"
     },
     {
       "source": "scripts/check_repo.py",
@@ -1869,6 +1869,20 @@
       "after": "CI bootstraps its controller in target/ci-controller while child commands retain their ordinary workspace target and cache. Local Cargo invocation documentation uses that same separate directory.",
       "rationale": "Retain Windows checks and ordinary Cargo artifact reuse without replacing the running executable.",
       "evidence": "tools/gamekit-repo-tools/tests/ci_cli.rs::isolated_controller_allows_cargo_to_rebuild_the_tested_binary; initial Windows CI run 34612173371 established the collision."
+    },
+    {
+      "id": "r2c-library-archives",
+      "before": "External consumer checks compile Cargo-selected staging sources without creating Cargo archives.",
+      "after": "distribution archives produces Cargo .crate files, validates paths/normalized manifests/source bytes, deletes the staging workspace and tests empty/pure/UI/network consumers of extracted sources. Temporary version requirements and omitted library lockfiles are reported; local patches do not claim registry resolution.",
+      "rationale": "Verify actual artifact contents and isolated consumption while public manifests remain unpublished.",
+      "evidence": "tools/gamekit-repo-tools/tests/distribution_archives.rs; distribution archives JSON report and hosted selected Rust jobs."
+    },
+    {
+      "id": "r2c-instruction-preparation",
+      "before": "The CLI package has no package-local baseline instruction snapshot; canonical skills and Python runtime share plugin directories.",
+      "after": "Rust bundle prepare/check/export generates and verifies a pinned deterministic instruction-only tarball plus manifest under the CLI package. bundle verify-package compares actual CLI archive bytes; CI checks drift on relevant changes. Default packages remain core-only and activation remains preparation-only.",
+      "rationale": "Prepare one canonical source for embedded and standalone artifacts without prematurely activating Python-oriented instructions or replacing R3 installation owners.",
+      "evidence": "tools/gamekit-repo-tools/tests/bundle.rs; tools/gameskills-cli/bundle/bundle.json; .github/workflows/gamekit.yml."
     }
   ]
 }

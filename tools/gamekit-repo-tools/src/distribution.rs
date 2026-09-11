@@ -642,6 +642,16 @@ pub fn inspect_archive(
     version: &str,
     destination: &Path,
 ) -> Result<ArchiveReport, String> {
+    inspect_archive_bounded(archive, package, version, destination, 64 * 1024 * 1024)
+}
+
+fn inspect_archive_bounded(
+    archive: &Path,
+    package: &str,
+    version: &str,
+    destination: &Path,
+    expanded_limit: u64,
+) -> Result<ArchiveReport, String> {
     use sha2::{Digest, Sha256};
     use std::io::Read;
     let prefix = format!("{package}-{version}");
@@ -673,7 +683,9 @@ pub fn inspect_archive(
     let compressed = std::fs::read(archive).map_err(|error| error.to_string())?;
     let digest = format!("{:x}", Sha256::digest(&compressed));
     let decoder = flate2::bufread::GzDecoder::new(compressed.as_slice());
-    let mut tar = tar::Archive::new(decoder);
+    // Bound decompression before tar eagerly materializes GNU/PAX extensions.
+    // Per-file checks below only see entries after those extensions are parsed.
+    let mut tar = tar::Archive::new(decoder.take(expanded_limit));
     let mut files = BTreeSet::new();
     let mut size = 0_u64;
     for entry in tar.entries().map_err(|error| error.to_string())? {
@@ -724,7 +736,8 @@ pub fn inspect_archive(
         .map_err(|error| error.to_string())?;
     if trailing.len() > 1024
         || trailing.iter().any(|byte| *byte != 0)
-        || !decoder.into_inner().is_empty()
+        || decoder.limit() == 0
+        || !decoder.into_inner().into_inner().is_empty()
     {
         return Err("archive has excess data after tar entries".into());
     }
@@ -1117,4 +1130,35 @@ pub fn archives_with_runner(
     }
     report.staged_version_requirements.sort();
     Ok(report)
+}
+
+#[cfg(test)]
+mod expansion_tests {
+    use super::inspect_archive_bounded;
+    use std::error::Error;
+
+    #[test]
+    fn gnu_extension_payload_is_bounded_before_tar_materializes_it() -> Result<(), Box<dyn Error>> {
+        let temporary = tempfile::tempdir()?;
+        let root = temporary.path().canonicalize()?;
+        let compressed = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        let mut builder = tar::Builder::new(compressed);
+        let mut header = tar::Header::new_gnu();
+        header.set_path("././@LongLink")?;
+        header.set_entry_type(tar::EntryType::GNULongName);
+        header.set_size(4096);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append(&header, vec![b'x'; 4096].as_slice())?;
+        let archive = root.join("extension.crate");
+        std::fs::write(&archive, builder.into_inner()?.finish()?)?;
+        // A 1 KiB stream cap includes the extension header and payload, although
+        // tar never exposes that extension as an ordinary entry to our loop.
+        let error =
+            inspect_archive_bounded(&archive, "fixture", "0.1.0", &root.join("extracted"), 1024)
+                .expect_err("extension must exhaust the bounded stream");
+        assert!(error.contains("EOF"), "{error}");
+        assert!(!root.join("extracted").exists());
+        Ok(())
+    }
 }

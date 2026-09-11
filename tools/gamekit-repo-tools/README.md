@@ -60,9 +60,14 @@ from committed canonical instructions plus this package's `bundle-compatibility.
 Commit changed inputs first. `plugins/` remains the human-edited skill source.
 The generated directory contains a manifest and deterministic gzip/tar payload, with
 the same manifest inside. `bundle check` regenerates in memory and compares both
-files, rejecting stale pins, dirty inputs, extra outputs and changed bytes. It needs
-the pinned Git commit locally (CI fetches full history). Unrelated commits keep the
-pin valid; instruction or compatibility changes require regeneration at a new pin.
+files, rejecting stale content, dirty inputs, extra outputs and changed bytes.
+`source_commit` records the preparation commit; current committed input verification
+is always required. When the historical commit is available, its inputs must also
+match. If a squash merge removes it from a fresh clone, the report explicitly sets
+`source_commit_verified = false`; exact content verification still runs. Other Git
+errors and available-but-mismatched commits fail. CI fetches full history to retain
+provenance where possible. Unrelated commits keep the payload valid; instruction or
+compatibility changes require regeneration at a new preparation commit.
 JSON keys, file order, modes and timestamps are canonicalized; payloads use Git blob
 bytes, independent of checkout line endings. Generated manifest checkout uses LF.
 
@@ -75,6 +80,12 @@ schema versions and Bevy/GameKit coverage are declarations, not compatibility te
 The payload is marked `preparation-only`: its current prose still refers to Python
 helpers. R3 must port those instructions and installation before activating it.
 No setup state, installed bundle, marketplace registration or executable changes.
+
+After `cargo package --locked -p gameskills-cli`, run `bundle verify-package`.
+It inspects `target/package/gameskills-cli-<version>.crate` (or `--archive <path>`),
+requires the normal Cargo lockfile and exact prepared bundle bytes, and rejects Python
+files. Cargo's preceding package command verifies the extracted build; inspection
+alone reports `cargo_build_verified = false` and cannot substitute for that build.
 
 `ci select --base <full-id> --head <full-id>` reads committed Git objects without
 Cargo metadata or network access. Missing/uncertain comparisons select all checks;

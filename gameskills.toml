@@ -100,3 +100,14 @@ resources = ["project:cargo-target"]
 argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "archives"]
 timeout_seconds = 1800
 resources = ["project:cargo-target"]
+
+[commands.cli-package]
+argv = ["cargo", "package", "--locked", "-p", "gameskills-cli"]
+timeout_seconds = 900
+resources = ["project:cargo-target"]
+
+[commands.bundle-package-check]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "bundle", "verify-package"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+requires = ["cli-package", "bundle-check"]

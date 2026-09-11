@@ -115,20 +115,46 @@ fn ensure_current(root: &Path, expected: &BTreeMap<String, Vec<u8>>) -> Result<(
         );
     }
     // Check only canonical inputs. Unrelated edits and generated outputs are allowed.
-    let changed = git(
-        root,
-        &[
-            "status",
-            "--porcelain=v1",
+    // `status` can report stale stat differences after changing checkout filters
+    // even when blob content is unchanged. Compare content and index separately.
+    for args in [
+        vec![
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--name-only",
             "-z",
-            "--untracked-files=all",
+            "HEAD",
             "--",
             "plugins/",
             INPUT,
         ],
-    )?;
-    if !changed.is_empty() {
-        return Err("commit canonical plugin/compatibility changes before bundle preparation or verification".into());
+        vec![
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--cached",
+            "--name-only",
+            "-z",
+            "HEAD",
+            "--",
+            "plugins/",
+            INPUT,
+        ],
+        vec![
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            "plugins/",
+            INPUT,
+        ],
+    ] {
+        let changed = git(root, &args)?;
+        if !changed.is_empty() {
+            return Err(format!("commit canonical plugin/compatibility changes before bundle preparation or verification: {:?}", String::from_utf8_lossy(&changed)));
+        }
     }
     for path in expected.keys() {
         let mut at = root.to_path_buf();
@@ -232,9 +258,42 @@ struct Prepared {
     manifest: Value,
     manifest_bytes: Vec<u8>,
     archive: Vec<u8>,
+    source_commit_verified: bool,
 }
 
-fn generate(root: &Path, revision: &str) -> Result<Prepared, String> {
+fn commit_available(root: &Path, revision: &str) -> Result<bool, String> {
+    use std::process::Stdio;
+    let mut child = Command::new("git")
+        .args(["cat-file", "--batch-check=%(objectname) %(objecttype)"])
+        .current_dir(root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    child
+        .stdin
+        .take()
+        .ok_or("Git input pipe")?
+        .write_all(format!("{revision}\n").as_bytes())
+        .map_err(|error| error.to_string())?;
+    let output = child
+        .wait_with_output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "Git object inspection failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    match text(&output.stdout)?.trim() {
+        value if value == format!("{revision} commit") => Ok(true),
+        value if value == format!("{revision} missing") => Ok(false),
+        _ => Err("source revision must identify a commit directly".into()),
+    }
+}
+
+fn generate(root: &Path, revision: &str, require_commit: bool) -> Result<Prepared, String> {
     if !matches!(revision.len(), 40 | 64)
         || !revision
             .bytes()
@@ -242,15 +301,18 @@ fn generate(root: &Path, revision: &str) -> Result<Prepared, String> {
     {
         return Err("revision must be a full lowercase Git commit ID".into());
     }
-    let resolved = git(
-        root,
-        &["rev-parse", "--verify", &format!("{revision}^{{commit}}")],
-    )?;
-    if text(&resolved)?.trim() != revision {
-        return Err("revision must identify a commit directly".into());
-    }
-    let mut files = inputs(root, revision)?;
+    let mut files = inputs(root, "HEAD")?;
     ensure_current(root, &files)?;
+    let source_commit_verified = commit_available(root, revision)?;
+    if !source_commit_verified && require_commit {
+        return Err("preparation requires the actual source commit locally".into());
+    }
+    if source_commit_verified && inputs(root, revision)? != files {
+        return Err(
+            "recorded source commit inputs differ from HEAD; prepare from the new committed inputs"
+                .into(),
+        );
+    }
     let compatibility = compatibility(&files.remove(INPUT).ok_or("missing compatibility")?)?;
     let catalog = parse_json(text(
         files
@@ -278,6 +340,7 @@ fn generate(root: &Path, revision: &str) -> Result<Prepared, String> {
         manifest,
         manifest_bytes,
         archive: archive(&files)?,
+        source_commit_verified,
     })
 }
 
@@ -321,13 +384,13 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn report(prepared: &Prepared) -> Value {
-    json!({"source_commit":prepared.manifest.get("source_commit"),"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":12,"optional_skills":9,"activation":"preparation-only"})
+    json!({"source_commit":prepared.manifest.get("source_commit"),"source_commit_verified":prepared.source_commit_verified,"source_commit_notice":if prepared.source_commit_verified {"recorded commit and current inputs match"} else {"historical commit unavailable; current committed content verified"},"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":12,"optional_skills":9,"activation":"preparation-only"})
 }
 
 /// Prepare the fixed package-local snapshot from a full committed source ID.
 /// Canonical sources must match HEAD and disk; unrelated changes are permitted.
 pub fn prepare(root: &Path, revision: &str) -> Result<Value, String> {
-    let prepared = generate(root, revision)?;
+    let prepared = generate(root, revision, true)?;
     let output = directory(root)?;
     write_atomic(&output.join("instructions.tar.gz"), &prepared.archive)?;
     write_atomic(&output.join("bundle.json"), &prepared.manifest_bytes)?;
@@ -335,7 +398,8 @@ pub fn prepare(root: &Path, revision: &str) -> Result<Value, String> {
 }
 
 /// Regenerate and compare both artifacts without writing files.
-/// The pinned source may predate unrelated commits but must contain current inputs.
+/// Always check current committed inputs; additionally verify the historical commit
+/// when available. Squashed history reports that provenance check as unavailable.
 pub fn check(root: &Path) -> Result<Value, String> {
     let output = root.join(OUTPUT);
     // Refuse symlinked ancestors before reading generated files.
@@ -352,7 +416,7 @@ pub fn check(root: &Path) -> Result<Value, String> {
         .get("source_commit")
         .and_then(Value::as_str)
         .ok_or("missing bundle source_commit")?;
-    let prepared = generate(root, revision)?;
+    let prepared = generate(root, revision, false)?;
     for (name, expected) in [
         ("bundle.json", &prepared.manifest_bytes),
         ("instructions.tar.gz", &prepared.archive),

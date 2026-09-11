@@ -241,3 +241,95 @@ fn checkout_line_endings_do_not_change_canonical_blob_identity() -> TestResult {
     assert_eq!(original, bundle::check(root)?);
     Ok(())
 }
+
+#[test]
+fn real_cli_cargo_archive_must_contain_the_verified_payload() -> TestResult {
+    let (temp, revision) = fixture()?;
+    let root = temp.path();
+    bundle::prepare(root, &revision)?;
+    write(root, "tools/gameskills-cli/Cargo.toml", "[package]\nname = \"gameskills-cli\"\nversion = \"0.1.0\"\nedition = \"2021\"\npublish = false\n[workspace]\n")?;
+    write(
+        root,
+        "tools/gameskills-cli/src/lib.rs",
+        "// Inert packaging probe\n",
+    )?;
+    let cli = root.join("tools/gameskills-cli");
+    let archive = cli.join("target/package/gameskills-cli-0.1.0.crate");
+    let package = || -> TestResult {
+        let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+            .args(["package", "--no-verify", "--allow-dirty", "--offline"])
+            .current_dir(&cli)
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    };
+    package()?;
+    assert_eq!(
+        bundle::verify_package(root, Some(&archive))?.get("cargo_build_verified"),
+        Some(&json!(false))
+    );
+    // Cargo still accepts a package when its include policy omits a payload file.
+    // The artifact inspector must catch this even though source bundle check passes.
+    let manifest = cli.join("Cargo.toml");
+    let mut source = std::fs::read_to_string(&manifest)?;
+    source = source.replace(
+        "publish = false",
+        "publish = false\nexclude = [\"bundle/instructions.tar.gz\"]",
+    );
+    std::fs::write(manifest, source)?;
+    package()?;
+    assert!(bundle::verify_package(root, Some(&archive)).is_err());
+    bundle::check(root)?;
+    Ok(())
+}
+
+#[test]
+fn squash_equivalent_checkout_verifies_content_without_claiming_missing_provenance() -> TestResult {
+    let (original, revision) = fixture()?;
+    bundle::prepare(original.path(), &revision)?;
+    commit(original.path())?;
+    let fresh = tempfile::tempdir()?;
+    for path in git(original.path(), &["ls-files"])?.lines() {
+        write(
+            fresh.path(),
+            path,
+            std::fs::read(original.path().join(path))?,
+        )?;
+    }
+    git(fresh.path(), &["init", "-q"])?;
+    git(fresh.path(), &["config", "user.name", "Bundle test"])?;
+    git(
+        fresh.path(),
+        &["config", "user.email", "bundle@example.invalid"],
+    )?;
+    git(fresh.path(), &["config", "commit.gpgsign", "false"])?;
+    git(fresh.path(), &["config", "core.autocrlf", "false"])?;
+    commit(fresh.path())?;
+    assert_eq!(
+        bundle::check(fresh.path())?.get("source_commit_verified"),
+        Some(&json!(false))
+    );
+    assert!(bundle::prepare(fresh.path(), &revision).is_err());
+    write(
+        fresh.path(),
+        "plugins/gameskills/references/context.md",
+        "Changed after squash\n",
+    )?;
+    commit(fresh.path())?;
+    assert!(bundle::check(fresh.path()).is_err());
+    // An available historical commit with different inputs must also fail.
+    write(
+        original.path(),
+        "plugins/gameskills/references/context.md",
+        "Changed\n",
+    )?;
+    commit(original.path())?;
+    assert!(bundle::check(original.path())
+        .expect_err("mismatched history")
+        .contains("recorded source commit inputs differ"));
+    Ok(())
+}

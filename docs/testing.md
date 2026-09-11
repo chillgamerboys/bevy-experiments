@@ -130,8 +130,10 @@ consumers patch unpublished siblings to inspected extracted files. These are exp
 artifact probes, with registry resolution and final library lockfiles still unverified.
 `bundle check` runs for skill changes and affected tooling; `bundle verify-package`
 checks the CLI archive when its package is selected. Narrative docs and isolated
-game edits do not request the bundle or complete distribution checks. Full Git
-history is required in bundle-check jobs to verify the recorded source pin.
+game edits do not request the bundle or complete distribution checks. Bundle jobs
+fetch full Git history to verify the preparation commit where available. After a
+squash, byte/digest checks still enforce current committed inputs, while missing
+historical commit verification is explicitly reported as unavailable.
 
 | Claim | Evidence | Does not establish |
 |---|---|---|
