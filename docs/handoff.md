@@ -1,4 +1,10 @@
-# Labyrinth and Gamekit — next-agent handoff
+# Historical Labyrinth and GameKit review
+
+This is the preserved PR21 review, not the current agent entry point. Its five
+findings were resolved in the [completed follow-up](handoff-followup-plan.md).
+Start with the [documentation index](README.md) for current commands, project
+direction and refinement work. The original recommendations below remain attached
+to their reviewed revision; they do not override later framework decisions.
 
 Reviewed implementation: `8ade27d`, against main `7531607`; September 10, 2026.
 Delivery: [PR #21](https://github.com/chillgamerboys/bevy-experiments/pull/21).
@@ -14,7 +20,7 @@ findings and revision-specific evidence are retained below as review history;
 they describe `8ade27d`, not the follow-up implementation. No balance-harness or broad
 networking consolidation work is included in this correction.
 
-## Start here
+## Original project context
 
 Labyrinth is the flagship. Gamekit is a set of opt-in capabilities, not its engine.
 Keep both in this repository, with dependency direction `games/ -> crates/` only.
@@ -85,7 +91,7 @@ and creature-profile driven; learned actors are for balancing comparable ability
 costs/levels, not controlling shipping enemies. Keep status semantics and formations
 local until a second game demonstrates the same contract.
 
-## Actionable findings left for the next agent
+## Original findings (resolved by the linked follow-up)
 
 Priorities: P2 = normal correctness/hardening follow-up; P3 = presentation/documentation.
 These are intentionally recorded, not silently fixed as part of this handoff.
@@ -197,7 +203,7 @@ Actual hidden enemy information needs recipient-specific snapshots/events/logs f
 No blanket 200% visual-review gate is required; retain existing tests without using
 them as a substitute for ordinary-size playability.
 
-## Suggested first follow-up
+## Original follow-up sequence
 
 1. Read the footprint policy and run the game; reproduce the two UI findings.
 2. Fix the throttle and request fairness with regression tests before networking

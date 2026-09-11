@@ -1,5 +1,9 @@
 # Labyrinth and Gamekit handoff follow-up plan
 
+This is a completed implementation record. Use the [documentation index](README.md)
+and [current refinement plan](decisions/gameskills-ci-scope.md) to choose new work;
+the original sequence below preserves the rationale and evidence for these fixes.
+
 Status: implemented, September 10, 2026. Source inspection is based
 on `e073da9e7b4ec851adf8474f3859507153fee252`, the clean checkout following the
 [review handoff](handoff.md). The sections below retain the accepted implementation
