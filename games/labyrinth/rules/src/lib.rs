@@ -24,7 +24,8 @@ pub use model::{
     SkillId, Team,
 };
 pub use preview::{
-    ActionPreview, ActorPreview, ActorPreviewState, DamagePreview, PreviewEvent, PreviewStatus,
+    ActionPreview, ActorPreview, ActorPreviewState, DamagePreview, MovementLimit, MovementPreview,
+    PreviewEvent, PreviewStatus,
 };
 pub use status::{
     status_definition, Boundary, DurationClock, Effect, Modifier, Reapplication, RemovalReason,

@@ -71,6 +71,7 @@ impl Combat {
             next_event: &mut self.next_event,
             next_status: &mut self.next_status,
             damage: None,
+            movement: None,
         }
     }
 

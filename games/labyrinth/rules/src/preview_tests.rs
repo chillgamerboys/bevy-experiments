@@ -154,9 +154,76 @@ fn direct_hit_separates_base_modifiers_and_remaining_hp_cap() {
 }
 
 #[test]
+fn driving_blow_moves_whole_footprints_and_reports_the_actual_limit() {
+    use crate::{
+        EnemyKind::{AshBrute as Brute, OssuaryHauler, WoundStalker as Stalker},
+        MovementLimit, MovementPreview,
+    };
+    let cases = [
+        (vec![Brute, Stalker, Brute], 3, None),
+        (
+            vec![Brute, Stalker, OssuaryHauler],
+            2,
+            Some(MovementLimit::Footprint {
+                actor: ActorId(103),
+                ranks: 2,
+            }),
+        ),
+        (vec![Brute, OssuaryHauler], 3, None),
+        (vec![Brute, Stalker], 2, Some(MovementLimit::FormationEdge)),
+        (vec![Brute], 1, Some(MovementLimit::FormationEdge)),
+        (vec![OssuaryHauler, Brute, Stalker], 3, None),
+    ];
+    for (enemies, to, limit) in cases {
+        let mut combat = Combat::with_rosters(
+            42,
+            vec![crate::HeroSetup::preset(ActorId(1), HeroClass::Gatekeeper)],
+            enemies
+                .into_iter()
+                .enumerate()
+                .map(|(i, kind)| (ActorId(101 + i as u16), kind))
+                .collect(),
+        )
+        .expect("formation fixture");
+        for _ in 0..MAX_ACTORS * 2 {
+            let actor = combat.snapshot().active_actor.expect("active");
+            if actor == ActorId(1) {
+                break;
+            }
+            combat.apply(actor, CombatAction::Wait).expect("wait");
+        }
+        let preview = compare(
+            &combat,
+            ActorId(1),
+            CombatAction::Skill {
+                skill: SkillId::DrivingBlow,
+                target: ActorId(101),
+            },
+        );
+        let damage = preview.damage.first().expect("direct hit");
+        assert_eq!(damage.base, 3);
+        assert_eq!(damage.hp_loss, 3);
+        assert_eq!(
+            preview.movement,
+            vec![MovementPreview {
+                actor: ActorId(101),
+                requested: 2,
+                from: 1,
+                to,
+                limit
+            }]
+        );
+        assert_eq!(
+            preview.actor(ActorId(101)).expect("target").after.rank,
+            Some(to)
+        );
+    }
+}
+
+#[test]
 fn lethal_hits_suppress_status_and_movement_followups() {
     for (source, skill, hp) in [
-        (ActorId(1), SkillId::DrivingBlow, 4),
+        (ActorId(1), SkillId::DrivingBlow, 3),
         (ActorId(2), SkillId::BleedingCut, 3),
     ] {
         let mut combat = fixture(source);
@@ -173,6 +240,10 @@ fn lethal_hits_suppress_status_and_movement_followups() {
         assert_eq!(target.after.hp, 5);
         assert!(matches!(target.after.life, crate::LifeState::Corpse { .. }));
         assert!(target.after.statuses.is_empty());
+        assert!(
+            preview.movement.is_empty(),
+            "a lethal hit never attempts its push"
+        );
         assert!(!preview.events.iter().any(|event| matches!(
             event,
             PreviewEvent::StatusApplied(_)

@@ -1,5 +1,50 @@
 # Labyrinth verification
 
+## Rust GameSkills trial — formation preview
+
+Driving Blow now deals 3 damage and attempts a push of up to two ranks. It stops
+at the formation edge or before crossing an occupant wider than the remaining
+distance. Lethal damage still suppresses the push. The shared effect resolver
+reports attempted movement and limits to previews; the UI does not calculate a
+second movement result. The content fingerprint is
+`0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9`;
+multiplayer participants need matching builds.
+
+Select Driving Blow (Gatekeeper's third equipped ability), then a front enemy.
+The after-action strip shows destination ranks, with gold markers for every moved
+occupant. Against the initial Iron Brute, the Hauler shifts from 3–4 to 2–3 and the
+Brute moves from 2 to 4. Against the initial Ash Brute, the push covers only one rank:
+the remaining rank cannot cross the two-rank Hauler. Live sprites and hit areas stay
+fixed until Confirm. Changing the turn, clearing selection, opening a menu, pausing,
+or concealing necessary facts removes the preview.
+
+The installed Rust CLI records the project-owned checks and their prerequisites:
+
+```sh
+gameskills run labyrinth-test labyrinth-lint rust-format repo-check
+gameskills run labyrinth-movement-test
+gameskills run labyrinth-render-movement labyrinth-render-movement-blocked labyrinth-render-movement-wide
+gameskills evidence validate RUN_ID
+```
+
+`labyrinth-test` requires `rules-test`. Render commands reserve the shared GPU,
+window and Cargo resources. The `movement` and `movement-blocked` capture routes
+use real legal forecasts over a deterministic, undamaged Gatekeeper decision;
+selection in the capture harness is authored, not native pointer evidence.
+
+Pure regressions compare preview and committed effects for full/partial/blocked
+pushes, whole large-unit movement and lethal suppression. Production UI tests cover
+pointer/keyboard selection and confirmation, stable live anchors, whole-footprint
+markers and disclosure/decision revocation at normal sizes and 200% scale. Inspect
+the three rendered frames separately for legibility and clipping.
+
+The native walk remains pending while the desktop is locked. Once available, run
+`gameskills run labyrinth-build`, launch `target/ci/labyrinth --local --seed 42`
+with an isolated profile, reach the Gatekeeper, compare both initial front targets,
+then confirm and check the actual ranks. Repeat with keyboard selection and resize.
+Human feedback on the damage/positioning tradeoff remains a separate acceptance
+decision; automated correctness does not establish balance or enjoyment.
+
 ## Handoff follow-up — September 10, 2026
 
 The follow-up to `e073da9` passes 113 application tests, 52 rules

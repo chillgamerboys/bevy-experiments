@@ -52,7 +52,7 @@ fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "53e0f0d6572c2408d126b0b82ce61a6a03af2f8d98398aca26105665281c622f"
+        "0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }
@@ -682,7 +682,7 @@ fn killed_enemy_leaves_corpse_without_moving_statuses_or_resolving_later_skill_e
     let status_id = status(&combat, ActorId(102), StatusKind::Bleed)
         .expect("bleed")
         .id;
-    damage_fixture(&mut combat, ActorId(101), 4);
+    damage_fixture(&mut combat, ActorId(101), 3);
     combat
         .apply(
             ActorId(1),

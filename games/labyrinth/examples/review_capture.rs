@@ -57,7 +57,12 @@ fn main() {
         .unwrap_or_else(|| "combat".to_owned());
     let large = matches!(
         route.as_str(),
-        "footprints" | "corpses" | "corpse-forecast" | "corpse-help"
+        "footprints"
+            | "corpses"
+            | "corpse-forecast"
+            | "corpse-help"
+            | "movement"
+            | "movement-blocked"
     );
     let heroes = if large {
         labyrinth_rules::PROTOTYPE_HERO_ROSTER.to_vec()
@@ -79,6 +84,9 @@ fn main() {
     .expect("review fixture");
     let mut events = Vec::new();
     for _ in 0..PARTY_SIZE * 2 {
+        if route.starts_with("movement") {
+            break;
+        }
         let Some(action) = combat.ai_action() else {
             break;
         };
@@ -86,10 +94,16 @@ fn main() {
             events.extend(combat.apply(actor, action).expect("legal fixture AI"));
         }
     }
-    if route == "corpse-forecast" {
+    if route == "corpse-forecast" || route.starts_with("movement") {
         for _ in 0..24 {
             let actor = combat.snapshot().active_actor.expect("review decision");
-            if actor == ActorId(3) {
+            if actor
+                == if route.starts_with("movement") {
+                    ActorId(1)
+                } else {
+                    ActorId(3)
+                }
+            {
                 break;
             }
             events.extend(
@@ -369,6 +383,9 @@ fn capture(
         ("corpse-help", 4) => Some("Actor 103 Effects"),
         ("corpse-forecast", 4) => Some("Skill 1"),
         ("corpse-forecast", 7) => Some("Actor 103"),
+        ("movement" | "movement-blocked", 4) => Some("Skill 2"),
+        ("movement", 7) => Some("Actor 104"),
+        ("movement-blocked", 7) => Some("Actor 103"),
         ("order", 4) => Some("Initiative Actor 4"),
         ("compact", 4) => Some("Battle Log Toggle"),
         ("compact", 7) => Some("History Toggle"),
