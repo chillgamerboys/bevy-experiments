@@ -162,6 +162,25 @@ impl Directory {
         }
         Ok(file)
     }
+    pub(super) fn check_private_file(&self, name: &str) -> Result<(), String> {
+        let (parent, leaf) = self.parent(name, false)?;
+        let file = parent
+            .opened(&leaf, false)
+            .map_err(|e| format!("unsafe file {name}: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = file.metadata().map_err(|e| e.to_string())?;
+            if metadata.uid() != rustix::process::getuid().as_raw() || metadata.mode() & 0o022 != 0
+            {
+                return Err(format!(
+                    "unsafe file {name}: expected user ownership without group/world writes"
+                ));
+            }
+        }
+        drop(file);
+        Ok(())
+    }
     pub(super) fn read_optional(&self, name: &str) -> Result<Option<Vec<u8>>, String> {
         let (parent, leaf) = match self.parent(name, false) {
             Ok(value) => value,

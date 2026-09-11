@@ -4,6 +4,8 @@
 mod storage;
 mod validation;
 
+pub(crate) use storage::is_temporary_file;
+
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

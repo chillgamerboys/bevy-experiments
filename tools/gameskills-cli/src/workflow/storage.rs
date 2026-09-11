@@ -6,6 +6,24 @@ use serde::{
 use serde_json::{Map, Value};
 use std::{fmt, io::Read, path::Path};
 const LIMIT: u64 = 16 * 1024 * 1024;
+
+// Match only the canonical decimal names produced by Directory::write below.
+// Installation may preserve these interrupted writes while holding the queue lock.
+pub(crate) fn is_temporary_file(name: &str) -> bool {
+    let Some((pid, serial)) = name
+        .strip_prefix(".queue-")
+        .and_then(|name| name.strip_suffix(".tmp"))
+        .and_then(|name| name.split_once('-'))
+    else {
+        return false;
+    };
+    pid.parse::<u32>()
+        .is_ok_and(|value| value != 0 && value.to_string() == pid)
+        && serial
+            .parse::<u64>()
+            .is_ok_and(|value| value.to_string() == serial)
+}
+
 struct Strict(Value);
 impl<'de> Deserialize<'de> for Strict {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {

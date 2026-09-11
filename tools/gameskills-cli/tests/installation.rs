@@ -263,6 +263,10 @@ fn malformed_recovery_journal_never_overwrites_files() -> Result {
 fn setup_lock_and_active_runs_exclude_updates() -> Result {
     let root = tempfile::tempdir()?;
     installed(root.path()).map_err(|e| format!("initial install: {e}"))?;
+    fs::write(
+        root.path().join(".gameskills/queues/.queue-12345-0.tmp"),
+        "partial",
+    )?;
     let lock = gameskills_cli::installation::lifecycle_guard(root.path())
         .map_err(|e| format!("initial setup owner acquisition: {e}"))?;
     // Model a concurrent Unix process spawn retaining the same open-file
@@ -315,6 +319,10 @@ fn active_python_and_rust_queues_block_transition_without_relabeling() -> Result
     for (schema, runtime) in [(1, Value::Null), (2, json!("rust"))] {
         let root = tempfile::tempdir()?;
         installed(root.path())?;
+        fs::write(
+            root.path().join(".gameskills/queues/.queue-12345-0.tmp"),
+            "partial",
+        )?;
         let path = root.path().join(".gameskills/queues/old.json");
         let value = json!({"schema_version":schema,"runtime":runtime,"orders":{"work":{"state":"reported"}}});
         fs::write(&path, serde_json::to_vec(&value)?)?;
@@ -329,6 +337,140 @@ fn active_python_and_rust_queues_block_transition_without_relabeling() -> Result
         fs::write(&path, serde_json::to_vec(&done)?)?;
         installed(root.path())?;
         assert_eq!(serde_json::from_slice::<Value>(&fs::read(&path)?)?, done);
+    }
+    Ok(())
+}
+
+#[test]
+fn interrupted_queue_temporaries_survive_updates_rollback_and_recovery() -> Result {
+    let root = tempfile::tempdir()?;
+    installed(root.path())?;
+    let residue = [
+        (".queue-12345-0.tmp", b"{\"schema_version\":2,".as_slice()),
+        (
+            ".queue-4294967295-18446744073709551615.tmp",
+            b"not queue JSON".as_slice(),
+        ),
+    ];
+    for (name, bytes) in residue {
+        fs::write(root.path().join(".gameskills/queues").join(name), bytes)?;
+    }
+    call(
+        root.path(),
+        "setup",
+        &["--packages", "gameskills", "gameskills-ui", "--apply"],
+    )?;
+    call(
+        root.path(),
+        "setup",
+        &["--packages", "gameskills", "--apply"],
+    )?;
+    let config = fs::read_to_string(root.path().join("gameskills.toml"))?;
+    let lock = fs::read_to_string(root.path().join("gameskills.lock.json"))?;
+    let after = format!("{config}\n# incomplete setup\n");
+    let journal = root.path().join(".gameskills/setup-transaction.json");
+    fs::write(
+        &journal,
+        serde_json::to_vec(&json!({
+            "gameskills.toml": {"before":config,"after":after},
+            "gameskills.lock.json": {"before":lock,"after":null}
+        }))?,
+    )?;
+    fs::write(root.path().join("gameskills.toml"), after)?;
+    assert_eq!(
+        call(root.path(), "setup", &["--recover"])?.get("recovered"),
+        Some(&json!(true))
+    );
+    assert_eq!(
+        fs::read_to_string(root.path().join("gameskills.toml"))?,
+        config
+    );
+    assert_eq!(
+        fs::read_to_string(root.path().join("gameskills.lock.json"))?,
+        lock
+    );
+    assert!(!journal.exists());
+    for (name, bytes) in residue {
+        assert_eq!(
+            fs::read(root.path().join(".gameskills/queues").join(name))?,
+            bytes
+        );
+    }
+    call(root.path(), "status", &[])?;
+    Ok(())
+}
+
+#[test]
+fn lookalike_queue_temporaries_and_directories_still_block_setup() -> Result {
+    let root = tempfile::tempdir()?;
+    installed(root.path())?;
+    for name in [
+        ".unknown",
+        ".queue-123-0.tmp.json",
+        ".queue-x-0.tmp",
+        ".queue-123-x.tmp",
+        ".queue-0-0.tmp",
+        ".queue-01-0.tmp",
+        ".queue-1-00.tmp",
+        ".queue-+1-0.tmp",
+        ".queue-1-+0.tmp",
+        ".queue-4294967296-0.tmp",
+        ".queue-1-18446744073709551616.tmp",
+        ".queue-1-0.tmp.extra",
+        ".queue-1-0-0.tmp",
+    ] {
+        let path = root.path().join(".gameskills/queues").join(name);
+        fs::write(&path, "owner data")?;
+        let before = snapshot(root.path())?;
+        assert!(
+            call(root.path(), "setup", &["--apply"]).is_err(),
+            "accepted {name}"
+        );
+        assert_eq!(snapshot(root.path())?, before);
+        fs::remove_file(path)?;
+    }
+    let directory = root.path().join(".gameskills/queues/.queue-1-0.tmp");
+    fs::create_dir(&directory)?;
+    let before = snapshot(root.path())?;
+    assert!(call(root.path(), "setup", &["--apply"]).is_err());
+    assert!(directory.is_dir());
+    assert_eq!(snapshot(root.path())?, before);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn unsafe_queue_temporary_files_are_not_ignored() -> Result {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let root = tempfile::tempdir()?;
+    installed(root.path())?;
+    let owned = root.path().join("owned.txt");
+    fs::write(&owned, "owner data")?;
+    let residue = root.path().join(".gameskills/queues/.queue-1-0.tmp");
+    for kind in ["symlink", "hardlink", "fifo", "writable"] {
+        match kind {
+            "symlink" => symlink(&owned, &residue)?,
+            "hardlink" => fs::hard_link(&owned, &residue)?,
+            "fifo" => assert!(std::process::Command::new("mkfifo")
+                .arg(&residue)
+                .status()?
+                .success()),
+            _ => {
+                fs::write(&residue, "partial")?;
+                fs::set_permissions(&residue, fs::Permissions::from_mode(0o622))?;
+            }
+        }
+        let config = fs::read(root.path().join("gameskills.toml"))?;
+        let lock = fs::read(root.path().join("gameskills.lock.json"))?;
+        assert!(
+            call(root.path(), "setup", &["--apply"]).is_err(),
+            "accepted {kind}"
+        );
+        assert!(fs::symlink_metadata(&residue).is_ok());
+        assert_eq!(fs::read(root.path().join("gameskills.toml"))?, config);
+        assert_eq!(fs::read(root.path().join("gameskills.lock.json"))?, lock);
+        assert_eq!(fs::read(&owned)?, b"owner data");
+        fs::remove_file(&residue)?;
     }
     Ok(())
 }

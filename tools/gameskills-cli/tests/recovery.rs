@@ -16,6 +16,8 @@ fn actual_cli_recovery_waits_for_queue_and_run_exclusions() -> Result<(), Box<dy
     };
     let installed = cli(&["setup", "--apply"])?;
     assert!(installed.status.success(), "{:?}", installed);
+    let residue = root.join(".gameskills/queues/.queue-12345-0.tmp");
+    fs::write(&residue, "partial queue write")?;
     let config = fs::read_to_string(root.join("gameskills.toml"))?;
     let lock = fs::read_to_string(root.join("gameskills.lock.json"))?;
     let journal = serde_json::to_vec(&json!({
@@ -41,6 +43,7 @@ fn actual_cli_recovery_waits_for_queue_and_run_exclusions() -> Result<(), Box<dy
     queue_guard.lock()?;
     assert!(!cli(&["setup", "--recover"])?.status.success());
     assert_unchanged()?;
+    queue_guard.unlock()?;
     drop(queue_guard);
     let queue_path = root.join(".gameskills/queues/pending.json");
     fs::write(
@@ -63,6 +66,7 @@ fn actual_cli_recovery_waits_for_queue_and_run_exclusions() -> Result<(), Box<dy
     active.lock()?;
     assert!(!cli(&["setup", "--recover"])?.status.success());
     assert_unchanged()?;
+    active.unlock()?;
     drop(active);
     let recovered = cli(&["setup", "--recover"])?;
     assert!(recovered.status.success(), "{:?}", recovered);
@@ -71,5 +75,6 @@ fn actual_cli_recovery_waits_for_queue_and_run_exclusions() -> Result<(), Box<dy
     assert_eq!(fs::read_to_string(root.join("gameskills.toml"))?, config);
     assert_eq!(fs::read_to_string(root.join("gameskills.lock.json"))?, lock);
     assert!(!journal_path.exists());
+    assert_eq!(fs::read_to_string(residue)?, "partial queue write");
     Ok(())
 }

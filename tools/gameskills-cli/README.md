@@ -29,6 +29,11 @@ and `setup --recover` to recover an interrupted config/lock transaction. Local
 instructions, overlays and previous bundles retain their ownership. Updates that
 conflict with newer local edits fail with paths to inspect.
 
+An interrupted queue write may leave a `.queue-<pid>-<serial>.tmp` file. Setup and
+recovery preserve recognized ordinary files under the queue lock without treating
+their incomplete contents as queue state. Unknown entries and unsafe files still
+block the operation, as do unfinished queues and active command runs.
+
 `config validate --file PATH` checks standalone TOML without setup or Git. Bare
 `config` requires installation readiness. Global `--root` defaults to the current
 directory. `catalog`, help and version do not require an installation. `native`

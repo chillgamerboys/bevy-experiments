@@ -52,8 +52,17 @@ pub(super) fn inactive_history(directory: &files::Directory) -> Result<Option<Fi
         if name == ".lock" {
             continue;
         }
+        if crate::workflow::is_temporary_file(&name) {
+            // The queue lock excludes live writers. A crash before atomic rename
+            // can leave an incomplete temporary file; preserve it without parsing
+            // it as authoritative queue state or overlooking unsafe file types.
+            queues.check_private_file(&name)?;
+            continue;
+        }
         if !name.ends_with(".json") || name.contains('/') {
-            return Err("unexpected queue state while checking runtime transition".into());
+            return Err(format!(
+                "unexpected queue state {name} while checking runtime transition"
+            ));
         }
         let queue = archive::json(&queues.read(&name)?)?;
         match queue.get("schema_version").and_then(Value::as_u64) {
