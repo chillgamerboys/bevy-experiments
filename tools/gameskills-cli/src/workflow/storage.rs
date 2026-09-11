@@ -102,6 +102,13 @@ pub(super) fn read_input(path: &Path) -> Result<Value, String> {
     read_json(open_input(path)?)
 }
 pub(super) fn current_configuration(root: &Path) -> Result<Value, String> {
+    // Called while holding the queue lock, which setup/recovery also acquire.
+    // A caller may have read readiness before an interrupted setup released it.
+    match std::fs::symlink_metadata(root.join(".gameskills/setup-transaction.json")) {
+        Ok(_) => return Err("interrupted setup; recover before changing queues".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(format!("cannot inspect setup recovery state: {error}")),
+    }
     let mut source = String::new();
     open_input(&root.join("gameskills.toml"))?
         .take(LIMIT + 1)

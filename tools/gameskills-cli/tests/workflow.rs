@@ -1222,6 +1222,35 @@ mod posix {
         assert!(execute(&f.root, &f.config, "queue", &args).is_err());
         assert!(!f.path().exists());
     }
+
+    #[test]
+    fn interrupted_setup_after_readiness_cannot_create_or_mutate_a_queue() {
+        let f = Fixture::new();
+        let plan = f.input("plan.json", &f.plan(vec![f.order("one")]));
+        let args = vec!["create".into(), "--file".into(), plan.into_os_string()];
+        fs::create_dir_all(f.root.join(".gameskills")).expect("state");
+        let journal = f.root.join(".gameskills/setup-transaction.json");
+        fs::write(&journal, "{}").expect("interrupted transaction");
+        assert!(execute(&f.root, &f.config, "queue", &args)
+            .expect_err("readiness was invalidated")
+            .contains("interrupted setup"));
+        assert!(!f.path().exists());
+        fs::remove_file(&journal).expect("recovered transaction");
+        execute(&f.root, &f.config, "queue", &args).expect("create after recovery");
+        fs::write(&journal, "{}").expect("later interrupted transaction");
+        f.unchanged("interrupted setup", || {
+            f.mutate(
+                "block",
+                "one",
+                json!({"reason":"bounded review", "checks_running":false}),
+                None,
+            )
+        });
+        assert_eq!(
+            fs::read_to_string(journal).expect("preserved journal"),
+            "{}"
+        );
+    }
 }
 #[cfg(windows)]
 #[test]
