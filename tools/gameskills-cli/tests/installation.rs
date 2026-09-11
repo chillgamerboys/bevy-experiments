@@ -1,10 +1,9 @@
 //! Immutable instruction, transaction and migration boundary regressions.
-use gameskills_cli::installation::{execute, verify_archive};
+use gameskills_cli::installation::verify_archive;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    ffi::OsString,
     fs,
     io::{Read, Write},
     path::Path,
@@ -12,11 +11,30 @@ use std::{
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 fn call(root: &Path, family: &str, args: &[&str]) -> std::result::Result<Value, String> {
-    execute(
-        root,
-        family,
-        &args.iter().map(OsString::from).collect::<Vec<_>>(),
-    )
+    // Exercise the production process boundary. In-process installation locks
+    // can be briefly inherited by unrelated parallel tests between fork and exec.
+    // Each actual CLI process owns and releases only its own installation locks.
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_gameskills"))
+        .current_dir(root)
+        .arg(family)
+        .args(args)
+        .output()
+        .map_err(|e| e.to_string())?;
+    let value: Value = serde_json::from_slice(&output.stdout).map_err(|e| {
+        format!(
+            "invalid CLI response: {e}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    })?;
+    if output.status.success() {
+        Ok(value)
+    } else {
+        Err(value
+            .pointer("/error/message")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("CLI failed: {value}")))
+    }
 }
 fn snapshot(root: &Path) -> Result<BTreeMap<String, Vec<u8>>> {
     fn visit(root: &Path, path: &Path, out: &mut BTreeMap<String, Vec<u8>>) -> Result {
