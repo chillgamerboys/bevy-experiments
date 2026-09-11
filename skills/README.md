@@ -30,12 +30,13 @@ Start with the [installation and workflow guide](../docs/gameskills.md),
 
 ## Validation
 
-Python 3.11 or newer and Git are required; repository checks use the standard
-library. The queue and command runner currently require macOS or Linux.
+Rust 1.97.1 builds the tools and Git supplies repository identity. Prebuilt CLI
+execution needs no compiler or interpreter. Queue mutation and command supervision
+currently require POSIX support.
 
 ```sh
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
-python3 -m unittest discover -s skills/tests -v
+cargo test --locked -p gameskills-cli --profile ci
 ```
 
 Structural checks, real process/worktree tests and native agent behavior establish
@@ -44,16 +45,15 @@ agent passed them. See the implementation guide for candidate evidence and limit
 
 ## Legacy migration
 
-`source/`, `references/`, the old installer and its tests are frozen compatibility
-material for existing seven-skill adopters. They are not part of the new default
-offering and receive no new feature work. Keeping the old updater during migration
-preserves local overlays and conflict detection; it does not retain seven extra
-core workflows. The [lesson migration map](../plugins/gameskills-maintainer/references/legacy-migration.md)
+`source/`, `references/` and their trigger fixtures are frozen compatibility
+material for existing seven-skill adopters. They are not additional core workflows.
+The Python installer and sync entrypoints are retired. Use `gameskills legacy import`
+to inspect an existing installation, then deliberately apply the Rust installation.
+The [lesson migration map](../plugins/gameskills-maintainer/references/legacy-migration.md)
 records what was retained, rewritten or retired.
 
-Do not delete an adopter's generated files or `.bevy-gamekit/overlays/` blindly.
-Compare their existing installation with its recorded source, preserve local
-changes, and retire the legacy installation only after the selected new packages
-work in that adopter. The old [install](maintainer/install-bevy-skills/SKILL.md)
-and [sync](maintainer/sync-bevy-skills/SKILL.md) workflows remain available for that
-transition; they are not the new adoption entrypoint.
+Preserve generated client files, `.bevy-gamekit/overlays/` and recorded base snapshots.
+The importer checks their identity and does not delete local guidance. Finish active
+queues with their original runtime; old evidence remains historical. The retired
+[install](maintainer/install-bevy-skills/SKILL.md) and
+[sync](maintainer/sync-bevy-skills/SKILL.md) guidance redirects to this migration path.

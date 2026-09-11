@@ -15,15 +15,17 @@ package; it does not authorize installing every package. Level 2 (refine) is the
 creative default; dispatch requires task authorization or applicable standing
 permission even when the configured maximum is five workers.
 
-Use the installed core runtime's `--help` and read-only `status`/`catalog`/`config`
+Use the compatible Rust `gameskills` executable's `--help` and read-only `status`/`catalog`/`config`
 commands to inspect supported settings. `setup --packages ...` prepares the
-configuration proposal; `--bundle <immutable-bundle> --apply` deliberately stages
-the selected packages and updates local configuration. Package names after
+configuration proposal; `--apply` installs its embedded baseline. An explicit
+`--bundle <immutable-bundle> --apply` installs or rolls back to verified compatible
+instructions. Both operations update local configuration and its content lock. Package names after
 `--packages` are space-separated. Use `setup --recover` after an interrupted
 update; it restores the previous config/lock and refuses to overwrite newer edits.
 Use exact command syntax from the runtime, inspect the proposal and preserve
-existing owner-controlled values. This helper does not establish native client
-installation or behavioral discovery.
+existing owner-controlled values. Setup does not establish native client
+installation or behavioral discovery. Finish any active queue with its original
+runtime before adoption; old queues and evidence remain historical records.
 
 For an installation/update, use the supported host mechanism and an immutable
 source identity. Compare installed, previous canonical and new canonical content

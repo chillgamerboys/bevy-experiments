@@ -1,7 +1,6 @@
 # Tests and evidence
 
-From the repository root, with Rust 1.97.1 and Python 3.11 or newer for the
-remaining GameSkills runtime tests:
+From the repository root, with Rust 1.97.1:
 
 ```sh
 cargo fmt --all -- --check
@@ -16,7 +15,7 @@ cargo run --locked -p gamekit-repo-tools --profile ci -- bundle check
 cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
-python3 -m unittest discover -s skills/tests -v
+cargo test --locked -p gameskills-cli --profile ci
 ```
 
 Use `cargo test -p <package> --profile ci` for focused iteration. The list above is
@@ -28,28 +27,32 @@ For Rust tooling, use the focused package tests and contract checker:
 ```sh
 cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
 cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
-cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference --cutover
 cargo package --locked -p gameskills-cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- bundle verify-package
 cargo package --locked -p gamekit-repo-tools
 ```
 
-The contract check accounts for the pinned 22 Python files and 142 test methods;
-it does not mark those behaviors ported or verified. The fixture suite includes
-34 observed configuration cases and a compiled subprocess example, without Python
-test children. Cargo packaging builds the extracted CLI source; public installation,
-complete embedded skills and runner support are separate later gates. The existing
-Python tests remain required for owners not yet ported. R2a replaces the repository,
-distribution and catalog test modules with Rust regressions. R2b replaces the CI
-router and its tests; the legacy installer and pinned runtime tests remain Python
-until their respective cutovers.
+The contract check accounts for the frozen 22 Python files and 142 test methods;
+it verifies complete accounting, not test execution. The original reference remains
+in Git history. Rust fixtures cover configuration, immutable installation/recovery,
+real worktrees, native protocols, DAG execution, resource locks, stale evidence and
+POSIX process cleanup. Compiled Rust probes replace interpreter-based children.
+Historical records retain their original runtime identity.
 
-R2c adds real Cargo archive fixtures, normalized manifest/path inspection and
-consumers of extracted library files. Bundle regressions use real Git commits to
-check reproducibility, provenance, dirty/stale inputs, corrupt or extra outputs,
-symlinks and checkout line endings. The prepared bundle is included in the CLI
-archive and compared byte-for-byte after Cargo packaging builds the extracted CLI.
-Preparation does not activate the instructions or port the remaining Python runtime.
+`tests/adoption.rs` copies the actual CLI outside the workspace and exercises a
+fresh POSIX Git adopter with Cargo, rustc and Python absent from its PATH. It checks
+embedded setup, package changes/rollback, interrupted recovery, owner-file preservation, command execution
+and evidence invalidation. `GAMESKILLS_CANDIDATE_BINARY` can select the executable
+built from an extracted Cargo archive for that same trial. Native authentication
+and visual game quality remain separate evidence.
+
+Archive tests inspect actual Cargo output, normalized manifests, safe paths and
+external library consumers. Bundle tests verify committed provenance, reproducibility,
+corruption/drift rejection and exact payload bytes in the CLI Cargo package. Queue
+operations, runner supervision and native Codex verification report unsupported on
+Windows until their process/state backend is implemented and independently tested.
+Portable Windows tests do not establish those capabilities.
 
 ## CI selection
 
@@ -57,7 +60,7 @@ Preparation does not activate the instructions or port the remaining Python runt
 local links and the routing regressions, then selects component jobs through
 [`gamekit-repo ci`](../tools/gamekit-repo-tools/src/ci/mod.rs). Narrative docs avoid Rust and skill-runtime
 jobs; skill instructions receive the skill matrix with Rust structural validators
-and the remaining Python runtime tests; a game edit
+and Rust CLI tests; a game edit
 receives its package tests and Clippy. Shared libraries also select their reverse
 consumers and applicable distribution, minimal-feature and browser-core checks.
 Selected Rust and skill jobs retain macOS/Linux/Windows coverage. The Rust routing,
@@ -70,8 +73,8 @@ respective tool package is selected or the full suite is required. All use the s
 pinned toolchain as game builds. The always-run layout check bootstraps only the small
 repository-tool package. The final gate independently builds that same checked-out
 Rust package with the locked dependencies and pinned toolchain; a bootstrap failure
-fails its job, with no older binary or successful fallback. Python setup belongs
-only to the skill matrix for the remaining runtime tests.
+fails its job, with no older binary or successful fallback. CI requires no Python
+setup or interpreter.
 
 The selector reads committed base and tested-tree manifests, including normal,
 development, build and target-specific local dependencies. PR checks compare the
@@ -104,8 +107,7 @@ reads `CI_SELECTION`. Build that controller with `--target-dir target/ci-control
 as the workflow does; its Cargo children retain the ordinary target directory,
 so Windows can rebuild the tested binary without replacing a running executable.
 It requires matching checkout HEAD, streams ordered child logs
-and stops on the first failure. Its final line is versioned JSON; for local skill
-runs use `--python python3` if the interpreter is not named `python`. `ci gate` reads
+and stops on the first failure. Its final line is versioned JSON. `ci gate` reads
 `CI_SELECTION` and `CI_NEEDS`; malformed/duplicate JSON and missing results fail.
 
 Hosted classification runs real-Git docs-only, tools-only, game-only and shared-input

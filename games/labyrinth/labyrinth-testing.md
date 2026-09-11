@@ -70,7 +70,7 @@ cargo clippy --workspace --all-targets --all-features --profile ci -- -D warning
 cargo fmt --all -- --check
 cargo deny check
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
-python3 -m unittest discover -s skills/tests -v
+cargo test --locked -p gameskills-cli --profile ci
 ```
 
 ## What each layer proves

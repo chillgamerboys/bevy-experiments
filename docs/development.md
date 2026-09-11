@@ -5,14 +5,14 @@ toolchain pins Rust 1.97.1 for the workspace and its locked Bevy 0.19 dependenci
 Linux builds need the window,
 input and ALSA development libraries installed by CI; live LAN browsing also needs
 Avahi. Native targets are macOS/Linux/Windows. Capability wasm compile checks do not
-promise packaged browser games. Repository/skill tooling uses Python 3.11 or newer
-(standard library only); CI selects Python 3.13 explicitly.
+promise packaged browser games. Repository maintenance and GameSkills runtime logic
+are Rust; metadata and agent instructions remain data and Markdown.
 
-The [Rust tooling foundation](../tools/gameskills-cli/README.md) adds explicit
-configuration validation and [migration accounting](../tools/gamekit-repo-tools/README.md).
-Its new commands run alongside the current Python candidate; installation and
-execution have not switched runtimes. Both tool packages initially declare the
-tested Rust 1.97.1 minimum and remain unpublished.
+The [Rust GameSkills CLI](../tools/gameskills-cli/README.md) handles installation,
+configuration, queues and command evidence. The separate
+[repository tool](../tools/gamekit-repo-tools/README.md) owns validators, CI and
+distribution checks. Both packages declare the tested Rust 1.97.1 minimum and remain
+unpublished. Prebuilt runtime adoption does not require a Rust compiler.
 
 ```sh
 cargo run                         # Labyrinth multiplayer menu

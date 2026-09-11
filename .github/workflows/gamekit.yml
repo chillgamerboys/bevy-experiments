@@ -55,9 +55,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.97.1'
@@ -89,7 +86,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Verify migration accounting against the accepted source
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
-        run: cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference --cutover
       - name: Verify the standalone CLI Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
         run: cargo package --locked -p gameskills-cli

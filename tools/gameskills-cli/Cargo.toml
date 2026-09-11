@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 rust-version = "1.97.1"
-description = "GameSkills Rust migration candidate: configuration checks and command contracts"
+description = "Installable Bevy and GameKit development workflows, instruction bundles and command evidence"
 repository = "https://github.com/chillgamerboys/bevy-experiments"
 readme = "README.md"
 include = ["src/**", "tests/**", "examples/**", "bundle/**", "Cargo.toml", "README.md"]
@@ -16,8 +16,22 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-serde_json.workspace = true
+# Evidence hashes require exact fractional observations after JSON reload.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 toml.workspace = true
+serde.workspace = true
+sha2.workspace = true
+flate2.workspace = true
+tar.workspace = true
+semver.workspace = true
+tempfile.workspace = true
+toml_edit.workspace = true
+regex.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+nix.workspace = true
+signal-hook.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

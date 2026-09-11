@@ -268,7 +268,7 @@ fn full_selection_requires_every_flag_and_selective_rust_requires_packages() -> 
 
 #[test]
 fn game_commands_exclude_distribution_and_other_games() -> TestResult {
-    let commands = checks::commands(&selection(), Job::Rust, "python")?;
+    let commands = checks::commands(&selection(), Job::Rust)?;
     assert_eq!(
         commands,
         vec![
@@ -300,7 +300,7 @@ fn game_commands_exclude_distribution_and_other_games() -> TestResult {
 fn labyrinth_keeps_real_process_check() -> TestResult {
     let mut value = selection();
     value.packages = vec!["labyrinth".into()];
-    let commands = checks::commands(&value, Job::Rust, "python")?;
+    let commands = checks::commands(&value, Job::Rust)?;
     assert_eq!(commands.len(), 3);
     assert_eq!(
         commands.get(1),
@@ -325,8 +325,8 @@ fn labyrinth_keeps_real_process_check() -> TestResult {
 #[test]
 fn skills_and_distribution_call_rust_validators() -> TestResult {
     let value = full();
-    let skills = checks::commands(&value, Job::Skills, "python executable")?;
-    let rust = checks::commands(&value, Job::Rust, "python executable")?;
+    let skills = checks::commands(&value, Job::Skills)?;
+    let rust = checks::commands(&value, Job::Rust)?;
     assert_eq!(
         skills.first(),
         Some(&argv(&[
@@ -369,13 +369,13 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
     assert_eq!(
         skills.last(),
         Some(&argv(&[
-            "python executable",
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "skills/tests",
-            "-v",
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "gameskills-cli",
+            "--profile",
+            "ci",
         ]))
     );
     assert!(!skills
@@ -397,7 +397,7 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
 fn selected_policy_avoids_shared_checks_and_preserves_package_arguments() -> TestResult {
     let mut value = selection();
     value.packages.push("deckbuilder_ui".into());
-    let commands = checks::commands(&value, Job::Policy, "python")?;
+    let commands = checks::commands(&value, Job::Policy)?;
     assert_eq!(
         commands,
         vec![
@@ -431,7 +431,7 @@ fn selected_policy_avoids_shared_checks_and_preserves_package_arguments() -> Tes
 
 #[test]
 fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
-    let commands = checks::commands(&full(), Job::Policy, "python")?;
+    let commands = checks::commands(&full(), Job::Policy)?;
     assert_eq!(commands.len(), 11);
     assert_eq!(
         commands.get(3),
@@ -521,7 +521,7 @@ fn optional_policy_flags_and_wasm_intersection_are_independent() -> TestResult {
         "bevy_game_ui".into(),
     ];
     value.wasm = true;
-    let commands = checks::commands(&value, Job::Policy, "python")?;
+    let commands = checks::commands(&value, Job::Policy)?;
     assert_eq!(commands.len(), 5);
     assert_eq!(
         commands.last(),
@@ -538,10 +538,10 @@ fn optional_policy_flags_and_wasm_intersection_are_independent() -> TestResult {
     );
     value.wasm = false;
     value.deny = true;
-    assert_eq!(checks::commands(&value, Job::Policy, "python")?.len(), 5);
+    assert_eq!(checks::commands(&value, Job::Policy)?.len(), 5);
     value.deny = false;
     value.minimal = true;
-    assert_eq!(checks::commands(&value, Job::Policy, "python")?.len(), 7);
+    assert_eq!(checks::commands(&value, Job::Policy)?.len(), 7);
     Ok(())
 }
 
@@ -550,7 +550,7 @@ fn other_checkout_cannot_reuse_selection() -> TestResult {
     let (root, mut value) = checkout()?;
     value.head = "c".repeat(40);
     let mut invoked = 0;
-    let error = checks::run_with(root.path(), &value, Job::Rust, "python", |_| {
+    let error = checks::run_with(root.path(), &value, Job::Rust, |_| {
         invoked += 1;
         Ok(())
     })
@@ -568,13 +568,13 @@ fn runner_rejects_invalid_unselected_and_unavailable_checkouts_before_children()
         invoked += 1;
         Ok(())
     };
-    assert!(checks::run_with(root.path(), &value, Job::Skills, "python", &mut callback).is_err());
-    assert!(checks::commands(&value, Job::Skills, "python").is_err());
+    assert!(checks::run_with(root.path(), &value, Job::Skills, &mut callback).is_err());
+    assert!(checks::commands(&value, Job::Skills).is_err());
     value.schema_version = 2;
-    assert!(checks::run_with(root.path(), &value, Job::Rust, "python", &mut callback).is_err());
+    assert!(checks::run_with(root.path(), &value, Job::Rust, &mut callback).is_err());
     value.schema_version = 1;
     let other = tempfile::tempdir()?;
-    assert!(checks::run_with(other.path(), &value, Job::Rust, "python", &mut callback).is_err());
+    assert!(checks::run_with(other.path(), &value, Job::Rust, &mut callback).is_err());
     assert_eq!(invoked, 0);
     Ok(())
 }
@@ -582,9 +582,9 @@ fn runner_rejects_invalid_unselected_and_unavailable_checkouts_before_children()
 #[test]
 fn runner_preserves_command_order_and_returns_completed_count() -> TestResult {
     let (root, value) = checkout()?;
-    let expected = checks::commands(&value, Job::Rust, "python")?;
+    let expected = checks::commands(&value, Job::Rust)?;
     let mut invoked = Vec::new();
-    let count = checks::run_with(root.path(), &value, Job::Rust, "python", |arguments| {
+    let count = checks::run_with(root.path(), &value, Job::Rust, |arguments| {
         invoked.push(arguments.to_vec());
         Ok(())
     })?;
@@ -599,7 +599,7 @@ fn runner_stops_at_first_failed_child_and_reports_its_position() -> TestResult {
     value.packages = vec!["labyrinth".into()];
     for failing_command in 1..=3 {
         let mut invoked = 0;
-        let error = checks::run_with(root.path(), &value, Job::Rust, "python", |_| {
+        let error = checks::run_with(root.path(), &value, Job::Rust, |_| {
             invoked += 1;
             if invoked == failing_command {
                 Err("child exit 23".into())

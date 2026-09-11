@@ -4,13 +4,15 @@ Start with [GameSkills](gameskills.md) for the installed workflow and its curren
 limits, then [development](development.md) and [testing](testing.md) for commands.
 The [framework decision](decisions/gameskills-framework.md) owns project direction;
 the [Rust migration plan](decisions/gameskills-rust-cli.md) owns the implementation
-sequence, first PR and acceptance checks after the accepted bounded trials.
+sequence and acceptance checks; its status records the completed implementation.
 Game-specific behavior belongs with each game below.
 
 - [GameSkills installation and development workflow](gameskills.md)
+- [Packaged Rust CLI smoke test](gameskills-smoke-test.md)
 - [Implemented CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
 - [Accepted refinement observations and follow-ups](decisions/gameskills-refinement-results.md)
 - [Repository-wide Rust tooling migration plan](decisions/gameskills-rust-cli.md)
+- [Rust candidate adoption and cutover evidence](decisions/gameskills-rust-adoption.md)
 - [GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
 - [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)

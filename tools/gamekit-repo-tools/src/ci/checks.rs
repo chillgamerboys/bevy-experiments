@@ -130,10 +130,9 @@ fn repository_command(command: &str, action: &str) -> Vec<String> {
 
 /// Build the ordered literal argument vectors for one selected CI job.
 ///
-/// The Python executable is used only for the remaining GameSkills runtime tests.
 /// Paths containing spaces remain one argument; no shell expansion is performed.
 /// Planning does not launch commands or check the current checkout identity.
-pub fn commands(selection: &Selection, job: Job, python: &str) -> Result<Vec<Vec<String>>, String> {
+pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, String> {
     validate(selection)?;
     if !selection.selected(job) {
         return Err(format!(
@@ -164,13 +163,13 @@ pub fn commands(selection: &Selection, job: Job, python: &str) -> Result<Vec<Vec
             commands.push(repository_command("skills", "validate"));
             commands.push(repository_command("bundle", "check"));
             commands.push(argv(&[
-                python,
-                "-m",
-                "unittest",
-                "discover",
-                "-s",
-                "skills/tests",
-                "-v",
+                "cargo",
+                "test",
+                "--locked",
+                "-p",
+                "gameskills-cli",
+                "--profile",
+                "ci",
             ]));
         }
         Job::Rust => {
@@ -296,14 +295,13 @@ pub fn run_with(
     root: &Path,
     selection: &Selection,
     job: Job,
-    python: &str,
     mut callback: impl FnMut(&[String]) -> Result<(), String>,
 ) -> Result<usize, String> {
     validate(selection)?;
     if head(root)? != selection.head {
         return Err("selection does not match tested checkout".into());
     }
-    let commands = commands(selection, job, python)?;
+    let commands = commands(selection, job)?;
     for (index, arguments) in commands.iter().enumerate() {
         callback(arguments).map_err(|error| {
             format!(

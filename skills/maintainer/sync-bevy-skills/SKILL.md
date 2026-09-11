@@ -1,25 +1,21 @@
 ---
 name: sync-bevy-skills
-description: Audit and synchronize an installed Bevy Gamekit skill pack to an explicitly selected tag or commit while preserving adopter overlays and surfacing generated-file conflicts. Use when a game already has `.bevy-gamekit/skills.json`. Do not use for first-time installation.
+description: Migrate an existing seven-skill Bevy Gamekit installation to the Rust GameSkills framework while preserving recorded bases and local overlays. Use for legacy adoption; new projects should use gameskills:setup.
 ---
 
-# Sync Bevy Skills
+# Migrate the legacy installation
 
-Synchronize conservatively from the pinned rendered base. Run commands from the
-checked-out Gamekit repository root, using Python 3.11 or newer.
+The former Python `sync` entrypoint is retired. Read the
+[GameSkills adoption guide](../../../docs/gameskills.md) and inspect the existing
+`.bevy-gamekit/skills.json`, recorded base files, generated client skills and local
+overlays. Use the compatible Rust executable:
 
-1. Read `.bevy-gamekit/skills.json`; stop if its schema, source pin, or base snapshot is missing. Verify the complete base file set and recorded hashes before trusting the three-way comparison.
-2. Check out the requested target tag or SHA. Never resolve a moving `latest`, `HEAD`, `main`, or `master` value, and reject a dirty or mismatched source checkout.
-3. Audit without mutation:
+```sh
+gameskills --root <repo> legacy import
+```
 
-   ```sh
-   python3 skills/scripts/skills_tool.py sync --target <repo> --revision <tag-or-sha>
-   ```
-
-4. Present ADD, UPDATE, DELETE, NO-OP, and CONFLICT classifications. For conflicts, compare pinned base, desired head, and adopter file.
-5. Resolve generated-file conflicts explicitly before applying. Never overwrite `.bevy-gamekit/overlays`.
-6. After confirmation and a conflict-free audit, rerun with `--apply`. Use `--allow-dirty` only after auditing unrelated changes.
-7. Confirm the manifest pin and base snapshot advance together, then run
-   `cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy` from the Gamekit repository root.
-
-If an adopter intentionally wants different guidance, place it in the matching overlay rather than editing generated skills.
+Inspect the proposal and any concrete conflicts. An authorized migration can apply
+the supported `legacy import --apply` operation. Preserve generated files, overlays
+and project instructions; adoption does not authorize removing them. Finish active
+queues with their original runtime. Verify the selected new packages and actual
+client discovery before declaring adoption complete.

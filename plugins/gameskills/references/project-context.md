@@ -6,13 +6,14 @@ toolbox request does not require a new plan, an issue, or queue creation.
 
 Resolve the installed `gameskills` package from the host's actual skill/plugin
 location, or a project-configured explicit package path. Its directory contains
-`skills/`, `references/` and `scripts/`. Do not assume a sibling package, a source
+`skills/` and `references/`. The Rust executable is distributed separately from
+the immutable instructions; inspect its `--version` and compatibility requirements. Do not assume a sibling package, a source
 checkout or a globally fixed install location is the installed core.
 
 When execution depends on setup, inspect readiness with:
 
 ```text
-python3 <resolved-core>/scripts/gameskills.py --root <repo> status
+<gameskills-executable> --root <repo> status
 ```
 
 This is a read-only observation. Missing configuration, packages or prerequisites

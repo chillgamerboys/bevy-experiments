@@ -10,20 +10,20 @@ acceptance checks, invokes other skills, merges Git branches, or contacts GitHub
 
 ## Commands
 
-Resolve the installed core package and use Python 3.11 or newer. `ROOT` is the
+Resolve the compatible Rust `gameskills` executable and the installed core package. `ROOT` is the
 actual repository checkout root that owns this queue, not an arbitrary child
 folder. These helpers require project setup/configuration.
 
 ```sh
-python3 <resolved-core>/scripts/gameskills.py --root <repo> plan validate --file PLAN.json
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue create --file PLAN.json
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue status wave-one
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue inject wave-one --file ORDER.json --expected-revision 1
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue start wave-one ui-copy --worktree <worker-checkout> --expected-revision 2
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue report wave-one ui-copy --file REPORT.json --expected-revision 3
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue block wave-one ui-copy --file BLOCK.json --expected-revision 4
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue resume wave-one ui-copy --worktree <worker-checkout> --expected-revision 5
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue integrated wave-one ui-copy --file INTEGRATION.json --expected-revision 7
+<gameskills-executable> --root <repo> plan validate --file PLAN.json
+<gameskills-executable> --root <repo> queue create --file PLAN.json
+<gameskills-executable> --root <repo> queue status wave-one
+<gameskills-executable> --root <repo> queue inject wave-one --file ORDER.json --expected-revision 1
+<gameskills-executable> --root <repo> queue start wave-one ui-copy --worktree <worker-checkout> --expected-revision 2
+<gameskills-executable> --root <repo> queue report wave-one ui-copy --file REPORT.json --expected-revision 3
+<gameskills-executable> --root <repo> queue block wave-one ui-copy --file BLOCK.json --expected-revision 4
+<gameskills-executable> --root <repo> queue resume wave-one ui-copy --worktree <worker-checkout> --expected-revision 5
+<gameskills-executable> --root <repo> queue integrated wave-one ui-copy --file INTEGRATION.json --expected-revision 7
 ```
 
 The examples show command syntax, not an executable sequence: resumed work must
@@ -298,3 +298,10 @@ its observations require coordinator reassessment. Queue events and evidence
 are historical records, not proof that all live facts remain unchanged. The
 helper has no timed leases or automatic worker-death detection: after interruption,
 inspect actual workers/checks and use the explicit block/resume transitions.
+
+Authored plans remain schema 1. Rust queues use schema 2 and runtime `rust`; their
+`at` timestamps contain explicit Unix seconds and nanoseconds. Historical Python
+queues are read as history and remain immutable to the Rust runtime. Finish an
+active old queue before creating or mutating a Rust queue. Setup and mutations
+share the queue lock; mutations re-read configuration under that lock to reject
+a stale pre-read selection.

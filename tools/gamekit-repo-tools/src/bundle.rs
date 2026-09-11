@@ -1,4 +1,4 @@
-//! Deterministic, preparation-only instruction artifacts from committed canonical sources.
+//! Deterministic, compatible instruction artifacts from committed canonical sources.
 
 use crate::catalog::EXPECTED_SKILLS;
 use crate::support::{parse_json, portable_relative, read_json};
@@ -190,14 +190,14 @@ fn compatibility(source: &[u8]) -> Result<Value, String> {
     if object.len() != expected.len() || expected.iter().any(|key| !object.contains_key(*key)) {
         return Err("unexpected or missing bundle compatibility fields".into());
     }
-    for key in [
-        "schema_version",
-        "config_schema",
-        "queue_schema",
-        "evidence_schema",
+    for (key, expected) in [
+        ("schema_version", 1),
+        ("config_schema", 1),
+        ("queue_schema", 2),
+        ("evidence_schema", 2),
     ] {
-        if value.get(key).and_then(Value::as_u64) != Some(1) {
-            return Err(format!("unsupported {key}; expected integer 1"));
+        if value.get(key).and_then(Value::as_u64) != Some(expected) {
+            return Err(format!("unsupported {key}; expected integer {expected}"));
         }
     }
     for key in ["cli_version_range", "bevy", "gamekit"] {
@@ -209,8 +209,8 @@ fn compatibility(source: &[u8]) -> Result<Value, String> {
             return Err(format!("expected nonempty compatibility {key}"));
         }
     }
-    if value.get("activation").and_then(Value::as_str) != Some("preparation-only") {
-        return Err("R2 bundle activation must remain preparation-only".into());
+    if value.get("activation").and_then(Value::as_str) != Some("runtime") {
+        return Err("bundle must declare compatible Rust runtime activation".into());
     }
     semver::VersionReq::parse(
         value
@@ -384,7 +384,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn report(prepared: &Prepared) -> Value {
-    json!({"source_commit":prepared.manifest.get("source_commit"),"source_commit_verified":prepared.source_commit_verified,"source_commit_notice":if prepared.source_commit_verified {"recorded commit and current inputs match"} else {"historical commit unavailable; current committed content verified"},"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":12,"optional_skills":9,"activation":"preparation-only"})
+    json!({"source_commit":prepared.manifest.get("source_commit"),"source_commit_verified":prepared.source_commit_verified,"source_commit_notice":if prepared.source_commit_verified {"recorded commit and current inputs match"} else {"historical commit unavailable; current committed content verified"},"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":12,"optional_skills":9,"activation":"runtime"})
 }
 
 /// Prepare the fixed package-local snapshot from a full committed source ID.
@@ -507,6 +507,6 @@ pub fn verify_package(root: &Path, archive: Option<&Path>) -> Result<Value, Stri
         }
     }
     Ok(
-        json!({"bundle":bundle,"cargo_archive":report,"activation":"preparation-only","cargo_build_verified":false}),
+        json!({"bundle":bundle,"cargo_archive":report,"activation":"runtime","cargo_build_verified":false}),
     )
 }
