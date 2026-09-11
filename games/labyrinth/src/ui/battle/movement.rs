@@ -51,7 +51,7 @@ pub(super) fn mount(world: &mut World, parent: Entity, team: Team, snapshot: &Co
         "Projected Rank Positions",
         Node {
             width: Val::Percent(100.0),
-            height: Val::Px(78.0),
+            height: Val::Px(48.0),
             ..default()
         },
     );
@@ -165,11 +165,7 @@ fn update(
     if world.get::<bevy_gamekit::ui::UiTextStyle>(strip.heading) != Some(&heading_style) {
         world.entity_mut(strip.heading).insert(heading_style);
     }
-    world.get_mut::<Node>(strip.row).expect("rank row").height = Val::Px(if compact {
-        66.0
-    } else {
-        78.0 * metrics.content_scale
-    });
+    world.get_mut::<Node>(strip.row).expect("rank row").height = Val::Px(48.0);
     let cleared = |id| {
         forecast.actors.iter().any(|change| {
             change.actor == id && change.outcome == Knowledge::Known(ForecastOutcome::CorpseCleared)
@@ -214,11 +210,7 @@ fn update(
         } else {
             rank_label(to, width)
         };
-        set_text(
-            world,
-            *marker,
-            format!("{}\n{ranks}", actors::formation_name(snapshot, actor)),
-        );
+        set_text(world, *marker, format!("{identity}\n{ranks}"));
         world.entity_mut(*marker).insert((
             AccessibleLabel::new(format!(
                 "After action: {identity}, ranks {} to {}",

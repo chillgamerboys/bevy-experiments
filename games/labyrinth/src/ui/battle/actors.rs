@@ -155,9 +155,9 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         TextLayout::justify(Justify::Center),
         Node {
             width: Val::Percent(100.0),
-            // Two name lines and current HP have fixed height. The final
+            // One name line and current HP have fixed height. The final
             // semantic height is resolved below, independently of their values.
-            height: Val::Px(72.0),
+            height: Val::Px(40.0),
             min_width: Val::Px(0.0),
             flex_shrink: 0.0,
             ..default()
@@ -242,32 +242,17 @@ pub(super) fn actor_color(kind: ActorKind) -> Color {
 
 pub(super) use crate::presentation::{actor_name as display_name, actor_title as title};
 
-/// Reserve two name lines in narrow formation columns, keeping HP/ranks aligned.
-pub(super) fn formation_name(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
-    let name = display_name(snapshot, actor);
-    if actor.team() == Team::Enemies {
-        name.replace(' ', "\n")
-    } else {
-        format!("\n{name}")
-    }
-}
-
 pub(super) fn compact_formation(metrics: ResolvedUiMetrics) -> bool {
     metrics.logical_size.y < 900.0 && metrics.content_scale > 1.0
 }
 
 pub(super) fn identity_font_limit(metrics: ResolvedUiMetrics) -> f32 {
-    if compact_formation(metrics) {
-        24.0
-    } else {
-        f32::INFINITY
-    }
+    (16.0 * metrics.content_scale).min(18.0)
 }
 
-/// Keep full names readable in fixed rank columns at enlarged UI scales.
-/// Use a conservative glyph budget, then verify actual shaping in layout tests.
-/// Reserve the ownership suffix even when absent so taking ownership cannot
-/// change text size. This affects text only; the footer keeps its semantic height.
+/// Game-owned compact identity typography: complete names occupy one line.
+/// Keep the shared body-text minimum for prose; these fixed formation labels
+/// have their own smaller scale and retain full names in accessible inspection.
 pub(super) fn fit_identity_text(
     world: &mut World,
     entity: Entity,
@@ -276,24 +261,27 @@ pub(super) fn fit_identity_text(
     metrics: ResolvedUiMetrics,
     maximum: f32,
 ) {
+    world.entity_mut(entity).remove::<UiTextRole>();
     let width = world
         .get::<ComputedNode>(entity)
         .map_or(0.0, |node| node.size().x * node.inverse_scale_factor);
     if width <= 0.0 {
         return;
     }
-    let letters = name.split_whitespace().map(str::len).max().unwrap_or(1)
-        + usize::from(actor.team() == Team::Heroes);
-    let desired = (world.resource::<UiTheme>().body_size * metrics.content_scale).min(maximum);
-    let fitted = desired
-        .min((width - 4.0) / (letters as f32 * 0.65))
-        .max(18.0);
-    let style = bevy_gamekit::ui::UiTextStyle {
-        base_size: Some(fitted / metrics.content_scale),
-        ..default()
-    };
-    if world.get::<bevy_gamekit::ui::UiTextStyle>(entity) != Some(&style) {
-        world.entity_mut(entity).insert(style);
+    // Reserve ownership and initiative-state marks, even while absent.
+    let letters = name.chars().count() + 2 + usize::from(actor.team() == Team::Heroes);
+    let fitted = identity_font_limit(metrics)
+        .min(maximum)
+        .min((width - 4.0) / (letters as f32 * 0.5))
+        .max(11.0);
+    let font = world.resource::<UiFonts>().body.clone();
+    if let Some(mut text_font) = world.get_mut::<TextFont>(entity) {
+        let mut next = text_font.clone();
+        next.font_size = bevy::text::FontSize::Px(fitted);
+        next.font = font.into();
+        if *text_font != next {
+            *text_font = next;
+        }
     }
 }
 
@@ -484,7 +472,7 @@ fn summary_geometry(world: &mut World, entity: Entity, metrics: ResolvedUiMetric
         18.0
     };
     let line_height = (size.min(identity_font_limit(metrics)) * 1.2).ceil();
-    let height = Val::Px(line_height * 3.0);
+    let height = Val::Px(line_height * 2.0);
     if let Some(mut node) = world.get_mut::<Node>(entity) {
         if node.height != height {
             node.height = height;
@@ -598,11 +586,7 @@ pub(super) fn present(
         set_text(
             world,
             text,
-            format!(
-                "{}{}\n{hp_text}",
-                formation_name(snapshot, actor),
-                if yours { "*" } else { "" }
-            ),
+            format!("{}{}\n{hp_text}", identity, if yours { "*" } else { "" }),
         );
         summary_geometry(world, text, metrics);
         fit_identity_text(
@@ -1234,7 +1218,7 @@ mod tests {
                         .0
                         .lines()
                         .count()
-                        == 3
+                        == 2
                 );
                 assert_eq!(
                     app.world()

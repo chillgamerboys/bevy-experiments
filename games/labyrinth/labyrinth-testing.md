@@ -44,19 +44,31 @@ Pure regressions compare preview and committed effects for full/partial/blocked
 pushes, whole large-unit movement and lethal suppression. Production UI tests cover
 pointer/keyboard selection and confirmation, stable live anchors, whole-footprint
 markers and disclosure/decision revocation at normal sizes and 200% scale. Inspect
-the four rendered frames separately for legibility and clipping. Name labels fit
-within their fixed columns at enlarged text scales, with a minimum 18 px font;
-full class/type detail remains available through inspection. Short windows with
+the four rendered frames separately for legibility and clipping. Complete names
+stay on one line, with HP or projected ranks on the next line. Compact identity
+labels fit their columns at 11–18 logical pixels, independently of body-text scale;
+full class/type detail remains available through inspection. Tests count actual
+rendered glyph lines as well as checking bounds. Short windows with
 enlarged text reserve a compact forecast lane before selection, so the preview
 cannot overlap live names or shift the sprites. Regression coverage
 includes repeated-class names, wire snapshot round trips and name-bearing log events.
 
-The native walk remains pending while the desktop is locked. Once available, run
-`gameskills run labyrinth-build`, launch `target/ci/labyrinth --local --seed 42`
-with an isolated profile, reach the Gatekeeper, compare both initial front targets,
-then confirm and check the actual ranks. Repeat with keyboard selection and resize.
-Human feedback on the damage/positioning tradeoff remains a separate acceptance
-decision; automated correctness does not establish balance or enjoyment.
+The September 11 native walk used the rebuilt app, an isolated `names-trial`
+profile and seed 42. Real enemy actions ran while the earlier heroes waited.
+Alden selected Driving Blow with shortcut 3 and compared the initial Ash Brute
+(one rank, Hauler limit) and Iron Brute (two ranks) using the pointer. Escape
+cleared the preview without changing HP or formation; shortcut 3 and Space
+recreated it on the focused Iron Brute. Tab reached Confirm and Enter committed:
+Iron Brute fell from 20 to 17 HP and moved from rank 2 to 4, while the intact
+Hauler shifted from ranks 3–4 to 2–3. The preview cleared for Ember's next decision.
+
+The native window was resized, and the settings menu switched to 200% text.
+Monster names stayed on one line. An Ember/Iris reposition preview also remained
+readable and was cancelled; the menus returned to the game and Auto scale was
+restored. Native screenshots and accessibility observations are saved under
+`target/review/labyrinth-native-*.jpg` and `.txt`. The game is left open for owner
+review. Human feedback on the damage/positioning tradeoff remains separate;
+verified input and rules do not establish balance or enjoyment.
 
 ## Handoff follow-up — September 10, 2026
 

@@ -136,7 +136,7 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
         let marker = find_named(app.world_mut(), "Actor 104 Landing Marker").expect("destination");
         assert_eq!(
             app.world().get::<Text>(marker).expect("ranks").0,
-            "Iron\nBrute\n2 → 4"
+            "Iron Brute\n2 → 4"
         );
         assert!(app.world().get::<Button>(marker).is_none());
         assert!(app.world().get::<Action>(marker).is_none());
@@ -145,7 +145,7 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
             find_named(app.world_mut(), "Actor 101 Landing Marker").expect("whole footprint");
         assert_eq!(
             app.world().get::<Text>(hauler).expect("ranks").0,
-            "Ossuary\nHauler\n3–4 → 2–3"
+            "Ossuary Hauler\n3–4 → 2–3"
         );
         assert!(
             app.world()
@@ -181,11 +181,27 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
                 .get::<ComputedNode>(marker)
                 .expect("marker bounds")
                 .size();
-            let text = app
+            let layout = app
                 .world()
                 .get::<bevy::text::TextLayoutInfo>(marker)
-                .expect("measured marker")
-                .size;
+                .expect("measured marker");
+            let text = layout.size;
+            let name = app.world().get::<Name>(marker).expect("label name");
+            let lines = layout
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.line_index)
+                .max()
+                .map_or(0, |last| last + 1);
+            assert_eq!(
+                lines,
+                if name.as_str().starts_with("Initiative Actor ") {
+                    1
+                } else {
+                    2
+                },
+                "{name} must keep the complete name on one rendered line"
+            );
             assert!(
                 text.x <= bounds.x + 0.5 && text.y <= bounds.y + 0.5,
                 "{} text must fit at the selected scale: {text:?} in {bounds:?}",
@@ -294,7 +310,7 @@ fn partial_movement_explains_footprint_and_revokes_concealed_preview() {
     let marker = find_named(app.world_mut(), "Actor 103 Landing Marker").expect("target");
     assert_eq!(
         app.world().get::<Text>(marker).expect("rank").0,
-        "Ash\nBrute\n1 → 2"
+        "Ash Brute\n1 → 2"
     );
     for paused in [true, false] {
         app.world_mut().resource_mut::<LabyrinthView>().paused = paused;
