@@ -209,6 +209,7 @@ fn observe(
     mut socket: UnixStream,
     cwd: Directory,
     directory: &Directory,
+    locks: &[OwnedFd],
     name: &str,
     spec: &Spec,
 ) -> Result<Value, String> {
@@ -223,13 +224,43 @@ fn observe(
     rustix::process::fchdir(&cwd.0).map_err(|e| e.to_string())?;
     let mut argv = spec.argv.iter();
     let program = argv.next().ok_or("empty command")?;
-    let spawn = Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(argv)
         .stdin(Stdio::null())
         .stdout(stdout.try_clone().map_err(|e| e.to_string())?)
         .stderr(stderr.try_clone().map_err(|e| e.to_string())?)
-        .process_group(0)
-        .spawn();
+        .process_group(0);
+    // This dedicated supervisor has one thread and one command spawn. Only the
+    // active/resource lock descriptions cross exec: a surviving command (and
+    // its descendants) must retain them even if this supervisor is killed.
+    // Cwd, run directory and lifecycle socket remain private CLOEXEC descriptors.
+    let mut spawn = (|| {
+        for fd in locks {
+            rustix::io::fcntl_setfd(fd, rustix::io::FdFlags::empty())?;
+        }
+        command.spawn()
+    })();
+    // Restore every descriptor before any further work, including after a
+    // partial flag change or spawn failure. Restoration failure after a spawn
+    // must clean the command up rather than lose a live child on an error path.
+    let mut restore_errors: Vec<_> = locks
+        .iter()
+        .filter_map(|fd| {
+            rustix::io::fcntl_setfd(fd, rustix::io::FdFlags::CLOEXEC)
+                .err()
+                .map(|error| error.to_string())
+        })
+        .collect();
+    if !restore_errors.is_empty() {
+        if let Ok(child) = &mut spawn {
+            restore_errors.extend(cleanup(child));
+        }
+        return Err(format!(
+            "cannot restore private supervisor lock descriptors: {}",
+            restore_errors.join("; ")
+        ));
+    }
     match spawn {
         Err(error) => {
             writeln!(stderr, "cannot execute {program:?}: {error}").map_err(|e| e.to_string())?;
@@ -354,7 +385,7 @@ pub(super) fn supervisor(args: &[OsString]) -> Result<Value, String> {
     {
         return Err("supervisor request is not bound to an active Rust run".into());
     }
-    let observed = observe(socket, cwd, &directory, name, &spec)
+    let observed = observe(socket, cwd, &directory, &locks, name, &spec)
         .unwrap_or_else(|error| json!({"status":"error","exit_code":null,"error":error}));
     directory.write_json(&format!("{name}.result.json"), &observed)?;
     drop(locks);
