@@ -143,6 +143,13 @@ class Routing(unittest.TestCase):
         self.base = self.save()
         self.assertTrue(self.changed("games/carterfight/assets/shared.bin")["full"])
 
+    def test_explicit_build_script_prevents_docs_shortcut(self):
+        path = self.root / "games/carterfight/Cargo.toml"
+        path.write_text(path.read_text().replace('[package]', '[package]\nbuild = "codegen.rs"'))
+        self.write("games/carterfight/codegen.rs", 'fn main() { let _ = std::fs::read("../../docs/existing.md"); }')
+        self.base = self.save()
+        self.assertTrue(self.changed("docs/existing.md")["full"])
+
     def test_included_skill_keeps_skill_checks(self):
         self.write("plugins/help.md", "Skill instructions")
         self.write("games/carterfight/src/lib.rs", 'const HELP: &str = include_str!("../../../plugins/help.md");\n')
