@@ -8,10 +8,39 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::Resource;
 use labyrinth_rules::{
-    skill_definition, status_definition, ActorId, ActorKind, Boundary, CombatAction,
+    skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction,
     CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, SkillId, StatusInstance,
     StatusKind, StatusTag,
 };
+
+/// Character names belong to the game's presentation, not combat authority.
+/// The encounter roster retains dead/removed actors, so ordering by stable ID
+/// survives formation changes, snapshot serialization and repeated hero classes.
+#[must_use]
+pub fn actor_name(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    const HERO_NAMES: [&str; 6] = ["Alden", "Mara", "Rowan", "Iris", "Ember", "Sera"];
+    if matches!(actor.kind, ActorKind::Enemy(_)) {
+        return actor.kind.name().to_owned();
+    }
+    let index = snapshot
+        .actors
+        .iter()
+        .filter(|other| other.team() == actor.team() && other.id < actor.id)
+        .count();
+    HERO_NAMES
+        .get(index)
+        .map_or_else(|| format!("Hero {}", actor.id.0), |name| (*name).to_owned())
+}
+
+/// Include a hero's class when there is room for inspection detail.
+#[must_use]
+pub fn actor_title(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    let name = actor_name(snapshot, actor);
+    match actor.kind {
+        ActorKind::Hero(_) => format!("{name} · {}", actor.kind.name()),
+        ActorKind::Enemy(_) => name,
+    }
+}
 
 /// A fact that the current viewer can or cannot know; absence is not zero.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,7 +167,7 @@ impl BattlePresentation {
                     ActorPresentation {
                         id: actor.id,
                         kind: actor.kind,
-                        name: actor.kind.name().to_owned(),
+                        name: actor_name(snapshot, actor),
                         standing: actor.standing(),
                         health: if policy.health {
                             Knowledge::Known(Health {
@@ -293,7 +322,10 @@ impl ForecastDisplay {
                             text.push_str(" · formation edge");
                         }
                         Some(labyrinth_rules::MovementLimit::Footprint { actor, ranks }) => {
-                            let name = snapshot.actor(actor).map_or("unit", |actor| actor.name());
+                            let name = snapshot.actor(actor).map_or_else(
+                                || "unit".to_owned(),
+                                |actor| actor_name(snapshot, actor),
+                            );
                             text.push_str(&format!(" · {name} needs {ranks} ranks to pass"));
                         }
                         None => {}

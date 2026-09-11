@@ -330,11 +330,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
             } else {
                 "Your hero"
             };
-            format!(
-                "{} {}\n{state}",
-                actors::token(snapshot, actor),
-                actor.name()
-            )
+            format!("{}\n{state}", actors::display_name(snapshot, actor))
         },
     );
     set_text(world, nodes.identity, identity);

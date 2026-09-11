@@ -178,7 +178,7 @@ pub(super) fn present(
                 "{} {message}",
                 snapshot
                     .actor(*actor)
-                    .map_or_else(String::new, |actor| actors::token(snapshot, actor))
+                    .map_or_else(String::new, |actor| actors::display_name(snapshot, actor))
             )
         })
         .collect::<Vec<_>>()

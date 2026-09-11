@@ -1,6 +1,6 @@
 # Labyrinth verification
 
-## Rust GameSkills trial — formation preview
+## Rust GameSkills trial — named characters and formation preview
 
 Driving Blow now deals 3 damage and attempts a push of up to two ranks. It stops
 at the formation edge or before crossing an occupant wider than the remaining
@@ -10,7 +10,15 @@ second movement result. The content fingerprint is
 `0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9`;
 multiplayer participants need matching builds.
 
-Select Driving Blow (Gatekeeper's third equipped ability), then a front enemy.
+The current company is Alden (Gatekeeper), Mara (Knifehand), Rowan (Scout),
+Iris (Field Medic), and Ember (Lantern Wagon); Sera names a sixth hero when present.
+Names are assigned from stable hero IDs within the encounter roster, independent
+of class, rank, snapshot array order and life state. Monsters use their type names.
+The battlefield, initiative, inspector, effects, forecasts and combat history share
+these names. Hero classes remain secondary inspection information. Names do not
+change actor IDs, ownership or the wire schema.
+
+Select Driving Blow (Alden's third equipped ability), then a front enemy.
 The after-action strip shows destination ranks, with gold markers for every moved
 occupant. Against the initial Iron Brute, the Hauler shifts from 3–4 to 2–3 and the
 Brute moves from 2 to 4. Against the initial Ash Brute, the push covers only one rank:
@@ -23,7 +31,7 @@ The installed Rust CLI records the project-owned checks and their prerequisites:
 ```sh
 gameskills run labyrinth-test labyrinth-lint rust-format repo-check
 gameskills run labyrinth-movement-test
-gameskills run labyrinth-render-movement labyrinth-render-movement-blocked labyrinth-render-movement-wide
+gameskills run labyrinth-render-movement labyrinth-render-movement-blocked labyrinth-render-movement-wide labyrinth-render-movement-large-text
 gameskills evidence validate RUN_ID
 ```
 
@@ -36,7 +44,12 @@ Pure regressions compare preview and committed effects for full/partial/blocked
 pushes, whole large-unit movement and lethal suppression. Production UI tests cover
 pointer/keyboard selection and confirmation, stable live anchors, whole-footprint
 markers and disclosure/decision revocation at normal sizes and 200% scale. Inspect
-the three rendered frames separately for legibility and clipping.
+the four rendered frames separately for legibility and clipping. Name labels fit
+within their fixed columns at enlarged text scales, with a minimum 18 px font;
+full class/type detail remains available through inspection. Short windows with
+enlarged text reserve a compact forecast lane before selection, so the preview
+cannot overlap live names or shift the sprites. Regression coverage
+includes repeated-class names, wire snapshot round trips and name-bearing log events.
 
 The native walk remains pending while the desktop is locked. Once available, run
 `gameskills run labyrinth-build`, launch `target/ci/labyrinth --local --seed 42`

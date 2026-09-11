@@ -11,19 +11,10 @@ struct Entry {
 }
 
 fn entries(view: &LabyrinthView) -> Vec<Entry> {
-    let token = |id: ActorId| {
-        view.combat
-            .as_ref()
-            .and_then(|s| s.actor(id).map(|a| actors::token(s, a)))
-            .unwrap_or_else(|| format!("#{}", id.0))
-    };
     let name = |id: ActorId| {
         view.combat
             .as_ref()
-            .and_then(|s| {
-                s.actor(id)
-                    .map(|a| format!("{} {}", actors::token(s, a), a.name()))
-            })
+            .and_then(|s| s.actor(id).map(|a| actors::display_name(s, a)))
             .unwrap_or_else(|| format!("Character {}", id.0))
     };
     let mut result: Vec<Entry> = Vec::new();
@@ -82,7 +73,7 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                     ..
                 } => format!(
                     "{} → {} −{amount} HP ({kind:?})",
-                    token(source),
+                    name(source),
                     name(target)
                 ),
                 CombatEventKind::Healed {
@@ -90,10 +81,66 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                     target,
                     amount,
                 } => {
-                    format!("{} → {} +{amount} HP", token(source), name(target))
+                    format!("{} → {} +{amount} HP", name(source), name(target))
                 }
                 CombatEventKind::Moved { actor, rank } => format!("{} → rank {rank}", name(actor)),
-                _ => item.event.to_string(),
+                CombatEventKind::TurnSkipped { actor } => format!("{} cannot act", name(actor)),
+                CombatEventKind::Downed { actor } => format!("{} is downed", name(actor)),
+                CombatEventKind::Defeated { actor } => {
+                    format!("{} dies and leaves a corpse", name(actor))
+                }
+                CombatEventKind::Rescued { source, actor, hp } => {
+                    format!("{} rescues {} with {hp} HP", name(source), name(actor))
+                }
+                CombatEventKind::DeathSave {
+                    actor,
+                    roll,
+                    failures,
+                } => match roll {
+                    Some(roll) => format!(
+                        "{} death save {roll}: {}, {failures}/3 failures",
+                        name(actor),
+                        if roll >= labyrinth_rules::DEATH_SAVE_TARGET {
+                            "holds on"
+                        } else {
+                            "failed"
+                        }
+                    ),
+                    None => format!("{} hit while dying: {failures}/3 failures", name(actor)),
+                },
+                CombatEventKind::CorpseRemoved { actor, expired } => format!(
+                    "{} corpse {}",
+                    name(actor),
+                    if expired { "expired" } else { "destroyed" }
+                ),
+                CombatEventKind::StatusApplied { ref instance } => format!(
+                    "{} gains {}",
+                    name(instance.bearer),
+                    status_definition(instance.kind).name
+                ),
+                CombatEventKind::StatusRefreshed { ref instance } => format!(
+                    "{}: {} refreshed",
+                    name(instance.bearer),
+                    status_definition(instance.kind).name
+                ),
+                CombatEventKind::StatusTriggered { actor, kind, .. } => {
+                    format!("{}: {} triggers", name(actor), status_definition(kind).name)
+                }
+                CombatEventKind::StatusRemoved {
+                    actor,
+                    kind,
+                    reason,
+                    ..
+                } => format!(
+                    "{}: {} removed ({reason:?})",
+                    name(actor),
+                    status_definition(kind).name
+                ),
+                CombatEventKind::Finished { outcome } => format!("{outcome:?}"),
+                // These events are group headings, handled above.
+                CombatEventKind::Action { .. }
+                | CombatEventKind::TurnStarted { .. }
+                | CombatEventKind::RoundStarted { .. } => unreachable!("history heading"),
             };
             if let Some(entry) = result.last_mut() {
                 entry.details.push(detail);
@@ -492,7 +539,14 @@ mod tests {
     use crate::view::PresentedEvent;
     #[test]
     fn grouping_uses_typed_boundaries_and_handles_retained_partial_actions() {
-        let mut view = LabyrinthView::default();
+        let mut view = LabyrinthView {
+            combat: Some(
+                labyrinth_rules::Combat::new(42, labyrinth_rules::DEFAULT_HERO_ROSTER)
+                    .expect("combat")
+                    .snapshot(),
+            ),
+            ..default()
+        };
         let kinds = [
             CombatEventKind::Damage {
                 source: ActorId(1),
@@ -508,6 +562,12 @@ mod tests {
                 actor: ActorId(2),
                 turn_id: 2,
             },
+            CombatEventKind::Downed { actor: ActorId(1) },
+            CombatEventKind::StatusTriggered {
+                actor: ActorId(101),
+                instance_id: 99,
+                kind: labyrinth_rules::StatusKind::Bleed,
+            },
         ];
         view.events = kinds
             .into_iter()
@@ -522,6 +582,19 @@ mod tests {
             .collect();
         let grouped = entries(&view);
         assert_eq!(grouped.len(), 3);
+        assert!(grouped
+            .first()
+            .expect("partial")
+            .details
+            .first()
+            .expect("damage")
+            .contains("Alden → Ash Brute"));
+        assert!(grouped.get(1).expect("action").title.starts_with("Alden ·"));
+        assert!(grouped.get(2).expect("turn").title.starts_with("Mara ·"));
+        assert_eq!(
+            grouped.get(2).expect("turn").details,
+            ["Alden is downed", "Ash Brute: Bleed triggers"]
+        );
         assert!(grouped.first().expect("partial").title.contains("partial"));
         assert_eq!(entries(&view), grouped, "snapshot replay is idempotent");
     }

@@ -147,7 +147,7 @@ pub(super) fn slot_value(
                 .and_then(|id| snapshot.actor(id))
                 .map_or_else(
                     || "No actor".to_owned(),
-                    |actor| format!("{} · {}", actors::token(snapshot, actor), actor.name()),
+                    |actor| actors::title(snapshot, actor),
                 );
             let ending = snapshot.outcome.map(|outcome| match outcome {
                 CombatOutcome::Victory => "VICTORY",
@@ -157,10 +157,10 @@ pub(super) fn slot_value(
         }
         Slot::Feedback => String::new(),
         Slot::Reason => {
-            let target = ui
-                .target
-                .and_then(|id| snapshot.actor(id))
-                .map_or_else(|| "—".to_owned(), |actor| actors::token(snapshot, actor));
+            let target = ui.target.and_then(|id| snapshot.actor(id)).map_or_else(
+                || "—".to_owned(),
+                |actor| actors::display_name(snapshot, actor),
+            );
             let obscured = display_actor(view).is_some_and(|actor| {
                 let policy = disclosure.actor(actor.id);
                 !policy.health || !policy.statuses || !policy.details

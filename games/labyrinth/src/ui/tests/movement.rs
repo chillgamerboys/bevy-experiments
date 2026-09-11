@@ -136,7 +136,7 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
         let marker = find_named(app.world_mut(), "Actor 104 Landing Marker").expect("destination");
         assert_eq!(
             app.world().get::<Text>(marker).expect("ranks").0,
-            "E3\n2 → 4"
+            "Iron\nBrute\n2 → 4"
         );
         assert!(app.world().get::<Button>(marker).is_none());
         assert!(app.world().get::<Action>(marker).is_none());
@@ -145,7 +145,7 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
             find_named(app.world_mut(), "Actor 101 Landing Marker").expect("whole footprint");
         assert_eq!(
             app.world().get::<Text>(hauler).expect("ranks").0,
-            "E1\n3–4 → 2–3"
+            "Ossuary\nHauler\n3–4 → 2–3"
         );
         assert!(
             app.world()
@@ -162,7 +162,20 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
                     * 1.9
         );
         let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
-        for marker in [marker, hauler] {
+        let labels = app
+            .world_mut()
+            .query::<(Entity, &Name)>()
+            .iter(app.world())
+            .filter(|(_, name)| {
+                name.as_str().ends_with("Landing Marker") && name.as_str().starts_with("Actor 10")
+                    || name.as_str().ends_with("Summary") && name.as_str().starts_with("Actor ")
+                    || name.as_str().starts_with("Initiative Actor ")
+                        && name.as_str().ends_with(" Label")
+                    || name.as_str() == "Command Hero Identity"
+            })
+            .map(|(entity, _)| entity)
+            .collect::<Vec<_>>();
+        for marker in labels {
             let bounds = app
                 .world()
                 .get::<ComputedNode>(marker)
@@ -175,8 +188,52 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
                 .size;
             assert!(
                 text.x <= bounds.x + 0.5 && text.y <= bounds.y + 0.5,
-                "rank text must fit at the selected scale: {text:?} in {bounds:?}"
+                "{} text must fit at the selected scale: {text:?} in {bounds:?}",
+                app.world().get::<Name>(marker).expect("label name")
             );
+        }
+        if scale == UiScaleMode::Percent200 {
+            let marker_bottom = app
+                .world()
+                .get::<UiGlobalTransform>(marker)
+                .expect("marker position")
+                .translation
+                .y
+                + app
+                    .world()
+                    .get::<ComputedNode>(marker)
+                    .expect("marker bounds")
+                    .size()
+                    .y
+                    / 2.0;
+            for (entity, anchor) in app
+                .world_mut()
+                .query::<(Entity, &crate::scene::SceneActorAnchor)>()
+                .iter(app.world())
+            {
+                if snapshot.actor(anchor.actor).expect("actor").team()
+                    != labyrinth_rules::Team::Enemies
+                {
+                    continue;
+                }
+                let top = app
+                    .world()
+                    .get::<UiGlobalTransform>(entity)
+                    .expect("actor position")
+                    .translation
+                    .y
+                    - app
+                        .world()
+                        .get::<ComputedNode>(entity)
+                        .expect("actor bounds")
+                        .size()
+                        .y
+                        / 2.0;
+                assert!(
+                    marker_bottom <= top + 0.5,
+                    "compact forecast must stay above live actors: {marker_bottom} > {top}"
+                );
+            }
         }
         if keyboard {
             assert!(focus_action(app.world_mut(), confirm));
@@ -237,7 +294,7 @@ fn partial_movement_explains_footprint_and_revokes_concealed_preview() {
     let marker = find_named(app.world_mut(), "Actor 103 Landing Marker").expect("target");
     assert_eq!(
         app.world().get::<Text>(marker).expect("rank").0,
-        "E2\n1 → 2"
+        "Ash\nBrute\n1 → 2"
     );
     for paused in [true, false] {
         app.world_mut().resource_mut::<LabyrinthView>().paused = paused;

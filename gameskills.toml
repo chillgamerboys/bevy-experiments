@@ -117,6 +117,11 @@ argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_r
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
+[commands.labyrinth-render-movement-large-text]
+argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-200.png", "1280", "720", "200", "movement"]
+timeout_seconds = 600
+resources = ["project:cargo-target", "gpu", "window"]
+
 [commands.labyrinth-render-movement-wide]
 argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-1920.png", "1920", "1080", "auto", "movement"]
 timeout_seconds = 600

@@ -211,7 +211,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         entries.insert(
             actor_subject(view.encounter, actor.id),
             UiTooltipContent {
-                title: format!("{} · {}", actors::token(snapshot, actor), actor.name()),
+                title: actors::title(snapshot, actor),
                 facts: rows,
                 links,
                 ..default()
@@ -240,7 +240,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         }
     }
     entries.insert(subject("ranks"), UiTooltipContent {
-        title: "Formation ranks".to_owned(), body: "Rank 1 is nearest the breach. Each side has six linear positions. Lit numbers show where an ability can be used and which target ranks it can reach. H1–H6 and E1–E6 identify actors, not their changing rank.".to_owned(), ..default()
+        title: "Formation ranks".to_owned(), body: "Rank 1 is nearest the breach. Each side has six linear positions. Lit numbers show where an ability can be used and which target ranks it can reach. Character names and monster types identify combatants; the numbers at their feet show their current ranks.".to_owned(), ..default()
     });
     entries.insert(subject("boundaries"), UiTooltipContent {
         title: "Condition timing".to_owned(), body: "Conditions tick or expire on their declared boundary, not when you inspect them. Turn-start damage happens at the bearer's initiative slot, including while dying. Corpses never take turns: retained conditions trigger and count down at round end, before corpse expiry. Initiative is rolled again each round.".to_owned(), ..default()

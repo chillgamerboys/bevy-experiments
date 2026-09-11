@@ -51,7 +51,7 @@ pub(super) fn mount(world: &mut World, parent: Entity, team: Team, snapshot: &Co
         "Projected Rank Positions",
         Node {
             width: Val::Percent(100.0),
-            height: Val::Px(54.0),
+            height: Val::Px(78.0),
             ..default()
         },
     );
@@ -157,8 +157,19 @@ fn update(
     world
         .entity_mut(strip.heading)
         .insert(BackgroundColor(appearance.dock));
-    world.get_mut::<Node>(strip.row).expect("rank row").height =
-        Val::Px(54.0 * metrics.content_scale);
+    let compact = actors::compact_formation(metrics);
+    let heading_style = bevy_gamekit::ui::UiTextStyle {
+        base_size: compact.then_some(18.0 / metrics.content_scale),
+        ..default()
+    };
+    if world.get::<bevy_gamekit::ui::UiTextStyle>(strip.heading) != Some(&heading_style) {
+        world.entity_mut(strip.heading).insert(heading_style);
+    }
+    world.get_mut::<Node>(strip.row).expect("rank row").height = Val::Px(if compact {
+        66.0
+    } else {
+        78.0 * metrics.content_scale
+    });
     let cleared = |id| {
         forecast.actors.iter().any(|change| {
             change.actor == id && change.outcome == Knowledge::Known(ForecastOutcome::CorpseCleared)
@@ -197,17 +208,20 @@ fn update(
             to - 1
         };
         let moved = from != to;
-        let identity = actors::token(snapshot, actor);
+        let identity = actors::display_name(snapshot, actor);
         let ranks = if moved {
             format!("{} → {}", rank_label(from, width), rank_label(to, width))
         } else {
             rank_label(to, width)
         };
-        set_text(world, *marker, format!("{identity}\n{ranks}"));
+        set_text(
+            world,
+            *marker,
+            format!("{}\n{ranks}", actors::formation_name(snapshot, actor)),
+        );
         world.entity_mut(*marker).insert((
             AccessibleLabel::new(format!(
-                "After action: {identity} {}, ranks {} to {}",
-                actor.name(),
+                "After action: {identity}, ranks {} to {}",
                 rank_label(from, width),
                 rank_label(to, width)
             )),
@@ -230,6 +244,14 @@ fn update(
                 ..default()
             },
         ));
+        actors::fit_identity_text(
+            world,
+            *marker,
+            actor,
+            &identity,
+            metrics,
+            if compact { 18.0 } else { f32::INFINITY },
+        );
         let mut node = world.get_mut::<Node>(*marker).expect("marker");
         node.display = Display::Flex;
         node.left = Val::Percent(f32::from(offset) / f32::from(total) * 100.0);
