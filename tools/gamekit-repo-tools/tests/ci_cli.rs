@@ -460,8 +460,24 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
         .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX));
     std::fs::create_dir_all(controller.parent().expect("controller parent"))
         .expect("controller directory");
-    let original = std::fs::read(env!("CARGO_BIN_EXE_gamekit-repo")).expect("controller source");
-    std::fs::copy(env!("CARGO_BIN_EXE_gamekit-repo"), &controller).expect("isolated controller");
+    let source = std::fs::canonicalize(env!("CARGO_BIN_EXE_gamekit-repo"))
+        .expect("compiled controller path");
+    let original = std::fs::read(&source).expect("controller source");
+    // A parallel Unix fork can inherit fs::copy's temporarily writable file and
+    // make exec fail with ETXTBSY. Alias the already-built immutable executable
+    // without opening it for writing; a symlink also works across filesystems.
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&source, &controller).expect("isolated controller alias");
+        assert_eq!(
+            std::fs::read_link(&controller).expect("controller is an alias"),
+            source
+        );
+    }
+    // Windows must run a real copy at the isolated path: preventing replacement
+    // of a running executable in Cargo's build directory is this regression.
+    #[cfg(not(unix))]
+    std::fs::copy(&source, &controller).expect("isolated controller");
     let cargo = std::env::var_os("CARGO").expect("Cargo executable");
     let mut paths = vec![Path::new(&cargo)
         .parent()
@@ -498,11 +514,19 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
         serde_json::from_str(stdout.lines().last().expect("final line")).expect("final result");
     assert_eq!(result.get("commands_completed"), Some(&json!(2)));
     assert_eq!(
-        std::fs::read(controller).expect("preserved controller"),
+        std::fs::read(&controller).expect("preserved controller"),
         original
     );
-    assert!(root
+    let rebuilt = root
         .join("target/ci")
-        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX))
-        .is_file());
+        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX));
+    assert!(rebuilt.is_file());
+    assert_ne!(
+        std::fs::canonicalize(&controller).expect("preserved controller path"),
+        std::fs::canonicalize(&rebuilt).expect("rebuilt binary path")
+    );
+    assert_ne!(
+        std::fs::read(rebuilt).expect("actual Cargo-built fixture binary"),
+        original
+    );
 }
