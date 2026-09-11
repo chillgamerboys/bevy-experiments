@@ -1,8 +1,9 @@
 //! Real Git worktrees exercise queue observations, failure atomicity and history.
 use gameskills_cli::workflow::{execute, validate_plan};
 use serde_json::{json, Value};
+#[cfg(unix)]
+use std::ffi::OsString;
 use std::{
-    ffi::OsString,
     fs,
     path::{Path, PathBuf},
     process::Command,

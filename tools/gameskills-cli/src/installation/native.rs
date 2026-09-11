@@ -1,5 +1,7 @@
 //! Bounded native discovery; no model turns, installation RPCs or global edits.
-use super::{archive, files, installed, package_files, strings, InstructionBundle};
+use super::{archive, installed, strings};
+#[cfg(unix)]
+use super::{files, package_files, InstructionBundle};
 use serde_json::{json, Value};
 use std::{path::Path, process::Command};
 

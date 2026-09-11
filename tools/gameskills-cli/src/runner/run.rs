@@ -195,9 +195,10 @@ fn evidence(root: &Path, config: &Value, args: &[OsString]) -> Result<Value, Str
         };
     }
     let state = root_dir.child(".gameskills", false, false)?;
-    if rustix::fs::statat(&state.0, "runs", rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
-        == Err(rustix::io::Errno::NOENT)
-    {
+    if matches!(
+        rustix::fs::statat(&state.0, "runs", rustix::fs::AtFlags::SYMLINK_NOFOLLOW),
+        Err(rustix::io::Errno::NOENT)
+    ) {
         return if id.is_none() {
             Ok(json!({"ok":true,"status":"listed","runs":[]}))
         } else {
