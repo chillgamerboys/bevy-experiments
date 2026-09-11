@@ -10,10 +10,10 @@ mechanical and visual trial. This record describes private adoption, not publica
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Final packaged implementation | `1ebfea1c0d91a66772eb40553ca510ee9f7e947a` |
+| Final packaged implementation | `48c9b49a65a3e3a18b2d7aab5e3e1d2fcd0ba671` |
 | Local prebuilt target | `aarch64-apple-darwin` |
 | CLI executable SHA-256 | `683d0a8b157110d377ca8b2ab8139a6ab2ba13615d6dc30920168d59d00255f7` |
-| Actual Cargo archive SHA-256 | `8ab1be66331142f4fa26d7eb7be00567c20374081148b58c6720b6cdefae7b2c` |
+| Actual Cargo archive SHA-256 | `7c260405984376b49b053b7a1298b24050dd1d8151f2c66149330efc296dcb0f` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -38,12 +38,20 @@ The rebuilt archive was installed again, and packaged adoption and actual Codex
 discovery were repeated. Cross-compilation is not a claim of native execution;
 the final PR carries the hosted platform evidence.
 
+The final archive also contains portable test fixtures: Git receives relative
+worktree paths, and simulated installation lock owners explicitly unlock while
+duplicate descriptors remain open. The latter models descriptor retention without
+claiming to reproduce hosted fork timing. These corrections change only tests;
+the final installed executable is byte-identical to the verified `1ebfea1` binary.
+
 ## Observed checks
 
-- The final combined Rust CLI suite passed **124 tests**, including real installation,
+- The combined Rust CLI suite at `1ebfea1` passed **124 tests**, including real installation,
   Git worktrees, command descendants, resource contention, coordinator/supervisor
   SIGKILL, recovery and stale evidence. The repository-tool suite passed **156**.
-  Both packages passed strict all-target Clippy and formatting.
+  Both packages passed strict all-target Clippy and formatting. After the final
+  portable fixture corrections, all **50 affected installation, recovery and
+  workflow tests** were rerun successfully, followed by packaged-binary adoption.
 - The actual packaged executable passed the external adoption test: embedded
   setup, package changes and rollback, owner-file preservation, interrupted
   transaction recovery, command execution and deliberate evidence invalidation.
