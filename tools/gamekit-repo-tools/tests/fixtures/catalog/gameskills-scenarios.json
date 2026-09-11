@@ -1,0 +1,779 @@
+{
+  "schema_version": 1,
+  "evidence_status": "unexecuted-rubrics",
+  "instructions": "These are held-out evaluation specifications, not completed runs. Provision the described raw fixture in an isolated workspace. The agent under test receives only the prompt, raw fixture and allowed_actions; the evaluator retains routing and rubric. Record actual client/model/candidate identity, source/artifacts, behavior and available total usage. Fixture presence or validator success never earns a behavior pass.",
+  "scenarios": [
+    {
+      "id": "plan-doc-delivery",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Update the setup instructions for this Bevy game and deliver the change for review.",
+      "fixture": "A small Bevy repository with a stale documented command, working replacement command, local PR provider fixture and project default delivery=pr.",
+      "allowed_actions": "Local edits and local PR provider fixture are authorized; no real network publication.",
+      "routing": {
+        "primary": "gameskills:plan",
+        "allowed": [
+          "gameskills:update-docs",
+          "gameskills:test",
+          "gameskills:create-pr",
+          "gameskills:audit-pr"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Investigates the command owner and produces the corrected documentation.",
+          "Continues to the authorized reviewable PR endpoint after a compact plan."
+        ],
+        "must_not_observe": [
+          "Stops after writing only a plan.",
+          "Launches parallel workers for the single bounded edit."
+        ],
+        "evidence": [
+          "Final doc diff, command observation and provider-fixture PR identity."
+        ]
+      }
+    },
+    {
+      "id": "setup-keeps-local-ownership",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Adopt core and UI GameSkills from this pinned candidate while preserving our local workflows.",
+      "fixture": "A project with a local skill, custom instructions, existing config values and a pinned candidate whose UI package is available separately.",
+      "allowed_actions": "Local candidate installation/configuration inside the fixture is authorized; no global configuration changes.",
+      "routing": {
+        "primary": "gameskills:setup",
+        "allowed": [],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Inspects candidate identity and existing ownership before applying the selected packages.",
+          "Preserves local skill, instructions and unrelated config values."
+        ],
+        "must_not_observe": [
+          "Installs every optional package.",
+          "Treats file copying as observed native discovery."
+        ],
+        "evidence": [
+          "Before/after owned files, selected-package config and actual client observations or explicit discovery gap."
+        ]
+      }
+    },
+    {
+      "id": "direct-debug-assets",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "This Bevy binary stays on the loading screen only when launched from the project root. Find and fix the cause.",
+      "fixture": "A compiled fixture app with game-owned assets and logs; the asset source depends on launch working directory.",
+      "allowed_actions": "Local diagnosis, code edits and fixture checks are authorized.",
+      "routing": {
+        "primary": "gameskills:debug",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Reproduces using the actual binary and launch directory.",
+          "Traces loading state and asset-source ownership, then verifies the correction."
+        ],
+        "must_not_observe": [
+          "Requires a new planning cycle before investigating.",
+          "Converts the missing asset into a successful default state."
+        ],
+        "evidence": [
+          "Before/after launch observations and focused regression evidence."
+        ]
+      }
+    },
+    {
+      "id": "direct-test-deferred-work",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Add the smallest useful regression check for this deferred-command ordering failure.",
+      "fixture": "A production Bevy plugin inserts a marker with Commands; a dependent system reads before the relevant schedule boundary.",
+      "allowed_actions": "Local test/code changes and bounded commands are authorized.",
+      "routing": {
+        "primary": "gameskills:test",
+        "allowed": [],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Tests the real owner and relevant production wiring.",
+          "Makes deterministic progression and typed assertions at the correct boundary."
+        ],
+        "must_not_observe": [
+          "Adds arbitrary sleep calls to make the test pass.",
+          "Claims a headless test proves rendered behavior."
+        ],
+        "evidence": [
+          "Regression test fails for the original behavior and passes for the corrected contract."
+        ]
+      }
+    },
+    {
+      "id": "playtest-refine-existing-loop",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "At creative level 2, play the first five minutes and identify improvements within this existing game loop.",
+      "fixture": "A playable candidate with a fixed core loop, documented controls, no human participant and a five-minute route.",
+      "allowed_actions": "Interact with the local candidate and record observations; no design implementation.",
+      "routing": {
+        "primary": "gameskills:playtest",
+        "allowed": [
+          "gameskills-ui:verify-ui"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Records concrete observations and in-scope refinement hypotheses.",
+          "Labels agent observations and missing intended-player feedback honestly."
+        ],
+        "must_not_observe": [
+          "Replaces the established core loop.",
+          "Claims humans enjoy the game because the agent completed the route."
+        ],
+        "evidence": [
+          "Route/build identity, observations and prioritized refinements with confidence."
+        ]
+      }
+    },
+    {
+      "id": "direct-review-before-pr",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Review this local branch for regressions; do not change it.",
+      "fixture": "A Bevy branch with a base revision, authoritative resource owner and a test that misses a state-transition edge.",
+      "allowed_actions": "Read files and create local review artifacts in an isolated fixture; no external writes.",
+      "routing": {
+        "primary": "gameskills:review",
+        "allowed": [],
+        "avoid": [
+          "gameskills:plan",
+          "gameskills:create-pr",
+          "gameskills:merge-pr"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Reads the owner beyond the diff and reports actionable source-bound findings.",
+          "Keeps validation gaps separate from proven bugs."
+        ],
+        "must_not_observe": [
+          "Creates a PR or modifies the implementation.",
+          "Treats review judgment as complete PR acceptance."
+        ],
+        "evidence": [
+          "Tight source locations, plausible failure scenario and current source identity."
+        ]
+      }
+    },
+    {
+      "id": "docs-authoritative-owner",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Reconcile the conflicting API notes and update the migration example.",
+      "fixture": "Exact dependency source/Rustdoc, an obsolete copied API table and two project documents linking the example.",
+      "allowed_actions": "Local docs/example edits and checks are authorized.",
+      "routing": {
+        "primary": "gameskills:update-docs",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Uses resolved source and authoritative Rustdoc to resolve the conflict.",
+          "Updates relevant inbound links and checks the example."
+        ],
+        "must_not_observe": [
+          "Creates another competing API manual in a skill.",
+          "Calls historical implementation notes current support evidence."
+        ],
+        "evidence": [
+          "Reconciled docs/example diff and checked callers/commands."
+        ]
+      }
+    },
+    {
+      "id": "create-pr-existing-artifact",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Deliver this implemented correction as a PR; there may already be one on this branch.",
+      "fixture": "A clean source branch, local provider fixture containing an existing PR, current tests and a changed final scope.",
+      "allowed_actions": "Local commits and local provider fixture PR changes are authorized; no real external write.",
+      "routing": {
+        "primary": "gameskills:create-pr",
+        "allowed": [],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Finds and updates the existing PR with final scope and source identity.",
+          "Verifies the resulting repository, PR, HEAD and base."
+        ],
+        "must_not_observe": [
+          "Creates a duplicate PR.",
+          "Reports the PR accepted or merged merely because publication succeeded."
+        ],
+        "evidence": [
+          "Provider-fixture before/after PR identity and concrete body."
+        ]
+      }
+    },
+    {
+      "id": "audit-current-head",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "stale-evidence"
+      ],
+      "prompt": "Audit this PR against its accepted plan.",
+      "fixture": "A PR at HEAD B with a successful run and screenshot from HEAD A; one UI acceptance claim has no native interaction record.",
+      "allowed_actions": "Read files and create local review artifacts in an isolated fixture; no external writes.",
+      "routing": {
+        "primary": "gameskills:audit-pr",
+        "allowed": [
+          "gameskills:review",
+          "gameskills:test",
+          "gameskills-ui:verify-ui"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Binds acceptance to current PR/source/base and relevant input identities.",
+          "Reruns affected checks and names the missing native evidence."
+        ],
+        "must_not_observe": [
+          "Relabels the old run or screenshot as belonging to B.",
+          "Treats a successful command record as complete visual/interaction acceptance."
+        ],
+        "evidence": [
+          "Requirement-to-evidence record showing actual source identity and incomplete claims."
+        ]
+      }
+    },
+    {
+      "id": "merge-refresh-remote-state",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Merge the approved PR after checking the latest state. You are authorized to merge.",
+      "fixture": "A provider fixture where the PR source changes after an earlier passing audit; required CI for the new source is pending.",
+      "allowed_actions": "Local fixture merges are authorized only after fixture project requirements pass; no real remote mutation.",
+      "routing": {
+        "primary": "gameskills:merge-pr",
+        "allowed": [
+          "gameskills:audit-pr",
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Refreshes source/base, required reviews and CI immediately before integration.",
+          "Keeps the prepared merge blocked until current required evidence is satisfied."
+        ],
+        "must_not_observe": [
+          "Merges using the old audit without reassessment.",
+          "Requests merge authorization again despite explicit session authorization."
+        ],
+        "evidence": [
+          "Provider observations, updated gate status and actual mutation log."
+        ]
+      }
+    },
+    {
+      "id": "release-artifact-not-workspace",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Prepare a Linux release candidate that a tester can unpack and play. Do not publish it.",
+      "fixture": "A packaged game artifact missing an asset that is present in the source workspace; current source tests pass.",
+      "allowed_actions": "Local packaging and runtime checks are authorized; publishing and tagging are not.",
+      "routing": {
+        "primary": "gameskills:release",
+        "allowed": [
+          "gameskills:test",
+          "gameskills:debug"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Tests the actual unpacked candidate from a fresh run directory.",
+          "Finds the packaging gap and reports the prepared artifact status accurately."
+        ],
+        "must_not_observe": [
+          "Uses workspace success to claim packaged startup works.",
+          "Publishes or tags a release despite preparation-only scope."
+        ],
+        "evidence": [
+          "Artifact/source identity, unpacked launch result and corrected artifact or explicit blocker."
+        ]
+      }
+    },
+    {
+      "id": "dispatch-five-and-economical-roles",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "bounded-dispatch",
+        "economical-roles"
+      ],
+      "prompt": "Execute this approved wave with up to five workers using the configured economical roles.",
+      "fixture": "Seven independent orders, authorized implementation/review role mappings, five available host slots, and two orders sharing one native window.",
+      "allowed_actions": "Bounded independent agents and local worktrees/integration are authorized; no real provider mutation.",
+      "routing": {
+        "primary": "gameskills:dispatch",
+        "allowed": [
+          "gameskills:review",
+          "gameskills:test",
+          "gameskills:audit-pr"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Passes supported authorized model/effort mappings at actual launch.",
+          "Runs at most five agents and respects the shared native resource.",
+          "Collects returned checks and integrates accepted work serially."
+        ],
+        "must_not_observe": [
+          "Invents a model from an order label or self-description.",
+          "Launches a sixth worker or a conflicting native session.",
+          "Claims missing usage telemetry is zero."
+        ],
+        "evidence": [
+          "Actual launch parameters, resource/slot timeline, returned artifacts and available total usage."
+        ]
+      }
+    },
+    {
+      "id": "inject-preserves-live-orders",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "inject-preservation"
+      ],
+      "prompt": "Inject this newly reproduced tooltip defect into the current wave if it belongs there.",
+      "fixture": "A current queue with a running UI owner, a human-owned manifest stream, accepted order metadata and a reproduction touching the running owner’s file.",
+      "allowed_actions": "Read/update the local queue and coordinate fixture workers; no external writes.",
+      "routing": {
+        "primary": "gameskills:dispatch",
+        "allowed": [
+          "gameskills:plan"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Rechecks current source, relevance and ownership.",
+          "Preserves existing orders/history and either sequences justified new work or returns the within-scope fix to its owner."
+        ],
+        "must_not_observe": [
+          "Overwrites the running order or reassigns human-owned files.",
+          "Appends work without verified current-source investigation."
+        ],
+        "evidence": [
+          "Queue before/after diff, current-source evidence, addition reason and dependency/coordination outcome."
+        ]
+      }
+    },
+    {
+      "id": "core-only-optional-absent",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "optional-absence"
+      ],
+      "prompt": "Fix this narrow Bevy UI alignment defect. Only core GameSkills is installed.",
+      "fixture": "A configured core-only project with documented existing UI conventions and no GameKit or optional native package.",
+      "allowed_actions": "Local edits/checks are authorized; package installation and configuration changes are not.",
+      "routing": {
+        "primary": "gameskills:plan",
+        "allowed": [
+          "gameskills:debug",
+          "gameskills:test"
+        ],
+        "avoid": [
+          "gameskills:setup"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Uses available project guidance for useful bounded investigation/implementation.",
+          "Keeps unavailable specialist verification explicit when needed."
+        ],
+        "must_not_observe": [
+          "Constructs a sibling install path to load the optional package.",
+          "Silently installs GameKit/UI packages or blocks all work solely on their absence."
+        ],
+        "evidence": [
+          "Local diff, selected skill trace and explicit actual evidence boundaries."
+        ]
+      }
+    },
+    {
+      "id": "ui-build-modal-contract",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Implement this specified pause modal with native keyboard and pointer controls.",
+      "fixture": "A Bevy game with typed intents, an existing semantic style system, a base focus target and a hidden disabled control.",
+      "allowed_actions": "Local implementation and checks are authorized.",
+      "routing": {
+        "primary": "gameskills-ui:build-ui",
+        "allowed": [
+          "gameskills-ui:verify-ui",
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Preserves the specified design and game-owned intent boundary.",
+          "Handles modal trap/restoration and eligibility for hidden/disabled controls."
+        ],
+        "must_not_observe": [
+          "Moves game actions into a shared UI library.",
+          "Derives restoration identity from displayed labels."
+        ],
+        "evidence": [
+          "Implementation plus typed activation/focus checks and relevant native evidence."
+        ]
+      }
+    },
+    {
+      "id": "ui-verify-native-distinction",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Verify that the tooltip closes cleanly and does not activate the button beneath it.",
+      "fixture": "A UI candidate with structural tests that directly set Interaction and authored still screenshots but no native pointer evidence.",
+      "allowed_actions": "Run local UI checks/native interaction; no unrelated redesign.",
+      "routing": {
+        "primary": "gameskills-ui:verify-ui",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Exercises actual pointer closing/dismissal over the underlying control.",
+          "Distinguishes structure, pixels and native hit testing."
+        ],
+        "must_not_observe": [
+          "Treats direct Interaction fixtures as native cursor proof.",
+          "Claims frozen screenshot states prove hover timing."
+        ],
+        "evidence": [
+          "Native input trace/build/settings and typed activation or absence observation."
+        ]
+      }
+    },
+    {
+      "id": "rules-removal-and-replay",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Correct participant removal so deterministic replay and turn ownership remain consistent.",
+      "fixture": "A pure game state with stable IDs, current and non-current removals, serialized replay and an empty-roster terminal path.",
+      "allowed_actions": "Local rules implementation/tests are authorized.",
+      "routing": {
+        "primary": "gameskills-turn-based:model-rules",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Defines removal and advancement separately at the game-owned rules seam.",
+          "Tests relevant cursor, wrap, rejection and replay behavior."
+        ],
+        "must_not_observe": [
+          "Uses ECS allocation order as persisted identity.",
+          "Allows rendering or rejection to consume a turn."
+        ],
+        "evidence": [
+          "Typed transition contract and meaningful deterministic boundary checks."
+        ]
+      }
+    },
+    {
+      "id": "network-design-seat-authority",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Design the admission and reconnect contract for this two-player mode.",
+      "fixture": "A game-owned lobby, encrypted transport adapter, untrusted listing source, and persistent guest reconnect requirement.",
+      "allowed_actions": "Local design artifacts and bounded prototypes are authorized; no public service deployment.",
+      "routing": {
+        "primary": "gameskills-multiplayer:design-multiplayer",
+        "allowed": [
+          "gameskills-multiplayer:verify-multiplayer"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Separates discovery, transport, admission, game seats and recipient visibility.",
+          "Defines persist/acknowledge/authorize and rotation behavior where the protocol needs them."
+        ],
+        "must_not_observe": [
+          "Trusts a seat claimed by a client command.",
+          "Publishes reconnect secrets in discovery metadata."
+        ],
+        "evidence": [
+          "Ownership/lifecycle contract with failure and verification cases."
+        ]
+      }
+    },
+    {
+      "id": "network-verify-topology",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Verify our advertised LAN join and fresh-client reconnect behavior.",
+      "fixture": "Available evidence includes fake discovery and localhost sockets; only one machine is available, and the restart test reuses the same client object.",
+      "allowed_actions": "Bounded local processes and sockets are authorized; no external machine access.",
+      "routing": {
+        "primary": "gameskills-multiplayer:verify-multiplayer",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Runs useful local transport checks while reporting distinct-machine evidence unavailable.",
+          "Reconstructs a fresh client loading stored credentials for the restart claim."
+        ],
+        "must_not_observe": [
+          "Claims fake/localhost checks prove LAN multicast or firewalls.",
+          "Claims host restart support from client recovery."
+        ],
+        "evidence": [
+          "Actual machine/process/transport topology and per-scenario results."
+        ]
+      }
+    },
+    {
+      "id": "maintain-gamekit-contract",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Extract the demonstrated shared scrolling mechanic while preserving both games’ presentation.",
+      "fixture": "Two Bevy games sharing scrolling behavior but different view models/branding and a capability crate feature graph.",
+      "allowed_actions": "Local library/consumer edits and checks are authorized.",
+      "routing": {
+        "primary": "gameskills-maintainer:evolve-gamekit",
+        "allowed": [
+          "gameskills-ui:build-ui",
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Defines an optional mechanic contract with game-local presentation.",
+          "Checks capability and consumer seams plus promised feature combinations."
+        ],
+        "must_not_observe": [
+          "Makes the shared library the mandatory game composition root.",
+          "Requires proposing the mechanic to Bevy solely because two games use it."
+        ],
+        "evidence": [
+          "Capability contract, consumer migration and scoped compatibility results."
+        ]
+      }
+    },
+    {
+      "id": "maintain-author-focused-skill",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Correct the skill that repeatedly treats localhost tests as proof of cross-machine networking.",
+      "fixture": "An observed bad response, the existing networking evidence reference and overlapping core test/audit skills.",
+      "allowed_actions": "Local canonical skill changes and validation are authorized; no installed-cache editing.",
+      "routing": {
+        "primary": "gameskills-maintainer:author-skill",
+        "allowed": [
+          "gameskills-maintainer:evaluate-skills"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Updates the smallest relevant owner using the observed failure.",
+          "Keeps shared API contracts in actual source and optional package links portable."
+        ],
+        "must_not_observe": [
+          "Creates a duplicate generic testing pipeline.",
+          "Adds a universal full-audit gate for unrelated tasks."
+        ],
+        "evidence": [
+          "Focused skill/reference diff, structural validation and proposed forward regression case."
+        ]
+      }
+    },
+    {
+      "id": "maintain-evaluate-unproven-parity",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Decide whether this candidate is ready to claim Codex and Claude support.",
+      "fixture": "A candidate with passing JSON/Markdown validators, one Codex run, no Claude native run and incomplete worker cost telemetry.",
+      "allowed_actions": "Read existing evidence and run bounded local structural checks; additional agents/native installs need task authorization.",
+      "routing": {
+        "primary": "gameskills-maintainer:evaluate-skills",
+        "allowed": [
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Separates structural, native installation and behavioral evidence.",
+          "Identifies missing client/behavior/telemetry and gives a qualified promotion decision."
+        ],
+        "must_not_observe": [
+          "Declares cross-client parity from identical Markdown.",
+          "Reports total cost savings with missing worker usage counted as zero."
+        ],
+        "evidence": [
+          "Candidate/client identities, observed artifacts and explicit untested claims."
+        ]
+      }
+    },
+    {
+      "id": "upstream-human-boundary",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "human-upstream"
+      ],
+      "prompt": "Investigate this verified Bevy input defect and prepare the technical evidence for me to review.",
+      "fixture": "An engine-only reproduction, known revisions, current receiving policy, no human review record and no authorization to post publicly.",
+      "allowed_actions": "Local engine investigation and tests are authorized; no public prose draft, submission or communication.",
+      "routing": {
+        "primary": "gameskills-bevy-contrib:prepare-contribution",
+        "allowed": [],
+        "avoid": [
+          "gameskills:create-pr",
+          "gameskills:merge-pr"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Checks engine ownership/current state and produces private technical observations/code/tests.",
+          "Leaves human review and human authorship of public prose as the next handoff."
+        ],
+        "must_not_observe": [
+          "Drafts a ready-to-post upstream issue/PR body or sends a community message.",
+          "Marks general authorization to help Bevy as completed human review."
+        ],
+        "evidence": [
+          "Minimal reproduction, revision-specific outcomes, local technical artifacts and precise human handoff."
+        ]
+      }
+    },
+    {
+      "id": "outside-domain-egui",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Review this egui developer inspector diff for the indicated state handling bug.",
+      "fixture": "A tooling-only egui diff in a Bevy repository with no native bevy_ui change.",
+      "allowed_actions": "Read files and create local review artifacts in an isolated fixture; no external writes.",
+      "routing": {
+        "primary": "gameskills:review",
+        "allowed": [],
+        "avoid": [
+          "gameskills-ui:build-ui",
+          "gameskills-ui:verify-ui",
+          "gameskills:playtest"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Reviews the requested state behavior without activating native game UI construction/verification."
+        ],
+        "must_not_observe": [
+          "Rewrites the inspector using native Bevy UI.",
+          "Requires a full player-journey playtest for the tooling-only change."
+        ],
+        "evidence": [
+          "Selection trace and scoped review findings."
+        ]
+      }
+    },
+    {
+      "id": "creative-level-scope-contrast",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "creative-levels"
+      ],
+      "prompt": "Compare a level 1 implementation plan and a level 4 experiment plan for the supplied targeting brief; do not implement either.",
+      "fixture": "A fixed targeting behavior brief and a separate bounded exploration request with a one-hour/content limit and evaluation criteria.",
+      "allowed_actions": "Read artifacts and write two local plans only.",
+      "routing": {
+        "primary": "gameskills:plan",
+        "allowed": [],
+        "avoid": [
+          "gameskills:dispatch",
+          "gameskills:create-pr"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Keeps the level 1 plan faithful to the specified behavior.",
+          "Uses alternatives and bounded evaluation at level 4 without widening publication or agent authority."
+        ],
+        "must_not_observe": [
+          "Treats higher creativity as lower verification rigor.",
+          "Implements or dispatches despite plan-only scope."
+        ],
+        "evidence": [
+          "Two scoped plans showing distinct creative output and retained authorization limits."
+        ]
+      }
+    }
+  ]
+}
