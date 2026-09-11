@@ -43,7 +43,7 @@ old observations cannot become validated Rust passes. Rerun checks with Rust to
 obtain new evidence. `legacy import` preserves the old seven-skill installation
 and project overlays while proposing the new installation.
 
-Queue mutation, command supervision and native Codex verification currently require
+Queue operations, command supervision and native Codex verification currently require
 POSIX support. Windows receives explicit unsupported diagnostics for those operations;
 portable configuration, catalog, packaging and installation checks have separate
 coverage. Authenticated native-client behavior and game playtests are separately

@@ -71,7 +71,7 @@ files to unlock resources: that creates a second lock identity.
 
 ## What is observed
 
-Each run creates an exclusive UUID directory at
+Each run creates an exclusive 32-character hexadecimal run-ID directory at
 `ROOT/.gameskills/runs/RUN_ID/`. It keeps `record.json`, an active-run lock, and
 separate stdout/stderr files for every command that starts. Records contain the
 selected graph, actual arguments and working directory, start/end times, elapsed
@@ -151,3 +151,11 @@ playability, human enjoyment, review acceptance, complete PR audit, publication
 authorization or merge authorization. Keep review findings, manual observations,
 player feedback and their limitations separate. This helper performs no review
 acceptance, PR creation, merge or release automation.
+
+## Runtime transition
+
+Rust execution records use schema 2 and identify runtime `rust`. Existing Python
+records remain historical and cannot validate or resume as Rust execution. Keep
+original records intact and rerun checks to create new evidence. Setup coordinates
+with run registration and refuses updates while active run locks are held; an
+abrupt coordinator exit does not release a supervisor's command locks early.

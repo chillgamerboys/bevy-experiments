@@ -298,3 +298,10 @@ its observations require coordinator reassessment. Queue events and evidence
 are historical records, not proof that all live facts remain unchanged. The
 helper has no timed leases or automatic worker-death detection: after interruption,
 inspect actual workers/checks and use the explicit block/resume transitions.
+
+Authored plans remain schema 1. Rust queues use schema 2 and runtime `rust`; their
+`at` timestamps contain explicit Unix seconds and nanoseconds. Historical Python
+queues are read as history and remain immutable to the Rust runtime. Finish an
+active old queue before creating or mutating a Rust queue. Setup and mutations
+share the queue lock; mutations re-read configuration under that lock to reject
+a stale pre-read selection.

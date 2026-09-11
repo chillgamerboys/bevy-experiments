@@ -147,18 +147,27 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                     return failure("invalid_arguments", "unexpected config operation")
                 }
             };
+            // Native plugin paths must not be resolved relative to the adopter twice.
+            // The private supervisor must reach its inherited handshake without root IO.
+            let root = if family == "__runner-supervisor" {
+                parsed.root
+            } else {
+                match parsed.root.canonicalize() {
+                    Ok(root) => root,
+                    Err(error) => return failure("root_io", error),
+                }
+            };
             let result = match family {
                 "__runner-supervisor" => crate::runner::supervisor(&arguments),
-                "plan" | "queue" | "run" | "evidence" => {
-                    crate::installation::ready_config(&parsed.root).and_then(|config| {
+                "plan" | "queue" | "run" | "evidence" => crate::installation::ready_config(&root)
+                    .and_then(|config| {
                         if matches!(family, "plan" | "queue") {
-                            crate::workflow::execute(&parsed.root, &config, family, &arguments)
+                            crate::workflow::execute(&root, &config, family, &arguments)
                         } else {
-                            crate::runner::execute(&parsed.root, &config, family, &arguments)
+                            crate::runner::execute(&root, &config, family, &arguments)
                         }
-                    })
-                }
-                _ => crate::installation::execute(&parsed.root, family, &arguments),
+                    }),
+                _ => crate::installation::execute(&root, family, &arguments),
             };
             match result {
                 Ok(mut value) => {

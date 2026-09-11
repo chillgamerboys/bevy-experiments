@@ -76,8 +76,7 @@ fn repository_commands_refuse_unconfigured_roots_without_creating_state(
 ) -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     for command in [
-        "config", "status", "setup", "bundle", "native", "plan", "queue", "run", "evidence",
-        "legacy",
+        "config", "status", "bundle", "native", "plan", "queue", "run", "evidence", "legacy",
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_gameskills"))
             .arg(command)
@@ -153,5 +152,46 @@ fn ordinary_file_boundary_refuses_symlinks() -> Result<(), Box<dyn Error>> {
     let alias = directory.path().join("alias");
     std::os::unix::fs::symlink(&source, &alias)?;
     assert!(gameskills_cli::platform::read_ordinary_file(&alias).is_err());
+    Ok(())
+}
+
+#[test]
+fn relative_root_native_paths_remain_absolute_after_child_cwd_change() -> Result<(), Box<dyn Error>>
+{
+    let parent = tempfile::tempdir()?;
+    let root = parent.path().join("adopter with spaces");
+    fs::create_dir(&root)?;
+    for tail in [
+        vec!["setup", "--apply"],
+        vec!["native", "claude"],
+        vec!["native", "codex"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_gameskills"))
+            .args(["--root", "adopter with spaces"])
+            .args(&tail)
+            .current_dir(parent.path())
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let value: Value = serde_json::from_slice(&output.stdout)?;
+        if tail.first() == Some(&"native") {
+            assert_eq!(
+                value
+                    .get("cwd")
+                    .and_then(Value::as_str)
+                    .map(std::path::Path::new),
+                Some(root.canonicalize()?.as_path())
+            );
+            let argv = value.get("argv").and_then(Value::as_array).ok_or("argv")?;
+            if tail.last() == Some(&"claude") {
+                let path = argv.get(2).and_then(Value::as_str).ok_or("plugin path")?;
+                assert!(std::path::Path::new(path).is_absolute());
+                assert!(std::path::Path::new(path).is_dir());
+            }
+        }
+    }
     Ok(())
 }

@@ -178,8 +178,8 @@ mod posix {
                 .join(id)
                 .join("record.json"),
         )?)?;
-        assert_eq!(record.get("schema_version"), Some(&json!(2)));
-        assert_eq!(record.get("runtime"), Some(&json!("rust")));
+        assert_eq!(record.pointer("/record/schema_version"), Some(&json!(2)));
+        assert_eq!(record.pointer("/record/runtime"), Some(&json!("rust")));
         fs::write(
             consumer.root.join("README.md"),
             "A later game edit invalidates prior evidence.\n",

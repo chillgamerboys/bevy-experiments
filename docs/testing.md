@@ -50,7 +50,7 @@ and visual game quality remain separate evidence.
 Archive tests inspect actual Cargo output, normalized manifests, safe paths and
 external library consumers. Bundle tests verify committed provenance, reproducibility,
 corruption/drift rejection and exact payload bytes in the CLI Cargo package. Queue
-mutation, runner supervision and native Codex verification report unsupported on
+operations, runner supervision and native Codex verification report unsupported on
 Windows until their process/state backend is implemented and independently tested.
 Portable Windows tests do not establish those capabilities.
 

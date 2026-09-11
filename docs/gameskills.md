@@ -105,7 +105,7 @@ The old seven-skill installer's install/sync entrypoints are retired. Use
 `gameskills legacy import` to inspect and deliberately adopt the new framework while
 preserving `.bevy-gamekit/`, local skills and client-owned instructions.
 
-Queue mutation, command execution/evidence supervision and Codex verification
+Queue operations, command execution/evidence supervision and Codex verification
 currently require POSIX support. Windows receives explicit unsupported errors for
 those operations; its portable configuration and installation tests do not establish
 process-supervision support. Authenticated Claude behavior remains a separate

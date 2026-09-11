@@ -1,23 +1,19 @@
 # Plan: finish the repository tooling migration to Rust
 
-Status: the owner accepted the refinement work and authorized its merge on
-September 10, 2026, then requested this repository-wide Rust migration plan.
-The implementation sequence and first PR specification below are the current plan.
-R0/R1 merged in PR31: two tool packages, a complete migration ledger, observed
-configuration fixtures, read-only commands and packaging checks. R2a now ports
-repository checks, native/legacy skill validation and external consumer verification
-into `gamekit-repo`, with callers moved and the replaced Python owners/tests removed.
-R2b ports committed CI selection, ordered command execution and final gating into
-Rust and removes the replaced CI script/test module. Its focused regressions cover
-the 26 frozen reference methods plus both R2a additions and new failure cases.
-R2c adds actual GameKit Cargo archive inspection and consumers of extracted files,
-plus deterministic package-local instruction preparation and CLI archive byte checks.
-These complete R2 implementation; hosted artifact checks and PR review remain delivery
-gates. R3–R7 have not started. The prepared instructions retain Python helper prose
-and cannot be activated until R3 migrates installation and command guidance.
-This replaces the earlier CLI-only proposal,
-which explicitly excluded CI routing and repository checks. The final state now
-includes **all repository-owned executable tooling and tests**.
+Status: the owner authorized completing the remaining migration without per-stage
+approval on September 11, 2026. R0/R1 merged in PR31. R2a, R2b and R2c merged in
+PRs32–34 after their hosted checks passed; the resulting main trees matched their
+accepted source heads. R3 installation, R4 queues and R5 runner work now proceed in
+three isolated streams on the runtime cutover branch, followed by R6 private
+adoption and R7 removal of the remaining Python. The final runtime PR stays open
+for the owner's end-result review. Mechanical and visual Labyrinth changes are the
+subsequent collaborative product trial, not part of this migration's scope.
+
+The prepared embedded instructions now declare Rust runtime compatibility and use
+Rust command guidance. This replaces the earlier CLI-only proposal, which excluded
+CI routing and repository checks. The final state includes **all repository-owned
+executable tooling and tests**. This status is progress tracking; passing migration
+accounting alone does not establish implementation or acceptance evidence.
 
 The [refinement observations](gameskills-refinement-results.md) retain the actual
 native walks, CI findings and evidence limits. The tooltip heading/close scrolling
@@ -323,8 +319,9 @@ without preserving every obsolete command. Explain such changes in the inventory
   bundles remain historical; rollback preserves the original state and user edits.
   Changing schema support must include fixtures for both acceptance and rejection.
 - **At R6:** use the candidate on a bounded repository task through PR delivery,
-  selecting one after the candidate is usable. The tooltip scrolling follow-up is
-  eligible if still open, with an actual native walk. Record failures as findings;
+  selecting one after the candidate is usable. The owner reserved Labyrinth mechanical/visual
+  changes for the collaborative trial after end-result review; use a bounded
+  tooling/documentation task for this private pipeline rehearsal. Record failures as findings;
   do not combine an unresolved product fix with proof of a successful tool migration.
 - **At R7:** delete the remaining Python only after the full candidate passes its
   supported-platform gates. An unavailable authenticated client check remains a
