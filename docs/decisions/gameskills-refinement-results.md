@@ -12,7 +12,7 @@ declare the trials finished or authorize the Rust migration. The
 | [CI scope, PR26](https://github.com/chillgamerboys/bevy-experiments/pull/26) | Component selection, reverse consumers, conservative unknown-input fallback and a stable final gate | 35 real-Git/routing/gate tests pass. Independent review found three edge cases and verified their fixes at `d61addbba23bcb300c983b7f9ce1c755030a079f`; hosted PR checks own platform/integration status. |
 | [Documentation entry points, PR27](https://github.com/chillgamerboys/bevy-experiments/pull/27) | Current workflow/direction is separate from resolved historical findings | Local links/layout pass. Hosted docs-only runs pass while deliberately skipping skills, Rust and policy jobs. |
 | [Card inspection, PR28](https://github.com/chillgamerboys/bevy-experiments/pull/28) | Accurate unavailable-card reasons and separate keyboard inspection using existing GameKit mechanics | 37 Deckbuilder tests and scoped strict Clippy pass at worker source `ed02353a1186e802694897d82f6c51c150c99a8d`. Authored restriction captures exist at `fb83817a26a74aaee09b0a447e415413eb8c60c9`; native walks remain pending. |
-| Shared tooltip close mark | An ordinary ASCII close mark renders with both default and game-owned fonts | Rendered Deckbuilder and Labyrinth captures at `e76197c` show the corrected mark. Shared UI tests pass (47 unit tests and one doctest). This is a small correction discovered during the UI trial, not another feature trial. |
+| [Shared tooltip close mark, PR29](https://github.com/chillgamerboys/bevy-experiments/pull/29) | An ordinary ASCII close mark renders with both default and game-owned fonts | Rendered Deckbuilder and Labyrinth captures at `e76197c` show the corrected mark. Shared UI tests pass (47 unit tests and one doctest). This is a small correction discovered during the UI trial, not another feature trial. |
 
 The close-mark captures are `target/review/deckbuilder-close-fixed-1280.png` and
 `target/review/labyrinth-close-fixed-1280.png`. Earlier Deckbuilder captures cover
@@ -44,6 +44,13 @@ and explicit Cargo `package.build` paths need the same uncertainty treatment as
 conventional `build.rs`. Each reproduced finding gained a regression; unsupported
 or dynamic include/build inputs now select full coverage. The reviewed selector
 does not claim to infer arbitrary undeclared runtime file readers.
+
+**Hosted execution exposed a fixture race.** The macOS skills job in run
+`34552810052` failed its no-writes assertion because Git background maintenance
+removed `.git/objects/maintenance.lock` between snapshots. The fixture now disables
+automatic maintenance before its initial commits, retaining the complete path
+comparison. All 17 packaging tests passed locally after this correction at
+`c841f73`; fresh hosted checks remain the platform evidence.
 
 **Queue evidence is useful but bounded.** The installed candidate
 `99be57217d4aab6b2e70272531ea6dcc5838a35b` coordinated real isolated worktrees in
