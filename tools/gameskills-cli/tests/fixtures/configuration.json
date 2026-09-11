@@ -1086,9 +1086,9 @@
         "no installation required for new validate command"
       ],
       "reference": {
-        "kind": "error",
-        "type": "ValueError",
-        "message": "Out of range float values are not JSON compliant: nan"
+        "kind": "non_json_output",
+        "stdout": "{\n  \"configuration\": {\n    \"agents\": {},\n    \"clients\": [\n      \"codex\",\n      \"claude\"\n    ],\n    \"commands\": {},\n    \"creative\": {\n      \"default_level\": 2\n    },\n    \"dispatch\": {\n      \"enabled\": false,\n      \"max_workers\": 5\n    },\n    \"packages\": [\n      \"gameskills\"\n    ],\n    \"project\": {\n      \"ratio\": NaN\n    },\n    \"schema_version\": 1,\n    \"targets\": {}\n  },\n  \"ok\": true\n}\n",
+        "reason": "The public Python encoder accepts non-finite floats and emits NaN."
       },
       "expected": {
         "exit_code": 2,
