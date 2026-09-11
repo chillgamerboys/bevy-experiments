@@ -129,7 +129,9 @@ def workspace(root: Path, revision: str) -> tuple[dict, dict, dict]:
                 included.setdefault(target, set()).add(owner)
             else:
                 included.setdefault("*", set()).add(owner or "unknown")
-    if any(p.endswith("/build.rs") for p in paths):
+    if (any(p.endswith("/build.rs") for p in paths)
+            or any(value["package"].get("build") not in (None, False)
+                   for value in manifests.values())):
         included.setdefault("*", set()).add("build-script")
     return packages, consumers, included
 
