@@ -3,9 +3,9 @@
 Start with [GameSkills](gameskills.md) for the installed workflow and its current
 limits, then [development](development.md) and [testing](testing.md) for commands.
 The [framework decision](decisions/gameskills-framework.md) owns project direction;
-the [Rust migration plan](decisions/gameskills-rust-cli.md) owns the next tooling
-work after the accepted bounded trials. Game-specific behavior belongs with each
-game below.
+the [Rust migration plan](decisions/gameskills-rust-cli.md) owns the implementation
+sequence, first PR and acceptance checks after the accepted bounded trials.
+Game-specific behavior belongs with each game below.
 
 - [GameSkills installation and development workflow](gameskills.md)
 - [Implemented CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)

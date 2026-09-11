@@ -2,6 +2,7 @@
 
 Status: the owner accepted the refinement work and authorized its merge on
 September 10, 2026, then requested this repository-wide Rust migration plan.
+The implementation sequence and first PR specification below are the current plan.
 Implementation has not started. This replaces the earlier CLI-only proposal,
 which explicitly excluded CI routing and repository checks. The final state now
 includes **all repository-owned executable tooling and tests**.
@@ -189,6 +190,133 @@ It must not become an adopter dependency or a permanent second implementation.
 Correct known bugs through documented contract changes and Rust regressions rather
 than copying them for parity. R7 removes the comparison harness's Python dependency;
 Git history and language-neutral cases retain the lessons.
+
+## Implementation order and ownership
+
+Start with one PR containing R0 and the smallest R1 foundation. Then deliver R2
+repository tooling and R3 installation as separately reviewable work. Split R2
+into validator/distribution and CI cutover PRs if the combined diff obscures review;
+switch each command together with its configuration, callers and tests. R4 queues
+and R5 execution follow R3. Finish with R6 candidate adoption, then R7 deletion and
+instruction cutover. Each stage's exit evidence above remains required even when
+the stage takes multiple PRs.
+
+Use one integration owner for `Cargo.toml`, `Cargo.lock`, toolchain configuration,
+workflow YAML, `gameskills.toml`, shared fixture schemas and release metadata.
+After R1 establishes interfaces, the useful independent owners are repository
+validation/CI, installation/native protocol, queue state and process/evidence.
+They are work boundaries, not a request to start four workers immediately. Do not
+assign whole CLI directories to two concurrent workers; declare concrete module
+paths in work orders. Native protocol tests from R3 join the real process cleanup
+backend in R5 before native execution can pass R6.
+
+The coordinator uses `plan`, then `dispatch` only for useful authorized parallel
+work. Each wave records actual worktree/source identities and dispatch versus merge
+dependencies. Apply the five-worker ceiling and any lower host limit. Shared
+manifest edits and integration are serialized. Use `test` and `update-docs` for
+changed contracts, then `create-pr` and `audit-pr` for each delivery; `merge-pr`
+and `release` follow the session's actual endpoint. Game UI/playtest skills are
+used only when the adopted real task makes those claims.
+
+## First implementation PR: contracts and a usable foundation
+
+The first PR establishes a buildable migration target with verified interfaces.
+Its review artifact includes the following concrete changes:
+
+1. Add `tools/migration-contracts.json`, a language-neutral inventory covering all
+   22 Python files and 142 test methods at the accepted reference revision. Each
+   behavior has a stable identifier, source test/symbol, retained/corrected/retired
+   disposition and rationale, destination stage/module, required evidence and
+   implementation status. A Rust check rejects missing, duplicate or unaccounted
+   entries against the pinned reference inventory. Test totals describe coverage
+   to assess, not evidence that tests passed.
+2. Capture representative command/config/error cases as package-local data under
+   each tool's `tests/fixtures/`. Record argv, inputs, exit status, structured output,
+   expected writes and required platform/preconditions. Keep fixture paths and
+   timestamps deterministic without normalizing away source or integrity checks.
+   Generate Git repositories/worktrees during tests; do not commit nested repos or
+   executable Python fixtures. Expand fixtures as each later owner ports behavior.
+3. Add `tools/gameskills-cli` and `tools/gamekit-repo-tools` to the existing workspace,
+   with package-local internal libraries and thin binary entrypoints. Implement
+   help/version, structured failures and initial configuration parsing/validation
+   tests. Preserve the current public command's setup prerequisites unless R0
+   records an intentional change. Unported operations fail explicitly; no success
+   stubs or forwarding to Python. No existing consumer is switched to these binaries.
+4. Establish reusable compiled test-probe utilities and minimal filesystem/process
+   interfaces for later stages. Keep platform policy behind explicit boundaries;
+   the first PR does not claim a working runner. Use the workspace's existing lint
+   policy, including `unsafe_code = "forbid"`, and reviewed safe dependencies for
+   needed OS behavior. Dependency selection and exact versions belong in this PR.
+5. Set the development toolchain deliberately and document each tool package's MSRV.
+   Current hosted Rust jobs use moving `stable` and there is no tracked toolchain
+   pin. Check the chosen minimum against the workspace resolver and dependencies
+   before declaring it. Record license/package metadata decisions and preserve
+   `publish = false`; public registry names remain provisional until checked.
+6. Package the minimal CLI, inspect its contents, extract it outside the checkout
+   and build/install it without sibling workspace paths. Record the source identity
+   and package listing. This proves the foundation can be packaged; the complete
+   embedded catalog and update experience remain R2/R3 acceptance.
+
+First-PR acceptance: focused Cargo tests, formatting and lint checks pass; the
+selected tools' build graphs exclude Bevy/GameKit/games; extracted-package checks
+pass; existing repository/skills checks still pass; `gameskills.lock.json` and
+installed bundles are unchanged. `gameskills.toml` may add reviewed Rust check
+commands while retaining the current runtime as its active entrypoint.
+Because this PR changes the root manifest/lock and CI inputs, broader hosted checks
+are expected. It must not weaken shared-input CI just to obtain a tools-only run.
+
+The contract inventory belongs to the migration, while executable fixtures live
+inside the package that needs them. A distributed CLI never reads the inventory
+from a source checkout at runtime. Packaging the later embedded bundle is covered
+by the [distribution proposal](../extraction.md).
+
+## Existing regression groups and port owners
+
+This is the source inventory observed during planning; exact test-to-contract
+mapping is R0's deliverable. Proposed Rust paths below are not existing files.
+
+| Python test module | Methods | Rust destination and stage |
+|---|---:|---|
+| `scripts/tests/test_check_repo.py` | 5 | `gamekit-repo-tools/tests/repository.rs` — R2 layout, links and dependency direction |
+| `scripts/tests/test_check_distribution.py` | 4 | `gamekit-repo-tools/tests/distribution.rs` — R2 source boundaries, supplemented by actual-archive tests |
+| `scripts/tests/test_ci.py` | 26 | `gamekit-repo-tools/tests/ci.rs` — R2 Git-backed ownership/selection, command selection and failing final gates |
+| `skills/tests/test_gameskills_catalog.py` | 21 | `gamekit-repo-tools/tests/catalog.rs` — R2 package/frontmatter/native metadata, references and scenario structure |
+| `skills/tests/test_gameskills_packaging.py` | 17 | `gameskills-cli/tests/installation.rs` — R1 initial config cases, R3 immutable setup/update/recovery |
+| `skills/tests/test_gameskills_native.py` | 10 | `gameskills-cli/tests/native.rs` — R3 protocol/discovery contracts, R5 real subprocess shutdown, R6 actual-client observations |
+| `skills/tests/test_gameskills_workflow.py` | 18 | `gameskills-cli/tests/workflow.rs` — R4 revisions, ownership, dependencies, worktrees and integration observations |
+| `skills/tests/test_gameskills_runner.py` | 32 | `gameskills-cli/tests/runner.rs` — R5 DAG execution, cancellation/descendants, locks, identity and evidence |
+| `skills/tests/test_skills_tool.py` | 9 | `gameskills-cli/tests/legacy.rs` — R3 preservation/import contracts; obsolete install/sync behavior explicitly retired by R7 |
+
+Rust paths are relative to `tools/`. The 142 methods are a completeness baseline,
+not a required one-to-one test translation or a coverage target. Retain meaningful
+negative cases, race and recovery tests; combine redundant setup and add missing
+packaging/platform regressions. Historical output formats may remain readable
+without preserving every obsolete command. Explain such changes in the inventory.
+
+## Transition and recovery checkpoints
+
+- **Before the first cutover:** the existing pinned Python candidate remains usable.
+  Run transition comparisons only against an isolated reference checkout. New Rust
+  checks run alongside relevant existing checks until their component's parity is
+  reviewed, rather than running the full migration suite for narrative docs.
+- **At R2:** switch repository commands and CI together with their Rust regression
+  tests, and remove only the Python owners they replace. Prove classifier build
+  failure, selected job failure and missing outputs cannot pass the final gate.
+  Record the last working source revision so an ordinary revert can restore that
+  CI slice; do not depend on a runtime fallback that silently invokes Python.
+- **At R3–R5:** exercise installation and state transitions in temporary adopters.
+  The current repository's installation is not a migration test fixture. An update
+  refuses active queues/runs that would cross runtime identity. Old records and
+  bundles remain historical; rollback preserves the original state and user edits.
+  Changing schema support must include fixtures for both acceptance and rejection.
+- **At R6:** use the candidate on a bounded repository task through PR delivery,
+  selecting one after the candidate is usable. The tooltip scrolling follow-up is
+  eligible if still open, with an actual native walk. Record failures as findings;
+  do not combine an unresolved product fix with proof of a successful tool migration.
+- **At R7:** delete the remaining Python only after the full candidate passes its
+  supported-platform gates. An unavailable authenticated client check remains a
+  stated support limitation; it cannot be counted as a pass. Finish the current
+  documentation/command updates before the separate broad docs restructure begins.
 
 ## Process and platform acceptance
 
