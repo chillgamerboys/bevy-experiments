@@ -36,8 +36,9 @@ development, build and target-specific local dependencies. PR checks compare the
 event's base commit with the tested GitHub merge tree; main pushes compare their
 before/after commits. Renames and deletions retain old owners. Root dependency,
 workflow/classifier and unknown-input changes select the full suite. Static Rust
-file inclusions count as build inputs; dynamic includes/build scripts prevent the
-documentation shortcut. Each run's summary reports selected packages and reasons.
+file inclusions count as build inputs alongside the file's normal owner; dynamic
+or unsupported includes/build scripts select the full suite. Each run's summary
+reports selected packages and reasons.
 
 The final `ci` job rejects failed, cancelled, missing or unexpectedly skipped
 selected jobs. It does not alter repository branch-protection settings. A manual
