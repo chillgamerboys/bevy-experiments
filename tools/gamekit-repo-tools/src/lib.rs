@@ -5,4 +5,5 @@ pub mod contracts;
 pub mod distribution;
 pub mod legacy;
 pub mod markdown;
+pub mod repository;
 pub mod support;

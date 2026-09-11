@@ -131,7 +131,11 @@ pub fn portable_relative(path: &str) -> bool {
 /// Resolve an existing local Markdown target within its owning boundary.
 /// HTTP(S) and mail links, query-only references and anchors have no local target.
 pub fn local_target(boundary: &Path, source: &Path, raw: &str) -> Result<Option<PathBuf>, String> {
-    if raw.starts_with("http:") || raw.starts_with("https:") || raw.starts_with("mailto:") {
+    if raw.split_once(':').is_some_and(|(scheme, _)| {
+        ["http", "https", "mailto"]
+            .iter()
+            .any(|known| scheme.eq_ignore_ascii_case(known))
+    }) {
         return Ok(None);
     }
     if raw.starts_with('/') || raw.contains(['\\', '\0']) {

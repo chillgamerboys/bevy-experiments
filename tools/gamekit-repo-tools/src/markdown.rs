@@ -1,6 +1,7 @@
 //! Markdown link destinations outside matching fenced code blocks.
 
 use regex::Regex;
+use std::sync::OnceLock;
 
 /// Find inline, image and reference-definition destinations for structural checks.
 pub fn links(content: &str) -> Vec<String> {
@@ -36,20 +37,24 @@ pub fn links(content: &str) -> Vec<String> {
             text.push('\n');
         }
     }
-    let patterns = [
-        r#"\]\(\s*(<[^>\n]+>|[^\s)]+)(?:\s+['\"][^\n]*?['\"])?\s*\)"#,
-        r"(?m)^\s{0,3}\[[^\]\n]+\]:\s*(<[^>\n]+>|\S+)",
-    ];
+    static PATTERNS: OnceLock<[Regex; 2]> = OnceLock::new();
+    let patterns = PATTERNS.get_or_init(|| {
+        [
+            r#"\]\(\s*(<[^>\n]+>|[^\s)]+)(?:\s+['\"][^\n]*?['\"])?\s*\)"#,
+            r"(?m)^\s{0,3}\[[^\]\n]+\]:\s*(<[^>\n]+>|\S+)",
+        ]
+        .map(|pattern| {
+            Regex::new(pattern).expect("static Markdown destination expression is valid")
+        })
+    });
     let mut targets = Vec::new();
-    for pattern in patterns {
-        if let Ok(regex) = Regex::new(pattern) {
-            targets.extend(
-                regex
-                    .captures_iter(&text)
-                    .filter_map(|capture| capture.get(1))
-                    .map(|value| value.as_str().trim_matches(['<', '>']).to_owned()),
-            );
-        }
+    for regex in patterns {
+        targets.extend(
+            regex
+                .captures_iter(&text)
+                .filter_map(|capture| capture.get(1))
+                .map(|value| value.as_str().trim_matches(['<', '>']).to_owned()),
+        );
     }
     targets
 }
