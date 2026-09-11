@@ -124,6 +124,33 @@ class Routing(unittest.TestCase):
         self.base = self.save()
         self.assertTrue(self.changed("docs/existing.md")["full"])
 
+    def test_cross_game_asset_keeps_owner_and_include_consumer(self):
+        self.write("games/carterfight/assets/shared.bin", "asset")
+        self.write("games/labyrinth/src/lib.rs", 'const DATA: &[u8] = include_bytes!("../../carterfight/assets/shared.bin");\n')
+        self.base = self.save()
+        self.assertEqual(self.changed("games/carterfight/assets/shared.bin")["packages"], ["carterfight", "labyrinth"])
+
+    def test_brace_and_bracket_includes_select_compiled_docs(self):
+        for opening, closing in (("{", "}"), ("[", "]")):
+            with self.subTest(opening=opening):
+                self.write("games/carterfight/src/lib.rs", f'const HELP: &str = include_str!{opening}"../../../docs/existing.md"{closing};\n')
+                self.write("docs/existing.md", f"before {opening}")
+                self.base = self.save()
+                self.assertEqual(self.changed("docs/existing.md")["packages"], ["carterfight"])
+
+    def test_dynamic_include_also_prevents_asset_shortcut(self):
+        self.write("games/labyrinth/src/lib.rs", 'include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../carterfight/assets/shared.bin"));\n')
+        self.base = self.save()
+        self.assertTrue(self.changed("games/carterfight/assets/shared.bin")["full"])
+
+    def test_included_skill_keeps_skill_checks(self):
+        self.write("plugins/help.md", "Skill instructions")
+        self.write("games/carterfight/src/lib.rs", 'const HELP: &str = include_str!("../../../plugins/help.md");\n')
+        self.base = self.save()
+        value = self.changed("plugins/help.md")
+        self.assertTrue(value["skills"])
+        self.assertEqual(value["packages"], ["carterfight"])
+
     def test_manual_full_run(self):
         self.assertTrue(ci.select(self.root, None, self.base, True)["full"])
 

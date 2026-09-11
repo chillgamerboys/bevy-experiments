@@ -118,7 +118,11 @@ def workspace(root: Path, revision: str) -> tuple[dict, dict, dict]:
             continue
         path = candidate.split(":", 1)[1]
         owner = owner_of(path, packages)
-        for expression in re.findall(r"\binclude(?:_str|_bytes)?!\s*\((.*?)\)", read_at(root, revision, path), re.S):
+        source = read_at(root, revision, path)
+        expressions = re.findall(r"\binclude(?:_str|_bytes)?!\s*[({\[](.*?)[)}\]]", source, re.S)
+        if len(expressions) != len(re.findall(r"\binclude(?:_str|_bytes)?!", source)):
+            included.setdefault("*", set()).add(owner or "unknown")
+        for expression in expressions:
             literal = re.fullmatch(r'\s*"([^"\\]+)"\s*,?\s*', expression)
             if literal and owner:
                 target = posixpath.normpath(posixpath.join(str(PurePosixPath(path).parent), literal[1]))
@@ -160,6 +164,8 @@ def select(root: Path, base: str | None, head: str, force_full: bool = False) ->
         paths = changed_paths(root, base, head)
         old, old_consumers, old_included = workspace(root, base)
         new, new_consumers, new_included = workspace(root, head)
+        if paths and ("*" in old_included or "*" in new_included):
+            raise ValueError("dynamic or unsupported include/build-script inputs cannot be scoped safely")
         result = {"schema_version": 1, "head": head, "base": base, "full": False,
                   "packages": [], "paths": paths, "reasons": [], **dict.fromkeys(FLAGS, False)}
         affected = set()
@@ -172,13 +178,14 @@ def select(root: Path, base: str | None, head: str, force_full: bool = False) ->
             if included:
                 affected.update(included)
                 result["reasons"].append(f"{path}: compiled input to {', '.join(sorted(included))}")
-            elif path.startswith(("plugins/", "skills/", ".claude-plugin/", ".codex-plugin/", ".agents/")) or path in SKILL_INPUTS:
+            if path.startswith(("plugins/", "skills/", ".claude-plugin/", ".codex-plugin/", ".agents/")) or path in SKILL_INPUTS:
                 result["skills"] = True
                 result["reasons"].append(f"{path}: GameSkills instructions, packaging or runtime")
             elif path.endswith(".md") or path in PROSE_ROOTS:
-                if "*" in old_included or "*" in new_included:
-                    raise ValueError(f"cannot rule out dynamic documentation build input: {path}")
-                if owner or path.startswith("docs/") or path in PROSE_ROOTS:
+                if included:
+                    if owner:
+                        affected.add(owner)
+                elif owner or path.startswith("docs/") or path in PROSE_ROOTS:
                     result["reasons"].append(f"{path}: narrative documentation")
                 else:
                     raise ValueError(f"unmapped Markdown: {path}")
@@ -192,7 +199,7 @@ def select(root: Path, base: str | None, head: str, force_full: bool = False) ->
             elif path in {"scripts/check_repo.py", "scripts/tests/test_check_repo.py"}:
                 result["skills"] = True
                 result["reasons"].append(f"{path}: always-run repository checks")
-            else:
+            elif not included:
                 raise ValueError(f"unmapped input: {path}")
         # Reach a fixed point over both graphs, including changed/deleted edges.
         previous = None
