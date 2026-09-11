@@ -1,24 +1,21 @@
 ---
 name: install-bevy-skills
-description: Audit and install the complete version-pinned Bevy Gamekit skill pack into a Codex and Claude game repository. Use from a checked-out Gamekit source when adopting the seven Bevy 0.19 craft skills for the first time. Do not use to update an existing adoption; use sync-bevy-skills.
+description: Migrate an existing seven-skill Bevy Gamekit installation to the Rust GameSkills framework while preserving recorded bases and local overlays. Use for legacy adoption; new projects should use gameskills:setup.
 ---
 
-# Install Bevy Skills
+# Migrate the legacy installation
 
-Install only after showing the audit to the user. Run commands from the checked-out
-Gamekit repository root, using Python 3.11 or newer.
+The former Python `install` entrypoint is retired. Read the
+[GameSkills adoption guide](../../../docs/gameskills.md) and inspect the existing
+`.bevy-gamekit/skills.json`, recorded base files, generated client skills and local
+overlays. Use the compatible Rust executable:
 
-1. Check out the explicit release tag or commit SHA. Reject `latest`, `HEAD`, moving branches, a mismatched checkout, or uncommitted canonical skill files.
-2. Verify the target is a Git repository and inspect its dirty state and existing `.agents`, `.claude`, and `.bevy-gamekit` paths.
-3. Run the tool without `--apply`:
+```sh
+gameskills --root <repo> legacy import
+```
 
-   ```sh
-   python3 skills/scripts/skills_tool.py install --target <repo> --repository <source-url> --revision <tag-or-sha>
-   ```
-
-4. Present every ADD, NO-OP, or CONFLICT. Do not infer permission from the request to inspect.
-5. After confirmation, rerun with `--apply`. Use `--allow-dirty` only after identifying every unrelated dirty file.
-6. Verify both client layouts, schema-2 `.bevy-gamekit/skills.json` with the resolved full SHA, the pinned base snapshot, and an unchanged overlay directory.
-7. Run `cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy` from the Gamekit repository root.
-
-The tool installs all seven craft skills. Game-specific rules belong in `.bevy-gamekit/overlays/<skill-name>.md`.
+Inspect the proposal and any concrete conflicts. An authorized migration can apply
+the supported `legacy import --apply` operation. Preserve generated files, overlays
+and project instructions; adoption does not authorize removing them. Finish active
+queues with their original runtime. Verify the selected new packages and actual
+client discovery before declaring adoption complete.

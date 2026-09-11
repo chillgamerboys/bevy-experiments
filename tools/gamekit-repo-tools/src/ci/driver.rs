@@ -29,9 +29,6 @@ pub enum Operation {
         /// Selected conditional job.
         #[arg(value_enum)]
         job: Job,
-        /// Python interpreter for the remaining skill runtime tests only.
-        #[arg(long, default_value = "python")]
-        python: String,
     },
     /// Fail unless classification and every selected job succeeded.
     Gate,
@@ -151,10 +148,9 @@ pub fn execute(root: &Path, operation: Operation) -> Result<Value, String> {
                 json!({"schema_version":1,"ok":true,"scope":"ci_gate","message":"All selected CI jobs succeeded; remaining jobs were intentionally skipped."}),
             )
         }
-        Operation::Run { job, python } => {
+        Operation::Run { job } => {
             let selection = parse_selection(&required("CI_SELECTION")?)?;
-            let commands =
-                checks::run_with(root, &selection, job, &python, |argv| run_child(root, argv))?;
+            let commands = checks::run_with(root, &selection, job, |argv| run_child(root, argv))?;
             Ok(
                 json!({"schema_version":1,"ok":true,"scope":"ci_run","job":job.name(),"commands_completed":commands}),
             )

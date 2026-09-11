@@ -72,11 +72,12 @@ fn help_and_version_work_without_a_repository() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn unported_commands_never_claim_readiness_or_create_state() -> Result<(), Box<dyn Error>> {
+fn repository_commands_refuse_unconfigured_roots_without_creating_state(
+) -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     for command in [
-        "config", "catalog", "status", "setup", "bundle", "native", "plan", "queue", "run",
-        "evidence", "legacy",
+        "config", "status", "setup", "bundle", "native", "plan", "queue", "run", "evidence",
+        "legacy",
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_gameskills"))
             .arg(command)
@@ -86,7 +87,7 @@ fn unported_commands_never_claim_readiness_or_create_state() -> Result<(), Box<d
         assert_eq!(output.status.code(), Some(2));
         assert_eq!(
             result.pointer("/error/code").and_then(Value::as_str),
-            Some("not_implemented"),
+            Some("operation_failed"),
             "{command}"
         );
     }

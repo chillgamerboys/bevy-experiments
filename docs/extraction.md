@@ -100,9 +100,11 @@ committed canonical instructions and a compatibility declaration. The repository
 tool checks regeneration, exports the same bytes as a standalone archive, and checks
 the actual CLI Cargo archive against them. This is an instruction preparation format,
 separate from the legacy Python bundle format. It preserves native metadata and
-core-only defaults but excludes Python code. Its current prose still names Python
-helpers; R3 must migrate those references before baseline activation. Installation,
-embedded runtime use, compatibility behavior and prebuilt adoption remain later work.
+core-only defaults and excludes Python code. The Rust runtime installs the embedded
+baseline and checks explicit compatibility before setup. Rust queue/evidence schemas
+distinguish new observations from historical Python records. Private prebuilt
+adoption and source-package builds supply evidence separately from public registry
+publishing.
 
 Before publishing, add reviewed license files/notices and metadata, set versioned
 internal dependencies, and enable publication only for the intended public crates.
@@ -191,7 +193,7 @@ cargo test --workspace --all-features
 cargo test --workspace --doc --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
-python3 -m unittest discover -s skills/tests -v
+cargo test --locked -p gameskills-cli --profile ci
 ```
 
 Let Cargo prune obsolete lockfile entries and commit the result. Check all retained

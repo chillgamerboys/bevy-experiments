@@ -356,7 +356,7 @@ fn run_refuses_unselected_job_wrong_checkout_and_invalid_job_before_execution() 
     selection.skills = true;
     selection.head = repo.base.clone();
     result(
-        repo.command(&["ci", "run", "skills", "--python", "missing-python"])
+        repo.command(&["ci", "run", "skills"])
             .env(
                 "CI_SELECTION",
                 serde_json::to_string(&selection).expect("selection"),

@@ -1,4 +1,4 @@
-//! Command boundary and versioned diagnostics for the foundation candidate.
+//! Command boundary and versioned diagnostics for the Rust runtime.
 
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -9,7 +9,7 @@ use std::path::PathBuf;
 #[command(
     name = "gameskills",
     version,
-    about = "GameSkills Rust foundation; installation and execution are not ported yet"
+    about = "Install GameSkills, coordinate work and verify configured commands"
 )]
 struct Arguments {
     #[arg(long, default_value = ".", global = true)]
@@ -20,51 +20,51 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Operation {
-    /// Inspect configuration. Only the explicit validate subcommand is implemented.
+    /// Inspect the installed configuration or validate a standalone TOML file.
     Config {
         #[command(subcommand)]
         command: Option<ConfigOperation>,
     },
-    /// Installation catalog (not yet ported).
+    /// Inspect the embedded instruction catalog.
     Catalog,
-    /// Installation readiness (not yet ported).
+    /// Verify the installed instruction bundle and configuration.
     Status,
-    /// Install or recover a bundle (not yet ported).
+    /// Propose, apply or recover an immutable instruction installation.
     Setup {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Prepare an immutable bundle (not yet ported).
+    /// Export a verified immutable instruction bundle.
     Bundle {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Activate an agent client (not yet ported).
+    /// Construct or launch a selected native agent client.
     Native {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Validate a work plan (not yet ported).
+    /// Validate a scoped work plan.
     Plan {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Coordinate durable work (not yet ported).
+    /// Coordinate revision-guarded durable work queues.
     Queue {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Execute configured commands (not yet ported).
+    /// Execute the selected configured command graph.
     Run {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Inspect execution records (not yet ported).
+    /// Inspect and validate execution records.
     Evidence {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
-    /// Import an older installation (not yet ported).
+    /// Import an older installation while preserving its owned files.
     Legacy {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
@@ -93,7 +93,7 @@ fn failure(code: &str, message: impl ToString) -> Response {
     Response { exit_code: 2, output: json!({"schema_version": 1, "ok": false, "error": {"code": code, "message": message.to_string()}}).to_string() }
 }
 
-/// Parse an argument vector and perform only implemented read-only operations.
+/// Parse an argument vector and execute the requested operation.
 pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
     let parsed = match Arguments::try_parse_from(args) {
         Ok(parsed) => parsed,
@@ -111,7 +111,9 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
         Err(error) => return failure("invalid_arguments", error),
     };
     match parsed.command {
-        Operation::Config { command: Some(ConfigOperation::Validate { file }) } => {
+        Operation::Config {
+            command: Some(ConfigOperation::Validate { file }),
+        } => {
             let path = parsed.root.join(file);
             let source = match crate::platform::read_ordinary_file(&path) {
                 Ok(source) => source,
@@ -122,6 +124,56 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 Err(error) => failure("invalid_configuration", error),
             }
         }
-        _ => failure("not_implemented", "this operation is not ported; use the existing pinned candidate until its Rust replacement is accepted"),
+        operation => {
+            let (family, arguments) = match operation {
+                Operation::Catalog => ("catalog", Vec::new()),
+                Operation::Status => ("status", Vec::new()),
+                Operation::Config { command: None } => ("config", Vec::new()),
+                Operation::Setup { args } => ("setup", args),
+                Operation::Bundle { args } => ("bundle", args),
+                Operation::Native { args } => ("native", args),
+                Operation::Legacy { args } => ("legacy", args),
+                Operation::Plan { args } => ("plan", args),
+                Operation::Queue { args } => ("queue", args),
+                Operation::Run { args } => ("run", args),
+                Operation::Evidence { args } => ("evidence", args),
+                Operation::Config { command: Some(_) } => {
+                    return failure("invalid_arguments", "unexpected config operation")
+                }
+            };
+            let result = match family {
+                "plan" | "queue" | "run" | "evidence" => {
+                    crate::installation::ready_config(&parsed.root).and_then(|config| {
+                        if matches!(family, "plan" | "queue") {
+                            crate::workflow::execute(&parsed.root, &config, family, &arguments)
+                        } else {
+                            crate::runner::execute(&parsed.root, &config, family, &arguments)
+                        }
+                    })
+                }
+                _ => crate::installation::execute(&parsed.root, family, &arguments),
+            };
+            match result {
+                Ok(mut value) => {
+                    let Some(object) = value.as_object_mut() else {
+                        return failure("invalid_result", "command did not return an object");
+                    };
+                    object.entry("schema_version").or_insert(json!(1));
+                    object.entry("ok").or_insert(json!(true));
+                    let exit_code = object
+                        .get("exit_code")
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|code| u8::try_from(code).ok())
+                        .unwrap_or_else(|| u8::from(object.get("ok") == Some(&json!(false))));
+                    let output = object
+                        .get("help")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| value.to_string());
+                    Response { exit_code, output }
+                }
+                Err(error) => failure("operation_failed", error),
+            }
+        }
     }
 }

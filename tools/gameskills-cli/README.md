@@ -1,44 +1,72 @@
-# GameSkills Rust foundation
+# GameSkills Rust CLI
 
-This unpublished `0.1.0-dev.2` candidate implements help/version and read-only
-configuration validation. Installation, native clients, queues, execution and
-evidence remain on the existing pinned candidate; their Rust commands fail with
-`not_implemented`. The internal Rust library is not a supported public API.
+The unpublished `0.1.0-dev.2` candidate installs immutable GameSkills instructions,
+constructs native Codex/Claude invocations, coordinates durable work queues and
+executes configured command graphs with verifiable evidence. Its 12 core skills
+use `plan` as the default entrypoint; nine optional skills live in five specialist
+packages. The internal Rust modules are not a stable public API.
 
 ```sh
-cargo run --locked -p gameskills-cli -- --help
-cargo run --locked -p gameskills-cli -- config validate --file gameskills.toml
+cargo install --locked --path tools/gameskills-cli
+# In the adopter's Git root:
+gameskills catalog
+gameskills setup
+gameskills setup --apply
+gameskills status
+gameskills native codex --verify
+```
+
+Initial setup uses the instruction snapshot embedded in the executable. It needs
+no source checkout, network bundle fetch, Cargo or interpreter at runtime. Git is
+required for repository operations. The source installation needs Rust 1.97.1;
+prebuilt candidates are target-specific. There is no Bevy, GameKit or repository-tool
+runtime dependency. Configuration and instructions remain TOML, JSON and Markdown.
+
+`setup` reports a proposal until `--apply` is supplied. Core-only installation is
+the default. `--packages gameskills gameskills-ui` selects an explicit combination.
+Use `setup --bundle PATH --apply` for a compatible immutable update or rollback,
+and `setup --recover` to recover an interrupted config/lock transaction. Local
+instructions, overlays and previous bundles retain their ownership. Updates that
+conflict with newer local edits fail with paths to inspect.
+
+`config validate --file PATH` checks standalone TOML without setup or Git. Bare
+`config` requires installation readiness. Global `--root` defaults to the current
+directory. `catalog`, help and version do not require an installation. `native`
+prints literal client arguments; `--launch` starts the selected client and
+`native codex --verify` checks bounded app-server discovery without a model turn.
+Neither structural validation nor discovery proves model behavior.
+
+Plans retain authored schema 1; Rust installation locks, queues and evidence use
+schema 2 with an explicit runtime identity. Finish active Python queues with their
+original runtime before adoption. Existing records and bundles remain untouched;
+old observations cannot become validated Rust passes. Rerun checks with Rust to
+obtain new evidence. `legacy import` preserves the old seven-skill installation
+and project overlays while proposing the new installation.
+
+Queue mutation, command supervision and native Codex verification currently require
+POSIX support. Windows receives explicit unsupported diagnostics for those operations;
+portable configuration, catalog, packaging and installation checks have separate
+coverage. Authenticated native-client behavior and game playtests are separately
+recorded acceptance evidence, not inferred from an operating-system test matrix.
+
+```sh
 cargo test --locked -p gameskills-cli --profile ci
+cargo clippy --locked -p gameskills-cli --all-targets --profile ci -- -D warnings
 cargo package --locked -p gameskills-cli
 ```
 
-`config validate` is an additive command that needs neither setup nor a Git checkout.
-It reads the named ordinary UTF-8 TOML file and reports normalized structure only.
-Relative file paths resolve against `--root`, which defaults to the current directory.
-It never executes configured commands, writes an installation or establishes client
-readiness. The existing bare `config` command is not ported and does not bypass its
-installation requirements. Help/version work outside a repository.
+Successful commands return JSON; diagnostic failures have `error.code` and
+`error.message` with exit 2. A failed execution observation exits 1. Help/version
+are text. Native launch preserves its process status. Diagnostic wording and the
+internal supervision protocol are not public compatibility promises.
 
-Results use JSON with `schema_version = 1`; errors have `error.code` and
-`error.message`, exit 2. Help/version are text with exit 0. Broken output also exits
-2. Diagnostic wording is not a compatibility promise. Source fixtures record prior
-configuration observations and deliberate changes: strict integer schema, typed
-project/target fields, portable target paths, duplicate target selection rejection
-and JSON-compatible scalars. TOML 1.1 syntax is accepted by the Rust parser.
+`bundle/` contains a generated manifest and deterministic archive from canonical
+`plugins/` instructions. Maintainers regenerate with `gamekit-repo bundle prepare`
+and verify with `bundle check`; Cargo packages carry those exact bytes. No build
+script downloads content and no runtime path points back into this workspace.
+Compiled examples are test probes, not additional installed programs.
 
-The toolchain and initial supported minimum are Rust 1.97.1, tested together rather
-than asserting an untested older MSRV. Direct dependencies are Clap, Serde JSON and
-TOML; there are no Bevy, GameKit, game or repository-tool dependencies. The workspace
-lockfile records exact resolutions. `cargo install --locked --path <extracted-crate>`
-can install the packaged foundation. `bundle/` now contains a generated instruction
-snapshot and manifest for R3, prepared by the Rust repository tool from canonical
-`plugins/` sources. The Cargo archive includes these package-local bytes; the
-executable does not yet activate or install them. The preparation-only payload
-excludes Python code, while its prose still needs the R3 command migration.
-Prebuilt distribution and baseline activation arrive in later stages.
-`process_probe` is a test example, not an installed binary.
-
-The workspace declares `MIT OR Apache-2.0`, inherited here. Actual license files,
-notices and registry ownership still need the planned release audit; publication
-remains disabled. The package contains its own sources and test data, without
-workspace-relative runtime resource paths or build-time downloads.
+Publication remains disabled. The workspace declares `MIT OR Apache-2.0`; the
+actual license/notice files, registry names and release ownership still require
+the planned public-release audit. See [distribution](../../docs/extraction.md) and
+[adopter guidance](../../docs/gameskills.md).

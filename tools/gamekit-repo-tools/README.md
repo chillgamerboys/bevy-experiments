@@ -35,7 +35,8 @@ packages, metadata, frontmatter and unexecuted scenario rubrics. It rejects dupl
 JSON keys and native-package symlinks. `skills legacy` checks the seven frozen
 canonical sources, client metadata and trigger fixtures. Both are structural checks;
 they cannot prove agent selection, native activation, instruction-following or savings.
-The legacy installer and pinned GameSkills runtime remain their existing Python owners.
+The Rust GameSkills CLI owns installation, legacy import, native clients, queues
+and execution. The old Python installer/runtime entrypoints are retired.
 
 `distribution check` stages Cargo-selected library files in a temporary workspace
 and checks empty, pure, UI and network consumer graphs and tests. `--case` selects
@@ -77,9 +78,9 @@ metadata are included; Python/runtime files are excluded. The content digest has
 the canonical manifest identity excluding `source_commit` and `content_sha256`;
 the archive digest also binds provenance. Default selection is core-only. CLI range,
 schema versions and Bevy/GameKit coverage are declarations, not compatibility tests.
-The payload is marked `preparation-only`: its current prose still refers to Python
-helpers. R3 must port those instructions and installation before activating it.
-No setup state, installed bundle, marketplace registration or executable changes.
+The payload declares Rust runtime compatibility: configuration schema 1 and queue/
+evidence schema 2. Its executable validates these declarations before installation.
+Preparation itself changes no setup state or native marketplace registration.
 
 After `cargo package --locked -p gameskills-cli`, run `bundle verify-package`.
 It inspects `target/package/gameskills-cli-<version>.crate` (or `--archive <path>`),
@@ -107,9 +108,8 @@ locking the running controller when workspace tests rebuild that same binary;
 an installed controller outside the workspace target also works.
 
 `ci run skills|rust|policy` reads `CI_SELECTION`, checks the current HEAD and runs
-ordered literal argument vectors, stopping at the first failed child. Python is
-used only for the remaining skill runtime tests; `--python python3` selects an
-alternate interpreter. `ci gate` reads `CI_SELECTION` and `CI_NEEDS`; it requires
+ordered literal argument vectors, stopping at the first failed child. All selected
+maintenance and runtime tests are Rust. `ci gate` reads `CI_SELECTION` and `CI_NEEDS`; it requires
 successful classification and all selected results, allowing only intentional
 unselected skips. Missing/malformed/duplicate data fail. The workflow builds the
 checked-out Rust gate even if classification fails; bootstrap failures remain red.
