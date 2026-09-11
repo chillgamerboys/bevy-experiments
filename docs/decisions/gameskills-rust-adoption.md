@@ -10,10 +10,10 @@ mechanical and visual trial. This record describes private adoption, not publica
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Final packaged implementation | `48c9b49a65a3e3a18b2d7aab5e3e1d2fcd0ba671` |
+| Final packaged implementation | `56a61b663e36b6cd1f012533f34c7bcf2482caac` |
 | Local prebuilt target | `aarch64-apple-darwin` |
 | CLI executable SHA-256 | `683d0a8b157110d377ca8b2ab8139a6ab2ba13615d6dc30920168d59d00255f7` |
-| Actual Cargo archive SHA-256 | `7c260405984376b49b053b7a1298b24050dd1d8151f2c66149330efc296dcb0f` |
+| Actual Cargo archive SHA-256 | `ab0e451b5f0c5d7d90457582e2fb0ffcb56e86466f9dd93a4aa4345e8beedc5a` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -43,9 +43,15 @@ worktree paths, and simulated installation lock owners explicitly unlock while
 duplicate descriptors remain open. The latter models descriptor retention without
 claiming to reproduce hosted fork timing. These corrections change only tests;
 the final installed executable is byte-identical to the verified `1ebfea1` binary.
+Native probe observations are published by rename so a deliberately terminated
+writer cannot leave an empty counter. The affected deadline case passed 20
+consecutive process runs, and all ten native integration tests passed.
 
 ## Observed checks
 
+- The complete workspace at `56a61b6` passed **613 tests and doctests** with all
+  features enabled. The existing real-LAN discovery and six-process restart gates
+  remained explicitly ignored; no additional tests were skipped for the migration.
 - The combined Rust CLI suite at `1ebfea1` passed **124 tests**, including real installation,
   Git worktrees, command descendants, resource contention, coordinator/supervisor
   SIGKILL, recovery and stale evidence. The repository-tool suite passed **156**.
