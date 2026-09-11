@@ -298,7 +298,69 @@ fn validate_files(
             return Err(format!("invalid catalog skills: {package}"));
         }
     }
+    let inventory = value
+        .get("files")
+        .and_then(Value::as_object)
+        .expect("validated files");
+    for name in inventory.keys() {
+        if name
+            .split('/')
+            .nth(1)
+            .is_none_or(|package| !packages.contains_key(package))
+        {
+            return Err("bundle inventory contains a package absent from its catalog".into());
+        }
+    }
+    for (package, info) in packages {
+        let prefix = format!("plugins/{package}/");
+        let skills = strings(info, "skills")?;
+        let advertised = skills
+            .iter()
+            .map(|name| format!("{prefix}skills/{name}/SKILL.md"))
+            .collect::<BTreeSet<_>>();
+        let present = inventory
+            .keys()
+            .filter(|name| {
+                name.starts_with(&format!("{prefix}skills/")) && name.ends_with("/SKILL.md")
+            })
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if present != advertised {
+            return Err(format!(
+                "catalog and instruction payload disagree on advertised skills: {package}"
+            ));
+        }
+        for client in ["codex", "claude"] {
+            let path = format!("{prefix}.{client}-plugin/plugin.json");
+            if !inventory.contains_key(&path) {
+                return Err(format!(
+                    "bundle lacks required {client} plugin metadata: {package}"
+                ));
+            }
+        }
+    }
     let selected = selected.unwrap_or_else(|| packages.keys().cloned().collect());
+    for package in &selected {
+        for client in ["codex", "claude"] {
+            let path = format!("plugins/{package}/.{client}-plugin/plugin.json");
+            let metadata =
+                json(files.get(&path).ok_or_else(|| {
+                    format!("selected payload lacks {client} metadata: {package}")
+                })?)?;
+            if metadata.get("name").and_then(Value::as_str) != Some(package.as_str())
+                || metadata.get("version") != catalog.get("version")
+            {
+                return Err(format!(
+                    "{client} plugin metadata disagrees with catalog identity: {package}"
+                ));
+            }
+            if (client == "codex" || metadata.get("skills").is_some())
+                && metadata.get("skills").and_then(Value::as_str) != Some("./skills/")
+            {
+                return Err(format!("{client} plugin metadata must discover the catalog's ./skills/ directory: {package}"));
+            }
+        }
+    }
     let expected = value
         .get("files")
         .and_then(Value::as_object)

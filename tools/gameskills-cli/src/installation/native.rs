@@ -360,11 +360,34 @@ mod posix {
         fn send(&mut self, value: &Value) -> Result<(), String> {
             let mut bytes = serde_json::to_vec(value).map_err(|e| e.to_string())?;
             bytes.push(b'\n');
-            self.input
-                .as_mut()
-                .ok_or("Codex input closed")?
-                .write_all(&bytes)
-                .map_err(|e| format!("Codex input closed: {e}"))
+            let mut offset = 0;
+            let mut backpressured = false;
+            while offset < bytes.len() {
+                let remaining = self
+                    .deadline
+                    .checked_duration_since(Instant::now())
+                    .filter(|remaining| !remaining.is_zero())
+                    .ok_or_else(|| if backpressured {
+                        "Codex native activation timed out while sending request: stdin backpressure".to_owned()
+                    } else {
+                        "Codex native activation timed out while sending request".to_owned()
+                    })?;
+                match self.input.as_mut().ok_or("Codex input closed")?.write(
+                    bytes
+                        .get(offset..)
+                        .expect("write progress stays inside request"),
+                ) {
+                    Ok(0) => return Err("Codex input closed before request was written".into()),
+                    Ok(written) => offset += written,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        backpressured = true;
+                        thread::sleep(remaining.min(Duration::from_millis(5)));
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(error) => return Err(format!("Codex input closed: {error}")),
+                }
+            }
+            Ok(())
         }
         fn call(&mut self, method: &str, params: Value) -> Result<Value, String> {
             let id = self.next;
@@ -426,9 +449,18 @@ mod posix {
         let input = child.stdin.take();
         let mut output = child.stdout.take().ok_or("Codex output unavailable")?;
         let (sender, receiver) = mpsc::sync_channel(16);
-        // Nonblocking reads make shutdown bounded even if an escaped descendant
-        // retains stdout. No thread owns a permanently blocking buffered reader.
+        // Both directions share one deadline. A peer may stop draining stdin
+        // while continuing to send responses, and a descendant may retain stdout.
         let nonblocking = (|| {
+            let stdin = input.as_ref().ok_or(nix::errno::Errno::EBADF)?;
+            let input_flags = nix::fcntl::fcntl(stdin, nix::fcntl::FcntlArg::F_GETFL)?;
+            nix::fcntl::fcntl(
+                stdin,
+                nix::fcntl::FcntlArg::F_SETFL(
+                    nix::fcntl::OFlag::from_bits_truncate(input_flags)
+                        | nix::fcntl::OFlag::O_NONBLOCK,
+                ),
+            )?;
             let flags = nix::fcntl::fcntl(&output, nix::fcntl::FcntlArg::F_GETFL)?;
             nix::fcntl::fcntl(
                 &output,

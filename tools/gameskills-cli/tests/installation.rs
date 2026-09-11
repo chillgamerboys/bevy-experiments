@@ -724,3 +724,109 @@ fn actual_cli_installs_and_validates_pinned_candidate() -> Result {
     }
     Ok(())
 }
+
+fn reseal_archive(files: &mut [(String, Vec<u8>)]) -> Result<Vec<u8>> {
+    let hashes = files
+        .iter()
+        .filter(|(name, _)| name != "bundle.json")
+        .map(|(name, bytes)| (name.clone(), json!(hash(bytes))))
+        .collect::<BTreeMap<_, _>>();
+    let (_, bytes) = files
+        .iter_mut()
+        .find(|(name, _)| name == "bundle.json")
+        .ok_or("manifest")?;
+    let mut value: Value = serde_json::from_slice(bytes)?;
+    *value.get_mut("files").ok_or("inventory")? = serde_json::to_value(hashes)?;
+    let mut identity = value.clone();
+    let map = identity.as_object_mut().ok_or("object")?;
+    map.remove("content_sha256");
+    map.remove("source_commit");
+    identity.sort_all_objects();
+    let mut identity = serde_json::to_vec_pretty(&identity)?;
+    identity.push(b'\n');
+    *value.get_mut("content_sha256").ok_or("identity")? = json!(hash(&identity));
+    *bytes = serde_json::to_vec(&value)?;
+    make_archive(files)
+}
+
+#[test]
+fn self_consistent_incomplete_archives_cannot_advertise_missing_skills_or_clients() -> Result {
+    verify_archive(&reseal_archive(&mut archive_files()?)?)?;
+    for (removed, reason) in [
+        (
+            "plugins/gameskills/skills/plan/SKILL.md",
+            "advertised skills",
+        ),
+        (
+            "plugins/gameskills-ui/skills/build-ui/SKILL.md",
+            "advertised skills",
+        ),
+        (
+            "plugins/gameskills/.claude-plugin/plugin.json",
+            "required claude plugin metadata",
+        ),
+        (
+            "plugins/gameskills/.codex-plugin/plugin.json",
+            "required codex plugin metadata",
+        ),
+    ] {
+        let mut files = archive_files()?;
+        files.retain(|(name, _)| name != removed);
+        let error = verify_archive(&reseal_archive(&mut files)?)
+            .expect_err("complete catalog payload required");
+        assert!(error.contains(reason), "{removed}: {error}");
+    }
+    let mut files = archive_files()?;
+    files.push((
+        "plugins/gameskills/skills/unadvertised/SKILL.md".into(),
+        b"unadvertised skill".to_vec(),
+    ));
+    assert!(verify_archive(&reseal_archive(&mut files)?)
+        .expect_err("unexpected native skill")
+        .contains("advertised skills"));
+    Ok(())
+}
+
+#[test]
+fn self_consistent_client_metadata_must_match_catalog_identity_and_skill_directory() -> Result {
+    for (client, field, value, reason) in [
+        ("codex", "name", json!("gameskills-ui"), "catalog identity"),
+        (
+            "claude",
+            "name",
+            json!("different-package"),
+            "catalog identity",
+        ),
+        ("codex", "version", json!("0.9.0"), "catalog identity"),
+        ("claude", "version", json!("0.9.0"), "catalog identity"),
+        (
+            "codex",
+            "skills",
+            json!("../other-skills/"),
+            "./skills/ directory",
+        ),
+        (
+            "claude",
+            "skills",
+            json!("../other-skills/"),
+            "./skills/ directory",
+        ),
+    ] {
+        let mut files = archive_files()?;
+        let path = format!("plugins/gameskills/.{client}-plugin/plugin.json");
+        let (_, bytes) = files
+            .iter_mut()
+            .find(|(name, _)| name == &path)
+            .ok_or("client metadata")?;
+        let mut metadata: Value = serde_json::from_slice(bytes)?;
+        metadata
+            .as_object_mut()
+            .ok_or("metadata object")?
+            .insert(field.into(), value);
+        *bytes = serde_json::to_vec(&metadata)?;
+        let error =
+            verify_archive(&reseal_archive(&mut files)?).expect_err("metadata identity required");
+        assert!(error.contains(reason), "{client}/{field}: {error}");
+    }
+    Ok(())
+}

@@ -376,6 +376,60 @@ mod posix {
             .contains("not selected"));
         Ok(())
     }
+    #[test]
+    fn peer_that_stops_draining_stdin_cannot_extend_the_activation_deadline() -> Result {
+        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let mut fixture = Fixture::new()?;
+        *fixture.scenario.get_mut("mode").ok_or("mode")? = json!("backpressure");
+        fs::write(
+            fixture.root.join("scenario.json"),
+            serde_json::to_vec(&fixture.scenario)?,
+        )?;
+        // Each discovery request carries this legitimate cwd. It fills macOS's
+        // normal stdin pipe within the bounded activation; Linux's probe narrows
+        // its pipe explicitly rather than assuming a host-dependent capacity.
+        let mut cwd = fixture.root.clone();
+        while cwd.as_os_str().len() < 880 {
+            cwd.push("discovery-project-path-component");
+        }
+        fs::create_dir_all(&cwd)?;
+        let bundle = fixture.bundle.clone();
+        let executable = fixture.executable.clone();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let started = Instant::now();
+        let worker = std::thread::spawn(move || {
+            let result = activate_codex(&bundle, &cwd, &executable, 10.0);
+            let _ = sender.send(result);
+        });
+        let observed = receiver.recv_timeout(Duration::from_secs(14));
+        // A regression must fail the test, not strand Cargo on a blocked writer.
+        if observed.is_err() {
+            if let Ok(pid) = fs::read_to_string(fixture.root.join("pid")) {
+                let pid = nix::unistd::Pid::from_raw(pid.trim().parse()?);
+                let _ = nix::sys::signal::killpg(pid, nix::sys::signal::Signal::SIGKILL);
+            }
+        }
+        worker.join().expect("native activation worker");
+        let error = observed
+            .map_err(|error| format!("activation exceeded bounded test wait: {error}"))?
+            .expect_err("backpressure must exhaust the shared deadline");
+        assert!(
+            error.contains("timed out while sending request: stdin backpressure"),
+            "{error}"
+        );
+        assert!(started.elapsed() < Duration::from_secs(12));
+        assert_eq!(
+            fs::read_to_string(fixture.root.join("stopped-draining"))?,
+            "true"
+        );
+        let sent: u64 = fs::read_to_string(fixture.root.join("response-count"))?.parse()?;
+        assert!(
+            sent >= 4,
+            "probe did not exercise repeated incomplete discovery"
+        );
+        fixture.dead()?;
+        Ok(())
+    }
     fn at<'a>(value: &'a Value, path: &str) -> &'a Value {
         value.pointer(path).expect("fixture field")
     }
