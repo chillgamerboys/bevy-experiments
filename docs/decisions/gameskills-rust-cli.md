@@ -10,8 +10,11 @@ into `gamekit-repo`, with callers moved and the replaced Python owners/tests rem
 R2b ports committed CI selection, ordered command execution and final gating into
 Rust and removes the replaced CI script/test module. Its focused regressions cover
 the 26 frozen reference methods plus both R2a additions and new failure cases.
-Bundle preparation for R3 and actual GameKit archive inspection remain outstanding
-R2 gates; this CI cutover does not complete all of R2. R3–R7 have not started.
+R2c adds actual GameKit Cargo archive inspection and consumers of extracted files,
+plus deterministic package-local instruction preparation and CLI archive byte checks.
+These complete R2 implementation; hosted artifact checks and PR review remain delivery
+gates. R3–R7 have not started. The prepared instructions retain Python helper prose
+and cannot be activated until R3 migrates installation and command guidance.
 This replaces the earlier CLI-only proposal,
 which explicitly excluded CI routing and repository checks. The final state now
 includes **all repository-owned executable tooling and tests**.

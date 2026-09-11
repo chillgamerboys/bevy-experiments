@@ -11,6 +11,8 @@ cargo clippy --workspace --all-targets --all-features --profile ci -- -D warning
 cargo deny check
 cargo run --locked -p gamekit-repo-tools --profile ci -- check
 cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
+cargo run --locked -p gamekit-repo-tools --profile ci -- distribution archives
+cargo run --locked -p gamekit-repo-tools --profile ci -- bundle check
 cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
@@ -28,6 +30,7 @@ cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
 cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
 cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
 cargo package --locked -p gameskills-cli
+cargo run --locked -p gamekit-repo-tools --profile ci -- bundle verify-package
 cargo package --locked -p gamekit-repo-tools
 ```
 
@@ -40,6 +43,13 @@ Python tests remain required for owners not yet ported. R2a replaces the reposit
 distribution and catalog test modules with Rust regressions. R2b replaces the CI
 router and its tests; the legacy installer and pinned runtime tests remain Python
 until their respective cutovers.
+
+R2c adds real Cargo archive fixtures, normalized manifest/path inspection and
+consumers of extracted library files. Bundle regressions use real Git commits to
+check reproducibility, provenance, dirty/stale inputs, corrupt or extra outputs,
+symlinks and checkout line endings. The prepared bundle is included in the CLI
+archive and compared byte-for-byte after Cargo packaging builds the extracted CLI.
+Preparation does not activate the instructions or port the remaining Python runtime.
 
 ## CI selection
 
@@ -113,6 +123,17 @@ checking the activated dependency graph for game/tool or networking leakage. Use
 artifacts reuse `target/`. This proves independent source consumption, not registry
 publication, a complete game, visual quality or cross-machine networking. The native
 probe does not open sockets or invoke Tailscale. CI runs all four cases on three OSes.
+
+`distribution archives` repeats those cases using actual Cargo-produced library
+archives. Its temporary staging adds sibling versions and uses `--exclude-lockfile`;
+consumers patch unpublished siblings to inspected extracted files. These are explicit
+artifact probes, with registry resolution and final library lockfiles still unverified.
+`bundle check` runs for skill changes and affected tooling; `bundle verify-package`
+checks the CLI archive when its package is selected. Narrative docs and isolated
+game edits do not request the bundle or complete distribution checks. Bundle jobs
+fetch full Git history to verify the preparation commit where available. After a
+squash, byte/digest checks still enforce current committed inputs, while missing
+historical commit verification is explicitly reported as unavailable.
 
 | Claim | Evidence | Does not establish |
 |---|---|---|

@@ -10,6 +10,8 @@ cargo run --locked -p gamekit-repo-tools --profile ci -- check
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
 cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check --case all
+cargo run --locked -p gamekit-repo-tools --profile ci -- distribution archives --case all
+cargo run --locked -p gamekit-repo-tools --profile ci -- bundle check
 cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --full
 cargo test --locked -p gamekit-repo-tools --profile ci
 cargo package --locked -p gamekit-repo-tools
@@ -43,6 +45,47 @@ go to stderr; stdout contains the final result. Temporary sources are removed on
 success and failure; Cargo artifacts reuse the selected repository's `target/`.
 This command needs Cargo and registry dependencies, and may compile Bevy explicitly.
 It establishes independent source consumption, not crates.io publication.
+
+`distribution archives` additionally produces actual Cargo library archives in a
+temporary library workspace, inspects/extracts them and runs the same consumer cases
+against extracted files. Staging adds versions to internal path dependencies and
+uses `--exclude-lockfile --no-verify` while retaining `publish = false`. The consumer
+uses explicit local patches and the repository lock as a resolution seed. The report
+records transformations and archive hashes. These probes do not verify registry
+resolution, licenses or publication readiness; library archive lockfiles remain a
+release gate. The normal CLI Cargo package retains its lockfile and Cargo verification.
+
+`bundle prepare --revision <full-commit-id>` generates `tools/gameskills-cli/bundle/`
+from committed canonical instructions plus this package's `bundle-compatibility.json`.
+Commit changed inputs first. `plugins/` remains the human-edited skill source.
+The generated directory contains a manifest and deterministic gzip/tar payload, with
+the same manifest inside. `bundle check` regenerates in memory and compares both
+files, rejecting stale content, dirty inputs, extra outputs and changed bytes.
+`source_commit` records the preparation commit; current committed input verification
+is always required. When the historical commit is available, its inputs must also
+match. If a squash merge removes it from a fresh clone, the report explicitly sets
+`source_commit_verified = false`; exact content verification still runs. Other Git
+errors and available-but-mismatched commits fail. CI fetches full history to retain
+provenance where possible. Unrelated commits keep the payload valid; instruction or
+compatibility changes require regeneration at a new preparation commit.
+JSON keys, file order, modes and timestamps are canonicalized; payloads use Git blob
+bytes, independent of checkout line endings. Generated manifest checkout uses LF.
+
+`bundle export --out <new-archive-path>` writes the exact verified tarball without
+overwriting an existing artifact. All six packages' Markdown, catalog and native
+metadata are included; Python/runtime files are excluded. The content digest hashes
+the canonical manifest identity excluding `source_commit` and `content_sha256`;
+the archive digest also binds provenance. Default selection is core-only. CLI range,
+schema versions and Bevy/GameKit coverage are declarations, not compatibility tests.
+The payload is marked `preparation-only`: its current prose still refers to Python
+helpers. R3 must port those instructions and installation before activating it.
+No setup state, installed bundle, marketplace registration or executable changes.
+
+After `cargo package --locked -p gameskills-cli`, run `bundle verify-package`.
+It inspects `target/package/gameskills-cli-<version>.crate` (or `--archive <path>`),
+requires the normal Cargo lockfile and exact prepared bundle bytes, and rejects Python
+files. Cargo's preceding package command verifies the extracted build; inspection
+alone reports `cargo_build_verified = false` and cannot substitute for that build.
 
 `ci select --base <full-id> --head <full-id>` reads committed Git objects without
 Cargo metadata or network access. Missing/uncertain comparisons select all checks;
@@ -85,7 +128,8 @@ the symbol check is not a general language parser. Snapshot JSON and contract
 fixtures are data; future executable checks remain Rust.
 
 The toolchain and initial supported minimum are Rust 1.97.1. Dependencies are Clap,
-Serde/JSON, SHA-256, TOML/TOML Edit, Regex, Proc Macro 2, Syn and Tempfile. This package is independent
+Serde/JSON, SHA-256, TOML/TOML Edit, Regex, Proc Macro 2, Syn, Tempfile, Semver,
+Tar and Flate2. This package is independent
 of the GameSkills runner and of Bevy/GameKit/games, and remains `publish = false`.
 The declared workspace license is `MIT OR Apache-2.0`; the distribution plan retains
 the license-file/notices audit before a public release.

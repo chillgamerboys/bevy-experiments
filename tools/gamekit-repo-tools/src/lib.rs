@@ -1,5 +1,6 @@
 //! Internal repository maintenance; not an adopter runtime dependency.
 
+pub mod bundle;
 pub mod catalog;
 pub mod ci;
 pub mod contracts;

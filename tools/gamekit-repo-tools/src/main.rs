@@ -1,7 +1,7 @@
 //! Repository maintenance executable entrypoint.
 
 use clap::{Parser, Subcommand};
-use gamekit_repo_tools::{catalog, ci, distribution, legacy, repository};
+use gamekit_repo_tools::{bundle, catalog, ci, distribution, legacy, repository};
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -22,6 +22,11 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Operation {
+    /// Prepare and check Cargo-local instruction payloads; does not install skills.
+    Bundle {
+        #[command(subcommand)]
+        command: BundleOperation,
+    },
     /// Inspect the R0 migration ledger.
     Contracts {
         #[command(subcommand)]
@@ -47,6 +52,28 @@ enum Operation {
 }
 
 #[derive(Subcommand)]
+enum BundleOperation {
+    /// Inspect CLI Cargo packaging and require the exact verified bundle payload.
+    VerifyPackage {
+        /// Defaults to target/package/gameskills-cli-<manifest-version>.crate.
+        #[arg(long)]
+        archive: Option<PathBuf>,
+    },
+    /// Regenerate from a full committed source ID matching current canonical inputs.
+    Prepare {
+        #[arg(long)]
+        revision: String,
+    },
+    /// Regenerate in memory and reject stale, changed or extra generated files.
+    Check,
+    /// Export the exact checked payload to a new standalone archive.
+    Export {
+        #[arg(long)]
+        out: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum SkillOperation {
     /// Check all six native packages, metadata, links and scenario rubrics.
     Validate {
@@ -60,6 +87,11 @@ enum SkillOperation {
 
 #[derive(Subcommand)]
 enum DistributionOperation {
+    /// Inspect actual Cargo archives and test consumers of their extracted sources.
+    Archives {
+        #[arg(long, value_enum, default_value = "all")]
+        case: distribution::Case,
+    },
     /// Stage Cargo-selected library sources and build the selected consumer cases.
     Check {
         #[arg(long, value_enum, default_value = "all")]
@@ -95,6 +127,18 @@ fn execute() -> (u8, String) {
         Err(error) => return failure("invalid_arguments", error),
     };
     match args.command {
+        Operation::Bundle { command } => {
+            let result = match command {
+                BundleOperation::VerifyPackage { archive } => bundle::verify_package(&args.root, archive.map(|path| args.root.join(path)).as_deref()),
+                BundleOperation::Prepare { revision } => bundle::prepare(&args.root, &revision),
+                BundleOperation::Check => bundle::check(&args.root),
+                BundleOperation::Export { out } => bundle::export(&args.root, &args.root.join(out)),
+            };
+            match result {
+                Ok(report) => (0, json!({"schema_version":1,"ok":true,"scope":"instruction_preparation","report":report}).to_string()),
+                Err(error) => (1, json!({"schema_version":1,"ok":false,"error":{"code":"bundle_failed","message":error}}).to_string()),
+            }
+        }
         Operation::Check => {
             let failures = repository::check(&args.root);
             (u8::from(!failures.is_empty()), json!({"schema_version":1,"ok":failures.is_empty(),"scope":"repository_structure","failures":failures}).to_string())
@@ -112,6 +156,12 @@ fn execute() -> (u8, String) {
         Operation::Distribution { command: DistributionOperation::Check { case } } => {
             match distribution::check(&args.root, case) {
                 Ok(report) => (0, json!({"schema_version":1,"ok":true,"scope":"external_library_consumers","report":report}).to_string()),
+                Err(error) => (1, json!({"schema_version":1,"ok":false,"error":{"code":"distribution_failed","message":error}}).to_string()),
+            }
+        }
+        Operation::Distribution { command: DistributionOperation::Archives { case } } => {
+            match distribution::archives(&args.root, case) {
+                Ok(report) => (0, json!({"schema_version":1,"ok":true,"scope":"external_library_archives","report":report}).to_string()),
                 Err(error) => (1, json!({"schema_version":1,"ok":false,"error":{"code":"distribution_failed","message":error}}).to_string()),
             }
         }
