@@ -609,6 +609,7 @@ fn render_if_dirty(
     fonts: Res<UiFonts>,
     mut dirty: ResMut<UiDirty>,
     roots: Query<Entity, With<DeckbuilderUiRoot>>,
+    mut tooltips: ResMut<bevy_gamekit::ui::UiTooltipCatalog>,
 ) {
     if !dirty.0 {
         return;
@@ -616,6 +617,10 @@ fn render_if_dirty(
     for root in &roots {
         commands.entity(root).try_despawn();
     }
+    // Only the recipient's current hand may supply retained inspection content.
+    tooltips
+        .0
+        .retain(|subject, _| !subject.0.starts_with("deckbuilder:hand:"));
     match ui.screen {
         Screen::Menu => spawn_menu(&mut commands, &fonts, &ui, &state),
         Screen::Multiplayer => spawn_multiplayer(&mut commands, &fonts, &ui, &state),
@@ -631,7 +636,14 @@ fn render_if_dirty(
         ),
         Screen::Password => spawn_password(&mut commands, &fonts, &ui, &state),
         Screen::Lobby => spawn_lobby(&mut commands, &fonts, &ui, &state),
-        Screen::Match => spawn_match(&mut commands, &fonts, &ui, &state, metrics.viewport),
+        Screen::Match => spawn_match(
+            &mut commands,
+            &fonts,
+            &ui,
+            &state,
+            metrics.viewport,
+            &mut tooltips,
+        ),
     }
     dirty.0 = false;
 }
@@ -1004,6 +1016,7 @@ fn spawn_match(
     ui: &DeckbuilderUi,
     state: &DeckNetworkState,
     viewport: UiViewportClass,
+    tooltips: &mut bevy_gamekit::ui::UiTooltipCatalog,
 ) {
     let Some(snapshot) = state.latest.as_ref() else {
         return spawn_menu(commands, fonts, ui, state);
@@ -1014,6 +1027,22 @@ fn spawn_match(
         .find(|seat| seat.seat == snapshot.recipient);
     let own_energy = own.map_or(0, |seat| seat.energy);
     let own_turn = snapshot.current_turn == snapshot.recipient;
+    for private in &snapshot.own_hand {
+        let availability = card_unavailable_reason(private, own_energy, own_turn)
+            .unwrap_or_else(|| "Select this card, then Play Selected to commit.".to_owned());
+        tooltips.0.insert(
+            card_subject(private.kind),
+            bevy_gamekit::ui::UiTooltipContent {
+                title: private.kind.title().to_owned(),
+                body: format!(
+                    "{}\nCost {} energy.\n{availability}",
+                    private.kind.rules(),
+                    private.kind.cost(),
+                ),
+                ..default()
+            },
+        );
+    }
     commands
         .spawn((screen_root("Deckbuilder Match"), DeckbuilderUiRoot))
         .with_children(|root| {
@@ -1088,9 +1117,9 @@ fn spawn_match(
                             })
                             .with_children(|cards| {
                                 for private in &snapshot.own_hand {
-                                    let disabled = private.played
-                                        || private.kind.cost() > own_energy
-                                        || !own_turn;
+                                    let disabled =
+                                        card_unavailable_reason(private, own_energy, own_turn)
+                                            .is_some();
                                     spawn_card(
                                         cards,
                                         fonts,
@@ -1169,6 +1198,35 @@ fn spawn_match(
         });
 }
 
+fn card_subject(kind: CardKind) -> bevy_gamekit::ui::UiTooltipSubject {
+    let key = match kind {
+        CardKind::Spark => "spark",
+        CardKind::Ward => "ward",
+        CardKind::Comet => "comet",
+    };
+    bevy_gamekit::ui::UiTooltipSubject(format!("deckbuilder:hand:{key}"))
+}
+
+fn card_unavailable_reason(
+    private: &domain::PrivateCard,
+    own_energy: u8,
+    own_turn: bool,
+) -> Option<String> {
+    // Playing again must not appear possible just by waiting for more energy.
+    // On an unplayed card, explain turn ownership before its current energy.
+    if private.played {
+        Some("Unavailable: already played this turn.".to_owned())
+    } else if !own_turn {
+        Some("Unavailable: wait for your turn.".to_owned())
+    } else if private.kind.cost() > own_energy {
+        Some(format!(
+            "Unavailable: insufficient energy (you have {own_energy})."
+        ))
+    } else {
+        None
+    }
+}
+
 fn spawn_card(
     parent: &mut ChildSpawnerCommands,
     fonts: &UiFonts,
@@ -1176,42 +1234,53 @@ fn spawn_card(
     selected: bool,
     disabled: bool,
 ) {
-    let mut entity = parent.spawn((
-        card(format!("Card {}", kind.title())),
-        DeckbuilderAction::SelectCard(kind),
-        Button,
-        bevy_gamekit::ui::UiInspectable,
-        bevy_gamekit::ui::UiContextHelp {
-            title: kind.title().to_owned(),
-            body: format!(
-                "{}\nCost {} energy.{}",
-                kind.rules(),
-                kind.cost(),
-                if disabled {
-                    " Unavailable: wait for your turn or sufficient energy."
-                } else {
-                    " Select this card, then Play selected card to commit."
+    let subject = card_subject(kind);
+    parent
+        .spawn((
+            Name::new(format!("{} Card and Inspection", kind.title())),
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
+                ..default()
+            },
+        ))
+        .with_children(|group| {
+            let mut entity = group.spawn((
+                card(format!("Card {}", kind.title())),
+                DeckbuilderAction::SelectCard(kind),
+                Button,
+                bevy_gamekit::ui::UiInspectable,
+                bevy_gamekit::ui::UiTooltipSource(subject.clone()),
+                bevy_gamekit::ui::UiFocusId::new("deckbuilder-card", subject.0.clone()),
+                bevy_gamekit::ui::UiAction,
+                bevy::input_focus::tab_navigation::TabIndex(0),
+            ));
+            if disabled {
+                entity.insert(UiDisabled);
+            }
+            entity.with_children(|surface| {
+                surface.spawn(text(fonts, UiTextRole::Title, kind.title()));
+                surface.spawn(text(
+                    fonts,
+                    UiTextRole::Body,
+                    format!("Cost {}", kind.cost()),
+                ));
+                surface.spawn(text(fonts, UiTextRole::Supporting, kind.rules()));
+                if selected {
+                    surface.spawn(text(fonts, UiTextRole::Body, "SELECTED"));
                 }
-            ),
-        },
-        bevy_gamekit::ui::UiAction,
-        bevy::input_focus::tab_navigation::TabIndex(0),
-    ));
-    if disabled {
-        entity.insert(UiDisabled);
-    }
-    entity.with_children(|surface| {
-        surface.spawn(text(fonts, UiTextRole::Title, kind.title()));
-        surface.spawn(text(
-            fonts,
-            UiTextRole::Body,
-            format!("Cost {}", kind.cost()),
-        ));
-        surface.spawn(text(fonts, UiTextRole::Supporting, kind.rules()));
-        if selected {
-            surface.spawn(text(fonts, UiTextRole::Body, "SELECTED"));
-        }
-    });
+            });
+            // A separate enabled control gives keyboard access to an unavailable
+            // card's explanation without making the card action focusable.
+            group
+                .spawn((
+                    button(format!("Inspect {}", kind.title())),
+                    bevy_gamekit::ui::UiTooltipSource(subject.clone()),
+                    bevy_gamekit::ui::UiTooltipOpen(subject.clone()),
+                    bevy_gamekit::ui::UiFocusId::new("deckbuilder-card-inspect", subject.0),
+                ))
+                .with_child(text(fonts, UiTextRole::Supporting, "Inspect"));
+        });
 }
 
 fn spawn_action(
@@ -1356,6 +1425,225 @@ mod tests {
                 .energy,
             2
         );
+    }
+
+    fn assert_card_help(app: &mut App, kind: CardKind, reason: Option<&str>) -> Entity {
+        let card = find_named(app.world_mut(), &format!("Card {}", kind.title()))
+            .expect("own hand contains card");
+        assert_eq!(
+            app.world().get::<UiDisabled>(card).is_some(),
+            reason.is_some()
+        );
+        let help = app
+            .world()
+            .get::<bevy_gamekit::ui::UiContextHelp>(card)
+            .expect("card resolves current help");
+        assert!(
+            help.body
+                .contains(reason.unwrap_or("Select this card, then Play Selected")),
+            "unexpected help: {}",
+            help.body
+        );
+        card
+    }
+
+    fn inspect_unavailable_card(app: &mut App, kind: CardKind, reason: &str) {
+        use bevy_gamekit::ui::{UiContextHelpState, UiTooltipState};
+
+        let before = network::latest_snapshot(app.world())
+            .expect("snapshot")
+            .clone();
+        let selected = app.world().resource::<DeckbuilderUi>().selected_card;
+        let card = assert_card_help(app, kind, Some(reason));
+        assert!(!focus_action(app.world_mut(), card));
+        // Headless cursor/layout wiring observes contextual selection. The native
+        // window hit path and rendered appearance are checked separately.
+        let center = app
+            .world()
+            .get::<UiGlobalTransform>(card)
+            .expect("laid out card")
+            .transform_point2(Vec2::ZERO);
+        app.world_mut()
+            .query::<&mut Window>()
+            .single_mut(app.world_mut())
+            .expect("one primary window")
+            .set_cursor_position(Some(center));
+        run_frames(app, 3);
+        assert_eq!(
+            app.world().resource::<UiContextHelpState>().entity,
+            Some(card)
+        );
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().subjects(),
+            &[card_subject(kind)]
+        );
+        let mut activations = bevy::ecs::message::MessageCursor::<UiActivated>::default();
+        activations.clear(app.world().resource::<Messages<UiActivated>>());
+        assert!(click_action(app, card));
+        assert!(activations
+            .read(app.world().resource::<Messages<UiActivated>>())
+            .all(|activation| activation.entity != card));
+        app.world_mut()
+            .query::<&mut Window>()
+            .single_mut(app.world_mut())
+            .expect("one primary window")
+            .set_cursor_position(None);
+        run_frames(app, 2);
+
+        let inspect = find_named(app.world_mut(), &format!("Inspect {}", kind.title()))
+            .expect("separate inspection control");
+        for _ in 0..16 {
+            if app.world().resource::<InputFocus>().get() == Some(inspect) {
+                break;
+            }
+            tap_key(app, KeyCode::Tab);
+        }
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(inspect));
+        tap_key(app, KeyCode::Enter);
+        let state = app.world().resource::<UiTooltipState>();
+        assert_eq!(state.subjects(), &[card_subject(kind)]);
+        assert!(state.is_pinned());
+        let rendered = ui_tree_snapshot(app.world_mut()).to_string();
+        assert!(
+            rendered.contains(reason),
+            "inspection renders current restriction"
+        );
+        tap_key(app, KeyCode::KeyT);
+        assert!(app.world().resource::<UiTooltipState>().captures_keyboard());
+        tap_key(app, KeyCode::Escape);
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty());
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(inspect));
+        assert!(!app.world().resource::<DeckbuilderUi>().menus.is_open());
+        assert_eq!(
+            app.world().resource::<DeckbuilderUi>().selected_card,
+            selected
+        );
+        assert_eq!(network::latest_snapshot(app.world()), Some(&before));
+    }
+
+    #[test]
+    fn unavailable_cards_explain_each_reason_without_pointer_or_keyboard_activation() {
+        let mut app = test_app(1920, 1080, UiScaleMode::Auto);
+        start_solo(&mut app);
+        inspect_unavailable_card(
+            &mut app,
+            CardKind::Comet,
+            "insufficient energy (you have 3)",
+        );
+
+        let spark = find_named(app.world_mut(), "Card Spark").expect("Spark action");
+        assert!(click_action(&mut app, spark));
+        run_frames(&mut app, 2);
+        let play = find_named(app.world_mut(), "Play Selected").expect("play action");
+        assert!(click_action(&mut app, play));
+        run_frames(&mut app, 2);
+        inspect_unavailable_card(&mut app, CardKind::Spark, "already played this turn");
+        assert_card_help(
+            &mut app,
+            CardKind::Comet,
+            Some("insufficient energy (you have 2)"),
+        );
+
+        let end = find_named(app.world_mut(), "End Turn").expect("end-turn action");
+        assert!(click_action(&mut app, end));
+        run_frames(&mut app, 2);
+        inspect_unavailable_card(&mut app, CardKind::Ward, "wait for your turn");
+        // Already-played takes precedence over off-turn; turn takes precedence
+        // over energy for unplayed cards. None of these descriptions grant play.
+        assert_card_help(&mut app, CardKind::Spark, Some("already played this turn"));
+        assert_card_help(&mut app, CardKind::Comet, Some("wait for your turn"));
+    }
+
+    #[test]
+    fn card_inspection_refreshes_and_revokes_disclosed_content_with_the_match_view() {
+        use bevy_gamekit::ui::{UiTooltipCatalog, UiTooltipState};
+        use domain::{CommandOutcome, DeckAuthority, GameRequest, RequestId, Seat};
+
+        let mut app = test_app(1920, 1080, UiScaleMode::Auto);
+        start_solo(&mut app);
+        network::submit_command(app.world_mut(), GameCommand::PlayCard(CardKind::Spark));
+        network::submit_command(app.world_mut(), GameCommand::EndTurn);
+        run_frames(&mut app, 3);
+        assert_card_help(&mut app, CardKind::Spark, Some("already played this turn"));
+        let inspect = find_named(app.world_mut(), "Inspect Comet").expect("Comet inspection");
+        assert!(focus_action(app.world_mut(), inspect));
+        tap_key(&mut app, KeyCode::Enter);
+        assert!(app.world().resource::<UiTooltipState>().is_pinned());
+
+        // Deliver a real reducer-produced next-turn projection through the same
+        // resource consumed by the production network-screen synchronization.
+        let snapshot = {
+            let mut authority = app.world_mut().resource_mut::<DeckAuthority>();
+            let request_id = RequestId(authority.next_request(Seat::Guest));
+            assert_eq!(
+                authority
+                    .apply(
+                        Seat::Guest,
+                        GameRequest {
+                            request_id,
+                            command: GameCommand::EndTurn,
+                        }
+                    )
+                    .outcome,
+                CommandOutcome::Accepted
+            );
+            authority.snapshot(Seat::Host)
+        };
+        app.world_mut().resource_mut::<DeckNetworkState>().latest = Some(snapshot);
+        run_frames(&mut app, 3);
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty());
+        assert_card_help(&mut app, CardKind::Spark, None);
+        assert_card_help(
+            &mut app,
+            CardKind::Comet,
+            Some("insufficient energy (you have 3)"),
+        );
+        let inspect = find_named(app.world_mut(), "Inspect Comet").expect("Comet inspection");
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(inspect));
+        tap_key(&mut app, KeyCode::Enter);
+        assert!(app.world().resource::<UiTooltipState>().is_pinned());
+        tap_key(&mut app, KeyCode::Escape);
+        tap_key(&mut app, KeyCode::Escape);
+        run_frames(&mut app, 2);
+        assert!(app.world().resource::<DeckbuilderUi>().menus.is_open());
+        let obscured = find_named(app.world_mut(), "Inspect Comet").expect("Comet inspection");
+        assert!(!focus_action(app.world_mut(), obscured));
+        let resume = find_named(app.world_mut(), "Back to game").expect("resume action");
+        assert!(click_action(&mut app, resume));
+        run_frames(&mut app, 2);
+        let inspect = find_named(app.world_mut(), "Inspect Comet").expect("Comet inspection");
+        assert!(focus_action(app.world_mut(), inspect));
+        tap_key(&mut app, KeyCode::Enter);
+
+        // The renderer must revoke any card absent from a new private projection,
+        // even when an inspection was already pinned.
+        app.world_mut()
+            .resource_mut::<DeckNetworkState>()
+            .latest
+            .as_mut()
+            .expect("private snapshot")
+            .own_hand
+            .retain(|card| card.kind != CardKind::Comet);
+        run_frames(&mut app, 3);
+        assert!(find_named(app.world_mut(), "Inspect Comet").is_none());
+        assert!(!app
+            .world()
+            .resource::<UiTooltipCatalog>()
+            .0
+            .contains_key(&card_subject(CardKind::Comet)));
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty());
     }
 
     #[test]

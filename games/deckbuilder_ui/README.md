@@ -18,6 +18,15 @@ closes it; returning to the main menu requires confirmation. The match and
 networking continue while the menu is open. Inspect disabled/selected states and
 the activity feed. Menu navigation/layout uses shared Gamekit primitives.
 
+Hover a card to preview its rules and current availability; hold the pointer for
+one second to keep the explanation open. Each card also has a separate Inspect
+control: use Tab/Shift+Tab and Enter/Space to read it even when the card cannot be
+played. `T` pins the hovered or focused explanation and enters keyboard inspection;
+Escape closes pinned inspection; press Escape again to open the Game menu.
+Inspection never selects or plays a card. Unavailable cards explain already-played status first, then turn ownership,
+then insufficient energy. Help is rebuilt from your current private hand whenever
+the match view refreshes.
+
 ## Two-player checks
 
 Host with a reachable advertised address. Copy the private BGN1 invitation to the
