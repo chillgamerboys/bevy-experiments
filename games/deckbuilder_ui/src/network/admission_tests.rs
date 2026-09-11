@@ -12,7 +12,46 @@ use std::sync::{
 fn host(password: &str) -> App {
     let mut app = socket_app();
     start_host(app.world_mut(), configuration(password)).expect("host");
+    // Configuring a host does not await its asynchronous UDP bind. Join only
+    // after the listener exists, as the Labyrinth socket fixtures already do.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !listening(&app) && Instant::now() < deadline {
+        app.update();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        listening(&app),
+        "host listener did not open: {}",
+        diagnostics(&app)
+    );
     app
+}
+
+fn listening(app: &App) -> bool {
+    let world = app.world();
+    world.get_resource::<HostedSession>().is_some_and(|host| {
+        world
+            .get::<aeronet::io::server::Server>(host.server_entity)
+            .is_some()
+    })
+}
+
+// Report stages without disclosing endpoints, invitation codes or credentials.
+fn diagnostics(app: &App) -> String {
+    let world = app.world();
+    let state = world.resource::<DeckNetworkState>();
+    let guest = world.get_resource::<GuestConnection>();
+    let socket_open =
+        guest.is_some_and(|guest| world.get::<aeronet::io::Session>(guest.0).is_some());
+    format!(
+        "client={:?}, listening={}, connection_present={}, socket_open={socket_open}, admitted={}, snapshot_present={}, notice_present={}",
+        world.resource::<State<ClientState>>().get(),
+        listening(app),
+        guest.is_some(),
+        state.admitted,
+        state.latest.is_some(),
+        state.notice.is_some(),
+    )
 }
 
 fn configuration(password: &str) -> HostConfiguration {
@@ -54,7 +93,9 @@ fn admitted(host: &mut App, guest: &mut App) {
                     .iter()
                     .any(|seat| seat.seat == Seat::Guest && seat.connected)
         }),
-        "socket admission did not finish"
+        "socket admission did not finish: host {}; guest {}",
+        diagnostics(host),
+        diagnostics(guest)
     );
 }
 
