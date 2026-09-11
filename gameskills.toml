@@ -58,8 +58,9 @@ resources = ["project:skills-tests"]
 requires = ["skills-validate"]
 
 [commands.repo-test]
-argv = ["python3", "-m", "unittest", "discover", "-s", "scripts/tests", "-v"]
-timeout_seconds = 180
+argv = ["cargo", "test", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--test", "ci_routing", "--test", "ci_checks", "--test", "ci_cli"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
 
 [commands.rust-format]
 argv = ["cargo", "fmt", "--all", "--", "--check"]

@@ -6,6 +6,8 @@ use std::path::Path;
 use std::process::Command;
 
 pub mod checks;
+pub mod driver;
+mod selector;
 
 /// Conditional jobs exposed by the GitHub Actions workflow.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ValueEnum)]
@@ -117,10 +119,10 @@ pub fn head(root: &Path) -> Result<String, String> {
 
 /// Compute selection using committed base/head trees; unavailable comparisons select all checks.
 pub fn select(
-    _root: &Path,
-    _base: Option<&str>,
-    _head: &str,
-    _force_full: bool,
+    root: &Path,
+    base: Option<&str>,
+    head: &str,
+    force_full: bool,
 ) -> Result<Selection, String> {
-    Err("CI selection implementation is in progress; the active caller remains Python".into())
+    selector::select(root, base, head, force_full)
 }

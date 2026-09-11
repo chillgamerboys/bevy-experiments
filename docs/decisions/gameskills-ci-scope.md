@@ -2,12 +2,13 @@
 
 Status: refinement sequence accepted after the foundation merged in
 [PR #24](https://github.com/chillgamerboys/bevy-experiments/pull/24). CI routing is
-implemented in [scripts/ci.py](../../scripts/ci.py); the owner accepted the trial
+implemented in [the Rust CI module](../../tools/gamekit-repo-tools/src/ci/mod.rs); the owner accepted the trial
 results and authorized their merge on September 10, 2026.
 [Testing guidance](../testing.md#ci-selection) owns current commands. The rationale
 and acceptance criteria below guide the bounded trials
 before the [repository-wide Rust tooling migration](gameskills-rust-cli.md), which
-will also replace the current Python classifier and repository checks.
+replaces the classifier and repository checks in R2a/R2b. The original Python
+implementation remains historical reference at the migration ledger’s pinned commit.
 
 ## Problem and intended result
 

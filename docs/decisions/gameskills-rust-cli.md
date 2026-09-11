@@ -7,8 +7,11 @@ R0/R1 merged in PR31: two tool packages, a complete migration ledger, observed
 configuration fixtures, read-only commands and packaging checks. R2a now ports
 repository checks, native/legacy skill validation and external consumer verification
 into `gamekit-repo`, with callers moved and the replaced Python owners/tests removed.
-R2b still owns CI selection/final-gate migration; bundle preparation for R3 and the
-remaining R2 artifact gates are not claimed complete by R2a. R3–R7 have not started.
+R2b ports committed CI selection, ordered command execution and final gating into
+Rust and removes the replaced CI script/test module. Its focused regressions cover
+the 26 frozen reference methods plus both R2a additions and new failure cases.
+Bundle preparation for R3 and actual GameKit archive inspection remain outstanding
+R2 gates; this CI cutover does not complete all of R2. R3–R7 have not started.
 This replaces the earlier CLI-only proposal,
 which explicitly excluded CI routing and repository checks. The final state now
 includes **all repository-owned executable tooling and tests**.
@@ -286,7 +289,7 @@ mapping is R0's deliverable. Proposed Rust paths below are not existing files.
 |---|---:|---|
 | `scripts/tests/test_check_repo.py` | 5 | `gamekit-repo-tools/tests/repository.rs` — R2 layout, links and dependency direction |
 | `scripts/tests/test_check_distribution.py` | 4 | `gamekit-repo-tools/tests/distribution.rs` — R2 source boundaries, supplemented by actual-archive tests |
-| `scripts/tests/test_ci.py` | 26 | `gamekit-repo-tools/tests/ci.rs` — R2 Git-backed ownership/selection, command selection and failing final gates |
+| `scripts/tests/test_ci.py` | 26 | `gamekit-repo-tools/tests/ci_routing.rs`, `ci_checks.rs`, `ci_cli.rs` — R2 Git-backed ownership/selection, command selection and failing final gates |
 | `skills/tests/test_gameskills_catalog.py` | 21 | `gamekit-repo-tools/tests/catalog.rs` — R2 package/frontmatter/native metadata, references and scenario structure |
 | `skills/tests/test_gameskills_packaging.py` | 17 | `gameskills-cli/tests/installation.rs` — R1 initial config cases, R3 immutable setup/update/recovery |
 | `skills/tests/test_gameskills_native.py` | 10 | `gameskills-cli/tests/native.rs` — R3 protocol/discovery contracts, R5 real subprocess shutdown, R6 actual-client observations |

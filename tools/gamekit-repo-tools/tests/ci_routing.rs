@@ -740,3 +740,27 @@ fn empty_committed_diff_selects_no_jobs_even_with_dynamic_inputs() -> TestResult
     assert!(value.paths.is_empty());
     Ok(())
 }
+
+#[test]
+fn raw_include_identifiers_preserve_literal_and_dynamic_inputs() -> TestResult {
+    for source in [
+        r#"pub const HELP: &str = r#include_str!("../../../docs/existing.md");"#,
+        r#"pub const HELP: &[u8] = r#include_bytes!("../../../docs/existing.md");"#,
+        r#"r#include!("../../../docs/existing.md");"#,
+    ] {
+        let mut fixture = Fixture::new()?;
+        fixture.write("games/carterfight/src/lib.rs", source)?;
+        fixture.rebase()?;
+        assert_packages(&fixture.changed(&["docs/existing.md"])?, &["carterfight"]);
+    }
+    for source in [
+        r#"r#include_str!(concat!("../../../docs/", "existing.md"));"#,
+        r#"r#include!(env!("GENERATED_SOURCE"));"#,
+    ] {
+        let mut fixture = Fixture::new()?;
+        fixture.write("games/carterfight/src/lib.rs", source)?;
+        fixture.rebase()?;
+        assert_full(&fixture.changed(&["docs/existing.md"])?);
+    }
+    Ok(())
+}
