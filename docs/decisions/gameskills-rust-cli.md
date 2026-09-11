@@ -71,9 +71,12 @@ independent. See [Cargo workspace and package selection](https://doc.rust-lang.o
   tool. Keep the classification and docs path free of native client or game startup.
   Do not make it compile the full command-runner implementation just to check links.
 
-These are repository package names, not a claim that registry names are reserved.
+The [distribution proposal](../extraction.md) recommends crates.io for the GameKit
+libraries and GameSkills executable, GitHub Releases for prebuilt binaries, and a
+baseline skill bundle embedded in the CLI. Repository tools remain unpublished.
+These are working package names, not a claim that registry names are reserved.
 Distribution names, versions, license audit and an explicit supported Rust version
-are resolved in the scaffold slice before publishing anything. Prefer established
+are resolved in R0/R1 before publishing anything. Prefer established
 CLI/serialization and platform libraries with reviewed dependencies; select exact
 versions at implementation time. Preserve the workspace's safety/lint policy and
 review any necessary platform abstraction before adopting it.
@@ -106,6 +109,10 @@ useful; internal Python module structure is not a Rust design requirement.
    check supported bundle/config/state schemas before reading or mutating them.
    Resolve the selected bundle explicitly from the installation, not the executable's
    former location beside Python files or an ambient source checkout.
+   The embedded baseline and standalone bundle must come from the same deterministic
+   package-local snapshot of canonical instructions. A packaged crate must build
+   without sibling workspace resources; initial setup must work without fetching a
+   bundle. Default selection remains core-only even if optional payloads are embedded.
 3. **Owned state.** Preserve local configuration, selected packages and client
    settings. Setup proposals remain read-only; apply/update/recovery keep locking,
    conflict detection and atomic writes. No live queue changes runtime midway.
@@ -159,13 +166,13 @@ be mistaken for GameKit capability crates by distribution or graph validation.
 
 | Slice | Concrete deliverable | Exit evidence and dependencies |
 |---|---|---|
-| R0. Contract baseline | Command/schema inventory, reference commit, language-neutral fixture data and decisions for intentional differences | Every Python behavior/test group has a retained contract, explicit correction or retirement owner; active state can be left on the old runtime safely |
-| R1. Rust foundation | Two tools packages, command parsing, structured diagnostics, dependency boundaries and compiled test-probe utilities | `cargo test -p ...` builds no Bevy; CLI help/config/error contracts pass; no global default-runtime switch; depends on R0 |
-| R2. Repository and CI tooling | Port layout/link/catalog/legacy validation, distribution selection and CI commands/tests; cut their callers over together | Hosted routing/gates retain coverage, bootstrap failure stays red and distribution consumers exclude tools; delete replaced repository Python scripts/tests after parity; depends on R1 |
-| R3. Installation and compatibility | Catalog/config, immutable bundles, setup/update/rollback/recovery, native command construction and legacy import | Real pinned-Git fixtures; preservation/conflict/path checks; clean consumer update and interrupted recovery; no Python requirement in the Rust adoption path; depends on R1 |
+| R0. Contract baseline | Command/schema inventory, reference commit, language-neutral fixtures, artifact/compatibility contracts and intentional differences | Every Python behavior/test group has a retained contract, explicit correction or retirement owner; active state can stay on the old runtime safely; public naming, license and MSRV decisions have owners |
+| R1. Rust foundation | Two tools packages, command parsing, diagnostics, dependency boundaries, packaging scaffold and compiled test probes | `cargo test -p ...` builds no Bevy; CLI help/config/error contracts pass; extracted CLI crate builds without sibling files; no global runtime switch or publication; depends on R0 |
+| R2. Repository and CI tooling | Port layout/link/catalog/legacy validation, distribution selection and CI commands/tests; add archive inspection and bundle preparation; cut callers over together | Hosted routing/gates retain coverage, bootstrap failure stays red and distribution consumers exclude tools; deterministic snapshot checks; delete replaced repository Python scripts/tests after parity; depends on R1 |
+| R3. Installation and compatibility | Catalog/config, embedded baseline, immutable bundles, setup/update/rollback/recovery, native command construction and legacy import | Real pinned-Git fixtures; initial setup without checkout/network bundle fetch; preservation/conflict/path checks; explicit compatible updates and interrupted recovery; no Python requirement; depends on R1, integrates R2 bundle preparation |
 | R4. Plans and queues | Validated plans, durable queues, revision-guarded mutations and injection | Real isolated worktrees, ownership/dependency checks, block/resume and observed integration; no cross-runtime active queue; depends on R3 |
 | R5. Runner and evidence | DAG execution, shared locks, deadlines/cancellation, logs, stale detection and recovery | Real subprocess/descendant/lock contention tests, including coordinator death and retained handles; prior record compatibility remains honest; depends on R3 and joins R4 before pipeline trials |
-| R6. Candidate adoption | Packaged Rust binary plus immutable skills, native adapters and a real bounded task through PR delivery | Fresh consumer installs/invokes/updates/recovers; actual Codex and authenticated Claude checks are separately recorded; both runtime and bundle identities match; depends on R2–R5 |
+| R6. Candidate adoption | Private distribution rehearsal: actual CLI source/prebuilt artifacts and immutable skills, GameKit consumers, native adapters and a bounded task through PR delivery | Fresh consumer installs/invokes/updates/recovers; package contents/licenses and claimed targets verified; actual Codex and authenticated Claude checks separately recorded; runtime/bundle identities match; public publishing is a later endpoint; depends on R2–R5 |
 | R7. Final cutover | Switch active instructions/configuration/CI; delete remaining Python runtime/tests/legacy updater and transition harness | No-Python acceptance below passes from a fresh checkout/artifact; one authoritative Rust implementation remains; depends on R6 |
 
 Each slice gets a bounded plan, appropriate tests, independent review when useful,
@@ -222,6 +229,10 @@ requires a successful authenticated evaluation before making that release claim.
 - A fresh consumer uses the actual packaged binary and pinned skills to install,
   invoke, run, inspect evidence, update and recover without Python or Cargo. Check
   source/versions, checksums and dependency/license boundaries for the artifact.
+  Separately build/install the CLI from its Cargo archive with no repository sibling
+  paths. Verify embedded and standalone bundles have matching source/content identity
+  and reject incompatible updates. Use the distribution proposal's actual-archive
+  gates; source staging alone must not be reported as registry verification.
 - CI demonstrates the intended scopes and fails on selected job failure/cancellation,
   missing outputs, unexpected skips and classifier/bootstrap errors. GameKit consumers
   still exclude tool/game dependencies and retain their feature contracts.

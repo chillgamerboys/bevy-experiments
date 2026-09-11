@@ -21,7 +21,7 @@ game below.
 - [Run, build and add a game](development.md)
 - [Testing and evidence](testing.md)
 - [Multiplayer operations and diagnostics](multiplayer.md)
-- [Library distribution and optional future extraction](extraction.md)
+- [GameKit and GameSkills distribution proposal](extraction.md)
 - [Canonical skill pack](../skills/README.md)
 - [Focused-workspace decision and recovery baseline](decisions/0001-focused-workspace.md)
 
