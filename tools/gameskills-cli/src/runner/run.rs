@@ -538,3 +538,34 @@ pub(super) fn execute(
         _ => Err("expected run or evidence command family".into()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn fractional_records_survive_protected_save_and_load() -> Result<(), String> {
+        let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let directory = Directory::root(scratch.path())?;
+        let record = json!({
+            "schema_version": 2,
+            "runtime": "rust",
+            "status": "failed",
+            "started_at": 1_789_150_486.000_000_2_f64,
+            "results": {"a": {"duration_seconds": 0.015000000000000001_f64}},
+        });
+        save(&directory, &record)?;
+        assert_eq!(load(&directory)?, record);
+        // Exact parsing must preserve integrity checks, including modifications
+        // small enough that the default approximate parser could discard them.
+        let mut envelope: Value =
+            serde_json::from_slice(&directory.read("record.json")?).map_err(|e| e.to_string())?;
+        *envelope
+            .pointer_mut("/record/results/a/duration_seconds")
+            .ok_or("missing duration")? = json!(0.015_f64);
+        directory.write_json("record.json", &envelope)?;
+        assert!(load(&directory)
+            .err()
+            .is_some_and(|error| error.contains("digest mismatch")));
+        Ok(())
+    }
+}

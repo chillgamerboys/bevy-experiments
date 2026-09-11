@@ -97,6 +97,27 @@ fn run_id(value: &str) -> bool {
 #[cfg(all(test, unix))]
 mod tests {
     #[test]
+    fn fractional_observation_digests_survive_json_roundtrip() -> Result<(), String> {
+        let timestamp = 1_789_150_486.0_f64;
+        for increment in 0..4096_u64 {
+            let value = serde_json::json!({
+                "schema_version": 2,
+                "runtime": "rust",
+                "started_at": f64::from_bits(timestamp.to_bits() + increment),
+                "duration_seconds": 0.015000000000000001_f64,
+            });
+            let bytes = serde_json::to_vec(&value).map_err(|e| e.to_string())?;
+            let restored: serde_json::Value =
+                serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            assert_eq!(
+                super::digest(&value)?,
+                super::digest(&restored)?,
+                "{value} restored as {restored}"
+            );
+        }
+        Ok(())
+    }
+    #[test]
     fn canonical_digest_ignores_nested_object_insertion_order() -> Result<(), String> {
         let first: serde_json::Value =
             serde_json::from_str(r#"{"z":{"b":2,"a":1},"a":0}"#).map_err(|e| e.to_string())?;

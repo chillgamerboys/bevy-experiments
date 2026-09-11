@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::{Command, ExitCode};
 #[cfg(unix)]
 use std::sync::{atomic::AtomicBool, Arc};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 fn stamp() -> f64 {
     SystemTime::now()
@@ -77,6 +77,18 @@ fn run() -> Result<Value, String> {
                 .min(10_000);
             writeln!(io::stdout().lock(), "{}", stamp()).map_err(|e| e.to_string())?;
             std::thread::sleep(Duration::from_millis(millis));
+            writeln!(io::stdout().lock(), "{}", stamp()).map_err(|e| e.to_string())?;
+        }
+        "await-release" => {
+            writeln!(io::stdout().lock(), "{}", stamp()).map_err(|e| e.to_string())?;
+            std::fs::write(arg(0)?, "ready").map_err(|e| e.to_string())?;
+            let deadline = Instant::now() + Duration::from_secs(12);
+            while !Path::new(arg(1)?).exists() {
+                if Instant::now() >= deadline {
+                    return Err("fixture release deadline expired".into());
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
             writeln!(io::stdout().lock(), "{}", stamp()).map_err(|e| e.to_string())?;
         }
         "mutate" => {

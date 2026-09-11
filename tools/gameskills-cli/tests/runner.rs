@@ -1114,16 +1114,41 @@ mod unix {
         let mut b = Fixture::new()?;
         for (prefix, overlap) in [("test", false), ("project", true)] {
             let resource = format!("{prefix}:{}", a.root.display());
+            let release = a.scratch.path().join(format!("{prefix}-release"));
             for fixture in [&mut a, &mut b] {
+                let ready = fixture.root.join(format!(".gameskills/{prefix}-ready"));
                 fixture.command(
                     "work",
-                    &["interval", "300"],
+                    &[
+                        "await-release",
+                        ready.to_str().ok_or("path")?,
+                        release.to_str().ok_or("path")?,
+                    ],
                     json!({"resources":[resource]}),
                 )?;
             }
-            let (mut run_a, mut run_b) = (a.launch("run", &["work"])?, b.launch("run", &["work"])?);
+            let mut run_a = a.launch("run", &["work"])?;
+            a.ready(&a.root.join(format!(".gameskills/{prefix}-ready")))?;
+            let mut run_b = b.launch("run", &["work", "--resource-wait-seconds", "0"])?;
+            if overlap {
+                // Both commands must reach their barriers while the first still
+                // holds its lock. This proves independent project scopes even
+                // when a loaded host schedules their startup far apart.
+                b.ready(&b.root.join(format!(".gameskills/{prefix}-ready")))?;
+            } else {
+                let (_, result) = run_b.collect()?;
+                assert!(!ok(&result), "{result}");
+                assert_eq!(status(&result, "work"), Some("skipped"));
+                assert!(!b.root.join(format!(".gameskills/{prefix}-ready")).exists());
+            }
+            fs::write(&release, "release")?;
             let (_, result_a) = run_a.collect()?;
-            let (_, result_b) = run_b.collect()?;
+            let result_b = if !overlap {
+                // The global lock becomes available only after its holder ends.
+                b.run(&["work", "--resource-wait-seconds", "0"])?
+            } else {
+                run_b.collect()?.1
+            };
             assert!(ok(&result_a) && ok(&result_b), "{result_a} {result_b}");
             let (first, second) = (
                 interval(&a, &result_a, "work")?,
