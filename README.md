@@ -19,7 +19,7 @@ until requested. See each game's README for controls and supported behavior.
 cargo test --workspace --all-features --profile ci
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
-python3 scripts/check_repo.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- check
 ```
 
 The CI profile optimizes compile time; normal `cargo run` uses the dev profile.

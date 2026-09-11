@@ -8,11 +8,11 @@ cargo test --workspace --all-features --profile ci
 cargo test --workspace --doc --all-features --profile ci
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo deny check
-python3 scripts/check_repo.py
-python3 scripts/check_distribution.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- check
+cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
 python3 -m unittest discover -s scripts/tests -v
-python3 skills/scripts/validate_skills.py
-python3 skills/scripts/validate_gameskills.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
 python3 -m unittest discover -s skills/tests -v
 ```
 
@@ -20,13 +20,14 @@ Use `cargo test -p <package> --profile ci` for focused iteration. The list above
 the broad validation set, not a requirement to rebuild all games for narrative
 documentation. `cargo deny` is a separately installed dependency-policy tool.
 
-For the Rust foundation, use the focused package tests and contract checker:
+For Rust tooling, use the focused package tests and contract checker:
 
 ```sh
 cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
 cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
 cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
 cargo package --locked -p gameskills-cli
+cargo package --locked -p gamekit-repo-tools
 ```
 
 The contract check accounts for the pinned 22 Python files and 142 test methods;
@@ -34,21 +35,27 @@ it does not mark those behaviors ported or verified. The fixture suite includes
 34 observed configuration cases and a compiled subprocess example, without Python
 test children. Cargo packaging builds the extracted CLI source; public installation,
 complete embedded skills and runner support are separate later gates. The existing
-Python tests remain required during this foundation stage.
+Python tests remain required for owners not yet ported. R2a replaces the repository,
+distribution and catalog test modules with Rust regressions; the CI router, legacy
+installer and pinned runtime tests remain Python until their respective cutovers.
 
 ## CI selection
 
 [The workflow](../.github/workflows/gamekit.yml) always checks repository layout,
 local links and the routing regressions, then selects component jobs through
 [scripts/ci.py](../scripts/ci.py). Narrative docs avoid Rust and skill-runtime
-jobs; skill instructions and tooling receive the Python/skill matrix; a game edit
+jobs; skill instructions receive the skill matrix with Rust structural validators
+and the remaining Python runtime tests; a game edit
 receives its package tests and Clippy. Shared libraries also select their reverse
 consumers and applicable distribution, minimal-feature and browser-core checks.
 Selected Rust and skill jobs retain macOS/Linux/Windows coverage. Python repository
 tool tests also run on those platforms with the skills job when tooling changes.
-Rust tool packages receive their focused Cargo checks. Reference verification and
-CLI packaging run only when their respective tool package is selected or the full
-suite is required. Both use the same pinned toolchain as game builds.
+Rust tool packages receive their focused Cargo checks. Repository-tool implementation
+changes also select skill validation and external consumer checks without selecting
+unrelated game tests. Reference verification and Cargo packaging run only when their
+respective tool package is selected or the full suite is required. All use the same
+pinned toolchain as game builds. The always-run layout check bootstraps only the small
+repository-tool package; a Rust bootstrap failure fails classification and the final gate.
 
 The selector reads committed base and tested-tree manifests, including normal,
 development, build and target-specific local dependencies. PR checks compare the
@@ -76,10 +83,10 @@ Selection reads committed objects, not uncommitted edits, and runs no game check
 Structural skill tests do not replace bounded native/model evaluations of changed
 guidance; those remain separately recorded acceptance evidence.
 
-`check_distribution.py` asks Cargo for each library package's file list, rejects
-escapes/symlinks, and stages those sources without `games/`. It builds an unrelated
+`gamekit-repo distribution check` asks Cargo for each library package's file list, rejects
+escapes/symlinks, and stages those sources without games or tool packages. It builds an unrelated
 consumer using empty, pure-algorithm, UI and native-networking feature selections,
-checking the activated dependency graph for game or networking leakage. Use
+checking the activated dependency graph for game/tool or networking leakage. Use
 `--case empty|pure|ui|network` for a focused probe. Temporary sources are deleted;
 artifacts reuse `target/`. This proves independent source consumption, not registry
 publication, a complete game, visual quality or cross-machine networking. The native

@@ -258,10 +258,10 @@ cargo test -p labyrinth --lib network::tests::process::six_native_processes_surv
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo fmt --all -- --check
 cargo deny check
-python3 scripts/check_repo.py
-python3 scripts/check_distribution.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- check
+cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
 python3 -m unittest discover -s scripts/tests -v
-python3 skills/scripts/validate_skills.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 python3 -m unittest discover -s skills/tests -v
 ```
 

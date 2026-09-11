@@ -34,7 +34,7 @@ Python 3.11 or newer and Git are required; repository checks use the standard
 library. The queue and command runner currently require macOS or Linux.
 
 ```sh
-python3 skills/scripts/validate_gameskills.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
 python3 -m unittest discover -s skills/tests -v
 ```
 

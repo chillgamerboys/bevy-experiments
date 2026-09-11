@@ -19,6 +19,6 @@ Gamekit repository root, using Python 3.11 or newer.
 4. Present every ADD, NO-OP, or CONFLICT. Do not infer permission from the request to inspect.
 5. After confirmation, rerun with `--apply`. Use `--allow-dirty` only after identifying every unrelated dirty file.
 6. Verify both client layouts, schema-2 `.bevy-gamekit/skills.json` with the resolved full SHA, the pinned base snapshot, and an unchanged overlay directory.
-7. Run `python3 skills/scripts/validate_skills.py` from the Gamekit repository root.
+7. Run `cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy` from the Gamekit repository root.
 
 The tool installs all seven craft skills. Game-specific rules belong in `.bevy-gamekit/overlays/<skill-name>.md`.

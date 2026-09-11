@@ -213,6 +213,9 @@ def select(root: Path, base: str | None, head: str, force_full: bool = False) ->
         result["packages"] = sorted(affected)
         if affected:
             result.update(rust=True, policy=True)
+        if "gamekit-repo-tools" in affected:
+            result.update(skills=True, distribution=True)
+            result["reasons"].append("repository validator implementation: native catalogs and external consumer contract")
         if any(new[name].startswith("crates/") for name in affected):
             result.update(distribution=True, minimal=True)
         result["wasm"] = bool(affected & WASM)
@@ -258,19 +261,19 @@ def run_checks(root: Path, kind: str, selection: dict) -> None:
     packages = ["--workspace"] if selection["full"] else [arg for name in selection["packages"] for arg in ("-p", name)]
     if kind == "skills":
         run(sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v")
-        run(sys.executable, "skills/scripts/validate_skills.py")
-        run(sys.executable, "skills/scripts/validate_gameskills.py")
+        run("cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "legacy")
+        run("cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "validate")
         run(sys.executable, "-m", "unittest", "discover", "-s", "skills/tests", "-v")
     elif kind == "rust":
         if selection["distribution"]:
-            run(sys.executable, "scripts/check_distribution.py")
+            run("cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "check")
         run("cargo", "test", *packages, "--all-features", "--profile", "ci")
         if selection["full"] or "labyrinth" in selection["packages"]:
             run("cargo", "test", "-p", "labyrinth", "--lib", "network::tests::process::six_native_processes_survive_guest_kill_and_finish_the_fight", "--profile", "ci", "--", "--ignored", "--exact", "--nocapture")
         run("cargo", "test", *packages, "--doc", "--all-features", "--profile", "ci")
     elif kind == "policy":
         run("cargo", "fmt", "--all", "--", "--check")
-        run("rustfmt", "--check", "--edition", "2021", "scripts/fixtures/gamekit_consumer.rs")
+        run("rustfmt", "--check", "--edition", "2021", "tools/gamekit-repo-tools/tests/fixtures/distribution/gamekit_consumer.rs")
         run("cargo", "clippy", *packages, "--all-targets", "--all-features", "--profile", "ci", "--", "-D", "warnings")
         if selection["deny"]:
             run("cargo", "install", "cargo-deny", "--locked")

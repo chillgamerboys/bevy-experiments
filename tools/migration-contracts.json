@@ -63,8 +63,8 @@
       "destination": "tools/gamekit-repo-tools/src/distribution.rs",
       "stage": "R2",
       "disposition": "corrected",
-      "rationale": "Retain source-staging checks and add actual archive verification with explicit evidence scope.",
-      "status": "planned"
+      "rationale": "R2a replaces the Python source-staging command with Rust; actual GameKit archive inspection remains a separate R2 gate.",
+      "status": "partial"
     },
     {
       "source": "scripts/check_repo.py",
@@ -72,7 +72,7 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Keep layout, link and ownership checks independent of game compilation.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "scripts/ci.py",
@@ -88,7 +88,7 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve observable consumer graph and selected package contents; replace interpreter-based fixtures with Rust probes.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "scripts/tests/test_check_repo.py",
@@ -96,7 +96,7 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve observable layout, local links and dependency direction; replace interpreter-based fixtures with Rust probes.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "scripts/tests/test_ci.py",
@@ -120,7 +120,7 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve structural package, native metadata, link and scenario validation.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "skills/scripts/validate_skills.py",
@@ -128,7 +128,7 @@
       "stage": "R2",
       "disposition": "corrected",
       "rationale": "Validate frozen legacy inputs during transition; retire the Python launcher after its Rust replacement.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "skills/tests/test_gameskills_catalog.py",
@@ -136,7 +136,7 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve observable malformed and valid package metadata, references and scenarios; replace interpreter-based fixtures with Rust probes.",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "source": "skills/tests/test_gameskills_native.py",
@@ -188,8 +188,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: graph rejects game and feature leakage.",
-      "evidence": "Rust regression using consumer graph and selected package contents; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/distribution.rs::graph_rejects_game_and_feature_leakage; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_distribution:DistributionChecks.test_package_list_requires_library_and_rejects_escapes",
@@ -199,8 +199,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: package list requires library and rejects escapes.",
-      "evidence": "Rust regression using consumer graph and selected package contents; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/distribution.rs::package_list_requires_library_and_rejects_escapes; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_distribution:DistributionChecks.test_package_rejects_symlinked_source",
@@ -210,8 +210,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: package rejects symlinked source.",
-      "evidence": "Rust regression using consumer graph and selected package contents; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/distribution.rs::package_rejects_symlinked_source_and_ancestors; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_distribution:DistributionChecks.test_staging_removes_game_membership_preserving_shared_settings",
@@ -221,8 +221,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: staging removes game membership preserving shared settings.",
-      "evidence": "Rust regression using consumer graph and selected package contents; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/distribution.rs::staging_removes_game_membership_preserving_shared_settings; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_repo:RepositoryChecks.test_capability_cannot_depend_back_on_facade",
@@ -232,8 +232,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: capability cannot depend back on facade.",
-      "evidence": "Rust regression using layout, local links and dependency direction; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs::capability_cannot_depend_back_on_facade; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_repo:RepositoryChecks.test_game_dependency_through_workspace_alias",
@@ -243,8 +243,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: game dependency through workspace alias.",
-      "evidence": "Rust regression using layout, local links and dependency direction; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs::game_dependency_through_workspace_alias; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_repo:RepositoryChecks.test_legacy_and_duplicate_workspace",
@@ -254,8 +254,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: legacy and duplicate workspace.",
-      "evidence": "Rust regression using layout, local links and dependency direction; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs::legacy_and_duplicate_workspace; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_repo:RepositoryChecks.test_missing_and_escaping_links",
@@ -265,8 +265,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: missing and escaping links.",
-      "evidence": "Rust regression using layout, local links and dependency direction; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs::missing_and_escaping_links; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_check_repo:RepositoryChecks.test_valid_workspace_and_ignored_output",
@@ -276,8 +276,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: valid workspace and ignored output.",
-      "evidence": "Rust regression using layout, local links and dependency direction; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs::valid_workspace_and_ignored_output; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_ci:Results.test_game_commands_exclude_distribution_and_other_games",
@@ -569,12 +569,12 @@
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_cli_reports_structural_scope_and_propagates_failure",
       "source": "skills/tests/test_gameskills_catalog.py",
       "symbol": "GameSkillsCatalogTests.test_cli_reports_structural_scope_and_propagates_failure",
-      "destination": "tools/gamekit-repo-tools/tests/catalog.rs",
+      "destination": "tools/gamekit-repo-tools/tests/cli.rs",
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: cli reports structural scope and propagates failure.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/cli.rs::catalog_json_preserves_counts_and_structural_limitations_on_failure; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_coherent_candidate_needs_no_literal_negative_phrase_or_ui_metadata",
@@ -584,8 +584,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: coherent candidate needs no literal negative phrase or ui metadata.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::coherent_candidate_needs_no_literal_negative_phrase_or_ui_metadata; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_duplicate_json_keys_are_an_error_instead_of_last_value_wins",
@@ -595,8 +595,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: duplicate json keys are an error instead of last value wins.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::duplicate_json_keys_are_an_error_instead_of_last_value_wins; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_existing_encoded_link_outside_package_is_rejected",
@@ -606,8 +606,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: existing encoded link outside package is rejected.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::existing_encoded_link_outside_package_is_rejected; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_extra_native_skill_and_missing_native_body_are_detected",
@@ -617,8 +617,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: extra native skill and missing native body are detected.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::extra_native_skill_and_missing_native_body_are_detected; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_fixtures_cannot_claim_execution_or_lose_required_boundary_cases",
@@ -628,8 +628,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: fixtures cannot claim execution or lose required boundary cases.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::fixtures_cannot_claim_execution_or_lose_required_boundary_cases; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_malformed_structural_types_report_failures_instead_of_crashing",
@@ -639,8 +639,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: malformed structural types report failures instead of crashing.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::malformed_structural_types_report_failures_instead_of_crashing; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_manifest_identity_and_versions_match_catalog",
@@ -650,8 +650,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: manifest identity and versions match catalog.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::manifest_identity_and_versions_match_catalog; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_marketplace_inventory_and_source_mapping_are_both_checked",
@@ -661,8 +661,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: marketplace inventory and source mapping are both checked.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::marketplace_inventory_and_source_mapping_are_both_checked; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_mismatched_empty_and_duplicate_frontmatter_fail",
@@ -672,8 +672,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: mismatched empty and duplicate frontmatter fail.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::mismatched_empty_and_duplicate_frontmatter_fail; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_missing_or_duplicate_catalog_skill_is_not_hidden_by_a_valid_manifest",
@@ -683,8 +683,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: missing or duplicate catalog skill is not hidden by a valid manifest.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::missing_or_duplicate_catalog_skill_is_not_hidden_by_a_valid_manifest; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_native_metadata_types_are_checked_without_assuming_client_execution",
@@ -694,8 +694,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: native metadata types are checked without assuming client execution.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::native_metadata_types_are_checked_without_assuming_client_execution; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_optional_package_cannot_discover_sibling_core_skills",
@@ -705,8 +705,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: optional package cannot discover sibling core skills.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::optional_package_cannot_discover_sibling_core_skills; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_optional_ui_metadata_cannot_point_at_another_skill",
@@ -716,8 +716,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: optional ui metadata cannot point at another skill.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::optional_ui_metadata_cannot_point_at_another_skill; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_reference_links_are_checked_and_fenced_examples_are_not_followed",
@@ -727,8 +727,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: reference links are checked and fenced examples are not followed.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::reference_links_are_checked_and_fenced_examples_are_not_followed; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_required_frontmatter_supports_folded_and_quoted_strings",
@@ -738,8 +738,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: required frontmatter supports folded and quoted strings.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::required_frontmatter_supports_folded_and_quoted_strings; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_scenario_rubrics_require_observable_criteria_and_consistent_routing",
@@ -749,8 +749,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: scenario rubrics require observable criteria and consistent routing.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::scenario_rubrics_require_observable_criteria_and_consistent_routing; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_symlink_cannot_make_an_external_reference_look_package_local",
@@ -760,8 +760,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: symlink cannot make an external reference look package local.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::symlink_cannot_make_an_external_reference_look_package_local; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_symlink_loop_is_a_validation_error_without_a_traceback",
@@ -771,8 +771,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: symlink loop is a validation error without a traceback.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::symlink_loop_is_a_validation_error_without_a_traceback; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_underspecified_description_fails_without_enforcing_trigger_words",
@@ -782,8 +782,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: underspecified description fails without enforcing trigger words.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::underspecified_description_fails_without_enforcing_trigger_words; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_catalog:GameSkillsCatalogTests.test_valid_space_and_fragment_local_links_are_portable",
@@ -793,8 +793,8 @@
       "stage": "R2",
       "disposition": "retained",
       "rationale": "Preserve the observable contract: valid space and fragment local links are portable.",
-      "evidence": "Rust regression using malformed and valid package metadata, references and scenarios; assert success/failure and unchanged state on rejected operations.",
-      "status": "planned"
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs::valid_space_and_fragment_local_links_are_portable; executable Rust regression with positive/negative fixtures. R2a CI runs the focused package tests on three operating systems.",
+      "status": "implemented"
     },
     {
       "id": "test_gameskills_native:NativeTests.test_child_holding_stdout_cannot_hang_shutdown",
@@ -1799,6 +1799,48 @@
       "after": "The selected Rust TOML parser also accepts TOML 1.1 syntax; configuration field/type rules still apply.",
       "rationale": "Use the maintained Rust parser while making broader syntax acceptance explicit.",
       "evidence": "configuration fixture toml-1-1-inline-table"
+    },
+    {
+      "id": "r2a-validator-cli",
+      "before": "Four Python validator entrypoints emit text or optional unversioned JSON.",
+      "after": "gamekit-repo check, skills validate, skills legacy and distribution check return schema_version=1 JSON. Validation rejection exits 1; invalid arguments and unported operations exit 2. skills validate accepts --json explicitly.",
+      "rationale": "One Rust owner per replaced command, with structural evidence limits retained.",
+      "evidence": "tools/gamekit-repo-tools/tests/cli.rs"
+    },
+    {
+      "id": "r2a-repository-inputs",
+      "before": "Malformed manifests and path types can raise exceptions; missing workspace aliases can silently skip ownership checks. The Markdown scanner toggles on any fence and does not understand reference definitions.",
+      "after": "Return actionable input failures, reject undefined inherited dependencies and nonportable dependency paths, resolve symlink ancestors before missing leaves, and check reference/title/encoded links outside matching fences. HTTP(S) and mail links are external; unsupported URI schemes fail.",
+      "rationale": "Fail invalid structure without hiding capability ownership or broken local links.",
+      "evidence": "tools/gamekit-repo-tools/tests/repository.rs and tests/inputs.rs"
+    },
+    {
+      "id": "r2a-catalog-boundaries",
+      "before": "Empty native manifests can bypass identity checks; contained symlinks can evade full directory auditing. Observation rubrics can demand and forbid the same text.",
+      "after": "Validate empty native manifests, reject all native package symlinks and contradictory observation rubrics. Legacy malformed trigger shapes and recursive duplicate JSON keys return failures.",
+      "rationale": "Make structural validation deterministic and keep package boundaries explicit without claiming native behavior.",
+      "evidence": "tools/gamekit-repo-tools/tests/catalog.rs and tests/legacy.rs"
+    },
+    {
+      "id": "r2a-distribution-staging",
+      "before": "A textual workspace-header replacement drops unrelated fields and assumes one TOML layout. Graph checks reject games but omit tool packages and can accept incomplete nonempty graphs.",
+      "after": "Edit only membership/default-members/exclude structurally, reject game/tool dependencies, require probe and facade in every graph, and reject duplicate/nonportable source entries. Embed the unchanged consumer fixture in the repository-tool crate.",
+      "rationale": "Preserve independent source consumption and shared settings across valid TOML layouts. Actual GameKit archive inspection remains outstanding.",
+      "evidence": "tools/gamekit-repo-tools/tests/distribution.rs and compiled distribution_process_probe example"
+    },
+    {
+      "id": "r2a-ci-callers",
+      "before": "CI invokes Python validators and routes their old source paths.",
+      "after": "CI bootstraps the pinned Rust repository tool, calls its validators, verifies its Cargo package and selects skill/distribution checks for affected repository-tool implementations. Old-path routing remains for historical diffs; docs/game isolation and the Python final gate remain.",
+      "rationale": "Cut callers over without losing failure semantics or migrating the R2b selector early.",
+      "evidence": "scripts/tests/test_ci.py; .github/workflows/gamekit.yml"
+    },
+    {
+      "id": "r2a-native-cargo-listing",
+      "before": "Windows Cargo can emit native backslash-separated package entries while portable validation expects slash-separated paths.",
+      "after": "Normalize separators only at the native Cargo listing boundary before validating relative components and duplicate entries; reject absolute, drive, UNC, dot, empty and parent components. Unix literal backslash names remain rejected.",
+      "rationale": "Accept real Windows Cargo output without weakening package containment or allowing alternate spellings to bypass duplicate detection.",
+      "evidence": "distribution::tests::native_cargo_separators_are_normalized_before_containment_checks; tests/distribution.rs::windows_cargo_listing_accepts_native_separators_but_rejects_alias_duplicates; hosted Windows consumer check"
     }
   ]
 }

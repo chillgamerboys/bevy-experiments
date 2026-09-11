@@ -78,7 +78,7 @@ releases for every instruction edit.
 
 ## Current readiness gaps
 
-The present `scripts/check_distribution.py` stages Cargo-selected source files into
+The `gamekit-repo distribution check` command stages Cargo-selected source files into
 a temporary library-only workspace. It verifies useful dependency boundaries, but
 does not produce or install a registry release artifact. The Rust replacement must
 retain those checks and add artifact verification.
@@ -178,7 +178,7 @@ cargo metadata --no-deps --format-version 1
 cargo test --workspace --all-features
 cargo test --workspace --doc --all-features
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-python3 skills/scripts/validate_skills.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 python3 -m unittest discover -s skills/tests -v
 ```
 

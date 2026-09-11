@@ -3271,10 +3271,13 @@ name = "gamekit-repo-tools"
 version = "0.1.0-dev.2"
 dependencies = [
  "clap",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "toml",
+ "toml_edit",
 ]
 
 [[package]]
@@ -6293,6 +6296,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

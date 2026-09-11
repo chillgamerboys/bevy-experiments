@@ -69,7 +69,7 @@ cargo test --workspace --doc --all-features --profile ci
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo fmt --all -- --check
 cargo deny check
-python3 skills/scripts/validate_skills.py
+cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
 python3 -m unittest discover -s skills/tests -v
 ```
 

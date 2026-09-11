@@ -3,9 +3,13 @@
 Status: the owner accepted the refinement work and authorized its merge on
 September 10, 2026, then requested this repository-wide Rust migration plan.
 The implementation sequence and first PR specification below are the current plan.
-R0/R1 implementation is under review: two tool packages, a complete migration
-ledger, observed configuration fixtures, read-only commands and packaging checks.
-R2–R7 have not started. This replaces the earlier CLI-only proposal,
+R0/R1 merged in PR31: two tool packages, a complete migration ledger, observed
+configuration fixtures, read-only commands and packaging checks. R2a now ports
+repository checks, native/legacy skill validation and external consumer verification
+into `gamekit-repo`, with callers moved and the replaced Python owners/tests removed.
+R2b still owns CI selection/final-gate migration; bundle preparation for R3 and the
+remaining R2 artifact gates are not claimed complete by R2a. R3–R7 have not started.
+This replaces the earlier CLI-only proposal,
 which explicitly excluded CI routing and repository checks. The final state now
 includes **all repository-owned executable tooling and tests**.
 
