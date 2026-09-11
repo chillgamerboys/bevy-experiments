@@ -10,10 +10,10 @@ mechanical and visual trial. This record describes private adoption, not publica
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Reviewed and packaged implementation | `4e9917820bea329f967aac0e540648ef1fb5e108` |
+| Final packaged implementation | `377fa66ae317f02ab5b3374b46321ea45850b61e` |
 | Local prebuilt target | `aarch64-apple-darwin` |
-| CLI executable SHA-256 | `1a487d8c53d885cad85370696bbf9d56f2e81ce3a68baaf3f6c5fa8214f0649e` |
-| Actual Cargo archive SHA-256 | `fcfb5c66429751544a1ae9f19a710cf62bdf9d9cc717e2cd08f1fd240fdddfa4` |
+| CLI executable SHA-256 | `1a95469a8e7724b662ebd4ddfeea1e661308617f2311b28b1296a769a611a96c` |
+| Actual Cargo archive SHA-256 | `562f7da3a3d5ac704113ea38d1f7711b4786af28788863eaf673b0ebb4e43bad` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -23,8 +23,13 @@ manifest, lockfile and embedded payload were inspected. The archive was extracte
 outside the workspace and `cargo install --locked --offline --path ...` produced
 the candidate there, with Python excluded from the build PATH. Runtime adoption
 then copied that executable into an environment containing only it and Git.
-Later cutover documentation/configuration changes leave these CLI source and
-dependency files unchanged. The final PR carries its own source identity and CI.
+The initial behavioral review used `4e991782`. The first hosted run then exposed
+a Unix-only import in the Windows path and a Linux-specific `Stat` comparison.
+The corrected candidate scopes platform imports and matches the missing-file error
+without requiring `Stat: PartialEq`. Strict all-target Clippy passed when compiled
+for both Windows and Linux. Its rebuilt archive was installed again, and packaged
+adoption and actual Codex discovery were repeated. Cross-compilation is not a
+claim of native execution; the final PR carries the hosted platform evidence.
 
 ## Observed checks
 
