@@ -262,20 +262,34 @@ fn malformed_recovery_journal_never_overwrites_files() -> Result {
 #[test]
 fn setup_lock_and_active_runs_exclude_updates() -> Result {
     let root = tempfile::tempdir()?;
-    installed(root.path())?;
-    let lock = gameskills_cli::installation::lifecycle_guard(root.path())?;
+    installed(root.path()).map_err(|e| format!("initial install: {e}"))?;
+    let lock = gameskills_cli::installation::lifecycle_guard(root.path())
+        .map_err(|e| format!("initial setup owner acquisition: {e}"))?;
+    // Model a concurrent Unix process spawn retaining the same open-file
+    // description before CLOEXEC takes effect. Fixture ownership must end at
+    // the explicit release below, even while a duplicate is still alive.
+    #[cfg(unix)]
+    let _inherited_setup = lock.try_clone()?;
     assert!(call(root.path(), "setup", &["--apply"]).is_err());
     assert!(call(root.path(), "setup", &["--recover"]).is_err());
+    lock.unlock()?;
     drop(lock);
+    call(root.path(), "setup", &["--recover"])
+        .map_err(|e| format!("after setup owner unlock: {e}"))?;
     let run = root.path().join(".gameskills/runs").join("a".repeat(32));
     fs::create_dir_all(&run)?;
     let active = fs::File::create(run.join("active.lock"))?;
     active.lock()?;
+    #[cfg(unix)]
+    let _inherited_active = active.try_clone()?;
     assert!(call(root.path(), "setup", &["--apply"])
         .expect_err("active run")
         .contains("active"));
+    // This test owns the simulated run; there is no supervisor inheriting its
+    // lease. Release ownership independently of any duplicate descriptor.
+    active.unlock()?;
     drop(active);
-    installed(root.path())?;
+    installed(root.path()).map_err(|e| format!("after active owner unlock: {e}"))?;
     Ok(())
 }
 #[test]
