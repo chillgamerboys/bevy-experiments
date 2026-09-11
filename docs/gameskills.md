@@ -8,9 +8,11 @@ this document owns installation and implementation limits.
 
 Python is the current tooling implementation. The foundation and
 [bounded refinement trials](decisions/gameskills-refinement-results.md) have merged.
-The next work is the [repository-wide Rust migration](decisions/gameskills-rust-cli.md),
-starting with contract capture and two tool packages. That plan also covers CI,
-tests and installable distribution. The commands below describe the current Python
+The [repository-wide Rust migration](decisions/gameskills-rust-cli.md) now has an
+initial [Rust tool foundation](../tools/gameskills-cli/README.md) for configuration
+validation and migration accounting. Installation and execution remain on the
+Python candidate. The plan also covers CI, tests and installable distribution.
+The installation and workflow commands below describe the current Python
 candidate until their Rust replacements are implemented and verified. Skill
 instructions remain Markdown and GameKit remains Rust throughout.
 

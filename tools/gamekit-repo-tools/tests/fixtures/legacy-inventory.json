@@ -1,0 +1,266 @@
+{
+  "reference_commit": "08a38a594750a44411756bcf8f21e99da5dddf8b",
+  "files": [
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/__init__.py",
+      "sha256": "703ed5617eafc1b00c99bc0d75ad3b4317f1bc24b4eadcaf44e11c92a250d04b",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/config.py",
+      "sha256": "e164cd945f494a839be64a2353df4053fea7cb4f2a5b6c4655a0fd099e023261",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/native.py",
+      "sha256": "ba1f5c77a247dafd9f0164a9752ba5d2aae381932045f17287746b40d63fe034",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/packaging.py",
+      "sha256": "1b498175a994bab38d8202c0798f041db5b74943dbed3067876d3fa0852ce862",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/runner.py",
+      "sha256": "aff49f29a0bb3055884ae2a2d813b64f199827d89b99fe37ff7eeb030e45e69c",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/runtime/gameskills_runtime/workflow.py",
+      "sha256": "ae0e73a9ab4f9ac440ca0306e7b8f4b112201341ce33ddd81530c24b9b4ad402",
+      "tests": []
+    },
+    {
+      "path": "plugins/gameskills/scripts/gameskills.py",
+      "sha256": "c19281f667733fcea7f32d8bbc8c85a2ef6311afb740d78e69e32b9517327f6a",
+      "tests": []
+    },
+    {
+      "path": "scripts/check_distribution.py",
+      "sha256": "03acad49ee6b70142251455275238fc76ced237a213343b886221b4a5ef01398",
+      "tests": []
+    },
+    {
+      "path": "scripts/check_repo.py",
+      "sha256": "b1b3ec9a052c42490f16afc5ee4318ebe068d2ae45195908e54df1dbafea78ee",
+      "tests": []
+    },
+    {
+      "path": "scripts/ci.py",
+      "sha256": "cf99225573e9957560089a538a965e66014766880b7511db01b4771bee1ca0e2",
+      "tests": []
+    },
+    {
+      "path": "scripts/tests/test_check_distribution.py",
+      "sha256": "7c0066208824d94b5f73d08611588841c7006b654c8d09463f60a77245f4560a",
+      "tests": [
+        "DistributionChecks.test_graph_rejects_game_and_feature_leakage",
+        "DistributionChecks.test_package_list_requires_library_and_rejects_escapes",
+        "DistributionChecks.test_package_rejects_symlinked_source",
+        "DistributionChecks.test_staging_removes_game_membership_preserving_shared_settings"
+      ]
+    },
+    {
+      "path": "scripts/tests/test_check_repo.py",
+      "sha256": "8de1362370fac38b357724c8d1c75b3bcfd2904297beffbf4955c3ff19002c75",
+      "tests": [
+        "RepositoryChecks.test_capability_cannot_depend_back_on_facade",
+        "RepositoryChecks.test_game_dependency_through_workspace_alias",
+        "RepositoryChecks.test_legacy_and_duplicate_workspace",
+        "RepositoryChecks.test_missing_and_escaping_links",
+        "RepositoryChecks.test_valid_workspace_and_ignored_output"
+      ]
+    },
+    {
+      "path": "scripts/tests/test_ci.py",
+      "sha256": "a2dd31c1ac7de119874ac3546097db648812324ef2cf890fe6f5f59fd897e486",
+      "tests": [
+        "Results.test_game_commands_exclude_distribution_and_other_games",
+        "Results.test_intentional_skip_passes",
+        "Results.test_labyrinth_keeps_real_process_check",
+        "Results.test_malformed_selection_fails",
+        "Results.test_other_checkout_cannot_reuse_selection",
+        "Results.test_selected_failure_cancellation_missing_and_skip_fail",
+        "Results.test_unselected_failure_not_hidden",
+        "Routing.test_brace_and_bracket_includes_select_compiled_docs",
+        "Routing.test_cross_game_asset_keeps_owner_and_include_consumer",
+        "Routing.test_deleted_source_selects_owner",
+        "Routing.test_docs_avoid_expensive_jobs",
+        "Routing.test_dynamic_include_also_prevents_asset_shortcut",
+        "Routing.test_dynamic_include_prevents_docs_shortcut",
+        "Routing.test_each_game_is_isolated",
+        "Routing.test_explicit_build_script_prevents_docs_shortcut",
+        "Routing.test_included_docs_and_old_graph_consumers",
+        "Routing.test_included_skill_keeps_skill_checks",
+        "Routing.test_invalid_head_is_error",
+        "Routing.test_manual_full_run",
+        "Routing.test_missing_history_and_bad_graph_select_full",
+        "Routing.test_mixed_changes_union_jobs",
+        "Routing.test_nested_rules_owner_and_consumer",
+        "Routing.test_rename_selects_both_owners",
+        "Routing.test_reverse_normal_dev_target_build_consumers",
+        "Routing.test_shared_unknown_and_routing_inputs_select_full",
+        "Routing.test_skill_markdown_and_runtime_select_skills_only"
+      ]
+    },
+    {
+      "path": "skills/scripts/skills_tool.py",
+      "sha256": "74aad9687f59495c3bcdf043499b20b96689e266f409c3cd16c156ed56e39437",
+      "tests": []
+    },
+    {
+      "path": "skills/scripts/validate_gameskills.py",
+      "sha256": "a557132ceedbaf446e95c296ffb1ce7ede947dceda2d9187edced0cad989078a",
+      "tests": []
+    },
+    {
+      "path": "skills/scripts/validate_skills.py",
+      "sha256": "0ca546e95ba1ba26598a9e7bed4422b5c63bcd0caa260b8904690a2ce16c3612",
+      "tests": []
+    },
+    {
+      "path": "skills/tests/test_gameskills_catalog.py",
+      "sha256": "8b640982a39d2a79676be298a52eba98bd1c860404f2ed305989fb060fb162a6",
+      "tests": [
+        "GameSkillsCatalogTests.test_cli_reports_structural_scope_and_propagates_failure",
+        "GameSkillsCatalogTests.test_coherent_candidate_needs_no_literal_negative_phrase_or_ui_metadata",
+        "GameSkillsCatalogTests.test_duplicate_json_keys_are_an_error_instead_of_last_value_wins",
+        "GameSkillsCatalogTests.test_existing_encoded_link_outside_package_is_rejected",
+        "GameSkillsCatalogTests.test_extra_native_skill_and_missing_native_body_are_detected",
+        "GameSkillsCatalogTests.test_fixtures_cannot_claim_execution_or_lose_required_boundary_cases",
+        "GameSkillsCatalogTests.test_malformed_structural_types_report_failures_instead_of_crashing",
+        "GameSkillsCatalogTests.test_manifest_identity_and_versions_match_catalog",
+        "GameSkillsCatalogTests.test_marketplace_inventory_and_source_mapping_are_both_checked",
+        "GameSkillsCatalogTests.test_mismatched_empty_and_duplicate_frontmatter_fail",
+        "GameSkillsCatalogTests.test_missing_or_duplicate_catalog_skill_is_not_hidden_by_a_valid_manifest",
+        "GameSkillsCatalogTests.test_native_metadata_types_are_checked_without_assuming_client_execution",
+        "GameSkillsCatalogTests.test_optional_package_cannot_discover_sibling_core_skills",
+        "GameSkillsCatalogTests.test_optional_ui_metadata_cannot_point_at_another_skill",
+        "GameSkillsCatalogTests.test_reference_links_are_checked_and_fenced_examples_are_not_followed",
+        "GameSkillsCatalogTests.test_required_frontmatter_supports_folded_and_quoted_strings",
+        "GameSkillsCatalogTests.test_scenario_rubrics_require_observable_criteria_and_consistent_routing",
+        "GameSkillsCatalogTests.test_symlink_cannot_make_an_external_reference_look_package_local",
+        "GameSkillsCatalogTests.test_symlink_loop_is_a_validation_error_without_a_traceback",
+        "GameSkillsCatalogTests.test_underspecified_description_fails_without_enforcing_trigger_words",
+        "GameSkillsCatalogTests.test_valid_space_and_fragment_local_links_are_portable"
+      ]
+    },
+    {
+      "path": "skills/tests/test_gameskills_native.py",
+      "sha256": "9e409c2174e8cfa1d7a7f4db28c872aa0c38579283002d207fedb6c1d22b2e63",
+      "tests": [
+        "NativeTests.test_child_holding_stdout_cannot_hang_shutdown",
+        "NativeTests.test_delayed_materialization_is_retried_within_one_deadline",
+        "NativeTests.test_discovers_exact_selected_packages_and_preserves_observed_paths",
+        "NativeTests.test_missing_selected_plugin_fails_without_a_skill_claim",
+        "NativeTests.test_missing_skills_exhaust_bounded_discovery_wait",
+        "NativeTests.test_native_bytes_must_match_entire_pinned_package",
+        "NativeTests.test_rpc_errors_malformed_output_and_early_exit_fail_cleanly",
+        "NativeTests.test_source_directory_is_not_evidence_of_native_installation",
+        "NativeTests.test_unresponsive_native_process_is_terminated",
+        "NativeTests.test_wrong_native_pin_or_unselected_package_is_rejected"
+      ]
+    },
+    {
+      "path": "skills/tests/test_gameskills_packaging.py",
+      "sha256": "f4032caa2bcd11cf9ca9a3c2142560dc50aeee758da3430f5c5ee08d1778ee14",
+      "tests": [
+        "PackagingTests.test_cli_applies_and_validates_installed_candidate",
+        "PackagingTests.test_ignored_files_are_not_packaged_under_the_commit_identity",
+        "PackagingTests.test_interrupted_update_requires_explicit_recovery_and_restores_old_pin",
+        "PackagingTests.test_native_commands_use_only_selected_bundle_and_preserve_user_files",
+        "PackagingTests.test_only_pinned_clean_source_can_be_bundled",
+        "PackagingTests.test_portable_lock_rehydrates_in_another_clone_and_checks_selection",
+        "PackagingTests.test_preserves_local_configuration_and_other_client_files",
+        "PackagingTests.test_proposal_has_no_writes_and_five_worker_default",
+        "PackagingTests.test_recovery_refuses_new_local_edits",
+        "PackagingTests.test_selected_packages_can_change_at_same_commit_and_rollback",
+        "PackagingTests.test_setup_lock_excludes_second_mutator",
+        "PackagingTests.test_symlink_state_bundle_and_files_are_rejected",
+        "PackagingTests.test_tag_is_resolved_to_commit_and_destination_is_immutable",
+        "PackagingTests.test_tampered_content_marketplace_and_unrecorded_package_are_rejected",
+        "PackagingTests.test_update_pin_requires_explicit_setup_and_old_bundle_remains_usable",
+        "PackagingTests.test_valid_quoted_indented_or_default_package_config_is_preserved",
+        "PackagingTests.test_worker_limits_are_strict_and_configuration_is_not_code"
+      ]
+    },
+    {
+      "path": "skills/tests/test_gameskills_runner.py",
+      "sha256": "0af290e2e830de22a387f056a38cad677129ace2eb44594040ae466c77bc4660",
+      "tests": [
+        "GameSkillsRunnerTests.test_active_run_cannot_be_resumed",
+        "GameSkillsRunnerTests.test_arguments_are_not_interpreted_by_a_shell",
+        "GameSkillsRunnerTests.test_base_ref_change_invalidates_evidence_with_unchanged_head",
+        "GameSkillsRunnerTests.test_changed_external_executable_invalidates_evidence",
+        "GameSkillsRunnerTests.test_changed_worktree_untracked_file_index_head_config_lock_and_environment_invalidate",
+        "GameSkillsRunnerTests.test_concurrency_is_useful_and_shared_resources_do_not_overlap",
+        "GameSkillsRunnerTests.test_configured_worker_cap_is_enforced",
+        "GameSkillsRunnerTests.test_cwd_swap_after_open_cannot_redirect_process_outside_repository",
+        "GameSkillsRunnerTests.test_cwd_symlink_is_rejected_and_real_subdirectory_is_used",
+        "GameSkillsRunnerTests.test_deterministic_dag_runs_shared_dependency_once_and_captures_output",
+        "GameSkillsRunnerTests.test_evidence_list_is_read_only_and_missing_setup_does_not_create_state",
+        "GameSkillsRunnerTests.test_evidence_path_traversal_is_rejected",
+        "GameSkillsRunnerTests.test_failure_preserves_logs_and_skips_dependents_but_runs_independent_work",
+        "GameSkillsRunnerTests.test_hard_killed_runner_cannot_be_resumed_while_command_retains_active_lock",
+        "GameSkillsRunnerTests.test_input_change_during_successful_command_marks_run_stale",
+        "GameSkillsRunnerTests.test_invalid_graphs_and_traversal_are_rejected_before_writing",
+        "GameSkillsRunnerTests.test_missing_executable_is_failed_observation_with_real_error_log",
+        "GameSkillsRunnerTests.test_modified_record_and_modified_log_never_validate",
+        "GameSkillsRunnerTests.test_record_relocated_to_another_run_or_repository_is_invalid",
+        "GameSkillsRunnerTests.test_ref_change_during_a_command_marks_run_stale",
+        "GameSkillsRunnerTests.test_relative_path_entry_resolves_from_actual_command_cwd",
+        "GameSkillsRunnerTests.test_resource_initialization_failure_preserves_a_failed_record",
+        "GameSkillsRunnerTests.test_resource_locks_coordinate_separate_runner_processes",
+        "GameSkillsRunnerTests.test_resource_wait_expiry_is_skipped_not_a_pass_and_does_not_block_unrelated_command",
+        "GameSkillsRunnerTests.test_resume_reruns_graph_preserves_failed_record_and_rejects_new_inputs",
+        "GameSkillsRunnerTests.test_sigterm_cleans_descendants_records_interruption_and_skips_pending",
+        "GameSkillsRunnerTests.test_state_symlinks_record_symlinks_hardlinks_and_fifo_are_rejected",
+        "GameSkillsRunnerTests.test_successful_leader_cannot_leave_background_descendants",
+        "GameSkillsRunnerTests.test_swapped_state_directory_does_not_redirect_atomic_record_writes",
+        "GameSkillsRunnerTests.test_timeout_kills_descendant_and_preserves_partial_output",
+        "GameSkillsRunnerTests.test_tracked_parent_replaced_by_symlink_is_not_followed_during_fingerprinting",
+        "GameSkillsRunnerTests.test_unrelated_refs_and_symbolic_head_are_conservative_inputs"
+      ]
+    },
+    {
+      "path": "skills/tests/test_gameskills_workflow.py",
+      "sha256": "a53bf5b03afd10a83e0f71de9b5ec5272022edee543cc602d0550d5c4d916604",
+      "tests": [
+        "WorkflowTests.test_checkout_must_be_isolated_same_repository_and_unique",
+        "WorkflowTests.test_cli_and_symlink_state_protection",
+        "WorkflowTests.test_full_lifecycle_and_distinct_dependency_gates",
+        "WorkflowTests.test_human_pending_reservation_and_shared_agent_resources",
+        "WorkflowTests.test_injection_can_reuse_integrated_territory",
+        "WorkflowTests.test_injection_is_atomic_add_only_and_source_bound",
+        "WorkflowTests.test_injection_shared_resources_require_sequencing",
+        "WorkflowTests.test_invalid_ids_dependencies_and_cycles",
+        "WorkflowTests.test_invalid_transitions_and_incomplete_or_stale_reports",
+        "WorkflowTests.test_line_ranges_and_directories_enforce_ownership",
+        "WorkflowTests.test_parallel_mutations_compare_and_swap_one_revision",
+        "WorkflowTests.test_plan_preserves_input_and_normalizes_identity",
+        "WorkflowTests.test_reported_human_predecessor_allows_only_sequenced_consumers",
+        "WorkflowTests.test_repository_source_and_base_identity",
+        "WorkflowTests.test_resume_rechecks_identity_and_preserves_old_evidence",
+        "WorkflowTests.test_returned_dependency_change_is_rejected",
+        "WorkflowTests.test_slots_cap_five_and_human_ownership",
+        "WorkflowTests.test_start_and_resume_recheck_current_package_selection"
+      ]
+    },
+    {
+      "path": "skills/tests/test_skills_tool.py",
+      "sha256": "f3447580afa781f3886e20861e7d26aed95e8b2ecca014290b374e127f776877",
+      "tests": [
+        "SkillsToolTests.test_arbitrary_branch_is_not_a_pin",
+        "SkillsToolTests.test_install_is_complete_and_idempotent_for_both_clients",
+        "SkillsToolTests.test_manifest_and_base_hashes_are_portable_between_path_flavors",
+        "SkillsToolTests.test_moving_revision_is_rejected",
+        "SkillsToolTests.test_sync_rejects_legacy_or_noncanonical_path_names_without_changes",
+        "SkillsToolTests.test_sync_rejects_manifest_path_traversal",
+        "SkillsToolTests.test_sync_rejects_modified_or_missing_cached_base",
+        "SkillsToolTests.test_sync_reports_generated_file_conflict_without_overwrite",
+        "SkillsToolTests.test_sync_updates_untouched_files_and_preserves_overlays"
+      ]
+    }
+  ]
+}

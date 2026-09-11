@@ -1,0 +1,1144 @@
+{
+  "reference_commit": "08a38a594750a44411756bcf8f21e99da5dddf8b",
+  "reference_observation": "config.validate and TOML/JSON serialization; public Python config still requires setup",
+  "cases": [
+    {
+      "id": "defaults",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version = 1\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {}
+        }
+      },
+      "expected": {
+        "exit_code": 0,
+        "ok": true,
+        "writes": [],
+        "configuration": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {}
+        }
+      }
+    },
+    {
+      "id": "selected",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version = 1\npackages=[\"gameskills\",\"gameskills-ui\"]\nclients=[\"claude\"]\n[dispatch]\nenabled=true\nmax_workers=3\n[targets.ui]\npath=\"games/demo\"\npackages=[\"gameskills-ui\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills",
+            "gameskills-ui"
+          ],
+          "clients": [
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": true,
+            "max_workers": 3
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {
+            "ui": {
+              "path": "games/demo",
+              "packages": [
+                "gameskills-ui"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "exit_code": 0,
+        "ok": true,
+        "writes": [],
+        "configuration": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills",
+            "gameskills-ui"
+          ],
+          "clients": [
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": true,
+            "max_workers": 3
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {
+            "ui": {
+              "path": "games/demo",
+              "packages": [
+                "gameskills-ui"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "literal-argv",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[commands.inspect]\nargv=[\"echo\", \"$(touch SHOULD_NOT_EXIST)\", \"a;b\", \"x y\", \"\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {
+            "inspect": {
+              "argv": [
+                "echo",
+                "$(touch SHOULD_NOT_EXIST)",
+                "a;b",
+                "x y",
+                ""
+              ]
+            }
+          },
+          "agents": {},
+          "targets": {}
+        }
+      },
+      "expected": {
+        "exit_code": 0,
+        "ok": true,
+        "writes": [],
+        "configuration": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {
+            "inspect": {
+              "argv": [
+                "echo",
+                "$(touch SHOULD_NOT_EXIST)",
+                "a;b",
+                "x y",
+                ""
+              ]
+            }
+          },
+          "agents": {},
+          "targets": {}
+        }
+      }
+    },
+    {
+      "id": "metadata",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[project]\nname=\"Bevy trial\"\n[agents.worker]\nrole=\"implementation\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {
+            "worker": {
+              "role": "implementation"
+            }
+          },
+          "targets": {},
+          "project": {
+            "name": "Bevy trial"
+          }
+        }
+      },
+      "expected": {
+        "exit_code": 0,
+        "ok": true,
+        "writes": [],
+        "configuration": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {
+            "worker": {
+              "role": "implementation"
+            }
+          },
+          "targets": {},
+          "project": {
+            "name": "Bevy trial"
+          }
+        }
+      }
+    },
+    {
+      "id": "schema-bool",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=true\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": true,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {}
+        }
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "schema-float",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1.0\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1.0,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {}
+        }
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "schema-new",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=2\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "gameskills.toml requires schema_version = 1"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "schema-missing",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "packages=[\"gameskills\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "gameskills.toml requires schema_version = 1"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "unknown-root",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\npython=\"code\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "unknown configuration fields: ['python']"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "duplicate-key",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\nschema_version=1\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "TOMLDecodeError",
+        "message": "Cannot overwrite a value (at line 2, column 17)"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "workers-zero",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[dispatch]\nmax_workers=0\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "dispatch.max_workers must be 1..5"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "workers-six",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[dispatch]\nmax_workers=6\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "dispatch.max_workers must be 1..5"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "workers-bool",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[dispatch]\nmax_workers=true\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "dispatch.max_workers must be 1..5"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "enabled-string",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[dispatch]\nenabled=\"true\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "dispatch.enabled must be boolean"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "creative-high",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[creative]\ndefault_level=5\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "creative.default_level must be 1..4"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "creative-type",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\ncreative=[]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "creative must be a table"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "project-scalar",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\nproject=\"demo\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {},
+          "project": "demo"
+        }
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "no-core",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\npackages=[\"gameskills-ui\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "select gameskills core and only known optional packages"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "unknown-package",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\npackages=[\"gameskills\",\"something\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "select gameskills core and only known optional packages"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "duplicate-package",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\npackages=[\"gameskills\",\"gameskills\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "packages contains duplicates"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "empty-clients",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\nclients=[]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "clients must be a nonempty string array"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "unknown-client",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\nclients=[\"unknown\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "supported clients are codex and claude"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "command-shell-string",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[commands.inspect]\nargv=\"echo hi\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "commands.inspect.argv must be a nonempty string array"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "command-invalid-id",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[commands.\"bad name\"]\nargv=[\"true\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "invalid command name/table: bad name"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "command-nul",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[commands.inspect]\nargv=[\"hello\\u0000\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "commands.inspect.argv must be a nonempty string array"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "target-package",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npackages=[\"gameskills-ui\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "target ui selects an uninstalled package"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "target-duplicate",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npackages=[\"gameskills\",\"gameskills\"]\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {
+            "ui": {
+              "packages": [
+                "gameskills",
+                "gameskills"
+              ]
+            }
+          }
+        }
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "windows-path",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npath='C:\\outside'\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "configuration",
+        "value": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {
+            "ui": {
+              "path": "C:\\outside"
+            }
+          }
+        }
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "parent-path",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npath=\"../outside\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "target ui path must stay inside its repository"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "absolute-path",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npath=\"/outside\"\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "target ui path must stay inside its repository"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "path-type",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[targets.ui]\npath=42\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "TypeError",
+        "message": "argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'int'"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "date-value",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[project]\ndate=2026-09-10\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "TypeError",
+        "message": "Object of type date is not JSON serializable"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "nonfinite-value",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\n[project]\nratio=nan\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "ValueError",
+        "message": "Out of range float values are not JSON compliant: nan"
+      },
+      "expected": {
+        "exit_code": 2,
+        "ok": false,
+        "writes": []
+      }
+    },
+    {
+      "id": "toml-1-1-inline-table",
+      "argv": [
+        "config",
+        "validate",
+        "--file",
+        "gameskills.toml"
+      ],
+      "input": "schema_version=1\ndispatch={\nenabled=false,\nmax_workers=5,\n}\n",
+      "preconditions": [
+        "ordinary UTF-8 file",
+        "no installation required for new validate command"
+      ],
+      "reference": {
+        "kind": "error",
+        "type": "TOMLDecodeError",
+        "message": "Invalid initial character for a key part (at line 2, column 11)"
+      },
+      "expected": {
+        "exit_code": 0,
+        "ok": true,
+        "writes": [],
+        "configuration": {
+          "schema_version": 1,
+          "packages": [
+            "gameskills"
+          ],
+          "clients": [
+            "codex",
+            "claude"
+          ],
+          "creative": {
+            "default_level": 2
+          },
+          "dispatch": {
+            "enabled": false,
+            "max_workers": 5
+          },
+          "commands": {},
+          "agents": {},
+          "targets": {}
+        }
+      }
+    }
+  ]
+}

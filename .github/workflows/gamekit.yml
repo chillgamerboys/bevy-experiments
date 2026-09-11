@@ -66,14 +66,24 @@ jobs:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.97.1'
       - name: Install Linux window-system dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
+      - name: Verify migration accounting against the accepted source
+        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+      - name: Verify the standalone CLI Cargo package
+        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
+        run: cargo package --locked -p gameskills-cli
       - run: python scripts/ci.py run rust
 
   policy:
@@ -87,8 +97,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: '1.97.1'
           components: clippy,rustfmt
       - name: Install Linux window-system dependencies
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
