@@ -1,8 +1,8 @@
 # Command execution and evidence
 
 Use the installed runtime through its actual path, shown here as
-`python3 <gameskills-runtime>/gameskills.py --root <repository>`. It requires
-Python 3.11 or later, Git, and a committed Git worktree. Readiness/configuration
+`<gameskills-executable> --root <repository>`. It requires
+Git and a committed Git worktree. Prebuilt execution requires neither Cargo nor an interpreter. Readiness/configuration
 is a separate operation; reading evidence does not perform setup.
 
 ## Commands and dependencies
@@ -29,12 +29,12 @@ resources = ["project:cargo-target", "gpu", "window"]
 ```
 
 ```text
-gameskills.py --root ROOT run rules app
-gameskills.py --root ROOT run app --max-workers 2 --resource-wait-seconds 60
-gameskills.py --root ROOT evidence list
-gameskills.py --root ROOT evidence show RUN_ID
-gameskills.py --root ROOT evidence validate RUN_ID
-gameskills.py --root ROOT run app --resume RUN_ID
+gameskills --root ROOT run rules app
+gameskills --root ROOT run app --max-workers 2 --resource-wait-seconds 60
+gameskills --root ROOT evidence list
+gameskills --root ROOT evidence show RUN_ID
+gameskills --root ROOT evidence validate RUN_ID
+gameskills --root ROOT run app --resume RUN_ID
 ```
 
 `run` executes the selected commands and their transitive `requires` graph.
@@ -105,7 +105,7 @@ files, and nested Git identities for populated submodules. Generated
 `.gameskills/` state is excluded. `gameskills.toml` and `gameskills.lock.json`
 have separate raw-file digests; effective project configuration and the selected
 normalized command graph also have digests. The identity records resolved command
-executables and their digests, Python/platform identity and a digest of the
+executables and their digests, Rust executable/platform identity and a digest of the
 inherited environment, excluding only shell bookkeeping (`PWD`, `OLDPWD`,
 `SHLVL`, `_`). Environment values are not copied into the record.
 

@@ -10,20 +10,20 @@ acceptance checks, invokes other skills, merges Git branches, or contacts GitHub
 
 ## Commands
 
-Resolve the installed core package and use Python 3.11 or newer. `ROOT` is the
+Resolve the compatible Rust `gameskills` executable and the installed core package. `ROOT` is the
 actual repository checkout root that owns this queue, not an arbitrary child
 folder. These helpers require project setup/configuration.
 
 ```sh
-python3 <resolved-core>/scripts/gameskills.py --root <repo> plan validate --file PLAN.json
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue create --file PLAN.json
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue status wave-one
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue inject wave-one --file ORDER.json --expected-revision 1
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue start wave-one ui-copy --worktree <worker-checkout> --expected-revision 2
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue report wave-one ui-copy --file REPORT.json --expected-revision 3
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue block wave-one ui-copy --file BLOCK.json --expected-revision 4
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue resume wave-one ui-copy --worktree <worker-checkout> --expected-revision 5
-python3 <resolved-core>/scripts/gameskills.py --root <repo> queue integrated wave-one ui-copy --file INTEGRATION.json --expected-revision 7
+<gameskills-executable> --root <repo> plan validate --file PLAN.json
+<gameskills-executable> --root <repo> queue create --file PLAN.json
+<gameskills-executable> --root <repo> queue status wave-one
+<gameskills-executable> --root <repo> queue inject wave-one --file ORDER.json --expected-revision 1
+<gameskills-executable> --root <repo> queue start wave-one ui-copy --worktree <worker-checkout> --expected-revision 2
+<gameskills-executable> --root <repo> queue report wave-one ui-copy --file REPORT.json --expected-revision 3
+<gameskills-executable> --root <repo> queue block wave-one ui-copy --file BLOCK.json --expected-revision 4
+<gameskills-executable> --root <repo> queue resume wave-one ui-copy --worktree <worker-checkout> --expected-revision 5
+<gameskills-executable> --root <repo> queue integrated wave-one ui-copy --file INTEGRATION.json --expected-revision 7
 ```
 
 The examples show command syntax, not an executable sequence: resumed work must

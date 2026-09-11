@@ -17,7 +17,7 @@ or invoke its supported skill through the host. Markdown links are not calls.
 The resolved core's read-only readiness command is:
 
 ```text
-python3 <resolved-core>/scripts/gameskills.py --root <repo> status
+<gameskills-executable> --root <repo> status
 ```
 
 Missing setup or tools remain explicit; do not silently install dependencies or
