@@ -109,7 +109,9 @@ mod posix {
     }
     #[test]
     fn native_argv_binds_selected_packages_without_config_writes() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = Fixture::new()?;
         let codex = native_argv(
             &fixture.bundle,
@@ -146,7 +148,9 @@ mod posix {
     }
     #[test]
     fn actual_peer_observes_exact_catalog_with_no_model_or_install_rpc() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = Fixture::new()?;
         let result = fixture.activate(2.0)?;
         assert_eq!(at(&result, "/skills").as_array().ok_or("skills")?.len(), 14);
@@ -181,7 +185,9 @@ mod posix {
     }
     #[test]
     fn delayed_native_materialization_is_retried_within_one_deadline() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut fixture = Fixture::new()?;
         *fixture
             .scenario
@@ -195,7 +201,9 @@ mod posix {
     }
     #[test]
     fn missing_plugins_and_wrong_pins_fail_without_skill_claim() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut fixture = Fixture::new()?;
         fixture
             .scenario
@@ -223,7 +231,9 @@ mod posix {
     }
     #[test]
     fn complete_native_package_bytes_and_cache_location_are_verified() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = Fixture::new()?;
         let path = at(&fixture.scenario, "/skills/0/path")
             .as_str()
@@ -250,7 +260,9 @@ mod posix {
     }
     #[test]
     fn protocol_errors_are_bounded_and_reap_the_actual_child() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         for mode in [
             "error",
             "malformed",
@@ -273,7 +285,9 @@ mod posix {
     }
     #[test]
     fn missing_skills_and_unresponsive_peer_exhaust_deadline_and_cleanup() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         for mode in ["missing", "hang", "child_pipe"] {
             let mut fixture = Fixture::new()?;
             if mode == "missing" {
@@ -307,7 +321,9 @@ mod posix {
     }
     #[test]
     fn duplicates_disabled_plugins_and_invalid_timeout_do_not_pass() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut fixture = Fixture::new()?;
         let first = at(&fixture.scenario, "/skills/0").clone();
         fixture
@@ -341,7 +357,9 @@ mod posix {
 
     #[test]
     fn cli_launch_propagates_native_exit_and_respects_client_selection() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = Fixture::new()?;
         execute(&fixture.root, "setup", &[OsString::from("--apply")])?;
         fs::copy(&fixture.executable, fixture.root.join("claude"))?;
@@ -377,31 +395,29 @@ mod posix {
         Ok(())
     }
     #[test]
-    fn peer_that_stops_draining_stdin_cannot_extend_the_activation_deadline() -> Result {
-        let _guard = NATIVE_PROCESS_TEST.lock().expect("native test lock");
+    fn incomplete_discovery_keeps_one_deadline_and_reaps_the_actual_peer() -> Result {
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut fixture = Fixture::new()?;
         *fixture.scenario.get_mut("mode").ok_or("mode")? = json!("backpressure");
         fs::write(
             fixture.root.join("scenario.json"),
             serde_json::to_vec(&fixture.scenario)?,
         )?;
-        // Each discovery request carries this legitimate cwd. It fills macOS's
-        // normal stdin pipe within the bounded activation; Linux's probe narrows
-        // its pipe explicitly rather than assuming a host-dependent capacity.
-        let mut cwd = fixture.root.clone();
-        while cwd.as_os_str().len() < 880 {
-            cwd.push("discovery-project-path-component");
-        }
-        fs::create_dir_all(&cwd)?;
+        // This exercises the complete protocol loop with incomplete responses.
+        // The private Rpc regression deterministically fills stdin in one write;
+        // no retry count or host-specific pipe capacity is assumed here.
+        let cwd = fixture.root.clone();
         let bundle = fixture.bundle.clone();
         let executable = fixture.executable.clone();
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         let started = Instant::now();
         let worker = std::thread::spawn(move || {
-            let result = activate_codex(&bundle, &cwd, &executable, 10.0);
+            let result = activate_codex(&bundle, &cwd, &executable, 1.5);
             let _ = sender.send(result);
         });
-        let observed = receiver.recv_timeout(Duration::from_secs(14));
+        let observed = receiver.recv_timeout(Duration::from_secs(5));
         // A regression must fail the test, not strand Cargo on a blocked writer.
         if observed.is_err() {
             if let Ok(pid) = fs::read_to_string(fixture.root.join("pid")) {
@@ -412,12 +428,9 @@ mod posix {
         worker.join().expect("native activation worker");
         let error = observed
             .map_err(|error| format!("activation exceeded bounded test wait: {error}"))?
-            .expect_err("backpressure must exhaust the shared deadline");
-        assert!(
-            error.contains("timed out while sending request: stdin backpressure"),
-            "{error}"
-        );
-        assert!(started.elapsed() < Duration::from_secs(12));
+            .expect_err("incomplete discovery must exhaust the shared deadline");
+        assert!(error.contains("timed out"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(4));
         assert_eq!(
             fs::read_to_string(fixture.root.join("stopped-draining"))?,
             "true"

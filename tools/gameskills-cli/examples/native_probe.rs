@@ -114,10 +114,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::io::stdout().flush()?;
         if mode == "backpressure" && method == "plugin/list" {
             // Stop reading requests but emit plausible, incomplete discovery
-            // responses. Linux's pipe is reduced to make the boundary portable;
-            // macOS's normal pipe fills with the test's long-cwd requests.
-            #[cfg(target_os = "linux")]
-            nix::fcntl::fcntl(std::io::stdin(), nix::fcntl::FcntlArg::F_SETPIPE_SZ(4096))?;
+            // responses. The separate full-request writer regression establishes
+            // backpressure without relying on a platform-specific pipe capacity.
             #[cfg(unix)]
             signal_hook::flag::register(
                 signal_hook::consts::SIGPIPE,

@@ -423,25 +423,16 @@ mod posix {
             }
         }
     }
-    pub(super) fn activate(
-        bundle_path: &Path,
-        root: &Path,
+    fn start_rpc(
         executable: &Path,
+        args: &[String],
+        root: &Path,
         timeout: f64,
-    ) -> Result<Value, String> {
-        let bundle = archive::source(bundle_path)?;
-        let bundle_path = bundle_path.canonicalize().map_err(|e| e.to_string())?;
-        let root = root.canonicalize().map_err(|e| e.to_string())?;
-        let market = archive::marketplace(&bundle);
-        let args = native_argv(
-            &bundle_path,
-            "codex",
-            &["app-server".into(), "--stdio".into()],
-        )?;
+    ) -> Result<Rpc, String> {
         let errors = tempfile::tempfile().map_err(|e| e.to_string())?;
         let mut child = Command::new(executable)
             .args(args.iter().skip(1))
-            .current_dir(&root)
+            .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(errors)
@@ -533,7 +524,7 @@ mod posix {
                 }
             }
         });
-        let mut rpc = Rpc {
+        Ok(Rpc {
             child,
             input,
             messages: receiver,
@@ -541,7 +532,26 @@ mod posix {
             deadline,
             next: 0,
             stopped,
-        };
+        })
+    }
+
+    pub(super) fn activate(
+        bundle_path: &Path,
+        root: &Path,
+        executable: &Path,
+        timeout: f64,
+    ) -> Result<Value, String> {
+        let bundle = archive::source(bundle_path)?;
+        let bundle_path = bundle_path.canonicalize().map_err(|e| e.to_string())?;
+        let root = root.canonicalize().map_err(|e| e.to_string())?;
+        let market = archive::marketplace(&bundle);
+        let args = native_argv(
+            &bundle_path,
+            "codex",
+            &["app-server".into(), "--stdio".into()],
+        )?;
+        let mut rpc = start_rpc(executable, &args, &root, timeout)?;
+        let deadline = rpc.deadline;
         let initialized = rpc.call("initialize", json!({"clientInfo":{"name":"gameskills","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}))?;
         let home = Path::new(
             initialized
@@ -602,6 +612,76 @@ mod posix {
                 .checked_duration_since(Instant::now())
                 .ok_or_else(|| format!("Codex native activation timed out: {pending}"))?;
             thread::sleep(remaining.min(Duration::from_millis(100)));
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn full_stdin_pipe_observes_write_deadline_and_reaps_actual_peer(
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            let directory = tempfile::tempdir()?;
+            let executable = std::env::current_exe()?
+                .parent()
+                .and_then(Path::parent)
+                .ok_or("test profile directory")?
+                .join("examples")
+                .join(format!("native_probe{}", std::env::consts::EXE_SUFFIX));
+            if !executable.is_file() {
+                return Err(
+                    format!("compiled native probe missing: {}", executable.display()).into(),
+                );
+            }
+            let cwd = directory.path().to_owned();
+            let (pid_sender, pid_receiver) = mpsc::sync_channel(1);
+            let (result_sender, result_receiver) = mpsc::sync_channel(1);
+            let started = Instant::now();
+            let worker = thread::spawn(move || {
+                let result = (|| -> Result<String, String> {
+                    // Use the same process setup as activation, including its
+                    // nonblocking descriptor flags and cleanup ownership.
+                    let mut rpc = start_rpc(
+                        &executable,
+                        &["native_probe".into(), "--hold-stdout".into()],
+                        &cwd,
+                        1.5,
+                    )?;
+                    pid_sender
+                        .send(rpc.child.id())
+                        .map_err(|error| error.to_string())?;
+                    // One request is larger than the host's ordinary pipe
+                    // capacity. The peer never reads, so this cannot merely
+                    // time out between small discovery retries.
+                    let result = rpc.send(&json!({"id":0,"method":"fixture/full-pipe","params":{"bytes":"x".repeat(4 * 1024 * 1024)}}));
+                    let error =
+                        result.expect_err("an undrained pipe cannot accept the full request");
+                    drop(rpc);
+                    Ok(error)
+                })();
+                let _ = result_sender.send(result);
+            });
+            let pid = pid_receiver.recv_timeout(Duration::from_secs(5))?;
+            let observed = result_receiver.recv_timeout(Duration::from_secs(5));
+            // An old blocking write must fail this test without stranding its
+            // worker or Cargo. The watchdog owns only the actual spawned group.
+            if observed.is_err() {
+                let _ = killpg(Pid::from_raw(i32::try_from(pid)?), Signal::SIGKILL);
+            }
+            worker.join().expect("native write worker");
+            let error =
+                observed.map_err(|error| format!("native writer exceeded watchdog: {error}"))??;
+            assert!(
+                error.contains("timed out while sending request: stdin backpressure"),
+                "{error}"
+            );
+            assert!(started.elapsed() < Duration::from_secs(4));
+            assert!(
+                nix::sys::signal::kill(Pid::from_raw(i32::try_from(pid)?), None).is_err(),
+                "native peer was not reaped"
+            );
+            Ok(())
         }
     }
 }
