@@ -126,6 +126,10 @@ fn recover(directory: &files::Directory) -> Result<Value, String> {
     let Some(bytes) = directory.read_optional(JOURNAL)? else {
         return Ok(json!({"ok":true,"recovered":false}));
     };
+    // Recovery changes the same managed files as apply and must retain the same
+    // queue/run exclusions while validating and restoring the transaction.
+    let _queue_guard = inactive_history(directory)?;
+    let _run_guards = inactive_runs(directory)?;
     let transaction = archive::json(&bytes)?;
     super::exact_keys(&transaction, &[CONFIG, LOCK])?;
     for name in [CONFIG, LOCK] {
