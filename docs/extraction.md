@@ -78,10 +78,15 @@ releases for every instruction edit.
 
 ## Current readiness gaps
 
-The `gamekit-repo distribution check` command stages Cargo-selected source files into
-a temporary library-only workspace. It verifies useful dependency boundaries, but
-does not produce or install a registry release artifact. The Rust replacement must
-retain those checks and add artifact verification.
+`gamekit-repo distribution check` retains Cargo-selected source consumer checks.
+`distribution archives` now produces actual Cargo archives in temporary staging,
+inspects their contents and normalized manifests, then tests the same empty/pure/UI/
+network cases against extracted sources. Staging adds matching versions to internal
+path dependencies and omits library lockfiles while siblings are unpublished. The
+consumer patches those packages to extracted files and seeds resolution from the
+repository lock. Reports retain archive hashes and these transformations, explicitly
+setting registry-resolution verification to false. Registry consumers and final
+library lockfile packaging remain release gates; public manifests stay unpublished.
 
 At this plan revision, the workspace declares `publish = false`, version `0.1.0`
 and `MIT OR Apache-2.0`; no tracked license files were found. Internal library
@@ -89,8 +94,15 @@ dependencies are path-only, and package descriptions, readmes, repository links,
 MSRV and explicit contents need review across the capability crates. The facade's
 current include list covers source, its manifest and README, so license inclusion
 also needs an explicit check. The Rust CLI foundation now has an unpublished
-`0.1.0-dev.2` manifest and self-contained source packaging; full embedded skills,
-installation and prebuilt distribution remain later migration work.
+`0.1.0-dev.2` manifest and self-contained source packaging. Its archive now includes
+`bundle/bundle.json` and `bundle/instructions.tar.gz`, deterministically prepared from
+committed canonical instructions and a compatibility declaration. The repository
+tool checks regeneration, exports the same bytes as a standalone archive, and checks
+the actual CLI Cargo archive against them. This is an instruction preparation format,
+separate from the legacy Python bundle format. It preserves native metadata and
+core-only defaults but excludes Python code. Its current prose still names Python
+helpers; R3 must migrate those references before baseline activation. Installation,
+embedded runtime use, compatibility behavior and prebuilt adoption remain later work.
 
 Before publishing, add reviewed license files/notices and metadata, set versioned
 internal dependencies, and enable publication only for the intended public crates.

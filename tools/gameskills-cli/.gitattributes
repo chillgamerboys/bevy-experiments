@@ -1,0 +1,3 @@
+# Generated artifact identity is byte-based on every checkout platform.
+/bundle/bundle.json text eol=lf
+/bundle/instructions.tar.gz binary

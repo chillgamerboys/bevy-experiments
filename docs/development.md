@@ -57,8 +57,10 @@ automatically starts a service or composes a game. Networking is an explicit cho
 ## Local artifacts
 
 `target/` is the only build tree; review output goes in `target/review/`. `.context/`
-is short-lived agent scratch. Enduring requirements belong in normal docs. Neither
-generated output nor scratch belongs in Git.
+is short-lived agent scratch. Enduring requirements belong in normal docs. Build
+output and scratch stay out of Git. The explicit exception is the deterministic
+instruction snapshot under `tools/gameskills-cli/bundle/`: commit it with its source
+pin after `gamekit-repo bundle prepare`, and verify it with `bundle check`.
 
 Cleanup is explicit maintenance after stopping workspace processes, never an
 automatic startup purge. Do not remove global caches/toolchains, game profiles,

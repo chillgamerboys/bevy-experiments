@@ -162,6 +162,7 @@ pub fn commands(selection: &Selection, job: Job, python: &str) -> Result<Vec<Vec
             ]));
             commands.push(repository_command("skills", "legacy"));
             commands.push(repository_command("skills", "validate"));
+            commands.push(repository_command("bundle", "check"));
             commands.push(argv(&[
                 python,
                 "-m",
@@ -173,8 +174,17 @@ pub fn commands(selection: &Selection, job: Job, python: &str) -> Result<Vec<Vec
             ]));
         }
         Job::Rust => {
+            if selection.full
+                || selection
+                    .packages
+                    .iter()
+                    .any(|name| matches!(name.as_str(), "gameskills-cli" | "gamekit-repo-tools"))
+            {
+                commands.push(repository_command("bundle", "check"));
+            }
             if selection.distribution {
                 commands.push(repository_command("distribution", "check"));
+                commands.push(repository_command("distribution", "archives"));
             }
             commands.push(package_command(
                 "test",

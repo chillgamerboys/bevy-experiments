@@ -30,8 +30,13 @@ The toolchain and initial supported minimum are Rust 1.97.1, tested together rat
 than asserting an untested older MSRV. Direct dependencies are Clap, Serde JSON and
 TOML; there are no Bevy, GameKit, game or repository-tool dependencies. The workspace
 lockfile records exact resolutions. `cargo install --locked --path <extracted-crate>`
-can install the packaged foundation; prebuilt distribution and embedded instructions
-arrive in later stages. `process_probe` is a test example, not an installed binary.
+can install the packaged foundation. `bundle/` now contains a generated instruction
+snapshot and manifest for R3, prepared by the Rust repository tool from canonical
+`plugins/` sources. The Cargo archive includes these package-local bytes; the
+executable does not yet activate or install them. The preparation-only payload
+excludes Python code, while its prose still needs the R3 command migration.
+Prebuilt distribution and baseline activation arrive in later stages.
+`process_probe` is a test example, not an installed binary.
 
 The workspace declares `MIT OR Apache-2.0`, inherited here. Actual license files,
 notices and registry ownership still need the planned release audit; publication

@@ -53,6 +53,8 @@ jobs:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -91,6 +93,9 @@ jobs:
       - name: Verify the standalone CLI Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
         run: cargo package --locked -p gameskills-cli
+      - name: Inspect the CLI archive's instruction payload
+        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- bundle verify-package
       - name: Verify the repository tool Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
         run: cargo package --locked -p gamekit-repo-tools

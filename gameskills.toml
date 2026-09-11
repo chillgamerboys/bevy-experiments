@@ -90,3 +90,13 @@ resources = ["project:cargo-target"]
 argv = ["cargo", "test", "-p", "labyrinth_rules", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
+
+[commands.bundle-check]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "bundle", "check"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.distribution-archives]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "archives"]
+timeout_seconds = 1800
+resources = ["project:cargo-target"]

@@ -348,7 +348,10 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
     for (commands, suffix) in [
         (&skills, ["skills", "legacy"]),
         (&skills, ["skills", "validate"]),
+        (&skills, ["bundle", "check"]),
+        (&rust, ["bundle", "check"]),
         (&rust, ["distribution", "check"]),
+        (&rust, ["distribution", "archives"]),
     ] {
         let mut expected = argv(&[
             "cargo",
@@ -380,9 +383,9 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
         .chain(&rust)
         .flatten()
         .any(|argument| argument.ends_with(".py")));
-    assert_eq!(rust.len(), 4);
+    assert_eq!(rust.len(), 6);
     assert!(rust
-        .get(1)
+        .get(3)
         .is_some_and(|command| command.contains(&"--workspace".into())));
     assert!(rust
         .last()

@@ -8,7 +8,7 @@ rust-version = "1.97.1"
 description = "GameSkills Rust migration candidate: configuration checks and command contracts"
 repository = "https://github.com/chillgamerboys/bevy-experiments"
 readme = "README.md"
-include = ["src/**", "tests/**", "examples/**", "Cargo.toml", "README.md"]
+include = ["src/**", "tests/**", "examples/**", "bundle/**", "Cargo.toml", "README.md"]
 
 [[bin]]
 name = "gameskills"
