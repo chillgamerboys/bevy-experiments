@@ -3,7 +3,7 @@
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::Value;
 use std::fmt;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 /// Read an ordinary UTF-8 source file, refusing symlink leaves and special files.
 pub fn read_text(path: &Path) -> Result<String, String> {
@@ -123,9 +123,9 @@ pub fn portable_relative(path: &str) -> bool {
     !path.is_empty()
         && !path.contains(['\\', ':', '\0'])
         && !Path::new(path).is_absolute()
-        && Path::new(path)
-            .components()
-            .all(|part| matches!(part, Component::Normal(_)))
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
 /// Resolve an existing local Markdown target within its owning boundary.

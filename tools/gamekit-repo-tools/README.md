@@ -35,7 +35,8 @@ The legacy installer and pinned GameSkills runtime remain their existing Python 
 
 `distribution check` stages Cargo-selected library files in a temporary workspace
 and checks empty, pure, UI and network consumer graphs and tests. `--case` selects
-one case or `all`. The consumer source is embedded in this crate. Cargo diagnostics
+one case or `all`. Windows Cargo separators are normalized before portable-path
+and containment checks. The consumer source is embedded in this crate. Cargo diagnostics
 go to stderr; stdout contains the final result. Temporary sources are removed on
 success and failure; Cargo artifacts reuse the selected repository's `target/`.
 This command needs Cargo and registry dependencies, and may compile Bevy explicitly.

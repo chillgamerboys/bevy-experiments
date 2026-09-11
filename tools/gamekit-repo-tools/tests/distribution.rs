@@ -253,6 +253,24 @@ fn graph_rejects_game_and_feature_leakage() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(windows)]
+#[test]
+fn windows_cargo_listing_accepts_native_separators_but_rejects_alias_duplicates(
+) -> Result<(), Box<dyn Error>> {
+    let directory = fixture()?;
+    let root = directory
+        .path()
+        .join("crates/bevy_gamekit")
+        .canonicalize()?;
+    assert_eq!(
+        package_sources(&root, "Cargo.toml\nsrc\\lib.rs\n")?,
+        vec![PathBuf::from("Cargo.toml"), PathBuf::from("src/lib.rs")]
+    );
+    assert!(package_sources(&root, "Cargo.toml\nsrc\\lib.rs\nsrc/lib.rs\n").is_err());
+    assert!(package_sources(&root, "Cargo.toml\nsrc\\..\\..\\outside.rs\n").is_err());
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn package_rejects_symlinked_source_and_ancestors() -> Result<(), Box<dyn Error>> {

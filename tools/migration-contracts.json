@@ -1834,6 +1834,13 @@
       "after": "CI bootstraps the pinned Rust repository tool, calls its validators, verifies its Cargo package and selects skill/distribution checks for affected repository-tool implementations. Old-path routing remains for historical diffs; docs/game isolation and the Python final gate remain.",
       "rationale": "Cut callers over without losing failure semantics or migrating the R2b selector early.",
       "evidence": "scripts/tests/test_ci.py; .github/workflows/gamekit.yml"
+    },
+    {
+      "id": "r2a-native-cargo-listing",
+      "before": "Windows Cargo can emit native backslash-separated package entries while portable validation expects slash-separated paths.",
+      "after": "Normalize separators only at the native Cargo listing boundary before validating relative components and duplicate entries; reject absolute, drive, UNC, dot, empty and parent components. Unix literal backslash names remain rejected.",
+      "rationale": "Accept real Windows Cargo output without weakening package containment or allowing alternate spellings to bypass duplicate detection.",
+      "evidence": "distribution::tests::native_cargo_separators_are_normalized_before_containment_checks; tests/distribution.rs::windows_cargo_listing_accepts_native_separators_but_rejects_alias_duplicates; hosted Windows consumer check"
     }
   ]
 }

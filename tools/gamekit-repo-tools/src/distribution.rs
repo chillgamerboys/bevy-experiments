@@ -102,6 +102,20 @@ fn ordinary(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn package_entry(name: &str, separator: char) -> Result<PathBuf, String> {
+    // Cargo emits native separators on Windows, including files selected by include.
+    // Normalize at that producer boundary before applying the portable path policy.
+    let portable = if separator == '\\' {
+        name.replace('\\', "/")
+    } else {
+        name.to_owned()
+    };
+    if !portable_relative(&portable) {
+        return Err(format!("nonlocal package entry: {name}"));
+    }
+    Ok(PathBuf::from(portable))
+}
+
 /// Validate Cargo's package listing before copying any selected source files.
 ///
 /// Generated Cargo entries are omitted. Every other entry must be an existing
@@ -120,10 +134,7 @@ pub fn package_sources(crate_root: &Path, listing: &str) -> Result<Vec<PathBuf>,
         if GENERATED.contains(&name) {
             continue;
         }
-        if !portable_relative(name) {
-            return Err(format!("nonlocal package entry: {name}"));
-        }
-        let relative = PathBuf::from(name);
+        let relative = package_entry(name, std::path::MAIN_SEPARATOR)?;
         if !seen.insert(relative.clone()) {
             return Err(format!("duplicate package entry: {name}"));
         }
@@ -457,8 +468,30 @@ pub fn check_with_runner(
 
 #[cfg(test)]
 mod tests {
-    use super::execute_cargo;
+    use super::{execute_cargo, package_entry};
     use std::ffi::OsString;
+
+    #[test]
+    fn native_cargo_separators_are_normalized_before_containment_checks() {
+        assert_eq!(
+            package_entry("src\\lib.rs", '\\'),
+            Ok(std::path::PathBuf::from("src/lib.rs"))
+        );
+        assert!(package_entry("src\\lib.rs", '/').is_err());
+        for name in [
+            "..\\outside",
+            "src\\..\\..\\outside",
+            "\\absolute",
+            "\\\\server\\share",
+            "C:\\outside",
+            "C:/outside",
+            "src\\.\\lib.rs",
+            "src\\\\lib.rs",
+            "src\\bad\0",
+        ] {
+            assert!(package_entry(name, '\\').is_err(), "{name:?}");
+        }
+    }
 
     #[test]
     fn child_arguments_are_literal_and_failures_propagate() -> Result<(), Box<dyn std::error::Error>>
