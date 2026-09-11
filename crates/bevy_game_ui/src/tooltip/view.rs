@@ -187,7 +187,8 @@ pub(super) fn render(world: &mut World) {
                         UiTextRole::Title,
                     );
                     if pinned {
-                        let close = action(world, heading, "×", TooltipAction::Close(depth));
+                        // ASCII remains visible with the default Bevy font as well as game fonts.
+                        let close = action(world, heading, "x", TooltipAction::Close(depth));
                         world.entity_mut(close).insert((
                             Name::new("Tooltip Close"),
                             AccessibleLabel::new("Close tooltip"),

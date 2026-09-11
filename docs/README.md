@@ -8,6 +8,7 @@ trials before Rust migration. Game-specific behavior belongs with each game belo
 
 - [GameSkills installation and development workflow](gameskills.md)
 - [Proposed CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
+- [Refinement observations and remaining acceptance](decisions/gameskills-refinement-results.md)
 - [Rust GameSkills CLI migration plan](decisions/gameskills-rust-cli.md)
 - [GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
 - [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)

@@ -292,7 +292,7 @@ fn preview_is_pointer_transparent_and_lock_exposes_only_a_corner_close() {
         .world_mut()
         .query::<&Text>()
         .iter(app.world())
-        .any(|text| text.0 == "×"));
+        .any(|text| text.0 == "x"));
     app.world_mut().write_message(UiActivated { entity: close });
     step(&mut app, 1);
     step(&mut app, 1000);
