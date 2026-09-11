@@ -1,7 +1,8 @@
 # Development documentation
 
 - [GameSkills installation and development workflow](gameskills.md)
-- [Scheduled follow-up: Rust GameSkills CLI](decisions/gameskills-rust-cli.md)
+- [Proposed CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
+- [Rust GameSkills CLI migration plan](decisions/gameskills-rust-cli.md)
 - [GameSkills and GameKit as a companion to Bevy](decisions/gameskills-framework.md)
 - [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)

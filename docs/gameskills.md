@@ -7,8 +7,10 @@ release. The [catalog](decisions/gameskills-catalog.md) owns workflow boundaries
 this document owns installation and implementation limits.
 
 Python is the initial tooling implementation. The owner requested a
-[Rust CLI migration](decisions/gameskills-rust-cli.md) after this foundation merges;
-the skill instructions remain Markdown and GameKit remains Rust throughout.
+[Rust CLI migration](decisions/gameskills-rust-cli.md); the foundation has now
+merged. The proposed next step is [bounded workflow trials and CI
+scoping](decisions/gameskills-ci-scope.md) before freezing the migration contracts.
+The skill instructions remain Markdown and GameKit remains Rust throughout.
 
 ## Install a pinned candidate
 
@@ -142,4 +144,5 @@ from the structural [scenario fixtures](../skills/tests/gameskills-scenarios.jso
 Do not claim a released framework, all-client parity, broad evaluation coverage or
 measured cost savings from these checks alone. Labyrinth/Deckbuilder refinement
 and the deferred [Port Vila pilot](decisions/port-vila-adoption.md) provide the next
-real adopter evidence after this foundation is reviewed.
+real adopter evidence after this foundation. Begin with the bounded internal
+trials; Port Vila remains a later, separately reviewed integration.
