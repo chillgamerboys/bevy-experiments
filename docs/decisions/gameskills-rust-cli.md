@@ -1,13 +1,14 @@
 # Plan: finish the repository tooling migration to Rust
 
 Status: the owner authorized completing the remaining migration without per-stage
-approval on September 11, 2026. R0/R1 merged in PR31. R2a, R2b and R2c merged in
-PRs32–34 after their hosted checks passed; the resulting main trees matched their
-accepted source heads. R3 installation, R4 queues and R5 runner work now proceed in
-three isolated streams on the runtime cutover branch, followed by R6 private
-adoption and R7 removal of the remaining Python. The final runtime PR stays open
-for the owner's end-result review. Mechanical and visual Labyrinth changes are the
-subsequent collaborative product trial, not part of this migration's scope.
+approval on September 11, 2026. R0/R1 merged in PR31 and R2a/R2b/R2c merged in
+PRs32–34 with passing hosted checks. R3 installation, R4 queues and R5 supervision
+are implemented and independently reviewed; 120 combined CLI tests passed locally.
+R6 packaged installation/adoption and actual Codex discovery passed. R7 now uses
+the Rust installation/configuration/CI path and removes all maintained Python;
+fresh-checkout and final hosted verification follow before delivery. The final
+runtime PR stays open for owner review. Mechanical and visual Labyrinth changes
+are the subsequent collaborative product trial.
 
 The prepared embedded instructions now declare Rust runtime compatibility and use
 Rust command guidance. This replaces the earlier CLI-only proposal, which excluded
@@ -378,8 +379,8 @@ requires a successful authenticated evaluation before making that release claim.
   No live queue is silently migrated; stale observations and client/platform limits
   remain visible. No record is upgraded into an unobserved passing claim.
 
-**R0 plus the smallest usable R1 scaffold** is implemented for review; after acceptance, continue
-with **R2 repository/CI tooling and R3 installation**, using the dependencies above.
+The runtime migration is implemented; the status above and final adoption record
+track its verification and review endpoint.
 The full docs restructure, tooltip scrolling correction, playable Labyrinth release,
 companion Deckbuilder development and deferred Port Vila integration remain explicit
 subsequent work. Their delivery should use the Rust framework once it is accepted.

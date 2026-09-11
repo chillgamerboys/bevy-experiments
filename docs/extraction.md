@@ -40,7 +40,7 @@ network bundle download. See [Cargo installation behavior](https://doc.rust-lang
 
 Keep `plugins/` as the only human-edited skill source. A Rust repository preparation
 command generates a deterministic, package-local bundle snapshot and manifest under
-the future CLI package. Include that snapshot in the Cargo package and embed it from
+the CLI package. The candidate includes that snapshot in the Cargo package and embeds it from
 within the package boundary. CI checks regeneration and the content digest. Do not
 depend on `../../plugins` existing when compiling an extracted crate, download skills
 in a build script, or package the retired Python runtime. Inspect and build the

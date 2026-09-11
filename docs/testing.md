@@ -27,7 +27,7 @@ For Rust tooling, use the focused package tests and contract checker:
 ```sh
 cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
 cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
-cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference --cutover
 cargo package --locked -p gameskills-cli
 cargo run --locked -p gamekit-repo-tools --profile ci -- bundle verify-package
 cargo package --locked -p gamekit-repo-tools
@@ -42,7 +42,7 @@ Historical records retain their original runtime identity.
 
 `tests/adoption.rs` copies the actual CLI outside the workspace and exercises a
 fresh POSIX Git adopter with Cargo, rustc and Python absent from its PATH. It checks
-embedded setup, package changes/rollback, owner-file preservation, command execution
+embedded setup, package changes/rollback, interrupted recovery, owner-file preservation, command execution
 and evidence invalidation. `GAMESKILLS_CANDIDATE_BINARY` can select the executable
 built from an extracted Cargo archive for that same trial. Native authentication
 and visual game quality remain separate evidence.

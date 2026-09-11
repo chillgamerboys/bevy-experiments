@@ -52,9 +52,9 @@ timeout_seconds = 1800
 resources = ["project:cargo-target"]
 
 [commands.skills-test]
-argv = ["python3", "-m", "unittest", "discover", "-s", "skills/tests", "-v"]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci"]
 timeout_seconds = 600
-resources = ["project:skills-tests"]
+resources = ["project:cargo-target"]
 requires = ["skills-validate"]
 
 [commands.repo-test]
@@ -72,7 +72,7 @@ timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.migration-contracts]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "contracts", "check", "--verify-reference"]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "contracts", "check", "--verify-reference", "--cutover"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 

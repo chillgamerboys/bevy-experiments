@@ -86,7 +86,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Verify migration accounting against the accepted source
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
-        run: cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference
+        run: cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference --cutover
       - name: Verify the standalone CLI Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
         run: cargo package --locked -p gameskills-cli
