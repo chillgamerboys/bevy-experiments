@@ -3300,9 +3300,18 @@ name = "gameskills-cli"
 version = "0.1.0-dev.2"
 dependencies = [
  "clap",
+ "flate2",
+ "nix",
+ "regex",
+ "rustix 1.1.4",
+ "semver",
+ "serde",
  "serde_json",
+ "sha2",
+ "tar",
  "tempfile",
  "toml",
+ "toml_edit",
 ]
 
 [[package]]
