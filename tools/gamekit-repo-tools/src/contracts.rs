@@ -260,7 +260,7 @@ pub fn cutover(root: &Path, source: &str) -> Result<(), String> {
                 .and_then(|extension| extension.to_str())
                 .map(str::to_ascii_lowercase)
                 .as_deref(),
-            Some("py" | "pyc" | "pyo")
+            Some("py" | "pyi" | "pyc" | "pyo")
         ) {
             return Err(format!("tracked interpreter source remains: {path}"));
         }

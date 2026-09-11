@@ -167,13 +167,15 @@ fn cutover_rejects_unfinished_missing_owners_python_sources_and_ci_setup(
     std::fs::remove_file(root.join("tools/fixture.rs"))?;
     assert!(cutover(root, &inventory.to_string()).is_err());
     std::fs::write(root.join("tools/fixture.rs"), "//! Synthetic Rust owner.\n")?;
-    std::fs::write(
-        root.join("old.py"),
-        "# Historical source that must not remain tracked.\n",
-    )?;
-    git(&["add", "old.py"])?;
-    assert!(cutover(root, &inventory.to_string()).is_err());
-    git(&["rm", "-f", "old.py"])?;
+    for name in ["old.py", "old.pyi", "old.PYC", "old.pyo"] {
+        std::fs::write(
+            root.join(name),
+            "# Interpreter source must not remain tracked.\n",
+        )?;
+        git(&["add", name])?;
+        assert!(cutover(root, &inventory.to_string()).is_err());
+        git(&["rm", "-f", name])?;
+    }
     std::fs::create_dir_all(root.join(".github/workflows"))?;
     std::fs::write(
         root.join(".github/workflows/test.yml"),
