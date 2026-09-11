@@ -5,6 +5,15 @@ use serde_json::json;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+const SETUP_HELP: &str = "gameskills setup [--packages NAME ...] [--bundle PATH] [--apply]\ngameskills setup --recover\nWithout --apply, setup only prints a proposal.";
+const BUNDLE_HELP: &str = "gameskills bundle --out NEW_DIRECTORY [--packages NAME ...]\ngameskills bundle --source CHECKOUT --revision FULL_COMMIT_OR_TAG --out NEW_DIRECTORY";
+const NATIVE_HELP: &str = "gameskills native codex|claude [--launch] [-- CLIENT_ARGUMENTS ...]\ngameskills native codex --verify\nWithout --launch or --verify, print the selected client's command.";
+const PLAN_HELP: &str = "gameskills plan validate --file PLAN.json";
+const QUEUE_HELP: &str = "gameskills queue create --file PLAN.json\ngameskills queue status QUEUE_ID\ngameskills queue inject QUEUE_ID --file ORDER.json --expected-revision N\ngameskills queue start|resume QUEUE_ID ORDER_ID --worktree PATH --expected-revision N\ngameskills queue block|report|integrated QUEUE_ID ORDER_ID --file OBSERVATION.json --expected-revision N";
+const RUN_HELP: &str = "gameskills run COMMAND ... [--max-workers N] [--resource-wait-seconds SECONDS] [--resume RUN_ID]\nCommands come from gameskills.toml; resume reruns the graph into a new record.";
+const EVIDENCE_HELP: &str = "gameskills evidence list\ngameskills evidence show|validate RUN_ID";
+const LEGACY_HELP: &str = "gameskills legacy import [--apply]\nInspect the old installation first; --apply preserves old client files and overlays.";
+
 #[derive(Parser)]
 #[command(
     name = "gameskills",
@@ -35,41 +44,49 @@ enum Operation {
     /// Verify the installed instruction bundle and configuration.
     Status,
     /// Propose, apply or recover an immutable instruction installation.
+    #[command(after_help = SETUP_HELP)]
     Setup {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Export a verified immutable instruction bundle.
+    #[command(after_help = BUNDLE_HELP)]
     Bundle {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Construct or launch a selected native agent client.
+    #[command(after_help = NATIVE_HELP)]
     Native {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Validate a scoped work plan.
+    #[command(after_help = PLAN_HELP)]
     Plan {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Coordinate revision-guarded durable work queues.
+    #[command(after_help = QUEUE_HELP)]
     Queue {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Execute the selected configured command graph.
+    #[command(after_help = RUN_HELP)]
     Run {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Inspect and validate execution records.
+    #[command(after_help = EVIDENCE_HELP)]
     Evidence {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
     },
     /// Import an older installation while preserving its owned files.
+    #[command(after_help = LEGACY_HELP)]
     Legacy {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<OsString>,
@@ -147,6 +164,31 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                     return failure("invalid_arguments", "unexpected config operation")
                 }
             };
+            // Nested help must be available before installation or filesystem IO.
+            // Native client arguments after `--` belong to the launched client.
+            if arguments
+                .iter()
+                .take_while(|arg| *arg != "--")
+                .any(|arg| arg == "--help" || arg == "-h")
+            {
+                let help = match family {
+                    "setup" => Some(SETUP_HELP),
+                    "bundle" => Some(BUNDLE_HELP),
+                    "native" => Some(NATIVE_HELP),
+                    "plan" => Some(PLAN_HELP),
+                    "queue" => Some(QUEUE_HELP),
+                    "run" => Some(RUN_HELP),
+                    "evidence" => Some(EVIDENCE_HELP),
+                    "legacy" => Some(LEGACY_HELP),
+                    _ => None,
+                };
+                if let Some(help) = help {
+                    return Response {
+                        exit_code: 0,
+                        output: help.into(),
+                    };
+                }
+            }
             // Native plugin paths must not be resolved relative to the adopter twice.
             // The private supervisor must reach its inherited handshake without root IO.
             let root = if family == "__runner-supervisor" {
