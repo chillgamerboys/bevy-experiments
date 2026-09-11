@@ -7,7 +7,8 @@ are implemented and independently reviewed; 124 combined CLI tests passed locall
 R6 packaged installation/adoption and actual Codex discovery passed. R7 uses the Rust installation/configuration/CI path and removes all maintained
 Python. Fresh-checkout checks passed with Python excluded from PATH; final hosted
 checks are attached to the review PR. The [adoption record](gameskills-rust-adoption.md)
-contains the candidate identities and evidence. The runtime PR stays open for owner review. Mechanical and visual Labyrinth changes
+contains the candidate identities and evidence. The owner authorized fixing the
+self-audit recovery finding and merging after updated checks pass. Mechanical and visual Labyrinth changes
 are the subsequent collaborative product trial.
 
 The prepared embedded instructions now declare Rust runtime compatibility and use

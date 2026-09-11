@@ -2,18 +2,19 @@
 
 The R3–R7 implementation replaces the maintained Python runtime with an installable
 Rust CLI, immutable instructions, durable queues and supervised command evidence.
-The owner reviews the final migration PR before the collaborative Labyrinth
-mechanical and visual trial. This record describes private adoption, not publication.
+The owner authorized correcting the self-audit finding and merging the migration
+after verification, before the collaborative Labyrinth mechanical and visual trial.
+This record describes private adoption, not publication.
 
 ## Candidate identity
 
 | Item | Observed identity |
 | --- | --- |
 | CLI / tested toolchain | `0.1.0-dev.2` / Rust `1.97.1` |
-| Final packaged implementation | `56a61b663e36b6cd1f012533f34c7bcf2482caac` |
+| Final packaged implementation | `558061d14fca113b0bd2addfea9983643905d876` |
 | Local prebuilt target | `aarch64-apple-darwin` |
-| CLI executable SHA-256 | `683d0a8b157110d377ca8b2ab8139a6ab2ba13615d6dc30920168d59d00255f7` |
-| Actual Cargo archive SHA-256 | `ab0e451b5f0c5d7d90457582e2fb0ffcb56e86466f9dd93a4aa4345e8beedc5a` |
+| CLI executable SHA-256 | `ded6b5a676ed500807a3f91284afd9e010b3b1613f359a7dfe96bb8a8b5f863a` |
+| Actual Cargo archive SHA-256 | `5fe02ca67e9cd5dc20105ea04861e7a0c3b42b45ddb0284bfcf0eb92d94340e1` |
 | Instruction catalog | `0.1.0-dev.1`; 12 core and nine optional skills across six packages |
 | Instruction content SHA-256 | `5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2` |
 | Canonical instruction source | `0a3d337cd814a2b0392cce7a8b421ecb2448cb31` |
@@ -41,11 +42,24 @@ the final PR carries the hosted platform evidence.
 The final archive also contains portable test fixtures: Git receives relative
 worktree paths, and simulated installation lock owners explicitly unlock while
 duplicate descriptors remain open. The latter models descriptor retention without
-claiming to reproduce hosted fork timing. These corrections change only tests;
-the final installed executable is byte-identical to the verified `1ebfea1` binary.
+claiming to reproduce hosted fork timing. Those fixture corrections changed only
+tests; the earlier `56a61b6` executable was byte-identical to the verified `1ebfea1`
+binary. The later self-audit correction below changes runtime behavior.
 Native probe observations are published by rename so a deliberately terminated
 writer cannot leave an empty counter. The affected deadline case passed 20
 consecutive process runs, and all ten native integration tests passed.
+
+The self-audit at `efcc58d` ran 280 tooling tests through the packaged CLI and
+reproduced an interrupted-queue-write recovery defect with a separate compiled
+Rust probe: `.queue-<pid>-<serial>.tmp` residue blocked setup as unknown history.
+The corrected `558061d` candidate recognizes only the queue writer's canonical
+temporary names, validates ordinary file safety under the queue lock, and preserves
+their bytes without parsing them as queues. Unknown entries, unsafe files and active
+owners still block changes. All 26 installation/recovery tests passed, including
+three new regressions for update/rollback/recovery, malformed names and unsafe files.
+Strict all-target Clippy passed on macOS and for Linux/Windows cross-compilation.
+The actual Cargo archive was rebuilt, installed externally without Python, and
+passed packaged adoption plus the standalone Rust residue probe.
 
 ## Observed checks
 
