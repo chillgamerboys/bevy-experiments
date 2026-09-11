@@ -20,6 +20,11 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Operation {
+    #[command(name = "__runner-supervisor", hide = true)]
+    Supervisor {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
     /// Inspect the installed configuration or validate a standalone TOML file.
     Config {
         #[command(subcommand)]
@@ -137,11 +142,13 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 Operation::Queue { args } => ("queue", args),
                 Operation::Run { args } => ("run", args),
                 Operation::Evidence { args } => ("evidence", args),
+                Operation::Supervisor { args } => ("__runner-supervisor", args),
                 Operation::Config { command: Some(_) } => {
                     return failure("invalid_arguments", "unexpected config operation")
                 }
             };
             let result = match family {
+                "__runner-supervisor" => crate::runner::supervisor(&arguments),
                 "plan" | "queue" | "run" | "evidence" => {
                     crate::installation::ready_config(&parsed.root).and_then(|config| {
                         if matches!(family, "plan" | "queue") {
