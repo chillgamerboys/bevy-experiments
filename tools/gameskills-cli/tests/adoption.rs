@@ -154,7 +154,25 @@ mod posix {
             export.to_str().ok_or("export UTF-8")?,
             "--apply",
         ])?;
-        consumer.cli(&["setup", "--recover"])?;
+        // Reproduce an interrupted transaction after its config write but before
+        // its lock write; recovery must restore both original files.
+        let lock_before = fs::read_to_string(consumer.root.join("gameskills.lock.json"))?;
+        let journal = json!({
+            "gameskills.toml": {"before": initial_config, "after": "schema_version=1\n"},
+            "gameskills.lock.json": {"before": lock_before, "after": null}
+        });
+        fs::write(
+            consumer.root.join(".gameskills/setup-transaction.json"),
+            serde_json::to_vec(&journal)?,
+        )?;
+        fs::write(consumer.root.join("gameskills.toml"), "schema_version=1\n")?;
+        let recovering = consumer.cli(&["setup", "--recover"])?;
+        assert_eq!(recovering.get("recovered"), Some(&json!(true)));
+        assert_eq!(
+            fs::read_to_string(consumer.root.join("gameskills.lock.json"))?,
+            lock_before
+        );
+        consumer.cli(&["status"])?;
         assert_eq!(fs::read_to_string(&owned)?, "Keep game-owned guidance.\n");
         assert_eq!(
             fs::read_to_string(consumer.root.join("gameskills.toml"))?,
