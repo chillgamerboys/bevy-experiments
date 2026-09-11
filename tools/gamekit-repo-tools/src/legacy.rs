@@ -216,8 +216,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn client_rendering_preserves_bytes_and_omits_only_claude_agents()
-    -> Result<(), Box<dyn std::error::Error>> {
+    fn client_rendering_preserves_bytes_and_omits_only_claude_agents(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let scratch = tempfile::tempdir()?;
         let root = scratch.path();
         let name = "architect-bevy-game";
@@ -260,20 +260,16 @@ mod tests {
                 Some(b"reference bytes\n".as_slice())
             );
         }
-        assert!(
-            output.contains_key(
-                &Path::new(".agents/skills")
-                    .join(name)
-                    .join("agents/openai.yaml")
-            )
-        );
-        assert!(
-            !output.contains_key(
-                &Path::new(".claude/skills")
-                    .join(name)
-                    .join("agents/openai.yaml")
-            )
-        );
+        assert!(output.contains_key(
+            &Path::new(".agents/skills")
+                .join(name)
+                .join("agents/openai.yaml")
+        ));
+        assert!(!output.contains_key(
+            &Path::new(".claude/skills")
+                .join(name)
+                .join("agents/openai.yaml")
+        ));
         Ok(())
     }
 }

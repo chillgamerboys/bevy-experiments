@@ -32,12 +32,24 @@ path = "crates"
 packages = ["gameskills-maintainer"]
 
 [commands.repo-check]
-argv = ["python3", "scripts/check_repo.py"]
-timeout_seconds = 60
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "check"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
 
 [commands.skills-validate]
-argv = ["python3", "skills/scripts/validate_gameskills.py"]
-timeout_seconds = 60
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "validate"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.legacy-skills-validate]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "legacy"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.distribution-check]
+argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "check"]
+timeout_seconds = 1800
+resources = ["project:cargo-target"]
 
 [commands.skills-test]
 argv = ["python3", "-m", "unittest", "discover", "-s", "skills/tests", "-v"]

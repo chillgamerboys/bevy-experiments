@@ -20,6 +20,6 @@ checked-out Gamekit repository root, using Python 3.11 or newer.
 5. Resolve generated-file conflicts explicitly before applying. Never overwrite `.bevy-gamekit/overlays`.
 6. After confirmation and a conflict-free audit, rerun with `--apply`. Use `--allow-dirty` only after auditing unrelated changes.
 7. Confirm the manifest pin and base snapshot advance together, then run
-   `python3 skills/scripts/validate_skills.py` from the Gamekit repository root.
+   `cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy` from the Gamekit repository root.
 
 If an adopter intentionally wants different guidance, place it in the matching overlay rather than editing generated skills.

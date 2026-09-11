@@ -151,6 +151,23 @@ fn missing_workspace_alias_and_wrong_path_type_fail() {
         .any(|error| error.contains("path must be a string")));
 }
 
+#[test]
+fn dependency_paths_do_not_gain_absolute_semantics_on_another_host() {
+    for path in [
+        "C:/games/example",
+        "games\\example",
+        "/absolute/games/example",
+    ] {
+        let temporary = fixture();
+        write(
+            temporary.path(),
+            "crates/cap/Cargo.toml",
+            &format!("[package]\nname = 'cap'\n[dependencies]\nalias.path = '{path}'\n"),
+        );
+        assert!(!check(temporary.path()).is_empty(), "{path}");
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn ownership_resolves_symlink_ancestor_before_missing_leaf() {

@@ -161,6 +161,21 @@ class Routing(unittest.TestCase):
     def test_manual_full_run(self):
         self.assertTrue(ci.select(self.root, None, self.base, True)["full"])
 
+    def test_repository_tool_changes_keep_owned_validation_without_game_tests(self):
+        path = self.root / "Cargo.toml"
+        path.write_text(path.read_text().replace('"crates/*",', '"tools/*", "crates/*",'))
+        self.write("tools/gamekit-repo-tools/Cargo.toml", '[package]\nname = "gamekit-repo-tools"\nversion = "0.1.0"\n')
+        self.write("tools/gamekit-repo-tools/src/lib.rs", "// fixture\n")
+        self.base = self.save()
+        value = self.changed("tools/gamekit-repo-tools/src/lib.rs")
+        self.assertFalse(value["full"])
+        self.assertEqual(value["packages"], ["gamekit-repo-tools"])
+        self.assertTrue(all(value[key] for key in ("skills", "rust", "policy", "distribution")))
+        self.assertFalse(any(value[key] for key in ("minimal", "wasm", "deny")))
+        self.git("reset", "--hard", self.base)
+        value = self.changed("tools/gamekit-repo-tools/README.md")
+        self.assertFalse(any(value[key] for key in ci.FLAGS), value)
+
 
 class Results(unittest.TestCase):
     def selection(self):
@@ -212,6 +227,17 @@ class Results(unittest.TestCase):
     def test_other_checkout_cannot_reuse_selection(self):
         with patch.object(ci, "git", return_value="c" * 40), self.assertRaises(ValueError):
             ci.run_checks(Path("."), "rust", self.selection())
+
+    def test_skills_and_distribution_call_rust_validators(self):
+        value = ci.full_selection("a" * 40, "b" * 40, "fixture")
+        with patch.object(ci, "git", return_value=value["head"]), patch.object(subprocess, "run") as run:
+            ci.run_checks(Path("."), "skills", value)
+            ci.run_checks(Path("."), "rust", value)
+        commands = [call.args[0] for call in run.call_args_list]
+        prefix = ("cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--")
+        for suffix in (("skills", "legacy"), ("skills", "validate"), ("distribution", "check")):
+            self.assertIn(prefix + suffix, commands)
+        self.assertFalse(any(arg.endswith(("check_distribution.py", "validate_skills.py", "validate_gameskills.py")) for argv in commands for arg in argv))
 
 
 if __name__ == "__main__":

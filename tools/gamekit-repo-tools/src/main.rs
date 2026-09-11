@@ -1,6 +1,7 @@
 //! Repository maintenance executable entrypoint.
 
 use clap::{Parser, Subcommand};
+use gamekit_repo_tools::{catalog, distribution, legacy, repository};
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -10,7 +11,7 @@ use std::process::ExitCode;
 #[command(
     name = "gamekit-repo",
     version,
-    about = "Internal Rust migration contract checker; repository/CI commands are not ported yet"
+    about = "Internal repository, skill catalog and distribution checks"
 )]
 struct Arguments {
     #[arg(long, default_value = ".", global = true)]
@@ -26,22 +27,43 @@ enum Operation {
         #[command(subcommand)]
         command: ContractOperation,
     },
-    /// Layout and links (not yet ported).
+    /// Check workspace layout, local links and capability dependency ownership.
     Check,
-    /// Catalog validation (not yet ported).
+    /// Validate candidate and legacy skill sources without executing an agent.
     Skills {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<std::ffi::OsString>,
+        #[command(subcommand)]
+        command: SkillOperation,
     },
-    /// Distribution verification (not yet ported).
+    /// Verify staged external consumers of the library packages.
     Distribution {
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<std::ffi::OsString>,
+        #[command(subcommand)]
+        command: DistributionOperation,
     },
     /// CI selection and gating (not yet ported).
     Ci {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<std::ffi::OsString>,
+    },
+}
+
+#[derive(Subcommand)]
+enum SkillOperation {
+    /// Check all six native packages, metadata, links and scenario rubrics.
+    Validate {
+        /// Select JSON explicitly; JSON is also the default output format.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Check the seven canonical legacy skill sources and trigger fixtures.
+    Legacy,
+}
+
+#[derive(Subcommand)]
+enum DistributionOperation {
+    /// Stage Cargo-selected library sources and build the selected consumer cases.
+    Check {
+        #[arg(long, value_enum, default_value = "all")]
+        case: distribution::Case,
     },
 }
 
@@ -73,6 +95,26 @@ fn execute() -> (u8, String) {
         Err(error) => return failure("invalid_arguments", error),
     };
     match args.command {
+        Operation::Check => {
+            let failures = repository::check(&args.root);
+            (u8::from(!failures.is_empty()), json!({"schema_version":1,"ok":failures.is_empty(),"scope":"repository_structure","failures":failures}).to_string())
+        }
+        Operation::Skills { command: SkillOperation::Validate { .. } } => {
+            let failures = catalog::validate(&args.root);
+            let skills: usize = catalog::EXPECTED_SKILLS.iter().map(|(_, skills)| skills.len()).sum();
+            let core = catalog::EXPECTED_SKILLS.iter().find(|(name, _)| *name == "gameskills").map_or(0, |(_, skills)| skills.len());
+            (u8::from(!failures.is_empty()), json!({"schema_version":1,"ok":failures.is_empty(),"structural_only":true,"packages":catalog::EXPECTED_SKILLS.len(),"skills":skills,"core_skills":core,"optional_skills":skills-core,"failures":failures,"notice":catalog::NOTICE}).to_string())
+        }
+        Operation::Skills { command: SkillOperation::Legacy } => {
+            let failures = legacy::validate(&args.root);
+            (u8::from(!failures.is_empty()), json!({"schema_version":1,"ok":failures.is_empty(),"structural_only":true,"skills":legacy::SKILLS.len(),"clients":legacy::CLIENTS,"failures":failures,"notice":legacy::NOTICE}).to_string())
+        }
+        Operation::Distribution { command: DistributionOperation::Check { case } } => {
+            match distribution::check(&args.root, case) {
+                Ok(report) => (0, json!({"schema_version":1,"ok":true,"scope":"external_library_consumers","report":report}).to_string()),
+                Err(error) => (1, json!({"schema_version":1,"ok":false,"error":{"code":"distribution_failed","message":error}}).to_string()),
+            }
+        }
         Operation::Contracts {
             command: ContractOperation::Check { verify_reference },
         } => {

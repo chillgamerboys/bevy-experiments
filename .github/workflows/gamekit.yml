@@ -32,7 +32,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - run: python scripts/check_repo.py
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.97.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: repository-validation
+      - run: cargo run --locked -p gamekit-repo-tools --profile ci -- check
       - run: python -m unittest discover -s scripts/tests -v
       - id: scope
         run: python scripts/ci.py select
@@ -52,6 +58,12 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.97.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: repository-validation
       - run: python scripts/ci.py run skills
 
   rust:
@@ -84,6 +96,9 @@ jobs:
       - name: Verify the standalone CLI Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
         run: cargo package --locked -p gameskills-cli
+      - name: Verify the repository tool Cargo package
+        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gamekit-repo-tools')
+        run: cargo package --locked -p gamekit-repo-tools
       - run: python scripts/ci.py run rust
 
   policy:

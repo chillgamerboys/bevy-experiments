@@ -30,7 +30,7 @@ fn dependencies<'a>(manifest: &'a Value, output: &mut Vec<(&'a str, &'a Value)>)
 // Resolve existing ancestors before handling .., including when the leaf is absent.
 // This is ownership classification, not an assertion that Cargo can build the dependency.
 fn destination(base: &Path, value: &str) -> Result<PathBuf, String> {
-    if value.contains(['\\', '\0']) {
+    if value.contains(['\\', ':', '\0']) {
         return Err(format!("nonportable dependency path {value:?}"));
     }
     let mut result = base.to_path_buf();

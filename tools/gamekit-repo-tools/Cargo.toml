@@ -13,6 +13,10 @@ readme = "README.md"
 name = "gamekit-repo"
 path = "src/main.rs"
 
+[[example]]
+name = "distribution_process_probe"
+path = "tests/fixtures/distribution/process_probe.rs"
+
 [dependencies]
 clap.workspace = true
 serde.workspace = true

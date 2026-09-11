@@ -1,7 +1,7 @@
 //! Candidate mutations preserve structural contracts without claiming agent evaluation.
 
 use gamekit_repo_tools::catalog::{self, EXPECTED_SKILLS};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -106,14 +106,12 @@ impl Candidate {
 fn coherent_candidate_needs_no_literal_negative_phrase_or_ui_metadata() -> TestResult {
     let fixture = Candidate::new()?;
     fixture.assert_valid();
-    assert!(
-        !fixture
-            .skill()
-            .parent()
-            .ok_or("skill parent missing")?
-            .join("agents/openai.yaml")
-            .exists()
-    );
+    assert!(!fixture
+        .skill()
+        .parent()
+        .ok_or("skill parent missing")?
+        .join("agents/openai.yaml")
+        .exists());
     Ok(())
 }
 
