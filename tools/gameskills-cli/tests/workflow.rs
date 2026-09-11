@@ -119,6 +119,9 @@ impl Fixture {
     }
     fn tree(&self, name: &str) -> PathBuf {
         let path = self.home.join(name);
+        // Git resolves this against -C repo. Its worktree command does not
+        // accept the verbatim prefix returned by Windows canonicalize().
+        let git_path = Path::new("..").join(name);
         git(
             &self.root,
             &[
@@ -127,7 +130,7 @@ impl Fixture {
                 "-q",
                 "-b",
                 name,
-                path.to_str().expect("UTF-8"),
+                git_path.to_str().expect("UTF-8"),
                 &self.base,
             ],
         );
