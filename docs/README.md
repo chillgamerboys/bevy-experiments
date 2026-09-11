@@ -1,5 +1,11 @@
 # Development documentation
 
+Start with [GameSkills](gameskills.md) for the installed workflow and its current
+limits, then [development](development.md) and [testing](testing.md) for commands.
+The [framework decision](decisions/gameskills-framework.md) owns project direction;
+the [refinement plan](decisions/gameskills-ci-scope.md) owns the current bounded
+trials before Rust migration. Game-specific behavior belongs with each game below.
+
 - [GameSkills installation and development workflow](gameskills.md)
 - [Proposed CI scope and bounded GameSkills trials](decisions/gameskills-ci-scope.md)
 - [Rust GameSkills CLI migration plan](decisions/gameskills-rust-cli.md)
@@ -7,8 +13,8 @@
 - [GameSkills catalog, plan entry and execution pipeline](decisions/gameskills-catalog.md)
 - [Deferred draft: Port Vila adoption pilot](decisions/port-vila-adoption.md)
 - [Architecture and ownership](architecture.md)
-- [Current agent handoff and review findings](handoff.md)
-- [Handoff follow-up implementation plan](handoff-followup-plan.md)
+- [Historical PR21 review and resolved findings](handoff.md)
+- [Completed handoff corrections and their evidence](handoff-followup-plan.md)
 - [Gamekit consolidation and balance infrastructure](gamekit-consolidation.md)
 - [Run, build and add a game](development.md)
 - [Testing and evidence](testing.md)
@@ -21,3 +27,7 @@ Rules and acceptance checks live with [Labyrinth](../games/labyrinth/README.md),
 [Carterfight](../games/carterfight/README.md) and [deckbuilder](../games/deckbuilder_ui/README.md).
 Public API contracts live in crate Rustdoc and tested examples. This index is not a
 second API manual or a collection of old phase plans.
+
+Historical reviews preserve their original revision and evidence limits. Their
+old “next” steps are not a current work queue; use the linked completion records
+and current refinement plan before treating an old finding as unfinished work.
