@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "cli_version_range": ">=0.1.0-dev.2, <0.2.0",
+  "config_schema": 1,
+  "queue_schema": 1,
+  "evidence_schema": 1,
+  "bevy": "0.19",
+  "gamekit": "0.1.0",
+  "activation": "preparation-only"
+}
