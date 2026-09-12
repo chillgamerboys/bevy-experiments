@@ -7,13 +7,13 @@ use std::{ffi::OsString, path::Path};
 #[cfg(unix)]
 mod graph;
 #[cfg(unix)]
-mod identity;
+pub(crate) mod identity;
 #[cfg(unix)]
 mod process;
 #[cfg(unix)]
 mod run;
 #[cfg(unix)]
-mod state;
+pub(crate) mod state;
 
 /// Execute `run` or `evidence list|show|validate` against a ready installation.
 pub fn execute(

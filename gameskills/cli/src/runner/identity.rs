@@ -10,7 +10,31 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub(super) fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+pub(crate) fn differences(recorded: &Value, current: &Value) -> Vec<String> {
+    let mut paths = Vec::new();
+    fn visit(old: &Value, new: &Value, path: &str, paths: &mut Vec<String>) {
+        if old == new {
+            return;
+        }
+        if let (Some(a), Some(b)) = (old.as_object(), new.as_object()) {
+            let keys: std::collections::BTreeSet<_> = a.keys().chain(b.keys()).collect();
+            for key in keys {
+                visit(
+                    a.get(key).unwrap_or(&Value::Null),
+                    b.get(key).unwrap_or(&Value::Null),
+                    &format!("{path}/{key}"),
+                    paths,
+                );
+            }
+        } else {
+            paths.push(format!("input changed: {path}"));
+        }
+    }
+    visit(recorded, current, "identity", &mut paths);
+    paths
+}
+
+pub(crate) fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let result = Command::new("git")
         .arg("-C")
         .arg(root)
@@ -31,7 +55,7 @@ fn text(root: &Path, args: &[&str]) -> Result<String, String> {
         .map(|s| s.trim().into())
         .map_err(|e| e.to_string())
 }
-pub(super) fn repository(root: &Path) -> Result<Value, String> {
+pub(crate) fn repository(root: &Path) -> Result<Value, String> {
     let canonical = root.canonicalize().map_err(|e| e.to_string())?;
     let top = PathBuf::from(text(root, &["rev-parse", "--show-toplevel"])?)
         .canonicalize()
@@ -239,4 +263,22 @@ pub(super) fn identity(
         json!({"repository":repository,"source_digest":digest(&(staged,entries))?,"config_digest":digest(config)?,"commands_digest":digest(commands)?,"managed_files":managed,"executables":executables,
         "environment_digest":digest(&environment)?,"runtime":{"language":"rust","version":env!("CARGO_PKG_VERSION"),"executable":runtime,"sha256":file_hash(File::open(&runtime).map_err(|e|e.to_string())?)?,"os":std::env::consts::OS,"arch":std::env::consts::ARCH}}),
     )
+}
+
+#[cfg(test)]
+mod difference_tests {
+    use super::*;
+    #[test]
+    fn diagnostics_name_changed_categories_without_exposing_values() {
+        let old =
+            json!({"repository":{"head":"same","refs":"old"},"environment_digest":"secret-old"});
+        let new =
+            json!({"repository":{"head":"same","refs":"new"},"environment_digest":"secret-new"});
+        let reasons = differences(&old, &new);
+        assert!(reasons.iter().any(|r| r.contains("repository/refs")));
+        assert!(reasons.iter().any(|r| r.contains("environment_digest")));
+        assert!(!reasons
+            .iter()
+            .any(|r| r.contains("secret") || r.contains("head")));
+    }
 }

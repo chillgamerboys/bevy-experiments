@@ -4,13 +4,14 @@ use std::collections::BTreeSet;
 use toml::{Table, Value};
 
 /// Package identities at the R0 reference; complete bundle loading belongs to R3.
-pub const PACKAGES: [&str; 6] = [
+pub const PACKAGES: [&str; 7] = [
     "gameskills",
     "gameskills-ui",
     "gameskills-turn-based",
     "gameskills-multiplayer",
     "gameskills-maintainer",
     "gameskills-bevy-contrib",
+    "gameskills-linear",
 ];
 
 /// Parse and normalize configuration without executing commands or changing files.
@@ -29,6 +30,7 @@ pub fn parse(source: &str) -> Result<Table, String> {
         "commands",
         "agents",
         "targets",
+        "tracking",
     ];
     if let Some(key) = value.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unknown configuration field: {key}"));
@@ -46,7 +48,55 @@ pub fn parse(source: &str) -> Result<Table, String> {
         table(&value, name)?;
     }
     if value.contains_key("project") {
-        table(&value, "project")?;
+        let project = table(&value, "project")?;
+        if let Some(endpoint) = project.get("delivery_target") {
+            if !endpoint.as_str().is_some_and(|s| {
+                ["design", "implementation", "pr", "merge", "release"].contains(&s)
+            }) {
+                return Err(
+                    "project.delivery_target must be design, implementation, pr, merge or release"
+                        .into(),
+                );
+            }
+        }
+    }
+    if value.contains_key("tracking") {
+        let tracking = table(&value, "tracking")?;
+        if tracking
+            .keys()
+            .any(|s| !["required", "observer"].contains(&s.as_str()))
+        {
+            return Err("tracking accepts required and observer only".into());
+        }
+        if tracking
+            .get("required")
+            .is_some_and(|v| v.as_bool().is_none())
+        {
+            return Err("tracking.required must be boolean".into());
+        }
+        if let Some(observer) = tracking.get("observer") {
+            let words = observer
+                .as_array()
+                .filter(|v| !v.is_empty())
+                .ok_or("tracking.observer must be a nonempty argv")?
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .ok_or("tracking.observer arguments must be strings")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if words
+                .iter()
+                .any(|s| s.trim().is_empty() || s.contains('\0'))
+            {
+                return Err("tracking.observer requires nonempty arguments without NUL".into());
+            }
+        }
+        if tracking.get("required").and_then(Value::as_bool) == Some(true)
+            && !tracking.contains_key("observer")
+        {
+            return Err("required tracking needs an observer command".into());
+        }
     }
     let packages = string_array(value.get("packages"), "packages", true)?;
     if !packages.contains(&"gameskills") || packages.iter().any(|name| !PACKAGES.contains(name)) {
