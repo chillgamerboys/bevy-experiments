@@ -13,8 +13,9 @@ and offer optional Linear tracking and on-demand retention cleanup.
 
 The user approved implementation and the manual-sweep revision. PR #38 now carries
 the implementation, with HEX-98 kept in progress until the program's acceptance
-work is complete. The live Hex pilot still requires the private export destination
-and separately configured supported API credentials. No ticket has been deleted.
+work is complete. Linear deletion and the live Hex pilot are now deferred until
+needed; an export directory, deletion API key, and live deletion are not current
+acceptance requirements. No ticket has been deleted.
 
 No gameplay changes, repository extraction, new projects for the other games,
 team-prefix changes, or automatic adoption into linked workspaces are included.
@@ -32,13 +33,44 @@ split it only when independently deliverable work benefits from separate trackin
 | Linear | Add a separately selected `gameskills-linear` plugin. Core-only adoption requires no Linear connection or credentials. |
 | Routing | Bevy Games owns repository/shared work; Labyrinth owns game-specific work; Hex owns the separate bevy-hex-game backlog. |
 | Retention | Manually invoked sweeps of tickets completed at least 30 days ago; duration remains configurable. No scheduled deletion. |
-| Cleanup | Export durably before deletion; protect unfinished related work, handle reopening, and make retries safe. An authorized cleanup invocation needs no repeated per-ticket approval. |
+| Cleanup | Deferred until needed. No mandatory ticket exports or private backup directory. Preserve useful delivery rationale in Git and protect unfinished work. |
 | Capacity recovery | A verified issue-limit error can invoke the same cleanup preview. Apply a sweep when covered by the user's cleanup instruction; lack of capacity alone does not authorize deletion. |
-| Pilot | Preview old Hex tickets, then exercise the real cleanup command on at most three eligible tickets. |
+| Pilot | Deferred; no live deletion required for this program. Revisit capability and scope when cleanup is requested. |
 
 The user revised the earlier automatic-retention decision to manual sweeps.
 This supersedes the daily scheduler proposal and its hosting decision. The
-30-day eligibility threshold and export-before-delete contracts remain accepted.
+30-day eligibility threshold remains the prior retention choice; the follow-up
+below removes mandatory exports and defers live deletion.
+
+## Follow-up scope: deletion deferred and documentation lifecycle
+
+The user removed mandatory ticket backups and then deferred deletion until it
+comes up. This supersedes the export/storage and live-pilot requirements in the
+original implementation sequence below. The draft helper still implements those
+older contracts; this note does not claim its runtime has been simplified.
+Everyday Linear work should use the connected MCP, without requiring a separate
+API key merely to link or verify a PR. Aligning that implementation remains open.
+
+The linked Hex repository already has a simpler policy, inspected at commit
+`bb556963632de933b44fb75b1d306aca79258cef`:
+
+- `docs/development/delivery-state.md`, “Free-workspace issue budget and retention,”
+  treats the repository as durable history and Linear as a small coordination view.
+  It records issue ID/title/outcome, landed SHA and PR before retiring fully
+  delivered workflow-owned issues; it protects partial and active related work.
+- `.claude/skills/update-linear/SKILL.md` uses a declared connector deletion tool
+  when available and reports the exact manual action when it is not. This is a
+  policy and fallback, not evidence of a hidden MCP deletion operation.
+- `docs/development/wave-protocol.md` closes work with a post-landing PR that
+  records the outcome, deletes temporary orders/maps, and fixes their links.
+
+Use that approach as input to the upcoming docs discussion. Proposed direction:
+current guides beside their owner, active plans separated from lasting decisions,
+and useful completed-plan conclusions folded into current docs before deleting
+obsolete plans/reports. Git supplies history instead of permanent history folders.
+This documentation reorganization is still to be discussed, not executed by this
+note. Hex's immediate post-delivery deletion policy does not silently replace this
+repository's previously chosen manual invocation and configurable retention age.
 
 ## Observed failure and investigation boundaries
 
