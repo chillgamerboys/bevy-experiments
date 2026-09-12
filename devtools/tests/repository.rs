@@ -84,7 +84,7 @@ fn legacy_and_duplicate_workspace() {
 fn capability_cannot_depend_back_on_facade() {
     let temporary = fixture();
     write(temporary.path(), "Cargo.toml", "[workspace]\nmembers = []\n[workspace.dependencies]\nbevy-gamekit = { package = \"bevy-gamekit\", path = \"gamekit/facade\" }\n");
-    write(temporary.path(), "gamekit/cap/Cargo.toml", "[package]\nname = \"cap\"\nversion = \"0.1.0\"\n[target.'cfg(unix)'.build-dependencies]\nbevy_gamekit.workspace = true\n");
+    write(temporary.path(), "gamekit/cap/Cargo.toml", "[package]\nname = \"cap\"\nversion = \"0.1.0\"\n[target.'cfg(unix)'.build-dependencies]\nbevy-gamekit.workspace = true\n");
     assert!(check(temporary.path())
         .iter()
         .any(|error| error.contains("depends on facade")));

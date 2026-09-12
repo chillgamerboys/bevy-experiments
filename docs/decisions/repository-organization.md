@@ -1,9 +1,9 @@
 # Repository organization and Rust naming refactor
 
-Status: implementation in progress September 12, 2026. The owner selected root-level Gamekit,
-GameSkills and games, with hyphenated Cargo package names. This document defines
-the implementation plan. Pass one relocates source and documentation; package
-names remain unchanged until its verification checkpoint.
+Status: implemented and locally verified September 12, 2026. The owner selected
+root-level Gamekit, GameSkills and games, with hyphenated Cargo package names.
+The accepted sequence and mappings below are retained as the migration record;
+verification results and current limits follow at the end.
 
 ## Outcome and ownership
 
@@ -262,3 +262,63 @@ Use separate reviewable commits for the passes and their generated artifacts.
 Recovery is a normal revert of the affected pass, not deletion of local state or
 history rewriting. This plan creates no implementation queue and performs no game
 changes, package publication, repository split or linked-workspace migration.
+
+## Implementation result — September 12, 2026
+
+The baseline was `74e4955b159b5f4263302fe6aebf10825f326bc5`. Directory ownership
+was committed in `46e8dd2`, with its generated instruction provenance in `0a6840b`.
+Package/import naming was committed in `0531ca2`, followed by the updated skill
+bundle in `c5bc54e`. All 14 Cargo packages retain their feature and dependency
+contracts after normalizing the intended names; all 694 external package
+name/version/source/checksum identities match the baseline lockfile.
+
+The active catalog scenario fixture now lives once under
+`devtools/tests/fixtures/catalog/`; the legacy trigger fixture remains with legacy
+source. Old root Python caches were moved into ignored local context, not copied
+into either product. The migration ledger retains its original reference commit
+and frozen 22-file/142-test inventory while pointing to the relocated Rust owners.
+
+The CLI can export from both historical and current source layouts. Authored
+instructions live under `gameskills/plugins/`; archives and installations retain
+`plugins/<package>/...`. Pass one preserved the instruction content digest exactly.
+Pass two updated capability-name guidance and generated digest
+`3d876fd981642ff0b7b4cb9dc81270bb9f9a944b828467d38f75896a56c3364a`.
+Existing project installation locks, bundles, queues and prior evidence were not
+rewritten, and the linked adopter workspaces were not migrated.
+
+Local macOS verification:
+
+- Workspace all-feature game, library, CLI and devtools tests and doctests passed
+  across the full run and focused reruns after correcting generated manifest keys
+  and renamed test fixtures. The final embedded bundle's installation tests were
+  rerun separately. No failing target remains from that run.
+- Formatting, strict workspace all-target/all-feature Clippy, dependency policy,
+  repository/link checks and current/legacy skill validation passed.
+- Source-selected and actual extracted Cargo archive consumers passed empty, pure,
+  UI and native-network feature cases. CLI and devtools Cargo packages built from
+  their packaged sources; packaged instruction bytes/provenance verified.
+- The actual packaged CLI was installed into an isolated local prefix. A fresh
+  disposable adopter installed the core, added UI/turn-based specialists, checked
+  readiness and exported the portable bundle. Native Codex discovery passed without
+  starting a model task. Both native-client manifests pass structural checks.
+- Each game built with its examples and started for six seconds from both the root
+  and its package directory, with no observed startup/asset errors. Labyrinth used
+  isolated local profiles. These are startup checks, not interactive visual review.
+- The explicitly enabled six-process Labyrinth guest-kill/reconnect test passed.
+  Minimal discovery, multiplayer and testing configurations and standalone UI tests
+  passed. Browser-compatible hex, turns, session, UI and rules packages passed the
+  WebAssembly check after installing the missing target for the existing toolchain.
+- CI routing tests cover the current plugin/docs owners and a historical-to-current
+  directory move. Selection against the real baseline conservatively requests the
+  full matrix because shared manifests and workflow inputs changed.
+
+Labyrinth's rules fingerprint is unchanged:
+`0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9`.
+No combat, presentation or session behavior was redesigned in this refactor.
+Local execution logs and contract comparisons are under
+`.context/reorganization/`; build/install artifacts are under `target/`.
+
+Remote Linux/Windows CI, authenticated Claude behavior, registry publication and
+cross-machine multiplayer were not verified by this local refactor. Archive tests
+still use explicit local patches for unpublished siblings and do not claim registry
+resolution. No remote push, release or repository extraction was performed.

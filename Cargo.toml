@@ -1,6 +1,21 @@
 [workspace]
 resolver = "3"
-members = ["gamekit/facade", "gamekit/hex", "gamekit/turns", "gamekit/ui", "gamekit/testing", "gamekit/session", "gamekit/discovery", "gamekit/multiplayer", "games/labyrinth", "games/deckbuilder", "games/carterfight", "games/labyrinth/rules", "gameskills/cli", "devtools"]
+members = [
+    "gamekit/facade",
+    "gamekit/hex",
+    "gamekit/turns",
+    "gamekit/ui",
+    "gamekit/testing",
+    "gamekit/session",
+    "gamekit/discovery",
+    "gamekit/multiplayer",
+    "gameskills/cli",
+    "games/labyrinth",
+    "games/labyrinth/rules",
+    "games/deckbuilder",
+    "games/carterfight",
+    "devtools",
+]
 default-members = ["games/labyrinth"]
 
 [workspace.package]
