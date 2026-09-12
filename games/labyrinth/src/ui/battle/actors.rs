@@ -155,9 +155,9 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         TextLayout::justify(Justify::Center),
         Node {
             width: Val::Percent(100.0),
-            // Identity and current HP always occupy two lines. The final
+            // One name line and current HP have fixed height. The final
             // semantic height is resolved below, independently of their values.
-            height: Val::Px(48.0),
+            height: Val::Px(40.0),
             min_width: Val::Px(0.0),
             flex_shrink: 0.0,
             ..default()
@@ -240,22 +240,49 @@ pub(super) fn actor_color(kind: ActorKind) -> Color {
     }
 }
 
-/// A compact identity, not a rank or class: movement never changes this label.
-pub(super) fn token(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
-    let ordinal = snapshot
-        .actors
-        .iter()
-        .filter(|other| other.team() == actor.team() && other.id < actor.id)
-        .count()
-        + 1;
-    format!(
-        "{}{ordinal}",
-        if actor.team() == Team::Heroes {
-            "H"
-        } else {
-            "E"
+pub(super) use crate::presentation::{actor_name as display_name, actor_title as title};
+
+pub(super) fn compact_formation(metrics: ResolvedUiMetrics) -> bool {
+    metrics.logical_size.y < 900.0 && metrics.content_scale > 1.0
+}
+
+pub(super) fn identity_font_limit(metrics: ResolvedUiMetrics) -> f32 {
+    (16.0 * metrics.content_scale).min(18.0)
+}
+
+/// Game-owned compact identity typography: complete names occupy one line.
+/// Keep the shared body-text minimum for prose; these fixed formation labels
+/// have their own smaller scale and retain full names in accessible inspection.
+pub(super) fn fit_identity_text(
+    world: &mut World,
+    entity: Entity,
+    actor: &ActorSnapshot,
+    name: &str,
+    metrics: ResolvedUiMetrics,
+    maximum: f32,
+) {
+    world.entity_mut(entity).remove::<UiTextRole>();
+    let width = world
+        .get::<ComputedNode>(entity)
+        .map_or(0.0, |node| node.size().x * node.inverse_scale_factor);
+    if width <= 0.0 {
+        return;
+    }
+    // Reserve ownership and initiative-state marks, even while absent.
+    let letters = name.chars().count() + 2 + usize::from(actor.team() == Team::Heroes);
+    let fitted = identity_font_limit(metrics)
+        .min(maximum)
+        .min((width - 4.0) / (letters as f32 * 0.5))
+        .max(11.0);
+    let font = world.resource::<UiFonts>().body.clone();
+    if let Some(mut text_font) = world.get_mut::<TextFont>(entity) {
+        let mut next = text_font.clone();
+        next.font_size = bevy::text::FontSize::Px(fitted);
+        next.font = font.into();
+        if *text_font != next {
+            *text_font = next;
         }
-    )
+    }
 }
 
 pub(super) fn reorder(
@@ -313,12 +340,8 @@ fn compact_status(actor: &ActorSnapshot, status: &StatusInstance) -> String {
     )
 }
 
-fn status_accessibility(actor: &ActorSnapshot) -> String {
-    let mut value = format!(
-        "Inspect all {} effects on {}.",
-        actor.statuses.len(),
-        actor.name()
-    );
+fn status_accessibility(actor: &ActorSnapshot, name: &str) -> String {
+    let mut value = format!("Inspect all {} effects on {}.", actor.statuses.len(), name);
     for status in &actor.statuses {
         value.push(' ');
         value.push_str(&crate::presentation::status_description(status, actor.life));
@@ -327,7 +350,7 @@ fn status_accessibility(actor: &ActorSnapshot) -> String {
     value
 }
 
-pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnapshot) {
+pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnapshot, name: &str) {
     let existing = world
         .query::<(Entity, &StatusBadge)>()
         .iter(world)
@@ -395,7 +418,7 @@ pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnap
             .insert(Action::Status(actor.id, status.id));
     }
     set_text(world, text, compact_status(actor, status));
-    let label = AccessibleLabel::new(status_accessibility(actor));
+    let label = AccessibleLabel::new(status_accessibility(actor, name));
     if world.get::<AccessibleLabel>(entity).map(|value| &value.0) != Some(&label.0) {
         world.entity_mut(entity).insert(label);
     }
@@ -404,8 +427,8 @@ pub(super) fn sync_statuses(world: &mut World, parent: Entity, actor: &ActorSnap
         .cloned()
         .unwrap_or_default();
     let help = bevy_gamekit::ui::UiContextHelp {
-        title: format!("{} effects", actor.name()),
-        body: status_accessibility(actor),
+        title: format!("{name} effects"),
+        body: status_accessibility(actor, name),
     };
     if world.get::<bevy_gamekit::ui::UiContextHelp>(entity) != Some(&help) {
         world.entity_mut(entity).insert(help);
@@ -448,7 +471,7 @@ fn summary_geometry(world: &mut World, entity: Entity, metrics: ResolvedUiMetric
     } else {
         18.0
     };
-    let line_height = (size * 1.2).ceil();
+    let line_height = (size.min(identity_font_limit(metrics)) * 1.2).ceil();
     let height = Val::Px(line_height * 2.0);
     if let Some(mut node) = world.get_mut::<Node>(entity) {
         if node.height != height {
@@ -482,6 +505,20 @@ pub(super) fn present(
         let Some(entity) = tiles.get(&actor.id).copied() else {
             continue;
         };
+        // Reserve the compact forecast lane even without a selection. Keeping
+        // this independent of forecast state prevents art/hit-area movement.
+        if let Some(parent) = world.get::<ChildOf>(entity).map(ChildOf::parent) {
+            if let Some(mut node) = world.get_mut::<Node>(parent) {
+                let top = Val::Px(if compact_formation(metrics) {
+                    108.0
+                } else {
+                    0.0
+                });
+                if node.padding.top != top {
+                    node.padding.top = top;
+                }
+            }
+        }
         let (control, text, bar, statuses, flash) = {
             let Some(mut tile) = world.get_mut::<ActorTile>(entity) else {
                 continue;
@@ -498,7 +535,7 @@ pub(super) fn present(
                 tile.flash_until > time,
             )
         };
-        let identity = token(snapshot, actor);
+        let identity = display_name(snapshot, actor);
         let owner = view.players.iter().find(|player| player.actor == actor.id);
         let yours = !view.local && owner.is_some_and(|player| Some(player.slot) == view.player);
         let ownership = if actor.team() == Team::Enemies {
@@ -549,9 +586,17 @@ pub(super) fn present(
         set_text(
             world,
             text,
-            format!("{identity}{}\n{hp_text}", if yours { "*" } else { "" }),
+            format!("{}{}\n{hp_text}", identity, if yours { "*" } else { "" }),
         );
         summary_geometry(world, text, metrics);
+        fit_identity_text(
+            world,
+            text,
+            actor,
+            &identity,
+            metrics,
+            identity_font_limit(metrics),
+        );
         let state = if actor.is_corpse() {
             "Corpse"
         } else if actor.dying() {
@@ -572,8 +617,8 @@ pub(super) fn present(
             |statuses| format!("{} effects", statuses.len()),
         );
         let label = AccessibleLabel::new(format!(
-            "{identity}, {}, {health_text}, rank {}. {state}. {ownership} {status_text}. {} Select or inspect. {}",
-            actor.name(),
+            "{}, {health_text}, rank {}. {state}. {ownership} {status_text}. {} Select or inspect. {}",
+            title(snapshot, actor),
             snapshot.rank(actor.id).unwrap_or(0),
             if eligible {
                 "Valid target for selected action."
@@ -586,7 +631,7 @@ pub(super) fn present(
             world
                 .entity_mut(control)
                 .insert(bevy_gamekit::ui::UiContextHelp {
-                    title: format!("{identity} · {}", actor.name()),
+                    title: title(snapshot, actor),
                     body: label.0.clone(),
                 });
             world.entity_mut(control).insert(label);
@@ -749,7 +794,7 @@ pub(super) fn present(
         paint_marker(world, control, marker);
         let mut disclosed_actor = actor.clone();
         disclosed_actor.statuses = facts.statuses.as_known().cloned().unwrap_or_default();
-        sync_statuses(world, statuses, &disclosed_actor);
+        sync_statuses(world, statuses, &disclosed_actor, &identity);
         sync_unknown_status(world, statuses, actor, facts.statuses.as_known().is_none());
     }
 }
@@ -836,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn identity_tokens_ignore_rank_class_and_snapshot_array_order() {
+    fn character_names_ignore_rank_class_and_snapshot_array_order() {
         let setup = std::array::from_fn(|index| {
             HeroSetup::preset(
                 ActorId(11 + u16::try_from(index).expect("six actors") * 7),
@@ -846,23 +891,59 @@ mod tests {
         let mut snapshot = Combat::with_heroes(42, setup)
             .expect("explicit IDs")
             .snapshot();
+        let names = snapshot
+            .actors
+            .iter()
+            .filter(|actor| actor.team() == Team::Heroes)
+            .map(|actor| display_name(&snapshot, actor))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            names.len(),
+            6,
+            "repeated classes still have individual names"
+        );
         let id = ActorId(18);
         assert_eq!(
-            token(&snapshot, snapshot.actor(id).expect("second hero")),
-            "H2"
+            display_name(&snapshot, snapshot.actor(id).expect("second hero")),
+            "Mara"
         );
         snapshot.hero_formation.reverse();
         snapshot.actors.reverse();
+        let mut snapshot: CombatSnapshot =
+            serde_json::from_str(&serde_json::to_string(&snapshot).expect("encode snapshot"))
+                .expect("reconnected snapshot");
+        // Presentation-only variations after validating the wire round trip.
+        let earlier = snapshot
+            .actors
+            .iter_mut()
+            .find(|actor| actor.id == ActorId(11))
+            .expect("first hero");
+        earlier.life = labyrinth_rules::LifeState::Removed;
+        snapshot
+            .actors
+            .iter_mut()
+            .find(|actor| actor.id == id)
+            .expect("named hero")
+            .kind = ActorKind::Hero(HeroClass::Scout);
         assert_eq!(
-            token(&snapshot, snapshot.actor(id).expect("same hero")),
-            "H2"
+            display_name(&snapshot, snapshot.actor(id).expect("same hero")),
+            "Mara"
         );
         assert_eq!(
-            token(
+            display_name(
                 &snapshot,
                 snapshot.actor(ActorId(101)).expect("first enemy")
             ),
-            "E1"
+            "Ash Brute"
+        );
+        let actor = snapshot.actor(id).expect("named hero");
+        assert_eq!(title(&snapshot, actor), "Mara · Scout");
+        assert_eq!(
+            BattlePresentation::new(&snapshot, &CombatDisclosure::default())
+                .actor(id)
+                .expect("facts")
+                .name,
+            "Mara"
         );
     }
 
@@ -878,7 +959,7 @@ mod tests {
         ];
         let mut world = overlay_world();
         let parent = world.spawn(Node::default()).id();
-        sync_statuses(&mut world, parent, &actor);
+        sync_statuses(&mut world, parent, &actor, "Alden");
         let (entity, text) = world
             .query::<(Entity, &StatusBadge)>()
             .iter(&world)
@@ -889,14 +970,14 @@ mod tests {
         assert_eq!(world.get::<Text>(text).expect("summary").0, "Ble2\n3t+1");
         assert_eq!(
             world.get::<AccessibleLabel>(entity).map(|value| &value.0),
-            Some(&status_accessibility(&actor))
+            Some(&status_accessibility(&actor, "Alden"))
         );
         assert!(matches!(
             world.get::<Action>(entity),
             Some(Action::Status(ActorId(1), 701))
         ));
         actor.statuses.clear();
-        sync_statuses(&mut world, parent, &actor);
+        sync_statuses(&mut world, parent, &actor, "Alden");
         assert_eq!(
             world.get::<Node>(entity).expect("preserved").display,
             Display::None
@@ -904,7 +985,7 @@ mod tests {
         actor
             .statuses
             .push(status(actor.id, StatusKind::Haste, 900));
-        sync_statuses(&mut world, parent, &actor);
+        sync_statuses(&mut world, parent, &actor, "Alden");
         assert_eq!(world.query::<&StatusBadge>().iter(&world).count(), 1);
         assert_eq!(
             world.get::<Node>(entity).expect("same control").display,
@@ -1122,7 +1203,13 @@ mod tests {
                     .world()
                     .get::<bevy::text::TextLayoutInfo>(tile.text)
                     .expect("measured essential text");
-                assert!(text.size.x <= bounds.size().x + 0.5);
+                assert!(
+                    text.size.x <= bounds.size().x + 0.5,
+                    "actor {:?}: {:?} in {:?}",
+                    tile.actor,
+                    text.size,
+                    bounds.size()
+                );
                 assert!(text.size.y <= bounds.size().y + 0.5);
                 assert!(
                     app.world()

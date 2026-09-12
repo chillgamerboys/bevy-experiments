@@ -41,7 +41,7 @@ pub(super) fn mount(world: &mut World, parent: Entity, snapshot: &CombatSnapshot
             flex_basis: Val::Px(0.0),
             flex_grow: 1.0,
             min_width: Val::Px(44.0),
-            max_width: Val::Px(86.0),
+            max_width: Val::Px(112.0),
             min_height: Val::Px(44.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
@@ -64,9 +64,17 @@ pub(super) fn mount(world: &mut World, parent: Entity, snapshot: &CombatSnapshot
             world,
             control,
             &format!("Initiative Actor {} Label", actor.id.0),
-            actors::token(snapshot, actor),
+            actors::display_name(snapshot, actor),
             UiTextRole::Supporting,
         );
+        world.entity_mut(text).insert((
+            Node {
+                width: Val::Percent(100.0),
+                min_width: Val::Px(0.0),
+                ..default()
+            },
+            TextLayout::justify(Justify::Center),
+        ));
         world.entity_mut(control).insert(InitiativePortrait {
             actor: actor.id,
             image,
@@ -142,7 +150,16 @@ pub(super) fn update(world: &mut World, snapshot: &CombatSnapshot) {
                     .iter()
                     .any(|p| p.actor == id && Some(p.slot) == view.player)
         });
-        let identity = actors::token(snapshot, actor);
+        let identity = actors::display_name(snapshot, actor);
+        let metrics = *world.resource::<ResolvedUiMetrics>();
+        actors::fit_identity_text(
+            world,
+            text,
+            actor,
+            &identity,
+            metrics,
+            actors::identity_font_limit(metrics),
+        );
         set_text(
             world,
             text,
@@ -161,8 +178,8 @@ pub(super) fn update(world: &mut World, snapshot: &CombatSnapshot) {
             ),
         );
         let label = format!(
-            "{identity}, {}. {}{} Inspect without changing target.",
-            actor.name(),
+            "{}. {}{} Inspect without changing target.",
+            actors::title(snapshot, actor),
             if yours { "Your hero. " } else { "" },
             if actor.is_corpse() || matches!(actor.life, labyrinth_rules::LifeState::Removed) {
                 "Dead; cannot act."

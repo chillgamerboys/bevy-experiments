@@ -8,10 +8,39 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::Resource;
 use labyrinth_rules::{
-    skill_definition, status_definition, ActorId, ActorKind, Boundary, CombatAction,
+    skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction,
     CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, SkillId, StatusInstance,
     StatusKind, StatusTag,
 };
+
+/// Character names belong to the game's presentation, not combat authority.
+/// The encounter roster retains dead/removed actors, so ordering by stable ID
+/// survives formation changes, snapshot serialization and repeated hero classes.
+#[must_use]
+pub fn actor_name(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    const HERO_NAMES: [&str; 6] = ["Alden", "Mara", "Rowan", "Iris", "Ember", "Sera"];
+    if matches!(actor.kind, ActorKind::Enemy(_)) {
+        return actor.kind.name().to_owned();
+    }
+    let index = snapshot
+        .actors
+        .iter()
+        .filter(|other| other.team() == actor.team() && other.id < actor.id)
+        .count();
+    HERO_NAMES
+        .get(index)
+        .map_or_else(|| format!("Hero {}", actor.id.0), |name| (*name).to_owned())
+}
+
+/// Include a hero's class when there is room for inspection detail.
+#[must_use]
+pub fn actor_title(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    let name = actor_name(snapshot, actor);
+    match actor.kind {
+        ActorKind::Hero(_) => format!("{name} · {}", actor.kind.name()),
+        ActorKind::Enemy(_) => name,
+    }
+}
 
 /// A fact that the current viewer can or cannot know; absence is not zero.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,7 +167,7 @@ impl BattlePresentation {
                     ActorPresentation {
                         id: actor.id,
                         kind: actor.kind,
-                        name: actor.kind.name().to_owned(),
+                        name: actor_name(snapshot, actor),
                         standing: actor.standing(),
                         health: if policy.health {
                             Knowledge::Known(Health {
@@ -194,6 +223,17 @@ pub enum ForecastOutcome {
     CorpseCleared,
 }
 
+/// Public rank change after all immediate effects, including displaced neighbours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PositionForecast {
+    /// Leading rank before the action.
+    pub from: u8,
+    /// Leading rank after the action.
+    pub to: u8,
+    /// Whole occupied width at either position.
+    pub footprint: u8,
+}
+
 /// A single actor's immediate preview, not its state after the next turn starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActorForecast {
@@ -203,6 +243,8 @@ pub struct ActorForecast {
     pub outcome: Knowledge<ForecastOutcome>,
     /// HP after this action only, using the before-pool ceiling when it is cleared.
     pub health: Knowledge<Health>,
+    /// Disclosed movement only; absent for unchanged, removed or uncertain actors.
+    pub position: Option<PositionForecast>,
     /// Concise immediate outcome, or explicit uncertainty.
     pub summary: String,
 }
@@ -218,6 +260,8 @@ pub struct ForecastDisplay {
     pub actors: Vec<ActorForecast>,
     /// Exact resolution is unavailable to this viewer.
     pub uncertainty: bool,
+    /// Push/pull result and any resolver-owned limit; absent for concealed outcomes.
+    pub movement: Option<String>,
 }
 
 impl ForecastDisplay {
@@ -250,12 +294,47 @@ impl ForecastDisplay {
                     actor: target,
                     outcome: Knowledge::Unknown,
                     health: Knowledge::Unknown,
+                    position: None,
                     summary: "Outcome unknown".to_owned(),
                 }],
                 uncertainty: true,
+                movement: None,
             });
         }
         let preview = snapshot.preview_action(actor, action)?;
+        let movement = (!preview.movement.is_empty()).then(|| {
+            preview
+                .movement
+                .iter()
+                .map(|movement| {
+                    let distance = movement.from.abs_diff(movement.to);
+                    let direction = if movement.requested < 0 {
+                        "Pull"
+                    } else {
+                        "Push"
+                    };
+                    let mut text = format!(
+                        "{direction} {distance}/{} ranks",
+                        movement.requested.unsigned_abs()
+                    );
+                    match movement.limit {
+                        Some(labyrinth_rules::MovementLimit::FormationEdge) => {
+                            text.push_str(" · formation edge");
+                        }
+                        Some(labyrinth_rules::MovementLimit::Footprint { actor, ranks }) => {
+                            let name = snapshot.actor(actor).map_or_else(
+                                || "unit".to_owned(),
+                                |actor| actor_name(snapshot, actor),
+                            );
+                            text.push_str(&format!(" · {name} needs {ranks} ranks to pass"));
+                        }
+                        None => {}
+                    }
+                    text
+                })
+                .collect::<Vec<_>>()
+                .join(" · ")
+        });
         let mut effects = Vec::new();
         for damage in &preview.damage {
             effects.push(format!(
@@ -370,10 +449,20 @@ impl ForecastDisplay {
                         summary.push_str(" · Corpse cleared; formation closes");
                     }
                 }
-                if change.before.rank != change.after.rank {
-                    if let Some(rank) = change.after.rank {
-                        summary.push_str(&format!(" · rank {rank}"));
-                    }
+                let position = change
+                    .before
+                    .rank
+                    .zip(change.after.rank)
+                    .filter(|(from, to)| from != to)
+                    .map(|(from, to)| PositionForecast {
+                        from,
+                        to,
+                        footprint: snapshot
+                            .actor(change.actor)
+                            .map_or(1, |actor| actor.kind.footprint()),
+                    });
+                if let Some(position) = position {
+                    summary.push_str(&format!(" · rank {} → {}", position.from, position.to));
                 }
                 ActorForecast {
                     actor: change.actor,
@@ -383,12 +472,16 @@ impl ForecastDisplay {
                         Knowledge::Unknown
                     },
                     health,
+                    position,
                     summary,
                 }
             })
             .collect::<Vec<_>>();
         if let Some(target) = actors.iter().find(|change| change.actor == target) {
             effects.push(target.summary.clone());
+        }
+        if let Some(movement) = &movement {
+            effects.push(movement.clone());
         }
         if effects.is_empty() {
             effects.push("No immediate HP change".to_owned());
@@ -398,6 +491,7 @@ impl ForecastDisplay {
             summary: effects.join(" · "),
             actors,
             uncertainty: false,
+            movement,
         })
     }
 }

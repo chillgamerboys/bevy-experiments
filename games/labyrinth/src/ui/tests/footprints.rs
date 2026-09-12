@@ -101,7 +101,7 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
             geometry
         );
         let text = find_named(app.world_mut(), "Actor 5 Summary").expect("HP label");
-        assert_eq!(app.world().get::<Text>(text).expect("text").0, "H5\n6");
+        assert_eq!(app.world().get::<Text>(text).expect("text").0, "Ember\n6");
         let bar = find_named(app.world_mut(), "Actor 5 HP Bar").expect("corpse bar");
         assert_eq!(
             app.world().get::<Node>(bar).expect("bar").width,

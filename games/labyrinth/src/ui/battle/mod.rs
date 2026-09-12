@@ -9,6 +9,7 @@ mod history;
 pub(super) use history::scroll as scroll_history;
 mod inspection;
 mod layout;
+mod movement;
 mod timeline;
 mod tooltips;
 pub(super) use tooltips::{actor_subject, effects_subject};
@@ -161,6 +162,7 @@ pub(super) fn present(
         dock::update(world, &nodes.dock, view, ui);
     });
     actors::present(world, view, ui, metrics, snapshot, &tiles, time);
+    movement::present(world, view, ui, metrics);
     timeline::update(world, snapshot);
     let slots = world
         .query::<(Entity, &Slot)>()
@@ -176,7 +178,7 @@ pub(super) fn present(
                 "{} {message}",
                 snapshot
                     .actor(*actor)
-                    .map_or_else(String::new, |actor| actors::token(snapshot, actor))
+                    .map_or_else(String::new, |actor| actors::display_name(snapshot, actor))
             )
         })
         .collect::<Vec<_>>()

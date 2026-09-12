@@ -1,5 +1,75 @@
 # Labyrinth verification
 
+## Rust GameSkills trial — named characters and formation preview
+
+Driving Blow now deals 3 damage and attempts a push of up to two ranks. It stops
+at the formation edge or before crossing an occupant wider than the remaining
+distance. Lethal damage still suppresses the push. The shared effect resolver
+reports attempted movement and limits to previews; the UI does not calculate a
+second movement result. The content fingerprint is
+`0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9`;
+multiplayer participants need matching builds.
+
+The current company is Alden (Gatekeeper), Mara (Knifehand), Rowan (Scout),
+Iris (Field Medic), and Ember (Lantern Wagon); Sera names a sixth hero when present.
+Names are assigned from stable hero IDs within the encounter roster, independent
+of class, rank, snapshot array order and life state. Monsters use their type names.
+The battlefield, initiative, inspector, effects, forecasts and combat history share
+these names. Hero classes remain secondary inspection information. Names do not
+change actor IDs, ownership or the wire schema.
+
+Select Driving Blow (Alden's third equipped ability), then a front enemy.
+The after-action strip shows destination ranks, with gold markers for every moved
+occupant. Against the initial Iron Brute, the Hauler shifts from 3–4 to 2–3 and the
+Brute moves from 2 to 4. Against the initial Ash Brute, the push covers only one rank:
+the remaining rank cannot cross the two-rank Hauler. Live sprites and hit areas stay
+fixed until Confirm. Changing the turn, clearing selection, opening a menu, pausing,
+or concealing necessary facts removes the preview.
+
+The installed Rust CLI records the project-owned checks and their prerequisites:
+
+```sh
+gameskills run labyrinth-test labyrinth-lint rust-format repo-check
+gameskills run labyrinth-movement-test
+gameskills run labyrinth-render-movement labyrinth-render-movement-blocked labyrinth-render-movement-wide labyrinth-render-movement-large-text
+gameskills evidence validate RUN_ID
+```
+
+`labyrinth-test` requires `rules-test`. Render commands reserve the shared GPU,
+window and Cargo resources. The `movement` and `movement-blocked` capture routes
+use real legal forecasts over a deterministic, undamaged Gatekeeper decision;
+selection in the capture harness is authored, not native pointer evidence.
+
+Pure regressions compare preview and committed effects for full/partial/blocked
+pushes, whole large-unit movement and lethal suppression. Production UI tests cover
+pointer/keyboard selection and confirmation, stable live anchors, whole-footprint
+markers and disclosure/decision revocation at normal sizes and 200% scale. Inspect
+the four rendered frames separately for legibility and clipping. Complete names
+stay on one line, with HP or projected ranks on the next line. Compact identity
+labels fit their columns at 11–18 logical pixels, independently of body-text scale;
+full class/type detail remains available through inspection. Tests count actual
+rendered glyph lines as well as checking bounds. Short windows with
+enlarged text reserve a compact forecast lane before selection, so the preview
+cannot overlap live names or shift the sprites. Regression coverage
+includes repeated-class names, wire snapshot round trips and name-bearing log events.
+
+The September 11 native walk used the rebuilt app, an isolated `names-trial`
+profile and seed 42. Real enemy actions ran while the earlier heroes waited.
+Alden selected Driving Blow with shortcut 3 and compared the initial Ash Brute
+(one rank, Hauler limit) and Iron Brute (two ranks) using the pointer. Escape
+cleared the preview without changing HP or formation; shortcut 3 and Space
+recreated it on the focused Iron Brute. Tab reached Confirm and Enter committed:
+Iron Brute fell from 20 to 17 HP and moved from rank 2 to 4, while the intact
+Hauler shifted from ranks 3–4 to 2–3. The preview cleared for Ember's next decision.
+
+The native window was resized, and the settings menu switched to 200% text.
+Monster names stayed on one line. An Ember/Iris reposition preview also remained
+readable and was cancelled; the menus returned to the game and Auto scale was
+restored. Native screenshots and accessibility observations are saved under
+`target/review/labyrinth-native-*.jpg` and `.txt`. The game is left open for owner
+review. Human feedback on the damage/positioning tradeoff remains separate;
+verified input and rules do not establish balance or enjoyment.
+
 ## Handoff follow-up — September 10, 2026
 
 The follow-up to `e073da9` passes 113 application tests, 52 rules

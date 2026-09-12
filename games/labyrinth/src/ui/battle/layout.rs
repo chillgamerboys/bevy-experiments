@@ -95,6 +95,8 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
             actor,
         );
     }
+    movement::mount(world, heroes, Team::Heroes, snapshot);
+    movement::mount(world, enemies, Team::Enemies, snapshot);
     let dock = dock::mount(world, root, formations);
     world.insert_resource(BattleNodes {
         heroes,

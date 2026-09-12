@@ -13,6 +13,7 @@ pub(super) struct EffectResolver<'a> {
     pub next_event: &'a mut u64,
     pub next_status: &'a mut u64,
     pub damage: Option<&'a mut Vec<DamagePreview>>,
+    pub movement: Option<&'a mut Vec<crate::MovementPreview>>,
 }
 
 impl EffectResolver<'_> {
@@ -538,13 +539,16 @@ impl EffectResolver<'_> {
         // split another footprint or silently turn a one-rank push into two.
         let mut next = previous;
         let mut remaining = offset.unsigned_abs();
-        loop {
+        let from = self.state.rank(target).ok_or(RuleError::InvalidState)?;
+        let mut limit = None;
+        while remaining > 0 {
             let adjacent = if offset < 0 {
                 next.checked_sub(1)
             } else {
                 next.checked_add(1).filter(|i| *i < formation.len())
             };
             let Some(adjacent) = adjacent else {
+                limit = Some(crate::MovementLimit::FormationEdge);
                 break;
             };
             let width = self
@@ -554,6 +558,10 @@ impl EffectResolver<'_> {
                 .kind
                 .footprint();
             if remaining < width {
+                limit = Some(crate::MovementLimit::Footprint {
+                    actor: *formation.get(adjacent).ok_or(RuleError::InvalidState)?,
+                    ranks: width,
+                });
                 break;
             }
             remaining -= width;
@@ -564,6 +572,15 @@ impl EffectResolver<'_> {
             formation.remove(previous);
             formation.insert(next, target);
             self.emit_positions(team, events, work)?;
+        }
+        if let Some(movement) = self.movement.as_deref_mut() {
+            movement.push(crate::MovementPreview {
+                actor: target,
+                requested: offset,
+                from,
+                to: self.state.rank(target).ok_or(RuleError::InvalidState)?,
+                limit,
+            });
         }
         Ok(())
     }

@@ -32,12 +32,14 @@ impl CombatSnapshot {
             .unwrap_or(0)
             .saturating_add(1);
         let mut damage = Vec::new();
+        let mut movement = Vec::new();
         let mut events = Vec::new();
         crate::resolve::EffectResolver {
             state: &mut candidate,
             next_event: &mut next_event,
             next_status: &mut next_status,
             damage: Some(&mut damage),
+            movement: Some(&mut movement),
         }
         .resolve_immediate(
             actor,
@@ -78,6 +80,7 @@ impl CombatSnapshot {
             action: *action,
             actors,
             damage,
+            movement,
             events,
             outcome: candidate.outcome,
         })
@@ -177,6 +180,8 @@ pub struct ActionPreview {
     pub actors: Vec<ActorPreview>,
     /// Damage calculations in immediate effect order, not promised future ticks.
     pub damage: Vec<DamagePreview>,
+    /// Displacements actually attempted by the shared resolver, including limits.
+    pub movement: Vec<MovementPreview>,
     /// Immediate outcomes without event or speculative status-instance identities.
     pub events: Vec<PreviewEvent>,
     /// Outcome if this immediate action alone ends the encounter.
@@ -189,6 +194,35 @@ impl ActionPreview {
     pub fn actor(&self, actor: ActorId) -> Option<&ActorPreview> {
         self.actors.iter().find(|change| change.actor == actor)
     }
+}
+
+/// Why the remaining displacement could not be completed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovementLimit {
+    /// No further occupant exists in the requested direction.
+    FormationEdge,
+    /// The remaining distance cannot cross this occupant's whole footprint.
+    Footprint {
+        /// Adjacent occupant, not an arbitrary formation index.
+        actor: ActorId,
+        /// Number of ranks required to pass it.
+        ranks: u8,
+    },
+}
+
+/// An attempted push/pull, observed in the same resolver used for commits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MovementPreview {
+    /// Displaced character.
+    pub actor: ActorId,
+    /// Signed authored distance: negative is forward, positive is back.
+    pub requested: i8,
+    /// Leading rank before movement.
+    pub from: u8,
+    /// Leading rank after movement.
+    pub to: u8,
+    /// Absent when the complete requested distance was covered.
+    pub limit: Option<MovementLimit>,
 }
 
 /// One actor's immediate projected change. Viewers must filter undisclosed facts.

@@ -15,6 +15,7 @@ mod dock;
 mod footprints;
 mod history;
 mod menus;
+mod movement;
 mod overlay_stability;
 mod turn_refresh;
 

@@ -159,12 +159,12 @@ pub const fn skill_definition(id: SkillId) -> SkillDefinition {
         ),
         SkillId::DrivingBlow => (
             "Driving Blow",
-            "Deal 4 damage, then push the surviving target back one rank.",
+            "Deal 3 damage, then push the surviving target back up to two ranks without splitting a footprint.",
             FRONT,
             FRONT,
             TargetRule::EnemyStanding,
             None,
-            &[Effect::Damage(4), Effect::Move(1)],
+            &[Effect::Damage(3), Effect::Move(2)],
         ),
         SkillId::FieldDressing => (
             "Field Dressing",
