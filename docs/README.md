@@ -20,3 +20,7 @@ Historical records retain their original source identities and evidence limits:
 [focused-workspace baseline](decisions/0001-focused-workspace.md),
 [PR21 handoff](history/handoff.md), and [handoff corrections](history/handoff-followup-plan.md).
 Current API contracts live in Rustdoc; historical reports are not an active work queue.
+
+Active work:
+
+- [Documentation and skill guidance refactor](plans/docs-and-skills.md)

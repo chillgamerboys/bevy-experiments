@@ -68,8 +68,9 @@ Use that approach as input to the upcoming docs discussion. Proposed direction:
 current guides beside their owner, active plans separated from lasting decisions,
 and useful completed-plan conclusions folded into current docs before deleting
 obsolete plans/reports. Git supplies history instead of permanent history folders.
-This documentation reorganization is still to be discussed, not executed by this
-note. Hex's immediate post-delivery deletion policy does not silently replace this
+The [concrete docs and skills plan](../../../docs/plans/docs-and-skills.md) now
+records the agreed direction, file dispositions, discovery contract and validation
+sequence. That refactor is planned, not implemented by this note. Hex's immediate post-delivery deletion policy does not silently replace this
 repository's previously chosen manual invocation and configurable retention age.
 
 ## Observed failure and investigation boundaries
