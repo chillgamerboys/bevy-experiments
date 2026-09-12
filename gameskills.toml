@@ -1,6 +1,6 @@
 # Project-owned choices. Core-only adoption is the distribution default.
 schema_version = 1
-packages = ["gameskills", "gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer", "gameskills-maintainer"]
+packages = ["gameskills", "gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer", "gameskills-maintainer", "gameskills-linear"]
 clients = ["codex", "claude"]
 
 [project]
@@ -52,7 +52,7 @@ timeout_seconds = 1800
 resources = ["project:cargo-target"]
 
 [commands.skills-test]
-argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci"]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "gameskills-linear", "--profile", "ci"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 requires = ["skills-validate"]
@@ -152,3 +152,13 @@ argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "-
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 requires = ["cli-package", "bundle-check"]
+
+[commands.linear-package]
+argv = ["cargo", "package", "--locked", "-p", "gameskills-linear"]
+timeout_seconds = 900
+resources = ["project:cargo-target"]
+
+# Explicit repository opt-in; the helper receives no credentials from core.
+[tracking]
+required = true
+observer = ["gameskills-linear", "observe", "--config", "gameskills-linear.toml"]

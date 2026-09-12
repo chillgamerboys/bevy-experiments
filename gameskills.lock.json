@@ -1,8 +1,9 @@
 {
-  "bundle": ".gameskills/bundles/5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2-211c8240",
-  "content_sha256": "5215cb966addc4f85812dc8f9b11c818ee851946f912733cc2355c743d31a8e2",
+  "bundle": ".gameskills/bundles/c1872389077f1fea365d638acc1283d1b3bc588979a873e83d260e10fdb25d86-ebf958be",
+  "content_sha256": "c1872389077f1fea365d638acc1283d1b3bc588979a873e83d260e10fdb25d86",
   "packages": [
     "gameskills",
+    "gameskills-linear",
     "gameskills-maintainer",
     "gameskills-multiplayer",
     "gameskills-turn-based",
