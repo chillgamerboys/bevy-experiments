@@ -25,12 +25,12 @@ Codex and Claude manifests. Optional packages are explicitly selected; the defau
 installation does not include all 24 skills. The contribution package is reserved
 for human-led investigation of verified Bevy bugs or compelling engine-level gaps.
 
-Start with the [installation and workflow guide](docs/development.md),
-[complete contracts](docs/decisions/gameskills-catalog.md) and
-[Bevy companion direction](docs/decisions/gameskills-framework.md).
+Start with the [installation and workflow guide](docs/installation.md),
+[skill responsibilities](docs/catalog.md) and
+[architecture and Decisions](docs/architecture.md).
 
-The [workflow reliability and optional Linear plan](docs/decisions/workflow-reliability-and-linear.md)
-tracks the next audit, legacy consolidation, planning grill, and retention pilot.
+The [workflow reliability and optional Linear plan](docs/plans/workflow-reliability.md)
+tracks remaining delivery and tracking acceptance; deletion is deferred.
 Implementation and evaluation are in progress; installed pins are updated explicitly.
 
 ## Validation
@@ -66,7 +66,6 @@ queues with their original runtime; old evidence remains historical. The retired
 The [CLI](cli/README.md), [plugins](plugins) and [legacy compatibility](../devtools/tests/fixtures/legacy/README.md)
 have separate owners. Active catalog evaluation fixtures live with the devtools tests.
 
-The optional `gameskills-linear` package adds `track` and `cleanup`. Its separately
-installed Rust helper owns credentials and manual retention sweeps; installing core
-does not connect Linear or schedule deletion. See the helper's source README and
-the plugin's setup reference for the supported configuration.
+The optional `gameskills-linear` package adds `track` and `cleanup`. Use connected Linear tools for ordinary tracking. The separately installed helper
+is optional and its older cleanup prototype is deferred. Installing core does not
+connect Linear, require extra credentials or schedule deletion.

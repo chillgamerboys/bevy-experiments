@@ -1,6 +1,7 @@
 # GameSkills Linear
 
-Optional companion executable for the `gameskills-linear` native plugin. Core
+Optional direct-API helper for explicitly selected programmatic operations.
+Normal tracking can use connected Linear MCP tools without this executable. Core
 GameSkills does not depend on this executable, its credentials, or a Linear account.
 
 Install from its Cargo archive or `cargo install --path gameskills/linear --locked`.
@@ -13,7 +14,14 @@ cache. Supply UUIDs for `workspace`, `team`, and default `project`; optional fie
 are `key_env` (default `LINEAR_API_KEY`), `retention_days` (30), `export_dir`,
 `keep_projects` and `[routes]` mapping repository-relative directories to projects.
 
-Cleanup is manual and previews by default. Apply requires an explicit project,
+## Deferred cleanup prototype
+
+Deletion is deferred and mandatory ticket backups are not part of the accepted
+workflow. The code below remains an experimental older implementation, not a
+requirement for normal tracking or a recommended cleanup path. Reconcile or remove
+it when deletion is selected again.
+
+The prototype cleanup is manual and previews by default. Apply requires an explicit project,
 `--limit`, and an existing user-designated backed-up private directory (mode 0700)
 outside source repositories and temporary storage. Original records and operation
 journals are atomically written, synced and read back before ordinary recoverable

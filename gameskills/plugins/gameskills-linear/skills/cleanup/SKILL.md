@@ -1,22 +1,22 @@
 ---
 name: cleanup
-description: Manually sweep old completed Linear issues, including an explicitly requested capacity cleanup. Preview by default; bounded apply requires an authorized sweep and verified durable private exports. Never schedule deletion.
+description: Assess an explicitly requested Linear issue cleanup using the current project policy and available connector capabilities. Deletion is deferred unless the user selects that work; installing the plugin never schedules it.
 ---
 
-# Cleanup
+# Assess requested cleanup
 
-Read [setup](../../references/setup.md) and [cleanup contract](../../references/cleanup.md).
-Resolve explicit project UUID and the user-owned durable private export store.
-Retention is an age threshold, not a schedule. Default to preview with reasons.
+Read [project context](../../references/project-context.md) and the adopter's current
+tracking/retention policy. Confirm the requested project and unfinished work that
+must remain. Use the connector's declared tools; never invent a deletion operation
+or assume moving to Done reclaims issue capacity.
 
-Use the supported `gameskills-linear cleanup` command. An authorized bounded
-apply does not need repeated per-ticket confirmation. Preserve existing session
-authorization; a quota error alone is not authorization. Do not bypass skip reasons
-or reduce retention to manufacture candidates. Missing durable storage blocks
-apply while preview remains useful.
+Deletion is deferred in this candidate. If requested later, inspect current supported
+capabilities and report a concrete manual action when the connector cannot delete.
+Do not request a backup directory or separate key merely to use ordinary tracking.
+The [helper status](../../references/cleanup.md) describes an earlier prototype;
+it is not the current policy or permission to invoke deletion.
 
-Report selected, exported, deleted, skipped and unverifiable counts separately,
-with original identifiers and private manifest locations. Do not put ticket bodies
-or exports in a public repository. Rerun safely to reconcile interruption; never
-interpret failed authentication or lookup as evidence of deletion. Report observed
-quota effects separately from deletion results. No scheduled job is installed.
+No ticket changes follow from a plan-only cleanup discussion. An actual authorized
+operation must preserve project scope, verify current state and report selected,
+deleted, skipped or unverifiable results honestly. An unavailable lookup cannot
+establish deletion. No scheduled job is installed.

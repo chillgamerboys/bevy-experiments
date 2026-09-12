@@ -27,3 +27,24 @@ task: 1 implement, 2 refine (default), 3 co-design, 4 bounded exploration. It do
 not change engineering rigor, permit new agents or grant publication authority.
 Share required checks/evidence with an active core audit instead of rerunning
 the same graph for each skill. Results remain tied to actual source and inputs.
+
+## Adopter documentation
+
+Use `gameskills docs resolve --path PATH` for affected files; repeat `--path` for
+mixed owners. Read the returned root/component indexes and only the relevant
+architecture, Decisions, development, testing or troubleshooting sections. The
+command finds locations, not evidence that content was read or is current.
+
+Mappings in `[docs]` and `[targets.NAME.docs]` are adopter-root-relative. Without
+mappings, discover `docs/README.md`, then `README.md`, at the root and target. If
+the executable is unavailable, use those declared/conventional locations directly
+and report the fallback. Missing conventional docs do not invent a new setup gate;
+broken explicit pointers must be surfaced. Never resolve project docs from this
+plugin's installed directory or treat an active plan as the current architecture.
+
+Investigate disagreements between accepted intent, docs and source/tests before
+choosing a correction. Update the current owner doc and affected pointers together.
+Keep concise rationale in its Decisions section; retire completed plans after
+preserving actual remaining work and repairing links. No separate history archive
+or decision record is required. Read package-local references for portable craft,
+not as replacements for the adopter's rules, commands or integration constraints.

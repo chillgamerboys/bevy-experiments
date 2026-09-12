@@ -66,3 +66,33 @@ Cleanup is explicit maintenance after stopping workspace processes, never an
 automatic startup purge. Do not remove global caches/toolchains, game profiles,
 reconnect credentials or Conductor metadata. A cold build recreates local output;
 deleting it after every verification wastes that work.
+
+## Documentation and skills
+
+Current docs explain supported behavior and how to develop or troubleshoot it.
+Keep docs with their owner; root docs cover shared concerns. A README is the
+entrypoint, with a docs index when several topics need navigation. Put rationale
+in the relevant page's Decisions section. Use substantial active/deferred plans
+for future work; remove completed plans after updating current guides and links.
+Git retains history. Do not keep separate decision or history archives.
+
+Skills resolve adopter docs through `gameskills docs resolve --path PATH`. The
+optional `[docs]` and `[targets.NAME.docs]` mappings identify root-relative indexes
+and plan directories. Preserve existing adopter layouts; no empty plan directories
+are required. Read the returned relevant sections, not every page recursively.
+
+Update docs and skill pointers with their changed behavior. Packaged skill references
+remain self-contained reusable guidance; local APIs/commands belong to source,
+Rustdoc and current project docs. Do not edit installed bundles or frozen fixtures.
+
+Run `gameskills run docs-check` with the selected candidate, or the repository
+check directly while developing that candidate. Checks validate current local links,
+heading anchors, declared indexes and active/deferred plan status. Review establishes
+accuracy and completion; a structural check cannot infer either or delete files.
+
+The local anchor checker supports ATX/setext headings, ordinary inline emphasis,
+code/link text, common HTML entities, duplicate heading suffixes, Unicode letters,
+percent-encoded destinations and explicit quoted HTML id/name anchors. It ignores
+fenced examples and external URLs. It is a documented subset, not a full GitHub
+Markdown implementation; use simple headings or explicit anchors for unsupported
+formatting. Compatibility fixtures use their existing separate validators.

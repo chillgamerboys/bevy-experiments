@@ -87,6 +87,7 @@ pub fn check(root: &Path) -> Vec<String> {
             return failures;
         }
     };
+    documentation_conventions(&root, &files, &mut failures);
     let mut manifests = BTreeMap::new();
     for path in &files {
         if path.file_name().is_some_and(|name| name == "Cargo.toml") {
@@ -121,7 +122,11 @@ pub fn check(root: &Path) -> Vec<String> {
             match support::read_text(path) {
                 Ok(source) => {
                     for target in markdown::links(&source) {
-                        if let Err(error) = support::local_target(&root, path, &target) {
+                        if let Err(error) =
+                            support::local_target(&root, path, &target).and_then(|destination| {
+                                markdown::check_anchor(path, destination.as_deref(), &target)
+                            })
+                        {
                             failures.push(format!("{relative}: {error}"));
                         }
                     }
@@ -182,4 +187,71 @@ pub fn check(root: &Path) -> Vec<String> {
     }
     failures.sort();
     failures
+}
+
+fn documentation_conventions(root: &Path, files: &[PathBuf], failures: &mut Vec<String>) {
+    let mut roots = vec![
+        root.join("docs"),
+        root.join("gamekit/docs"),
+        root.join("gameskills/docs"),
+        root.join("devtools/docs"),
+    ];
+    for path in files {
+        if path.file_name().is_some_and(|n| n == "Cargo.toml")
+            && path.starts_with(root.join("games"))
+        {
+            if let Some(parent) = path.parent() {
+                roots.push(parent.join("docs"));
+            }
+        }
+    }
+    for owner in roots {
+        for retired in ["history", "decisions"] {
+            if owner.join(retired).exists() {
+                failures.push(format!(
+                    "retired current documentation directory: {}",
+                    owner
+                        .join(retired)
+                        .strip_prefix(root)
+                        .unwrap_or(&owner)
+                        .display()
+                ));
+            }
+        }
+        for path in files.iter().filter(|p| {
+            p.starts_with(owner.join("plans")) && p.extension().is_some_and(|e| e == "md")
+        }) {
+            if let Ok(source) = support::read_text(path) {
+                let status = source
+                    .lines()
+                    .find_map(|l| l.strip_prefix("Status: "))
+                    .and_then(|s| s.split([' ', ';', '.']).next());
+                if !matches!(status, Some("active" | "deferred")) {
+                    failures.push(format!("{}: plan needs Status: active or deferred; retire completed plans after reconciling docs",path.display()));
+                }
+            }
+        }
+    }
+    let path = root.join("gameskills.toml");
+    if !path.is_file() {
+        return;
+    }
+    let Ok(source) = support::read_text(&path) else {
+        return;
+    };
+    let Ok(config) = source.parse::<toml::Table>() else {
+        return;
+    };
+    let mut mappings = vec![config.get("docs")];
+    if let Some(targets) = config.get("targets").and_then(Value::as_table) {
+        mappings.extend(targets.values().map(|v| v.get("docs")));
+    }
+    for mapping in mappings.into_iter().flatten() {
+        if let Some(index) = mapping.get("index").and_then(Value::as_str) {
+            match support::local_target(root, &path, index) {
+                Ok(Some(target)) if target.is_file() => {}
+                _ => failures.push(format!("invalid configured documentation index: {index}")),
+            }
+        }
+    }
 }

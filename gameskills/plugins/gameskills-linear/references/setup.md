@@ -1,15 +1,18 @@
 # Optional Linear setup and routing
 
-Select `gameskills-linear` explicitly alongside core through supported GameSkills
-setup. Install the separate `gameskills-linear` Rust executable from the same
-candidate Cargo archives. Core-only adoption needs neither this binary nor a key.
-The executable uses the official GraphQL endpoint via `curl`; PR observations and
-links use authenticated `gh`. It never reads a connector's interactive credentials.
+Select `gameskills-linear` explicitly alongside core. Use the connected Linear
+MCP for normal lookup, create/reuse, updates and two-way PR links. No extra API key
+is required for those connector operations. Resolve current identities through
+supported tools; never extract credentials from an interactive connector.
 
-Keep a personal API key in the configured environment variable (default
-`LINEAR_API_KEY`), never in source or a command argument. A connected Linear MCP
-session does not automatically authenticate a separate executable. Missing delete
-capability in MCP requires this supported direct API path; never mine token caches.
+The optional standalone helper uses direct GraphQL via curl and authenticated gh.
+It requires separate configuration when deliberately selected. Its observer is not
+a bridge to MCP authentication. An adopter using it must report missing credentials
+as an observation gap, not as evidence a ticket or link does not exist.
+
+Deletion is deferred; see [helper status](cleanup.md). No export directory or
+live deletion pilot is required. The following config belongs to the optional
+helper, not a prerequisite for using the connector:
 
 Create an explicit `gameskills-linear.toml`:
 
@@ -20,7 +23,7 @@ project = "DEFAULT_PROJECT_UUID"
 key_env = "LINEAR_API_KEY"
 retention_days = 30
 keep_projects = []
-# export_dir = "/absolute/backed-up/private/directory"
+
 
 [routes]
 "games/labyrinth" = "LABYRINTH_PROJECT_UUID"
@@ -49,8 +52,6 @@ response. `complete --issue UUID --project UUID --state UUID --pr URL` requires 
 required PRs as repeated flags; the caller still owns completeness and acceptance.
 A closed unmerged PR cannot complete an issue.
 
-A verified quota failure can route to a scoped cleanup preview. Unknown GraphQL,
-authentication and rate-limit errors never count as quota proof. Current transport
-fails these closed and leaves classification to the supported provider's explicit
-error observation. After authorized verified cleanup, reconcile the original
-create UUID and retry once. Report remaining capacity uncertainty without looping.
+If issue capacity prevents creation, report the exact provider failure. Deletion
+is deferred; do not route an ordinary tracking task into automatic cleanup or
+request backup storage. Reconcile ambiguous creates before any bounded retry.

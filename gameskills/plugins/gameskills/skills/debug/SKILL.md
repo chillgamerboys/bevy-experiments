@@ -31,3 +31,6 @@ Report reproduction, causal evidence, correction and regression results, or the
 remaining hypotheses and blocked observation. A suspected engine bug remains a
 candidate until isolated against a known Bevy source; select optional contribution
 preparation only if a verified bug or compelling engine-level gap merits it.
+
+Use the affected owner's troubleshooting and architecture guidance to establish
+expected behavior. If the fix invalidates a diagnostic recipe, repair that recipe.

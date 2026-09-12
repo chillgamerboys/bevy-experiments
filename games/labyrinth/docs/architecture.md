@@ -35,7 +35,7 @@ and both default rosters participate in compatibility validation/fingerprinting.
 Formations contain unique occupant IDs, never repeated cells. `ranks(id)` returns
 the complete footprint; `occupant(team, rank)` maps either covered space to one ID.
 Life states distinguish living HP, dying heroes, independent corpse HP, and removed
-remains. See the [formation and death decision](decisions/footprints-and-death.md)
+remains. See the [formation and death decision](rules.md)
 for precise clocks, movement, targeting and provisional death-save semantics.
 
 ### Ability composition seam

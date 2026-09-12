@@ -27,3 +27,7 @@ code, tickets or external state and is not a mandatory approval or audit gate.
 Adapted from jxp's grill at source commit
 `b11265ad9681f54a0e365416ce655d279b53f437`, with smaller optional rounds and an
 explicit handoff. The wording here is authored for GameSkills.
+
+Read the affected owner docs and Decisions before asking about existing constraints.
+Keep new choices in the active plan; update current docs only when the chosen change
+is implemented. Resolve contradictory guidance explicitly.

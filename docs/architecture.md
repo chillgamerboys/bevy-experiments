@@ -1,45 +1,27 @@
-# Architecture and ownership
+# Repository architecture
 
-Games depend on capabilities; capabilities never import their consuming games.
-Share a stable contract with independent tests and two plausible consumers, not
-merely similar code. Keep uncertain abstractions local until experiments establish
-the common behavior.
+This Cargo workspace develops games while improving Gamekit and GameSkills.
 
-Applications may consume the feature-gated [bevy-gamekit facade](../gamekit/facade/README.md)
-or individual capabilities. The facade only re-exports types; it owns no plugin,
-rules or runtime state. Capabilities cannot depend back on it. Library-only external
-consumer checks enforce a boundary independent of the games' workspace builds.
-See the [consolidation plan](gamekit-consolidation.md) for staged extractions and
-the game-adapted balance harness; no universal combat model is planned.
+| Owner | Responsibility |
+|---|---|
+| `games/` | Each game's rules, composition, presentation, assets and acceptance |
+| `gamekit/` | Optional library capabilities; see [architecture](../gamekit/docs/architecture.md) |
+| `gameskills/` | Portable skills, CLI and workflow guidance; see [architecture](../gameskills/docs/architecture.md) |
+| `devtools/` | Internal repository, packaging and CI checks |
+| Root configuration and `docs/` | Shared development and coordinated distribution |
 
-| Owner | Responsibility | Excludes |
-|---|---|---|
-| `bevy-gamekit-hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
-| `bevy-gamekit-turns` | Validated ordered roster, cursor and rounds | Initiative rolls, legality, victory |
-| `bevy-gamekit-session` | Pure identity, credentials, admission security | Sockets, Bevy, seats, lobby rules |
-| `bevy-gamekit-discovery` | Public listings, provider lifetime, route handoff | Admission or connection construction |
-| `bevy-gamekit-multiplayer` | Secure transport adapter, lifecycle, credential stores | Game commands, authority, disclosure |
-| `bevy-gamekit-ui` | Input, scoped focus, metrics, opt-in contextual help, skins and primitives | Screens, action enums, game view models |
-| `bevy-gamekit-testing` | Deterministic App/input/layout helpers | Game fixtures or visual sign-off |
-| Game | Rules, orchestration, schedules, views, content, assets and UX | Other games' private implementation |
+## Decisions
 
-Labyrinth's `rules/` package has no Bevy/network/filesystem dependency. Carterfight's
-backend stays pure Rust and local to that game. They do not need identical layouts
-or a common combat engine. Labyrinth uses rolled initiative; deckbuilder uses cyclic
-turns. Carterfight's displayed HP follows narrated events after backend resolution.
+Use root-level product directories rather than a toolkit wrapper or a mixed crate
+collection. Rust package names use hyphens; Rust imports use underscores. Shared
+packages use `bevy-gamekit-*`; game-owned rules stay with their game. The workspace
+root is virtual and keeps one dependency lockfile.
 
-See [shared UI integration](../gamekit/docs/ui.md) and
-[Labyrinth disclosure](../games/labyrinth/docs/disclosure.md) for detailed contracts.
+Games adopt capabilities independently. Gamekit and GameSkills are companions and
+are intended to move together to a future repository; games can move independently.
+A split is not necessary to develop or verify release artifacts. See
+[distribution](distribution.md) for current contracts and its separate release plan.
 
-## Network flow
-
-Discovery resolves public route data; the composition root chooses its adapter.
-An encrypted, certificate-pinned connection still needs admission. An acknowledged,
-persisted credential authorizes commands; the host derives the seat from the
-connection. Games own readiness, capacity, replay watermarks, private snapshots and
-disconnect policy. Lost peers cannot silently become local AI.
-
-Errors are typed and visible. Invalid persisted/network data cannot bypass domain
-invariants. Optional discovery failure does not disable Direct joining. Worker
-queues, deadlines and frame work stay bounded. See Rustdoc for public contracts and
-[network operations](../gamekit/docs/multiplayer.md) for diagnostics.
+Documentation follows the same ownership. Current guides explain supported behavior;
+important rationale lives in their Decisions sections. Active plans describe changes.
+See [documentation conventions](development.md#documentation-and-skills).

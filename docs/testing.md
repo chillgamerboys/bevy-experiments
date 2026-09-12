@@ -56,5 +56,5 @@ Portable Windows tests do not establish those capabilities.
 
 ## Specialized verification
 
-See [CI selection](../devtools/docs/ci.md), [Labyrinth forecasts](../games/labyrinth/docs/forecasts.md)
+See [CI selection](../devtools/docs/ci.md), [Labyrinth forecasts](../games/labyrinth/docs/testing.md)
 and each game's verification guide for the owning checks.

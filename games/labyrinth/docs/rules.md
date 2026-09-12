@@ -1,20 +1,7 @@
-# Labyrinth: footprints and death
+# Labyrinth rules
 
-Status: implementation milestone, September 2026. These are Labyrinth rules, not
-Gamekit contracts. Gamekit continues to own UI/input and networking mechanics.
-
-## Plan and contracts
-
-1. Represent a formation as ordered unique occupants, each with a content-defined
-   contiguous footprint. Six is the capacity in spaces, not a required actor count.
-2. Validate sizes, life states, unique identities, initiative and status persistence
-   on snapshot ingress. Use the same rank-range legality in previews and commits.
-3. Resolve death and corpse destruction transactionally; retain original identity for
-   ownership, status sources and event references. No resurrection in this milestone.
-4. Integrate a two-rank rear Lantern Wagon and a two-rank midline Ossuary Hauler with
-   player ownership and replacement art independent of domain rules.
-5. Test pure rules, session/reconnect ownership, UI structure, static frames and native
-   interaction separately. A screenshot is not multiplayer evidence.
+Current formation, life-state and fixture-content behavior. APIs and invariants live
+in the game-owned pure rules package; see [architecture](architecture.md).
 
 ## Formation
 
@@ -67,3 +54,10 @@ Both are balance fixtures, not balanced release content.
 
 Rules/content fingerprints change; all multiplayer participants must run matching builds.
 Existing saves/wire snapshots are not silently migrated to the new life-state schema.
+
+## Decisions
+
+Formation capacity counts spaces, not actors. Footprints preserve one actor identity
+and HP pool across occupied ranks. Life-state transitions and corpse clocks belong
+to Labyrinth, not Gamekit or a universal shared combat schema. The death-save policy
+and fixture content are prototype choices, not a promise of balanced release content.

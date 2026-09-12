@@ -158,7 +158,7 @@ expire after three full rounds, excluding creation: a round-2 corpse clears at
 round-5 end. Destruction/expiry compacts the formation. Healing/rescue cannot revive
 corpses. All heroes down loses; all living enemies dead wins even with corpses left.
 The host can return to the lobby for a new test encounter; this is not campaign revival.
-See [formation and death contracts](docs/decisions/footprints-and-death.md).
+See [formation and death contracts](docs/rules.md).
 
 ### Disconnect and restart
 

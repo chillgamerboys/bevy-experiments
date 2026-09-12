@@ -35,3 +35,6 @@ Run the existing task's delivery check with current command evidence. Inspect it
 reasons alongside source review and any human/playtest evidence. A provider failure
 means unverifiable; it is not proof that an artifact is absent. The checker cannot
 attest that a skill was invoked or that a human accepted the change.
+
+Include current-doc accuracy, relevant link/anchor checks and plan retirement in
+the acceptance review. Preserve genuinely outstanding requirements with their owner.

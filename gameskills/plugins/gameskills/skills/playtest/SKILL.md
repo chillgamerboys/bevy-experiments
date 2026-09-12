@@ -31,3 +31,6 @@ Prioritize a small set of improvements by player impact and confidence, with
 supporting evidence and a way to evaluate them. Implement refinements only within
 the active task's authorization; otherwise return concrete options. Preserve
 negative results and unresolved hypotheses in the task's acceptance record.
+
+Read the game's current rules and testing routes to frame the experience. Record
+useful reproduction guidance with that game, without making it a universal skill rule.

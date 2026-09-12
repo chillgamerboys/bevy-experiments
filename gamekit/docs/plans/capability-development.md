@@ -1,31 +1,10 @@
-# Gamekit consolidation and balance infrastructure
+# Capability development
 
-## Decision
+Status: deferred
+Owner: Gamekit and consuming games. Resume when a capability or balance experiment is selected.
 
-Gamekit and GameSkills are paired products at `gamekit/` and `gameskills/`;
-`games/` contains their independently composed adopters. Labyrinth is the primary
-game, Deckbuilder is the contrasting UI/network adopter, and Carterfight remains
-a small offline consumer. Keep uncertain abstractions with their game until a
-stable reusable contract is demonstrated.
-
-GameSkills' Rust CLI and canonical plugins are implemented. Repository organization
-follows the [accepted refactor](decisions/repository-organization.md). The capability
-work below is follow-on scope, not part of that refactor. The external
-[Port Vila pilot](../gameskills/docs/decisions/port-vila-adoption.md) remains deferred.
-
-## Implementation sequence and acceptance
-
-### 1. Consumer and distribution boundary — implemented
-
-- `bevy-gamekit` is a thin, feature-gated facade with no default dependencies or
-  umbrella plugin. Capability crates remain independently usable.
-- All three game applications use the facade; pure game rules stay independent.
-- Policy rejects capability dependencies on games or back onto the facade.
-- An external consumer builds from Cargo-selected library sources in a temporary
-  workspace without games. Separate empty/pure/UI/native feature checks prevent
-  workspace feature unification from hiding missing or accidental dependencies.
-- CI runs this probe on macOS, Linux and Windows. This is source-consumption
-  evidence, not a published-registry install or native-network play test.
+Current boundaries live in [architecture](../architecture.md). The following work
+is proposed, not an existing universal game engine.
 
 ### 2. Shared UI and application mechanics — incremental refinement
 
@@ -110,7 +89,7 @@ Distribute the facade and capability packages, plus the canonical skill pack und
 one pinned release tag. Exclude `games/`, game assets and game fixtures. No repository
 split is required. A source archive and a private registry release have different
 requirements; select the channel explicitly before preparing the first release.
-The [distribution proposal](extraction.md) carries this private candidate forward
+The [distribution proposal](../../../docs/distribution.md) carries this private candidate forward
 into eventual crates.io libraries/CLI and GitHub binary/bundle releases. It defines
 artifact verification and separate runtime/bundle compatibility during the Rust
 migration; public publication remains a later release decision.

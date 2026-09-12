@@ -31,6 +31,7 @@ pub fn parse(source: &str) -> Result<Table, String> {
         "agents",
         "targets",
         "tracking",
+        "docs",
     ];
     if let Some(key) = value.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unknown configuration field: {key}"));
@@ -98,6 +99,9 @@ pub fn parse(source: &str) -> Result<Table, String> {
             return Err("required tracking needs an observer command".into());
         }
     }
+    if let Some(docs) = value.get("docs") {
+        crate::docs::validate_mapping(docs, "docs")?;
+    }
     let packages = string_array(value.get("packages"), "packages", true)?;
     if !packages.contains(&"gameskills") || packages.iter().any(|name| !PACKAGES.contains(name)) {
         return Err("select gameskills core and only known optional packages".into());
@@ -130,6 +134,7 @@ pub fn parse(source: &str) -> Result<Table, String> {
             ));
         }
     }
+    let mut target_paths = BTreeSet::new();
     for (name, target) in table(&value, "targets")? {
         if !identifier(name) {
             return Err(format!("invalid target: {name}"));
@@ -137,6 +142,14 @@ pub fn parse(source: &str) -> Result<Table, String> {
         let target = target
             .as_table()
             .ok_or_else(|| format!("target {name} must be a table"))?;
+        if let Some(docs) = target.get("docs") {
+            crate::docs::validate_mapping(docs, &format!("targets.{name}.docs"))?;
+            if !target.contains_key("path") {
+                return Err(format!(
+                    "target {name}: docs mapping requires a target path"
+                ));
+            }
+        }
         if let Some(selected) = target.get("packages") {
             let selected = string_array(Some(selected), "target packages", false)?;
             if selected.iter().any(|package| !packages.contains(package)) {
@@ -147,6 +160,9 @@ pub fn parse(source: &str) -> Result<Table, String> {
             let path = path
                 .as_str()
                 .ok_or_else(|| format!("target {name} path must be a string"))?;
+            if !target_paths.insert(path) {
+                return Err(format!("duplicate target path: {path}"));
+            }
             if path.starts_with('/')
                 || path.contains(['\\', ':', '\0'])
                 || path.split('/').any(|part| part == "..")

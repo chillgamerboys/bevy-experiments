@@ -48,3 +48,6 @@ Report completed/blocked streams, reviewed integration and remaining work. Track
 actual coordinator/worker usage and elapsed time when available; missing telemetry
 is unavailable, not zero. Worker launch, budget exhaustion and stopped checks are
 not completion.
+
+Work orders identify affected owner docs and any proposed constraint changes.
+Treat shared docs/index edits as owned files; reconcile links at integration.

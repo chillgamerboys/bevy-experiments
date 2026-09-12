@@ -162,3 +162,34 @@ resources = ["project:cargo-target"]
 [tracking]
 required = true
 observer = ["gameskills-linear", "observe", "--config", "gameskills-linear.toml"]
+
+
+[docs]
+index = "docs/README.md"
+plans = "docs/plans"
+
+[targets.labyrinth.docs]
+index = "games/labyrinth/README.md"
+plans = "games/labyrinth/docs/plans"
+
+[targets.gamekit.docs]
+index = "gamekit/docs/README.md"
+plans = "gamekit/docs/plans"
+
+[targets.gameskills]
+path = "gameskills"
+
+[targets.gameskills.docs]
+index = "gameskills/docs/README.md"
+plans = "gameskills/docs/plans"
+
+[targets.devtools]
+path = "devtools"
+
+[targets.devtools.docs]
+index = "devtools/README.md"
+
+[commands.docs-check]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "check"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]

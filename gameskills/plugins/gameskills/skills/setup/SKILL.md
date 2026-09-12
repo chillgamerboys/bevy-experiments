@@ -38,3 +38,7 @@ identities separately from structural checks. Exercise update/recovery/removal
 when those are in scope. Report configured choices, observed installation state,
 conflicts, compatibility evidence and remaining readiness gaps. A read-only setup
 request ends with findings; an authorized adoption continues through verification.
+
+Inspect the adopter docs before proposing `[docs]` or target docs mappings. Keep
+its existing layout; mappings need a compatible CLI and must survive setup/update
+without overwriting owner choices. Verify `docs resolve` on representative paths.

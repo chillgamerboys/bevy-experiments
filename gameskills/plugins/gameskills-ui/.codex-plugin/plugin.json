@@ -1,6 +1,6 @@
 {
   "name": "gameskills-ui",
-  "version": "0.1.0-dev.2",
+  "version": "0.1.0-dev.3",
   "description": "Build and verify native Bevy and GameKit user interfaces.",
   "author": {
     "name": "GameKit contributors"

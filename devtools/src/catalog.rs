@@ -282,7 +282,12 @@ fn target(
     failures: &mut Vec<String>,
 ) -> Option<PathBuf> {
     match support::local_target(boundary, source, raw) {
-        Ok(target) => target,
+        Ok(target) => {
+            if let Err(error) = markdown::check_anchor(source, target.as_deref(), raw) {
+                failures.push(format!("{}: {error}", source.display()));
+            }
+            target
+        }
         Err(error) => {
             failures.push(format!("{}: {error}", source.display()));
             None

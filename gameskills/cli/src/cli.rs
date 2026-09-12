@@ -13,6 +13,7 @@ const QUEUE_HELP: &str = "gameskills queue create --file PLAN.json\ngameskills q
 const RUN_HELP: &str = "gameskills run COMMAND ... [--max-workers N] [--resource-wait-seconds SECONDS] [--resume RUN_ID]\nCommands come from gameskills.toml; resume reruns the graph into a new record.";
 const EVIDENCE_HELP: &str = "gameskills evidence list\ngameskills evidence show|validate RUN_ID";
 const DELIVERY_HELP: &str = "gameskills delivery start ID --goal TEXT [--endpoint pr] [--repo OWNER/REPO] [--base main] [--check COMMAND]\ngameskills delivery bind ID [--pr URL] [--issue UUID] [--project UUID]\ngameskills delivery show ID\ngameskills delivery note ID [--remaining TEXT] [--authorization TEXT]\ngameskills delivery check ID [--evidence RUN_ID]";
+const DOCS_HELP: &str = "gameskills docs resolve [--path PATH]...\nResolve adopter docs without installation; paths are repository-relative.";
 const LEGACY_HELP: &str = "gameskills legacy import [--apply]\nInspect the old installation first; --apply preserves old client files and overlays.";
 
 #[derive(Parser)]
@@ -39,6 +40,12 @@ enum Operation {
     Config {
         #[command(subcommand)]
         command: Option<ConfigOperation>,
+    },
+    /// Resolve adopter documentation entrypoints.
+    #[command(after_help = DOCS_HELP)]
+    Docs {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
     },
     /// Inspect the embedded instruction catalog.
     Catalog,
@@ -155,6 +162,7 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
         }
         operation => {
             let (family, arguments) = match operation {
+                Operation::Docs { args } => ("docs", args),
                 Operation::Catalog => ("catalog", Vec::new()),
                 Operation::Status => ("status", Vec::new()),
                 Operation::Config { command: None } => ("config", Vec::new()),
@@ -180,6 +188,7 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 .any(|arg| arg == "--help" || arg == "-h")
             {
                 let help = match family {
+                    "docs" => Some(DOCS_HELP),
                     "setup" => Some(SETUP_HELP),
                     "bundle" => Some(BUNDLE_HELP),
                     "native" => Some(NATIVE_HELP),
@@ -209,6 +218,7 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 }
             };
             let result = match family {
+                "docs" => crate::docs::execute(&root, &arguments),
                 "__runner-supervisor" => crate::runner::supervisor(&arguments),
                 "plan" | "queue" | "run" | "evidence" | "delivery" => {
                     crate::installation::ready_config(&root).and_then(|config| {

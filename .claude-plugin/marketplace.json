@@ -7,37 +7,37 @@
     {
       "name": "gameskills",
       "source": "./gameskills/plugins/gameskills",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-ui",
       "source": "./gameskills/plugins/gameskills-ui",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-turn-based",
       "source": "./gameskills/plugins/gameskills-turn-based",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-multiplayer",
       "source": "./gameskills/plugins/gameskills-multiplayer",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-maintainer",
       "source": "./gameskills/plugins/gameskills-maintainer",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-bevy-contrib",
       "source": "./gameskills/plugins/gameskills-bevy-contrib",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     },
     {
       "name": "gameskills-linear",
       "source": "./gameskills/plugins/gameskills-linear",
-      "version": "0.1.0-dev.2"
+      "version": "0.1.0-dev.3"
     }
   ]
 }

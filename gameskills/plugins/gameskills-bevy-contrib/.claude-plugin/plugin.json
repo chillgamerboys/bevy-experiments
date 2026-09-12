@@ -1,6 +1,6 @@
 {
   "name": "gameskills-bevy-contrib",
-  "version": "0.1.0-dev.2",
+  "version": "0.1.0-dev.3",
   "description": "Investigate engine defects and substantial gaps for human-reviewed contributions.",
   "author": {
     "name": "GameKit contributors"

@@ -1,9 +1,9 @@
 # Documentation and skill guidance refactor
 
-Status: active planning; implementation has not started.
+Status: active; implementation and verification in progress.
 Owner: shared repository work, tracked with [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows).
 Inspection baseline: `b1a14cfc34c1f443bd6d369e266a7ed813d83d25`.
-Related work: [GameSkills reliability](../../gameskills/docs/decisions/workflow-reliability-and-linear.md), draft PR #38.
+Related work: [GameSkills reliability](../../gameskills/docs/plans/workflow-reliability.md), draft PR #38.
 
 ## Outcome and accepted choices
 
@@ -27,8 +27,7 @@ The user has settled these choices:
 - Linear deletion and the live Hex deletion pilot are deferred. Mandatory ticket
   backups are removed; no backup directory or deletion credential gates this work.
 
-This turn delivers a plan. The implementation described below requires the next
-implementation instruction. It does not authorize gameplay changes, a repository
+The user authorized implementation after reviewing this plan. It does not authorize gameplay changes, a repository
 split, edits to linked workspaces, merging, a public release, or parallel agents.
 The MCP-first everyday tracking correction remains a separate open item in the
 reliability work; this docs refactor must not claim that runtime fix was completed.
@@ -137,7 +136,7 @@ old installed pins or machine execution evidence as “historical docs.”
 
 Prefer one index per owner over a second machine-maintained catalog of every
 page. Introduce the following small optional mapping in `gameskills.toml` during
-implementation; these fields and command are proposed, not available today:
+implementation; the candidate CLI now supports these fields and command:
 
 ```toml
 [docs]
@@ -159,7 +158,7 @@ All configured paths are relative to the repository root, including target docs.
 The index points to architecture, development, testing and troubleshooting topics
 that exist; several roles may share a page or section.
 
-Proposed read-only command: `gameskills docs resolve [--path PATH]`.
+Read-only command: `gameskills docs resolve [--path PATH]`.
 
 - Return the root entrypoint plus the most specific enclosing target's index and
   plan location, with origin (configured or conventional) and diagnostics.
@@ -299,7 +298,7 @@ arbitrary fixture paths or another adopter's pre-existing layout.
 Use logical commits within the existing branch/PR unless a later user instruction
 changes the integration shape. Do not create a ticket per document. The current
 PR remains a draft while implementation/acceptance is incomplete; merging remains
-separately authorized. This planning commit is not implementation of the sequence.
+separately authorized. Implementation is in progress in this PR; final package and delivery observations follow below.
 
 ## Verification and acceptance
 

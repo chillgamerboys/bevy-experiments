@@ -19,3 +19,9 @@ Author shared capabilities in `gamekit/`, current skills in `gameskills/plugins/
 and game-owned rules/content with their games. `devtools/tests/fixtures/legacy/`
 contains frozen compatibility inputs, not an active skill source. Preserve local
 adopter overlays, recorded pins and historical evidence when updating skills.
+
+Resolve affected owner docs with `gameskills docs resolve --path PATH` (or their
+configured indexes when the executable is unavailable). Read relevant current
+architecture/Decisions and development/testing guidance; keep local facts there.
+Update current docs and skill pointers together, and retire completed plans after
+preserving outstanding work and repairing links. Git supplies historical context.

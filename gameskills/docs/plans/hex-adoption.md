@@ -1,8 +1,8 @@
 # Port Vila adoption pilot
 
-Status: deferred draft, September 10, 2026. Revisit after the internal GameSkills,
-documentation and GameKit refactors produce a suitable candidate. No skills or
-GameKit dependencies have been installed in Bevy Hex Game by this investigation.
+Status: deferred
+Owner: GameSkills/adopter integration. Resume after internal docs and framework work
+and explicit selection of an adopter task. No installation is performed by this plan.
 
 ## Purpose and ownership
 
@@ -50,7 +50,7 @@ and [dependency check](https://github.com/chillgamerboys/bevy-hex-game/blob/bb55
 
 ## Entry conditions
 
-1. The internal [skills-first sequence](gameskills-framework.md) has produced
+1. The internal [skills-first sequence](../architecture.md) has produced
    working, evaluated workflows and reconciled documentation.
 2. A reproducible GameKit/GameSkills candidate has immutable source and package
    identities, compatible Bevy features, install/update instructions and recovery

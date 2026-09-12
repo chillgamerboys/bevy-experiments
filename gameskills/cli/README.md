@@ -1,6 +1,6 @@
 # GameSkills Rust CLI
 
-The unpublished `0.1.0-dev.2` candidate installs immutable GameSkills instructions,
+The unpublished `0.1.0-dev.3` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
 executes configured command graphs with verifiable evidence. Its 13 core skills
 use `plan` as the default entrypoint; eleven optional skills live in five specialist
@@ -73,5 +73,13 @@ Compiled examples are test probes, not additional installed programs.
 
 Publication remains disabled. The workspace declares `MIT OR Apache-2.0`; the
 actual license/notice files, registry names and release ownership still require
-the planned public-release audit. See [distribution](../../docs/extraction.md) and
-[adopter guidance](../docs/development.md).
+the planned public-release audit. See [distribution](../../docs/distribution.md) and
+[adopter guidance](../docs/installation.md).
+
+
+## Documentation discovery
+
+`gameskills docs resolve --path PATH` reads optional `[docs]` and target docs
+mappings from the adopter root; repeat `--path` for mixed work. It works before
+setup, returns root/component indexes and diagnostics, and does not read all linked
+pages. See [mapping behavior](../docs/architecture.md#documentation-discovery).
