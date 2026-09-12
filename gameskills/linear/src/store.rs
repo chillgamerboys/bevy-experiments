@@ -12,6 +12,14 @@ mod posix {
         directory: OwnedFd,
         _lock: File,
     }
+    impl Drop for Store {
+        fn drop(&mut self) {
+            // CLOEXEC closes inherited descriptors at exec, not during the fork
+            // window. Release this open-file-description lock explicitly so an
+            // unrelated spawning thread cannot prolong it across a retry.
+            let _ = fs::flock(&self._lock, fs::FlockOperation::Unlock);
+        }
+    }
     impl Store {
         pub(crate) fn open(path: &Path) -> Result<Self, String> {
             if !path.is_absolute() {
@@ -46,8 +54,9 @@ mod posix {
                 );
             }
             let lock = Self::file(&directory, ".sweep.lock", true)?;
-            fs::flock(&lock, fs::FlockOperation::NonBlockingLockExclusive)
-                .map_err(|_| "another sweep holds this export store")?;
+            fs::flock(&lock, fs::FlockOperation::NonBlockingLockExclusive).map_err(|e| {
+                format!("cannot acquire export store lock (another sweep may be active): {e}")
+            })?;
             Ok(Self {
                 directory,
                 _lock: lock,
@@ -107,6 +116,28 @@ mod posix {
             if self.read(name)?.as_deref() != Some(bytes) {
                 return Err("export readback mismatch".into());
             }
+            Ok(())
+        }
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn release_does_not_wait_for_a_duplicated_descriptor(
+        ) -> Result<(), Box<dyn std::error::Error>> {
+            use std::os::unix::fs::PermissionsExt;
+            let root = tempfile::tempdir()?;
+            std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
+            let path = root.path().canonicalize()?;
+            let store = Store::open(&path)?;
+            // dup models the same open-file description inherited between fork
+            // and exec, without unsafe fork inside a threaded Rust test harness.
+            let inherited = store._lock.try_clone()?;
+            assert!(Store::open(&path).is_err());
+            drop(store);
+            let next = Store::open(&path)?;
+            drop(inherited);
+            drop(next);
             Ok(())
         }
     }
