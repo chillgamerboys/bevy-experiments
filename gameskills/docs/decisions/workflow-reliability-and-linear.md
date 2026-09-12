@@ -9,10 +9,10 @@ Baseline: `5a19b55e6ca94e8f97a4981f3d151b9c769905a2`, the merge of
 
 Make GameSkills carry authorized work to its requested endpoint, expose missing
 delivery steps, preserve the useful legacy craft lessons in one current catalog,
-and offer optional Linear tracking and retention automation.
+and offer optional Linear tracking and on-demand retention cleanup.
 
 The current request ends with this reviewable plan and unresolved questions.
-Implementation, installation changes, scheduled jobs, and live deletion have not
+Implementation, installation changes, and live deletion have not
 started. The Hex deletion pilot is part of the subsequent implementation plan.
 Do not interpret publishing this plan as completing HEX-98.
 
@@ -31,9 +31,14 @@ split it only when independently deliverable work benefits from separate trackin
 | Planning | Adapt jxp's read-only grill for material ambiguity; use small rounds, recommendations, and explicit settled/deferred decisions. |
 | Linear | Add a separately selected `gameskills-linear` plugin. Core-only adoption requires no Linear connection or credentials. |
 | Routing | Bevy Games owns repository/shared work; Labyrinth owns game-specific work; Hex owns the separate bevy-hex-game backlog. |
-| Retention | Automatic deletion after 30 days from completion for configured projects; support a keep mode and configurable duration. |
-| Cleanup | Export durably before deletion; protect unfinished related work, handle reopening, and make retries safe. No repeated approval for runs covered by the configured policy. |
-| Pilot | Preview old Hex tickets, then exercise the real cleanup path on a small eligible batch before scheduling broader cleanup. |
+| Retention | Manually invoked sweeps of tickets completed at least 30 days ago; duration remains configurable. No scheduled deletion. |
+| Cleanup | Export durably before deletion; protect unfinished related work, handle reopening, and make retries safe. An authorized cleanup invocation needs no repeated per-ticket approval. |
+| Capacity recovery | A verified issue-limit error can invoke the same cleanup preview. Apply a sweep when covered by the user's cleanup instruction; lack of capacity alone does not authorize deletion. |
+| Pilot | Preview old Hex tickets, then exercise the real cleanup command on at most three eligible tickets. |
+
+The user revised the earlier automatic-retention decision to manual sweeps.
+This supersedes the daily scheduler proposal and its hosting decision. The
+30-day eligibility threshold and export-before-delete contracts remain accepted.
 
 ## Observed failure and investigation boundaries
 
@@ -154,7 +159,7 @@ Author the self-contained native package at
 skills with the necessary setup/configuration reference, using the existing core
 plan and PR lifecycle. Avoid duplicating those workflows in the new package.
 
-Automated cleanup requires deterministic execution without a model session.
+The cleanup command needs deterministic selection, export, and mutation behavior.
 Use an optional Rust helper under `gameskills/linear/`, package/binary
 `gameskills-linear`, if the adapter cannot fit an already supported optional
 runtime mechanism. Keep Linear-specific network dependencies and credentials out
@@ -164,9 +169,9 @@ of default core installation. Freeze the concrete command/config schemas in phas
 Provider operations must support create/reuse, exact lookup, attachment/linking,
 state reconciliation, export, and deletion observation. Test against the actual
 supported Linear API. The current MCP tool catalog has no issue-delete tool;
-verify a supported authenticated API path for unattended operation. Never extract
+verify a supported authenticated API path for the cleanup command. Never extract
 interactive connector credentials or assume a connected agent session supplies
-credentials to a scheduled runner.
+credentials to a separate executable.
 
 Persist bindings by workspace/team/project/issue UUID and repository/PR identity.
 On opted-in implementation work, resolve or create the ticket in planning, link
@@ -188,12 +193,23 @@ The prefix is never a project selector or a cleanup boundary. Shared and game-lo
 parts can be related issues in their respective projects when separate work is
 useful; do not force a ticket for every file or commit.
 
-### 5. Implement retention, durable exports, and scheduling
+### 5. Implement manual sweeps, durable exports, and capacity recovery
 
-The optional plugin supports keeping tickets or deleting after a configured number
-of days. This workspace has chosen automatic cleanup with 30 days retention.
-Installing the plugin alone does not enable cleanup for every project. Adopt an
-explicit project allowlist; begin with Hex during the pilot.
+The optional plugin offers an on-demand cleanup command. Thirty days determines
+eligibility, not when a job runs. Installing the plugin does not schedule cleanup
+or delete tickets. Require explicit project scope; begin with Hex during the pilot.
+
+Proposed command shape, to finalize with the adapter interface:
+
+```text
+gameskills-linear cleanup --project PROJECT_UUID --retention-days 30
+gameskills-linear cleanup --project PROJECT_UUID --retention-days 30 --limit 3 --export-dir DURABLE_DIRECTORY --apply
+```
+
+The first form previews candidates and skip reasons. The second exports and
+deletes a bounded batch under the existing cleanup authorization. These are
+proposed interfaces, not commands available in the current CLI. Support a
+configured durable export destination as well as an explicit per-run destination.
 
 Eligibility requires all of the following:
 
@@ -214,8 +230,10 @@ Export descriptions, comments, relationships, project/status identity, important
 decisions, PR/merge links, and referenced attachments/documents needed to preserve
 the record. Resolve temporary download URLs into durable content where necessary;
 an expiring link alone is not an export. Retain original identifiers and store a
-manifest with hashes and observed revisions. Verify remote durability before
-deleting; local temporary files and expiring CI artifacts are insufficient.
+manifest with hashes and observed revisions. Verify persistence in the selected
+durable store before deleting; local temporary files and expiring CI artifacts
+are insufficient. A backed-up user-owned directory or private remote store can
+satisfy this contract; a new repository is not a mandatory prerequisite.
 
 Separate preview, export, delete, and reconcile stages. Recheck current eligibility
 and revision immediately before deletion; refresh changed exports. Investigate API
@@ -227,13 +245,22 @@ not be interpreted as successful deletion.
 Use stable operation identities, bounded batches, concurrency control, rate-limit
 handling, and interruption/retry recovery. A repeated run must not duplicate
 exports unnecessarily, delete outside the selected set, or fail on a previously
-verified deletion. Provide an off switch through keep mode and scheduler disable.
+verified deletion. Retain a keep policy that disables deletion for projects where
+history should remain in Linear.
 
-Proposed cadence: daily, with bounded catch-up after missed runs. Scheduling is
-deterministic and independent of agent conversations. The scheduler host and
-durable storage location remain the one open user decision below. Credentials
-must be supplied through the chosen runner's supported secret mechanism. Do not
-log ticket bodies or export them into this public source repository.
+When ticket creation receives a verified issue-limit response, invoke the same
+scoped preview and report how many tickets qualify. Do not classify authentication,
+network, rate-limit, or unrelated validation failures as exhausted capacity. If
+the current instruction authorizes cleanup, execute the bounded sweep; otherwise
+offer the concrete sweep to the user. Never broaden project scope, shorten the
+retention period, or delete unfinished tickets to force ticket creation through.
+After verified deletion, check whether capacity was recovered and retry the
+original creation once, reconciling any ambiguous prior result to avoid duplicate
+tickets. If capacity remains unavailable, report that blocker without looping.
+
+Credentials use the command's supported secret mechanism. Do not log ticket
+bodies or export them into this public source repository. No cron, GitHub Actions
+schedule, background daemon, or scheduler infrastructure is part of this plan.
 
 Linear documents a 30-day recovery window after deletion; that window is separate
 from our 30 days before deletion. Verify actual quota accounting before claiming
@@ -252,8 +279,9 @@ installation when adopting the candidate; canonical edits do not update the lock
 Run deterministic tests for delivery endpoints, source/base changes, unavailable
 providers, existing bindings, failed mutations, missing exports, and retention
 boundaries. Test native skill discovery, direct/implicit routing, coexistence with
-local guidance, and update/recovery behavior. Test the actual supported scheduler
-platform rather than implying existing POSIX runtime support covers every host.
+local guidance, and update/recovery behavior. Test cleanup preview/apply on the
+actual supported command platforms. Cover true quota errors, unrelated failures,
+authorization boundaries, bounded retry, and no eligible candidates.
 
 Run bounded forward tasks through available native clients using pinned candidate
 and control identities. Separate discovery-only results from actual model behavior.
@@ -276,8 +304,8 @@ supports it; do not claim export is a lossless Linear restore until tested.
 
 Use real completion dates and the chosen 30-day duration; do not alter timestamps
 or lower retention merely to manufacture eligible records. Record observed quota
-effects separately. Expand scheduled cleanup beyond the pilot only after its
-acceptance checks pass, within the configured Hex scope and existing policy.
+effects separately. Any subsequent sweep uses the same qualified command and its
+explicit scope; the pilot does not schedule recurring cleanup.
 
 Deliver logical implementation PRs linked to HEX-98, with combined validation of
 the final candidate. Refresh external checks at each actual PR source/base. Merge
@@ -296,21 +324,15 @@ other linked workspaces remain separate actions.
 | Linear is optional and correctly scoped | Core-only adopter needs no credentials; enabled adopter routes by project UUID and links/reuses the correct ticket and PR |
 | Completion reflects actual delivery | Unmerged/partially delivered issues remain open; required merged work reconciles accurately |
 | Retention is safe to repeat | Boundary, reopen, relationship, pagination, export failure, rate limit, crash, ambiguity, and concurrent-change cases pass |
-| Automation survives without an agent | Actual scheduled runner executes a bounded job and persists verified exports with supported credentials |
+| Manual cleanup is predictable | Preview has no destructive effects; an authorized bounded apply persists verified exports and deletes only qualified tickets; no scheduler is installed |
+| Capacity recovery is bounded | A verified quota error routes to the same scoped cleanup; other errors do not; creation retries once after observed recovery without duplicates |
 | Hex pilot works | Up to three qualified tickets exported/deleted; rerun safe; skipped and out-of-scope tickets unchanged; quota effect reported honestly |
 | Candidate is usable | Packaged artifacts, relevant Rust checks, native discovery/behavior, and adopted pins verified with explicit limits |
 
-## Open decision
+## Setup inputs before the live pilot
 
-Where should scheduled cleanup run and retain exports?
-
-- Recommended: GitHub Actions with a dedicated private archive repository, so
-  runs do not depend on the Mac being awake and private exports stay out of the
-  public source repository. Exact archive owner/name and secrets are setup inputs.
-- Alternative: a scheduled job on the user's Mac with a backed-up local archive
-  folder. Specify backup durability and missed-run behavior before enabling it.
-
-This choice does not block writing the plan or the provider-independent tests.
-It does block deploying the scheduler and qualifying a real export-before-delete
-pilot. An unanswered preference is not permission to create infrastructure or
-delete tickets. No other material scope question is currently outstanding.
+The scheduler-hosting question is withdrawn. No material scope question remains.
+Configure or supply a durable private export destination and the supported
+cleanup credentials before applying the live pilot. These are operational setup
+inputs, not a requirement to create infrastructure during planning. A missing
+export destination still allows preview and blocks deletion with a clear reason.
