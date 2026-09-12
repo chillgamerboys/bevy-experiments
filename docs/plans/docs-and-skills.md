@@ -1,6 +1,6 @@
 # Documentation and skill guidance refactor
 
-Status: active; implementation and verification in progress.
+Status: active; implemented, final verification and PR delivery in progress.
 Owner: shared repository work, tracked with [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows).
 Inspection baseline: `b1a14cfc34c1f443bd6d369e266a7ed813d83d25`.
 Related work: [GameSkills reliability](../../gameskills/docs/plans/workflow-reliability.md), draft PR #38.
@@ -339,3 +339,29 @@ bounded technical checks from code and tests before their dependent edits:
 - Refresh every supposedly completed historical item before deletion. In particular,
   release readiness, network-disclosure limits, external adoption and model trials
   must not disappear because their old report was removed.
+
+## Implementation observations
+
+Current docs and skill pointers now follow the ownership/disposition above. The
+candidate implements optional docs mappings, read-only discovery and repository
+anchor/plan checks. The supported anchor subset is documented in development
+guidance. No game behavior or frozen compatibility source was changed.
+
+CLI/instructions `0.1.0-dev.3` were packaged from canonical commit
+`50d305928febb1617a7cc535db062359639b7f58` and installed from the actual Cargo archive
+outside this checkout. Core-only and core-plus-Linear consumers passed setup/status;
+Codex discovery observed 13 and 15 skills respectively, without model turns or
+Linear credentials. An upgrade from the dev.2 CLI/bundle preserved custom docs
+configuration byte-for-byte, local instructions and the original immutable bundle.
+This repository deliberately adopted the candidate; linked repositories were untouched.
+
+Solo authored exercises covered plan-only scope, mixed/custom owner routing, an
+accepted change conflicting with stale docs, and completed-plan retirement with a
+moved heading and deferred work. These are self-review observations, not independent
+forward trials. Structural validators pass for 24 skills across seven packages;
+independent behavior and Claude-native observations remain explicitly unavailable.
+
+Final source-bound command results and remote CI belong to PR #38's validation
+record. Retain this plan until its outcome lands, then remove it after any remaining
+acceptance has an owner. The separate reliability plan retains MCP-first tracking
+alignment and independent evaluation; Linear deletion and its live pilot stay deferred.
