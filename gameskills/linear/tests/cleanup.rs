@@ -272,3 +272,33 @@ fn set(v: &mut Value, path: &str, value: Value) {
         *v.pointer_mut(path).expect("fixture pointer") = value;
     }
 }
+
+#[test]
+#[cfg(unix)]
+fn restored_recompleted_issue_gets_a_new_period_and_preserves_old_operation(
+) -> Result<(), Box<dyn Error>> {
+    let d = private()?;
+    let path = d.path().canonicalize()?;
+    let mut o = opts(Some(&path));
+    let mut p = Fake::new();
+    cleanup::run(&mut p, &config(), &o)?;
+    p.deleted = 0;
+    let r = cleanup::run(&mut p, &config(), &o)?;
+    assert_eq!(at(&r, "/results/0/status"), "skipped");
+    assert_eq!(p.deleted, 0);
+    set(&mut p.issue, "/completedAt", json!("2026-09-01T12:00:00Z"));
+    set(
+        &mut p.issue,
+        "/history/0/createdAt",
+        json!("2026-09-01T12:00:00Z"),
+    );
+    let r = cleanup::run(&mut p, &config(), &o)?;
+    assert_eq!(at(&r, "/results/0/status"), "skipped");
+    o.now = OffsetDateTime::parse("2026-10-01T12:00:00Z", &Rfc3339)?;
+    cleanup::run(&mut p, &config(), &o)?;
+    assert_eq!(p.deleted, 1);
+    assert!(std::fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .any(|e| e.file_name().to_string_lossy().contains("-operation-")));
+    Ok(())
+}

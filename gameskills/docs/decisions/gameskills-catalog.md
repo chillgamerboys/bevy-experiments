@@ -31,11 +31,11 @@ remains supported without forcing a fresh planning cycle.
 package. A missing setup is surfaced before dependent execution; a read-only
 readiness check does not silently install packages or rewrite project settings.
 
-## Initial catalog
+## Current catalog
 
-The default installation contains **12 core skills**. Five optional packages offer
-nine additional skills, selected explicitly for the project. Each skill has a focused
-body with conditional references; installing 21 skills does not mean loading 21
+The default installation contains **13 core skills**. Six optional packages offer
+eleven additional skills, selected explicitly for the project. Each skill has a focused
+body with conditional references; installing 24 skills does not mean loading 24
 bodies on every task. Names below are logical names. Native invocation syntax and
 package metadata must be verified independently in Codex and Claude.
 
@@ -45,6 +45,7 @@ package metadata must be verified independently in Codex and Claude.
 |---|---|---|
 | `setup` | Adopt GameSkills, configure a project or deliberately update its installation; inspect existing instructions and supported Bevy/GameKit versions | Selected packages, project commands, compatibility and pinned installation; local ownership preserved |
 | `plan` | Start or substantially revise a task; investigate once, define creative scope, decisions, ownership and acceptance | A bounded plan, or work orders and a dispatch queue when parallel execution is authorized |
+| `grill` | Resolve material ambiguity through read-only research and small question rounds | Accepted, delegated and deferred decisions handed to plan; clear tasks skip interviews |
 | `dispatch` | Execute an established wave of independent work; own worker lifecycle, resources, returned results and integration | Completed/blocked stream state, reviewed PRs and verified integration within authorization; `--inject` adds justified work |
 | `debug` | Investigate an observed failure or unexplained behavior | Reproduction, causal explanation, proposed correction and regression evidence; unresolved investigation remains explicit |
 | `test` | Establish engineering behavior for a change or artifact | Appropriate command graph and actual results for pure, app, runtime or performance checks; selected packages supply specialist cases |
@@ -81,6 +82,10 @@ ownership model, rather than a second implementation of coordination.
 | `gameskills-maintainer` | `author-skill` | Create or revise a canonical skill, its triggers, focused references and deterministic helpers from observed needs |
 | `gameskills-maintainer` | `evaluate-skills` | Compare behavior, quality, installation and cost across candidates and supported agents; recommend or reject promotion |
 | `gameskills-bevy-contrib` | `prepare-contribution` | Investigate a verified engine bug or compelling engine-level gap and prepare technical evidence for human review under Bevy's contribution policy |
+
+`gameskills-linear` adds optional `track` and `cleanup` skills. It owns exact
+project routing, two-way PR links, and manually invoked retention sweeps through a
+separately installed helper. Core-only adoption needs no Linear account.
 
 Each package can also contribute references and check recipes used by core
 planning, testing and review. A networking change selects the multiplayer

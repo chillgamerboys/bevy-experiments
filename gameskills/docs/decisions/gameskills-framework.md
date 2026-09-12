@@ -75,7 +75,7 @@ split, combine, move or retire the current entry points as the new design needs.
 
 The core should help a developer go from a game idea or existing project to a
 working, understandable and releasable game. The [initial catalog and
-pipeline](gameskills-catalog.md) defines 12 core skills and 9 optional skills,
+pipeline](gameskills-catalog.md) defines 13 core skills and 11 optional skills,
 their responsibilities and the shared execution contracts. These approved
 boundaries provide the starting point for validation through real tasks.
 
@@ -367,7 +367,7 @@ reported as a failed library contract or as completed integration.
 
 ## Decisions settled and still ahead
 
-The initial offering is 12 core skills, with nine optional skills across five
+The initial offering is 13 core skills, with eleven optional skills across six
 packages. `plan` is the default entry, level 2 is the creative default, and the
 initial dispatch cap is five workers. The owner authorized implementation.
 

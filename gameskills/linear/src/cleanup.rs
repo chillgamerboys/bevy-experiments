@@ -294,8 +294,17 @@ pub fn run(p: &mut dyn Provider, c: &Config, o: &Options<'_>) -> Result<Value, S
                 return Err(format!("ambiguous prior deletion for {identifier}; reconcile remote trash state before another apply"));
             }
             if prior.get("phase").and_then(Value::as_str) == Some("deleted") {
-                results.push(json!({"id":id,"identifier":identifier,"status":"skipped","reason":"previous deletion confirmed; restored issues require explicit new lifecycle"}));
-                continue;
+                let old_completion = prior.get("completedAt").and_then(Value::as_str).ok_or(
+                    "prior operation lacks completion identity; reconcile before applying",
+                )?;
+                if Some(old_completion) == current.get("completedAt").and_then(Value::as_str) {
+                    results.push(json!({"id":id,"identifier":identifier,"status":"skipped","reason":"previous deletion confirmed for this lifecycle"}));
+                    continue;
+                }
+                // A restored, reopened and re-completed issue has a new retention
+                // period. Preserve the previous verified operation before replacing
+                // the current journal for this exact stable issue identity.
+                store.write(&format!("{key}-operation-{}.json", hash(&prior)), &bytes)?;
             }
         }
         let context = export_context(&current)?;
@@ -325,7 +334,7 @@ pub fn run(p: &mut dyn Provider, c: &Config, o: &Options<'_>) -> Result<Value, S
         store.write(
             &journal,
             &serde_json::to_vec(
-                &json!({"phase":"deleted","manifest":filename,"issue":id,"observation":deletion}),
+                &json!({"phase":"deleted","manifest":filename,"issue":id,"completedAt":current.get("completedAt"),"observation":deletion}),
             )
             .map_err(|e| e.to_string())?,
         )?;

@@ -73,3 +73,26 @@ quota-shaped errors closed and routes verified capacity failures through the ski
 
 Keep this candidate in limited rollout and the issue open while the live pilot,
 provider-specific capacity observations and forward behavior remain unverified.
+
+## Candidate observations
+
+The instruction candidate is catalog `0.1.0-dev.2`, content
+`c1872389077f1fea365d638acc1283d1b3bc588979a873e83d260e10fdb25d86`, prepared from
+`20d8743dc36a89fa1fdb6f28d3e418223c211f73`. This repository explicitly adopted it,
+including the Linear package; other workspaces were not migrated.
+
+Both executables were built/installed from actual Cargo archives outside the source
+workspace. The candidate's 13 core skills and 15 core-plus-Linear skills were
+observed through Codex native discovery (`codex_sdk_ts/0.153.4`, macOS arm64).
+A separate native control/update run observed the older pin and the candidate while
+preserving a local user-owned skill byte-for-byte. These runs make no model turns
+and do not prove implicit routing or end-to-end model behavior. Claude command
+construction is tested; this runtime's discovery verifier supports Codex only.
+
+All 20 generated/literal GraphQL operations validated against the official SDK
+schema inspected that day. This is schema compatibility, not authenticated provider
+acceptance. The helper's subprocess regressions additionally verify ambiguous
+creation reuse and two-way links without logging test credentials. Recovery tests
+cover restored/re-completed issues and preserve the prior deletion journal when a
+new completion lifecycle becomes eligible. Live provider and quota effects remain
+pending the operational inputs above.

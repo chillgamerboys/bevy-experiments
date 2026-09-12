@@ -1,8 +1,8 @@
 # Using GameSkills
 
 GameSkills is a Rust CLI with immutable agent instructions for Bevy projects.
-The approved offering remains 13 core skills, entered through `plan`, and nine
-optional skills in five packages. GameKit supplies optional reusable game
+The approved offering remains 13 core skills, entered through `plan`, and eleven
+optional skills in six packages. GameKit supplies optional reusable game
 capabilities. The [catalog](decisions/gameskills-catalog.md) owns skill boundaries;
 this document owns installation and runtime limits.
 
