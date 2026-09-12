@@ -231,6 +231,9 @@ pub fn run(p: &mut dyn Provider, c: &Config, o: &Options<'_>) -> Result<Value, S
             .args(["rev-parse", "--is-inside-work-tree"])
             .output()
             .is_ok_and(|r| r.status.success())
+            || std::env::temp_dir()
+                .canonicalize()
+                .is_ok_and(|temporary| path.starts_with(temporary))
             || path.components().any(|p| {
                 p.as_os_str() == ".context"
                     || p.as_os_str() == ".gameskills"

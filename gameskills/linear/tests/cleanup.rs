@@ -305,3 +305,16 @@ fn restored_recompleted_issue_gets_a_new_period_and_preserves_old_operation(
         .any(|e| e.file_name().to_string_lossy().contains("-operation-")));
     Ok(())
 }
+
+#[test]
+#[cfg(unix)]
+fn system_temporary_directory_is_not_a_durable_export_store() -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let d = tempfile::tempdir()?;
+    std::fs::set_permissions(d.path(), std::fs::Permissions::from_mode(0o700))?;
+    let path = d.path().canonicalize()?;
+    let mut p = Fake::new();
+    assert!(cleanup::run(&mut p, &config(), &opts(Some(&path))).is_err());
+    assert_eq!(p.deleted, 0);
+    Ok(())
+}
