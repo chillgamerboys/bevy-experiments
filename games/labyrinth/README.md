@@ -71,7 +71,7 @@ LAN discovery requires a common multicast domain and OS local-network permission
 it does not cross Tailscale. Tailnet discovery uses an externally installed and
 authenticated Tailscale CLI and UDP 7778, and is never enabled implicitly. Allow
 UDP 7777 for gameplay and UDP 7778 for tailnet probes in host/peer firewall policy.
-See [network diagnostics](../../docs/multiplayer.md) for route and permission checks.
+See [network diagnostics](../../gamekit/docs/multiplayer.md) for route and permission checks.
 
 ### Controls and combat
 
@@ -158,7 +158,7 @@ expire after three full rounds, excluding creation: a round-2 corpse clears at
 round-5 end. Destruction/expiry compacts the formation. Healing/rescue cannot revive
 corpses. All heroes down loses; all living enemies dead wins even with corpses left.
 The host can return to the lobby for a new test encounter; this is not campaign revival.
-See [formation and death contracts](../../docs/decisions/labyrinth-footprints-and-death.md).
+See [formation and death contracts](docs/decisions/footprints-and-death.md).
 
 ### Disconnect and restart
 
@@ -219,7 +219,7 @@ which uses the same disclosed ability content. Neither inspection nor a skillboo
 link spends a turn. The shared timing and key bindings can be changed independently
 of Labyrinth's rules and palette.
 
-See [architecture and extension contracts](labyrinth-architecture.md)
-and [verification](labyrinth-testing.md). The future endless maze should
+See [architecture and extension contracts](docs/architecture.md)
+and [verification](docs/testing.md). The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.

@@ -8,7 +8,7 @@
       "name": "gameskills",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills"
+        "path": "./gameskills/plugins/gameskills"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -20,7 +20,7 @@
       "name": "gameskills-ui",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills-ui"
+        "path": "./gameskills/plugins/gameskills-ui"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -32,7 +32,7 @@
       "name": "gameskills-turn-based",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills-turn-based"
+        "path": "./gameskills/plugins/gameskills-turn-based"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -44,7 +44,7 @@
       "name": "gameskills-multiplayer",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills-multiplayer"
+        "path": "./gameskills/plugins/gameskills-multiplayer"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -56,7 +56,7 @@
       "name": "gameskills-maintainer",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills-maintainer"
+        "path": "./gameskills/plugins/gameskills-maintainer"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -68,7 +68,7 @@
       "name": "gameskills-bevy-contrib",
       "source": {
         "source": "local",
-        "path": "./plugins/gameskills-bevy-contrib"
+        "path": "./gameskills/plugins/gameskills-bevy-contrib"
       },
       "policy": {
         "installation": "AVAILABLE",

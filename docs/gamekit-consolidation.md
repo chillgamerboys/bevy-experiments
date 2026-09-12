@@ -2,22 +2,16 @@
 
 ## Decision
 
-Keep one repository with two product boundaries: `crates/` is the reusable library;
-`games/` contains its consumers. Labyrinth is the flagship, Deckbuilder is the
-contrasting UI/network/balance adopter, and Carterfight remains a small offline
-consumer. Do not create another validation game now. Synthetic test fixtures are
-appropriate for contracts that neither real game exercises.
+Gamekit and GameSkills are paired products at `gamekit/` and `gameskills/`;
+`games/` contains their independently composed adopters. Labyrinth is the primary
+game, Deckbuilder is the contrasting UI/network adopter, and Carterfight remains
+a small offline consumer. Keep uncertain abstractions with their game until a
+stable reusable contract is demonstrated.
 
-Gamekit is a set of capabilities, not a combat engine. Extract reusable contracts
-from Labyrinth, not all of Labyrinth's features. A shared algorithm must not depend
-on Labyrinth's entities, abilities, screen organization, rules or content.
-
-The agreed priority is to implement and adopt GameSkills before the broad
-documentation and code refactors. The [draft framework sequence](decisions/gameskills-framework.md)
-proposes the milestones and keeps the capability work below as scoped follow-on
-work. Labyrinth's playable release and Deckbuilder's companion development lead;
-the existing-game [Port Vila pilot](decisions/port-vila-adoption.md) is deferred
-until after the internal refactor and candidate packaging.
+GameSkills' Rust CLI and canonical plugins are implemented. Repository organization
+follows the [accepted refactor](decisions/repository-organization.md). The capability
+work below is follow-on scope, not part of that refactor. The external
+[Port Vila pilot](../gameskills/docs/decisions/port-vila-adoption.md) remains deferred.
 
 ## Implementation sequence and acceptance
 
@@ -33,7 +27,7 @@ until after the internal refactor and candidate packaging.
 - CI runs this probe on macOS, Linux and Windows. This is source-consumption
   evidence, not a published-registry install or native-network play test.
 
-### 2. Shared UI and application mechanics — after the skills/docs foundation
+### 2. Shared UI and application mechanics — incremental refinement
 
 Audit existing menu, tooltip, feed, focus and input contracts against both Labyrinth
 and Deckbuilder before moving more code. Consolidate only repeated mechanics such
@@ -55,10 +49,10 @@ explicit schedules and narrow callbacks/data contracts; retain game-owned seat
 assignment, readiness, authority, protocol payloads, disclosure and reconnect policy.
 Do not create a generic replicated combat model.
 
-First resolve the intermittent Deckbuilder admission-refusal delivery tests seen
-in the preceding PR: investigate the close/delivery handshake rather than simply
-lengthening sleeps or accepting a missing refusal. Then migrate one contract at a
-time with failure-path tests before consolidating callers.
+Before each migration, establish the current admission/refusal baseline. Prior
+reviews observed intermittent refusal delivery; preserve close/delivery assertions
+and investigate any reproduced failure rather than weakening the contract. Migrate
+one demonstrated common mechanism at a time with failure-path tests.
 
 Acceptance: two independent consumer protocols; refusal then clean disconnect;
 host/guest leave; fresh-process guest reconnect against a running host; both games'

@@ -20,7 +20,7 @@ path = "games/labyrinth"
 packages = ["gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer"]
 
 [targets.deckbuilder]
-path = "games/deckbuilder_ui"
+path = "games/deckbuilder"
 packages = ["gameskills-ui", "gameskills-multiplayer"]
 
 [targets.carterfight]
@@ -28,7 +28,7 @@ path = "games/carterfight"
 packages = ["gameskills-ui"]
 
 [targets.gamekit]
-path = "crates"
+path = "gamekit"
 packages = ["gameskills-maintainer"]
 
 [commands.repo-check]

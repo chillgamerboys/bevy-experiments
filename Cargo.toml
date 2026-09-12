@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "games/*", "games/labyrinth/rules", "tools/gameskills-cli", "tools/gamekit-repo-tools"]
+members = ["gamekit/facade", "gamekit/hex", "gamekit/turns", "gamekit/ui", "gamekit/testing", "gamekit/session", "gamekit/discovery", "gamekit/multiplayer", "games/labyrinth", "games/deckbuilder", "games/carterfight", "games/labyrinth/rules", "gameskills/cli", "devtools"]
 default-members = ["games/labyrinth"]
 
 [workspace.package]
@@ -11,14 +11,14 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 bevy = { version = "0.19", default-features = false, features = ["std", "async_executor", "bevy_state"] }
-bevy_gamekit = { package = "bevy-gamekit", path = "crates/bevy_gamekit", default-features = false }
-bevy_game_hex = { path = "crates/bevy_game_hex" }
-bevy_game_discovery = { path = "crates/bevy_game_discovery" }
-bevy_game_multiplayer = { path = "crates/bevy_game_multiplayer" }
-bevy_game_session = { path = "crates/bevy_game_session" }
-bevy_game_test = { path = "crates/bevy_game_test" }
-bevy_game_turns = { path = "crates/bevy_game_turns" }
-bevy_game_ui = { path = "crates/bevy_game_ui" }
+bevy_gamekit = { package = "bevy-gamekit", path = "gamekit/facade", default-features = false }
+bevy_game_hex = { path = "gamekit/hex" }
+bevy_game_discovery = { path = "gamekit/discovery" }
+bevy_game_multiplayer = { path = "gamekit/multiplayer" }
+bevy_game_session = { path = "gamekit/session" }
+bevy_game_test = { path = "gamekit/testing" }
+bevy_game_turns = { path = "gamekit/turns" }
+bevy_game_ui = { path = "gamekit/ui" }
 if-addrs = "=0.15.0"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "time"] }
