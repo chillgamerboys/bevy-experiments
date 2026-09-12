@@ -17,7 +17,7 @@ Public distribution follows artifact verification and a separate release decisio
 | GameKit libraries | crates.io source crates, with API documentation on docs.rs | Keep the `bevy-gamekit` facade and opt-in capability crates; default features stay empty. Games, GameSkills and repository tools are not library dependencies. |
 | GameSkills executable | A crates.io binary package plus prebuilt archives on GitHub Releases | Working package name `gameskills-cli`, executable `gameskills`. Source installation uses Cargo; prebuilt adoption requires neither Cargo nor Python. No Bevy dependency in the CLI. |
 | GameSkills instructions | A baseline bundle embedded in the CLI, plus a versioned standalone bundle archive | Canonical Markdown and native-client metadata remain in `gameskills/plugins/`. Install the 12 core skills by default and only explicitly selected optional packages. |
-| Repository maintenance | Source-built `gamekit-repo-tools`, kept `publish = false` | Layout, CI and distribution checks belong to this repository, not the adopter's runtime. |
+| Repository maintenance | Source-built `repo-devtools`, kept `publish = false` | Layout, CI and distribution checks belong to this repository, not the adopter's runtime. |
 
 These are proposed names, not registry reservations. Settle ownership, consistent
 capability names and package metadata in R0/R1 before the first public release.
@@ -78,7 +78,7 @@ releases for every instruction edit.
 
 ## Current readiness gaps
 
-`gamekit-repo distribution check` retains Cargo-selected source consumer checks.
+`repo-devtools distribution check` retains Cargo-selected source consumer checks.
 `distribution archives` now produces actual Cargo archives in temporary staging,
 inspects their contents and normalized manifests, then tests the same empty/pure/UI/
 network cases against extracted sources. Staging adds matching versions to internal

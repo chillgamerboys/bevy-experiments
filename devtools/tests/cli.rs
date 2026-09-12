@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::Command;
 
 fn run(root: &Path, args: &[&str]) -> (i32, Value) {
-    let output = Command::new(env!("CARGO_BIN_EXE_gamekit-repo"))
+    let output = Command::new(env!("CARGO_BIN_EXE_repo-devtools"))
         .arg("--root")
         .arg(root)
         .args(args)

@@ -12,7 +12,7 @@ use atomicwrites::{AllowOverwrite, AtomicFile};
 use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 
-use bevy_game_session::{
+use bevy_gamekit_session::{
     CertificateFingerprint, DirectEndpoint, PeerId, ReconnectCredential, SessionId,
 };
 

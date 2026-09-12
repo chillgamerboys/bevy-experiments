@@ -542,7 +542,7 @@ fn compare(root: &Path, base: &str, head: &str) -> Result<Selection, String> {
         result.rust = true;
         result.policy = true;
     }
-    if affected.contains("gamekit-repo-tools") {
+    if affected.contains("repo-devtools") {
         result.skills = true;
         result.distribution = true;
         result.reasons.push(
@@ -561,11 +561,11 @@ fn compare(root: &Path, base: &str, head: &str) -> Result<Selection, String> {
     result.wasm = affected.iter().any(|name| {
         matches!(
             name.as_str(),
-            "bevy_game_hex"
-                | "bevy_game_turns"
-                | "bevy_game_session"
-                | "bevy_game_ui"
-                | "labyrinth_rules"
+            "bevy-gamekit-hex"
+                | "bevy-gamekit-turns"
+                | "bevy-gamekit-session"
+                | "bevy-gamekit-ui"
+                | "labyrinth-rules"
         )
     });
     result.packages = affected.into_iter().collect();

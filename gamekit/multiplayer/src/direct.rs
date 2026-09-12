@@ -27,7 +27,7 @@ use x509_parser::{
 };
 
 use crate::ReconnectEndpointBinding;
-use bevy_game_session::{
+use bevy_gamekit_session::{
     CertificateFingerprint, DirectConnectionCode, DirectEndpoint, DiscoveredDirectTarget,
     InviteToken, SessionId,
 };

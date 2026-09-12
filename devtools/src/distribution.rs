@@ -188,8 +188,8 @@ pub fn validate_graph(
     }
     if case != Case::Network {
         let forbidden: Vec<_> = [
-            "bevy_game_multiplayer",
-            "bevy_game_discovery",
+            "bevy-gamekit-multiplayer",
+            "bevy-gamekit-discovery",
             "aeronet_webtransport",
         ]
         .into_iter()
@@ -312,14 +312,14 @@ edition = "2021"
 publish = false
 
 [dependencies]
-bevy_gamekit = {{ package = "bevy-gamekit", path = {facade}, default-features = false }}
+bevy-gamekit = {{ path = {facade}, default-features = false }}
 serde_json = {{ version = "1", optional = true }}
 
 [features]
 default = []
-pure = ["bevy_gamekit/hex", "bevy_gamekit/turns-serde", "dep:serde_json"]
-ui = ["bevy_gamekit/testing-ui"]
-network = ["bevy_gamekit/direct", "bevy_gamekit/mdns", "bevy_gamekit/tailscale-cli"]
+pure = ["bevy-gamekit/hex", "bevy-gamekit/turns-serde", "dep:serde_json"]
+ui = ["bevy-gamekit/testing-ui"]
+network = ["bevy-gamekit/direct", "bevy-gamekit/mdns", "bevy-gamekit/tailscale-cli"]
 
 [profile.ci]
 inherits = "dev"

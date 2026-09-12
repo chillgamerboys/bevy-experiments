@@ -1,5 +1,5 @@
 [package]
-name = "bevy_game_session"
+name = "bevy-gamekit-session"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true

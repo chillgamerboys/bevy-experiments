@@ -8,13 +8,13 @@ cargo test --workspace --all-features --profile ci
 cargo test --workspace --doc --all-features --profile ci
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo deny check
-cargo run --locked -p gamekit-repo-tools --profile ci -- check
-cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check
-cargo run --locked -p gamekit-repo-tools --profile ci -- distribution archives
-cargo run --locked -p gamekit-repo-tools --profile ci -- bundle check
-cargo test --locked -p gamekit-repo-tools --profile ci --test ci_routing --test ci_checks --test ci_cli
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
+cargo run --locked -p repo-devtools --profile ci -- check
+cargo run --locked -p repo-devtools --profile ci -- distribution check
+cargo run --locked -p repo-devtools --profile ci -- distribution archives
+cargo run --locked -p repo-devtools --profile ci -- bundle check
+cargo test --locked -p repo-devtools --profile ci --test ci_routing --test ci_checks --test ci_cli
+cargo run --locked -p repo-devtools --profile ci -- skills legacy
+cargo run --locked -p repo-devtools --profile ci -- skills validate
 cargo test --locked -p gameskills-cli --profile ci
 ```
 
@@ -25,12 +25,12 @@ documentation. `cargo deny` is a separately installed dependency-policy tool.
 For Rust tooling, use the focused package tests and contract checker:
 
 ```sh
-cargo test --locked -p gameskills-cli -p gamekit-repo-tools --profile ci
-cargo clippy --locked -p gameskills-cli -p gamekit-repo-tools --all-targets --profile ci -- -D warnings
-cargo run --locked -p gamekit-repo-tools --profile ci -- contracts check --verify-reference --cutover
+cargo test --locked -p gameskills-cli -p repo-devtools --profile ci
+cargo clippy --locked -p gameskills-cli -p repo-devtools --all-targets --profile ci -- -D warnings
+cargo run --locked -p repo-devtools --profile ci -- contracts check --verify-reference --cutover
 cargo package --locked -p gameskills-cli
-cargo run --locked -p gamekit-repo-tools --profile ci -- bundle verify-package
-cargo package --locked -p gamekit-repo-tools
+cargo run --locked -p repo-devtools --profile ci -- bundle verify-package
+cargo package --locked -p repo-devtools
 ```
 
 The contract check accounts for the frozen 22 Python files and 142 test methods;

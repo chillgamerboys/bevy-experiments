@@ -3,7 +3,7 @@
 
 [The workflow](../../.github/workflows/gamekit.yml) always checks repository layout,
 local links and the routing regressions, then selects component jobs through
-[`gamekit-repo ci`](../src/ci/mod.rs). Narrative docs avoid Rust and skill-runtime
+[`repo-devtools ci`](../src/ci/mod.rs). Narrative docs avoid Rust and skill-runtime
 jobs; skill instructions receive the skill matrix with Rust structural validators
 and Rust CLI tests; a game edit
 receives its package tests and Clippy. Shared libraries also select their reverse
@@ -39,8 +39,8 @@ inside its networking/UI source are deferred until their inputs are mapped.
 To inspect selection locally, supply full committed object IDs:
 
 ```sh
-cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --base BASE_COMMIT --head HEAD_COMMIT
-cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --full
+cargo run --locked -p repo-devtools --profile ci -- ci select --base BASE_COMMIT --head HEAD_COMMIT
+cargo run --locked -p repo-devtools --profile ci -- ci select --full
 ```
 
 Selection reads committed objects, not uncommitted edits, and runs no game checks.
@@ -62,7 +62,7 @@ that PR’s actual workflow result, not just a passing fixture.
 Structural skill tests do not replace bounded native/model evaluations of changed
 guidance; those remain separately recorded acceptance evidence.
 
-`gamekit-repo distribution check` asks Cargo for each library package's file list, rejects
+`repo-devtools distribution check` asks Cargo for each library package's file list, rejects
 escapes/symlinks, and stages those sources without games or tool packages. It builds an unrelated
 consumer using empty, pure-algorithm, UI and native-networking feature selections,
 checking the activated dependency graph for game/tool or networking leakage. Use

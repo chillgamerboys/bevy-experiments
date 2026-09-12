@@ -1,7 +1,7 @@
 //! Repository maintenance executable entrypoint.
 
 use clap::{Parser, Subcommand};
-use gamekit_repo_tools::{bundle, catalog, ci, distribution, legacy, repository};
+use repo_devtools::{bundle, catalog, ci, distribution, legacy, repository};
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use std::process::ExitCode;
 
 #[derive(Parser)]
 #[command(
-    name = "gamekit-repo",
+    name = "repo-devtools",
     version,
     about = "Internal repository, skill catalog and distribution checks"
 )]
@@ -185,20 +185,20 @@ fn execute() -> (u8, String) {
                 Ok(source) => source,
                 Err(error) => return failure("inventory_io", error),
             };
-            if let Err(error) = gamekit_repo_tools::contracts::validate(&source) {
+            if let Err(error) = repo_devtools::contracts::validate(&source) {
                 return failure("invalid_inventory", error);
             }
             if verify_reference {
-                if let Err(error) = gamekit_repo_tools::contracts::verify_reference(&args.root) {
+                if let Err(error) = repo_devtools::contracts::verify_reference(&args.root) {
                     return failure("reference_unavailable_or_changed", error);
                 }
             }
             if cutover {
-                if let Err(error) = gamekit_repo_tools::contracts::cutover(&args.root, &source) {
+                if let Err(error) = repo_devtools::contracts::cutover(&args.root, &source) {
                     return failure("incomplete_cutover", error);
                 }
             }
-            (0, json!({"schema_version": 1, "ok": true, "scope": "migration_accounting", "source_files": 22, "test_methods": 142, "reference_commit": gamekit_repo_tools::contracts::REFERENCE, "reference_verified": verify_reference, "cutover_structure_verified": cutover, "ports_verified": false}).to_string())
+            (0, json!({"schema_version": 1, "ok": true, "scope": "migration_accounting", "source_files": 22, "test_methods": 142, "reference_commit": repo_devtools::contracts::REFERENCE, "reference_verified": verify_reference, "cutover_structure_verified": cutover, "ports_verified": false}).to_string())
         }
         Operation::Ci { command } => {
             let status = if matches!(command, ci::driver::Operation::Select { .. }) { 2 } else { 1 };

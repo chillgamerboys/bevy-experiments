@@ -5,7 +5,7 @@ Carterfight retain their own composition roots and rules.
 
 | Layer | Owns | Explicitly excludes |
 |---|---|---|
-| `labyrinth_rules` | Actors, formations, content, statuses, deterministic combat/AI | Bevy entities, peers, sockets, files, animation |
+| `labyrinth-rules` | Actors, formations, content, statuses, deterministic combat/AI | Bevy entities, peers, sockets, files, animation |
 | Labyrinth session | Up to six reservations within six formation spaces, explicit actor ownership/loadouts, ready/rematch, pause, command watermark | Certificates and discovery provider mechanics |
 | Labyrinth network | Wire schema, admission policy, target-specific snapshots, capability composition | Combat legality/effect implementation |
 | Labyrinth UI | Forms, selection, inspection, status summaries and accessible native controls | Mutable authoritative state, sprite artwork |

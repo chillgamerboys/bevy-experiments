@@ -7,7 +7,7 @@ Run from the repository root. CI profile uses the same source/features with fast
 compilation; ordinary play uses the default development profile.
 
 ```sh
-cargo test -p labyrinth_rules --profile ci
+cargo test -p labyrinth-rules --profile ci
 cargo test -p labyrinth --profile ci
 cargo test -p labyrinth --lib network::tests::process::six_native_processes_survive_guest_kill_and_finish_the_fight --profile ci -- --ignored --exact --nocapture
 cargo test --workspace --all-features --profile ci
@@ -15,7 +15,7 @@ cargo test --workspace --doc --all-features --profile ci
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
 cargo fmt --all -- --check
 cargo deny check
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
+cargo run --locked -p repo-devtools --profile ci -- skills legacy
 cargo test --locked -p gameskills-cli --profile ci
 ```
 

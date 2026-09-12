@@ -11,14 +11,14 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 bevy = { version = "0.19", default-features = false, features = ["std", "async_executor", "bevy_state"] }
-bevy_gamekit = { package = "bevy-gamekit", path = "gamekit/facade", default-features = false }
-bevy_game_hex = { path = "gamekit/hex" }
-bevy_game_discovery = { path = "gamekit/discovery" }
-bevy_game_multiplayer = { path = "gamekit/multiplayer" }
-bevy_game_session = { path = "gamekit/session" }
-bevy_game_test = { path = "gamekit/testing" }
-bevy_game_turns = { path = "gamekit/turns" }
-bevy_game_ui = { path = "gamekit/ui" }
+bevy-gamekit = { path = "gamekit/facade", default-features = false }
+bevy-gamekit-hex = { path = "gamekit/hex" }
+bevy-gamekit-discovery = { path = "gamekit/discovery" }
+bevy-gamekit-multiplayer = { path = "gamekit/multiplayer" }
+bevy-gamekit-session = { path = "gamekit/session" }
+bevy-gamekit-testing = { path = "gamekit/testing" }
+bevy-gamekit-turns = { path = "gamekit/turns" }
+bevy-gamekit-ui = { path = "gamekit/ui" }
 if-addrs = "=0.15.0"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "time"] }

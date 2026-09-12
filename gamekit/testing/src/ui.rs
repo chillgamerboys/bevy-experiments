@@ -3,7 +3,7 @@
 use bevy::input_focus::{FocusCause, InputFocus};
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
-use bevy_game_ui::{
+use bevy_gamekit_ui::{
     GameUiPlugin, GameUiSystems, UiAction, UiCard, UiDisabled, UiPanel, UiRegionRole, UiScreenRoot,
     UiTextField, UiTextRole,
 };
@@ -114,7 +114,7 @@ impl Plugin for HeadlessUiPlugin {
 /// Gives an eligible action or editable field keyboard focus.
 pub fn focus_action(world: &mut World, entity: Entity) -> bool {
     if (world.get::<UiAction>(entity).is_none() && world.get::<UiTextField>(entity).is_none())
-        || !bevy_game_ui::activation_eligible(world, entity)
+        || !bevy_gamekit_ui::activation_eligible(world, entity)
     {
         return false;
     }
@@ -351,7 +351,7 @@ pub fn ui_tree_snapshot(world: &mut World) -> UiTreeSnapshot {
                 disabled: world.get::<UiDisabled>(entity).is_some(),
                 activation_eligible: (world.get::<UiAction>(entity).is_some()
                     || world.get::<UiTextField>(entity).is_some())
-                    && bevy_game_ui::activation_eligible(world, entity),
+                    && bevy_gamekit_ui::activation_eligible(world, entity),
                 focused: focused == Some(entity),
                 tab_index: world
                     .get::<bevy::input_focus::tab_navigation::TabIndex>(entity)
@@ -383,7 +383,7 @@ fn named_path(world: &World, mut entity: Entity) -> String {
 mod tests {
     use super::*;
     use crate::{run_frames, TestAppBuilder};
-    use bevy_game_ui::{button, modal, screen_root, text_field, UiFonts, UiTabOrder};
+    use bevy_gamekit_ui::{button, modal, screen_root, text_field, UiFonts, UiTabOrder};
 
     #[derive(Resource, Default)]
     struct KeyEvidence {
@@ -392,8 +392,8 @@ mod tests {
     }
 
     fn collect_key_evidence(
-        mut activated: MessageReader<bevy_game_ui::UiActivated>,
-        mut submitted: MessageReader<bevy_game_ui::UiTextSubmitted>,
+        mut activated: MessageReader<bevy_gamekit_ui::UiActivated>,
+        mut submitted: MessageReader<bevy_gamekit_ui::UiTextSubmitted>,
         mut evidence: ResMut<KeyEvidence>,
     ) {
         evidence

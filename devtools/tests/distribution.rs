@@ -1,6 +1,6 @@
 //! Distribution boundaries exercised with inert Cargo output and local sources.
 
-use gamekit_repo_tools::distribution::{
+use repo_devtools::distribution::{
     check_with_runner, library_manifest, package_sources, validate_graph, Case,
 };
 use std::collections::BTreeSet;
@@ -49,10 +49,10 @@ fn fixture() -> Result<tempfile::TempDir, Box<dyn Error>> {
     write(root, "Cargo.lock", "owning lock versions\n")?;
     for (directory, package) in [
         ("gamekit/facade", "bevy-gamekit"),
-        ("gamekit/hex", "bevy_game_hex"),
+        ("gamekit/hex", "bevy-gamekit-hex"),
         ("games/labyrinth", "labyrinth"),
         ("games/labyrinth/rules", "labyrinth-rules"),
-        ("devtools", "gamekit-repo-tools"),
+        ("devtools", "repo-devtools"),
     ] {
         write(
             root,
@@ -76,12 +76,12 @@ fn strings(args: &[&str]) -> Vec<OsString> {
 
 fn graph(case: Case) -> String {
     let extra = match case {
-        Case::Pure => vec!["serde_json", "bevy_game_hex", "bevy_game_turns"],
-        Case::Ui => vec!["bevy", "bevy_game_ui", "bevy_game_test"],
+        Case::Pure => vec!["serde_json", "bevy-gamekit-hex", "bevy-gamekit-turns"],
+        Case::Ui => vec!["bevy", "bevy-gamekit-ui", "bevy-gamekit-testing"],
         Case::Network => vec![
             "bevy",
-            "bevy_game_multiplayer",
-            "bevy_game_discovery",
+            "bevy-gamekit-multiplayer",
+            "bevy-gamekit-discovery",
             "aeronet_webtransport",
         ],
         Case::Empty | Case::All => Vec::new(),
@@ -202,25 +202,25 @@ fn package_list_requires_library_and_rejects_escapes() -> Result<(), Box<dyn Err
 
 #[test]
 fn graph_rejects_game_and_feature_leakage() -> Result<(), Box<dyn Error>> {
-    let forbidden = BTreeSet::from(["labyrinth".into(), "gamekit-repo-tools".into()]);
+    let forbidden = BTreeSet::from(["labyrinth".into(), "repo-devtools".into()]);
     validate_graph(Case::Empty, &names(&[]), &forbidden)?;
     validate_graph(
         Case::Pure,
-        &names(&["bevy_game_hex", "serde_json"]),
+        &names(&["bevy-gamekit-hex", "serde_json"]),
         &forbidden,
     )?;
-    validate_graph(Case::Ui, &names(&["bevy", "bevy_game_ui"]), &forbidden)?;
+    validate_graph(Case::Ui, &names(&["bevy", "bevy-gamekit-ui"]), &forbidden)?;
     validate_graph(
         Case::Network,
         &names(&[
-            "bevy_game_multiplayer",
-            "bevy_game_discovery",
+            "bevy-gamekit-multiplayer",
+            "bevy-gamekit-discovery",
             "aeronet_webtransport",
         ]),
         &forbidden,
     )?;
     for case in [Case::Empty, Case::Pure, Case::Ui, Case::Network] {
-        for extra in ["labyrinth", "gamekit-repo-tools"] {
+        for extra in ["labyrinth", "repo-devtools"] {
             assert!(
                 validate_graph(case, &names(&[extra]), &forbidden).is_err(),
                 "{case:?}: {extra}"
@@ -233,8 +233,8 @@ fn graph_rejects_game_and_feature_leakage() -> Result<(), Box<dyn Error>> {
     }
     for case in [Case::Empty, Case::Pure, Case::Ui] {
         for extra in [
-            "bevy_game_multiplayer",
-            "bevy_game_discovery",
+            "bevy-gamekit-multiplayer",
+            "bevy-gamekit-discovery",
             "aeronet_webtransport",
         ] {
             assert!(
@@ -351,7 +351,7 @@ fn all_cases_stage_only_cargo_sources_embed_fixture_and_seed_lock() -> Result<()
                 let package = args.get(2).ok_or("package missing")?;
                 assert!(matches!(
                     package.to_str(),
-                    Some("bevy-gamekit" | "bevy_game_hex")
+                    Some("bevy-gamekit" | "bevy-gamekit-hex")
                 ));
                 assert_eq!(
                     args,
@@ -400,7 +400,7 @@ fn all_cases_stage_only_cargo_sources_embed_fixture_and_seed_lock() -> Result<()
                 .map_err(|error| error.to_string())?;
                 let facade = manifest
                     .get("dependencies")
-                    .and_then(|value| value.get("bevy_gamekit"))
+                    .and_then(|value| value.get("bevy-gamekit"))
                     .ok_or("facade dependency missing")?;
                 assert_eq!(
                     facade.get("path").and_then(toml::Value::as_str),
@@ -439,7 +439,7 @@ fn all_cases_stage_only_cargo_sources_embed_fixture_and_seed_lock() -> Result<()
             _ => Err("unexpected command".into()),
         }
     })?;
-    assert_eq!(report.packages, ["bevy-gamekit", "bevy_game_hex"]);
+    assert_eq!(report.packages, ["bevy-gamekit", "bevy-gamekit-hex"]);
     assert_eq!(report.staged_files, 6);
     assert_eq!(
         report
@@ -530,7 +530,7 @@ fn cargo_failures_stop_verification_and_remove_temporary_sources() -> Result<(),
 fn forbidden_activated_graphs_never_reach_cargo_test() -> Result<(), Box<dyn Error>> {
     let directory = fixture()?;
     for case in [Case::Empty, Case::Pure, Case::Ui, Case::Network] {
-        for forbidden in ["labyrinth", "labyrinth-rules", "gamekit-repo-tools"] {
+        for forbidden in ["labyrinth", "labyrinth-rules", "repo-devtools"] {
             let result = check_with_runner(directory.path(), case, |_, args| {
                 match args.first().and_then(|arg| arg.to_str()) {
                     Some("package") => Ok(LISTING.into()),

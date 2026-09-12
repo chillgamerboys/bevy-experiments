@@ -1,6 +1,6 @@
 //! Actual Cargo artifact probes and adversarial extraction boundaries.
 
-use gamekit_repo_tools::distribution::{archives_with_runner, inspect_archive, Case};
+use repo_devtools::distribution::{archives_with_runner, inspect_archive, Case};
 use std::error::Error;
 use std::ffi::OsString;
 use std::io::Write;
@@ -189,7 +189,7 @@ fn real_two_crate_archives_compile_after_staging_is_removed() -> Result<(), Box<
             )
             .map_err(|error| error.to_string())?;
             let mut args = args.to_vec();
-            args.extend(["--features".into(), "bevy_gamekit/hex".into()]);
+            args.extend(["--features".into(), "bevy-gamekit/hex".into()]);
             tested = true;
             cargo(cwd, &args)
         } else {

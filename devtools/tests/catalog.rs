@@ -1,6 +1,6 @@
 //! Candidate mutations preserve structural contracts without claiming agent evaluation.
 
-use gamekit_repo_tools::catalog::{self, EXPECTED_SKILLS};
+use repo_devtools::catalog::{self, EXPECTED_SKILLS};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::path::{Path, PathBuf};

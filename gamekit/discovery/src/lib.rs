@@ -17,11 +17,11 @@ use std::{
 
 use bevy::prelude::*;
 #[cfg(any(feature = "mdns", feature = "tailscale-cli", test))]
-use bevy_game_session::{CertificateFingerprint, DirectEndpoint};
-use bevy_game_session::{DiscoveredDirectTarget, SessionId};
+use bevy_gamekit_session::{CertificateFingerprint, DirectEndpoint};
+use bevy_gamekit_session::{DiscoveredDirectTarget, SessionId};
 use serde::{Deserialize, Serialize};
 
-pub use bevy_game_session::{
+pub use bevy_gamekit_session::{
     PasswordAttemptError, PasswordPolicyError, SessionPassword, SessionPasswordVerifier,
 };
 #[cfg(feature = "mdns")]

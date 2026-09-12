@@ -5,16 +5,16 @@ skill validation, external GameKit consumer verification, migration accounting,
 committed CI selection, selected command execution and the final CI gate.
 
 ```sh
-cargo run --locked -p gamekit-repo-tools -- contracts check --verify-reference
-cargo run --locked -p gamekit-repo-tools --profile ci -- check
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
-cargo run --locked -p gamekit-repo-tools --profile ci -- distribution check --case all
-cargo run --locked -p gamekit-repo-tools --profile ci -- distribution archives --case all
-cargo run --locked -p gamekit-repo-tools --profile ci -- bundle check
-cargo run --locked -p gamekit-repo-tools --profile ci -- ci select --full
-cargo test --locked -p gamekit-repo-tools --profile ci
-cargo package --locked -p gamekit-repo-tools
+cargo run --locked -p repo-devtools -- contracts check --verify-reference
+cargo run --locked -p repo-devtools --profile ci -- check
+cargo run --locked -p repo-devtools --profile ci -- skills validate
+cargo run --locked -p repo-devtools --profile ci -- skills legacy
+cargo run --locked -p repo-devtools --profile ci -- distribution check --case all
+cargo run --locked -p repo-devtools --profile ci -- distribution archives --case all
+cargo run --locked -p repo-devtools --profile ci -- bundle check
+cargo run --locked -p repo-devtools --profile ci -- ci select --full
+cargo test --locked -p repo-devtools --profile ci
+cargo package --locked -p repo-devtools
 ```
 
 `--root` defaults to the current directory and may appear before or after the
@@ -99,7 +99,7 @@ their scoped routing.
 Build the controller separately from the Cargo commands it launches:
 
 ```sh
-cargo run --locked -p gamekit-repo-tools --profile ci --target-dir target/ci-controller -- ci run rust
+cargo run --locked -p repo-devtools --profile ci --target-dir target/ci-controller -- ci run rust
 ```
 
 The workflow uses this separate directory for every `ci run` job. Its children

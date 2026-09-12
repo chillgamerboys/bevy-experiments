@@ -19,7 +19,7 @@ use crate::{
     DiscoveryObservation, DiscoveryProviderId, DiscoveryRoute, DiscoverySource, SessionMetadata,
     WireAnnouncement,
 };
-use bevy_game_session::{CertificateFingerprint, DiscoveredDirectTarget, SessionId};
+use bevy_gamekit_session::{CertificateFingerprint, DiscoveredDirectTarget, SessionId};
 
 /// DNS-SD service type used by Gamekit LAN discovery.
 pub const MDNS_SERVICE_TYPE: &str = "_bevy-gamekit._udp.local.";
@@ -646,7 +646,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_game_session::{DirectEndpoint, SessionId};
+    use bevy_gamekit_session::{DirectEndpoint, SessionId};
     use mdns_sd_discovery::TxtRecord;
 
     fn advertisement() -> MdnsSessionAdvertisement {
@@ -813,7 +813,7 @@ mod tests {
             return;
         };
         let mut advertisement = advertisement();
-        advertisement.target.session_id = bevy_game_session::SessionId::generate();
+        advertisement.target.session_id = bevy_gamekit_session::SessionId::generate();
         advertisement.target.endpoint =
             DirectEndpoint::new(address.to_string(), 7777).expect("detected LAN endpoint");
         let expected_session = advertisement.target.session_id;

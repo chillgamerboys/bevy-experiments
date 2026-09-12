@@ -137,7 +137,7 @@ pub fn find_named(world: &mut World, expected: &str) -> Option<Entity> {
 mod tests {
     use super::*;
     #[cfg(feature = "ui")]
-    use bevy_game_ui::{button, screen_root};
+    use bevy_gamekit_ui::{button, screen_root};
 
     #[test]
     fn bounded_runner_reports_non_completion_as_data() {

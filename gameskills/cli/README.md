@@ -66,7 +66,7 @@ are text. Native launch preserves its process status. Diagnostic wording and the
 internal supervision protocol are not public compatibility promises.
 
 `bundle/` contains a generated manifest and deterministic archive from canonical
-`gameskills/plugins/` instructions. Maintainers regenerate with `gamekit-repo bundle prepare`
+`gameskills/plugins/` instructions. Maintainers regenerate with `repo-devtools bundle prepare`
 and verify with `bundle check`; Cargo packages carry those exact bytes. No build
 script downloads content and no runtime path points back into this workspace.
 Compiled examples are test probes, not additional installed programs.

@@ -13,7 +13,7 @@
 //!
 //! ```
 //! use bevy::prelude::*;
-//! use bevy_game_ui::{button, UiSkin, UiControlMetrics, UiSpacing, UiInsets, UiSpace};
+//! use bevy_gamekit_ui::{button, UiSkin, UiControlMetrics, UiSpacing, UiInsets, UiSpace};
 //!
 //! fn spawn_controls(mut commands: Commands) {
 //!     // A game chooses the neutral skin and its own size/spacing baseline.

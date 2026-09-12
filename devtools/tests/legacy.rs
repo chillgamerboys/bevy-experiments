@@ -1,6 +1,6 @@
 //! Canonical skill regression cases and malformed trigger fixtures use package-local data.
 
-use gamekit_repo_tools::legacy::{self, SKILLS};
+use repo_devtools::legacy::{self, SKILLS};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::path::{Path, PathBuf};

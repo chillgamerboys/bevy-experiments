@@ -1,6 +1,6 @@
 //! CI routing contracts over committed Git fixtures, without Cargo metadata or game builds.
 
-use gamekit_repo_tools::ci::{self, Selection};
+use repo_devtools::ci::{self, Selection};
 use std::error::Error;
 use std::path::Path;
 use std::process::Command;
@@ -10,22 +10,22 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 const WORKSPACE: &str = r#"[workspace]
 members = ["gamekit/*", "games/*", "games/labyrinth/rules"]
 [workspace.dependencies]
-shared = { package = "bevy_game_ui", path = "gamekit/ui" }
+shared = { package = "bevy-gamekit-ui", path = "gamekit/ui" }
 "#;
 
 const PACKAGES: &[(&str, &str, &str)] = &[
-    ("gamekit/ui", "bevy_game_ui", ""),
+    ("gamekit/ui", "bevy-gamekit-ui", ""),
     (
         "gamekit/test",
-        "bevy_game_test",
+        "bevy-gamekit-testing",
         "[dev-dependencies]\nshared.workspace = true\n",
     ),
     (
         "gamekit/facade",
         "bevy-gamekit",
-        "[target.'cfg(unix)'.build-dependencies]\nhelper = { package = \"bevy_game_test\", path = \"../test\" }\n",
+        "[target.'cfg(unix)'.build-dependencies]\nhelper = { package = \"bevy-gamekit-testing\", path = \"../test\" }\n",
     ),
-    ("games/labyrinth/rules", "labyrinth_rules", ""),
+    ("games/labyrinth/rules", "labyrinth-rules", ""),
     (
         "games/labyrinth",
         "labyrinth",
@@ -33,7 +33,7 @@ const PACKAGES: &[(&str, &str, &str)] = &[
     ),
     (
         "games/deckbuilder",
-        "deckbuilder_ui",
+        "deckbuilder",
         "[dependencies]\nfacade = { path = \"../../gamekit/facade\" }\n",
     ),
     (
@@ -148,7 +148,7 @@ impl Fixture {
             "\"gamekit/*\",",
             "\"devtools\", \"gamekit/*\",",
         )?;
-        self.package("devtools", "gamekit-repo-tools", "")?;
+        self.package("devtools", "repo-devtools", "")?;
         self.write("devtools/src/catalog.rs", "// catalog\n")?;
         self.rebase()
     }
@@ -216,7 +216,7 @@ fn test_each_game_is_isolated() -> TestResult {
     let fixture = Fixture::new()?;
     for (directory, name) in [
         ("labyrinth", "labyrinth"),
-        ("deckbuilder", "deckbuilder_ui"),
+        ("deckbuilder", "deckbuilder"),
         ("carterfight", "carterfight"),
     ] {
         let value = fixture.changed(&[&format!("games/{directory}/src/lib.rs")])?;
@@ -234,7 +234,7 @@ fn test_each_game_is_isolated() -> TestResult {
 fn test_nested_rules_owner_and_consumer() -> TestResult {
     let fixture = Fixture::new()?;
     let value = fixture.changed(&["games/labyrinth/rules/src/lib.rs"])?;
-    assert_packages(&value, &["labyrinth", "labyrinth_rules"]);
+    assert_packages(&value, &["labyrinth", "labyrinth-rules"]);
     assert_eq!(
         flags(&value),
         [false, true, true, false, false, true, false]
@@ -250,10 +250,10 @@ fn test_reverse_normal_dev_target_build_consumers() -> TestResult {
         &value,
         &[
             "bevy-gamekit",
-            "bevy_game_test",
-            "bevy_game_ui",
+            "bevy-gamekit-testing",
+            "bevy-gamekit-ui",
             "carterfight",
-            "deckbuilder_ui",
+            "deckbuilder",
             "labyrinth",
         ],
     );
@@ -352,7 +352,7 @@ fn test_rename_selects_both_owners() -> TestResult {
         "games/deckbuilder/src/moved.rs",
     ])?;
     let value = fixture.select()?;
-    assert_packages(&value, &["carterfight", "deckbuilder_ui"]);
+    assert_packages(&value, &["carterfight", "deckbuilder"]);
     assert_eq!(
         value.paths,
         [
@@ -478,7 +478,7 @@ fn test_repository_tool_changes_keep_owned_validation_without_game_tests() -> Te
     // The CI cutover makes lib.rs a shared classifier input. Catalog behavior
     // retains R2a's selective tool-only contract.
     let value = fixture.changed(&["devtools/src/catalog.rs"])?;
-    assert_packages(&value, &["gamekit-repo-tools"]);
+    assert_packages(&value, &["repo-devtools"]);
     assert_eq!(flags(&value), [true, true, true, true, false, false, false]);
     fixture.reset()?;
     let value = fixture.changed(&["devtools/README.md"])?;
@@ -547,10 +547,10 @@ fn removed_include_and_deleted_compiled_doc_retain_old_consumers() -> TestResult
         &fixture.select()?,
         &[
             "bevy-gamekit",
-            "bevy_game_test",
-            "bevy_game_ui",
+            "bevy-gamekit-testing",
+            "bevy-gamekit-ui",
             "carterfight",
-            "deckbuilder_ui",
+            "deckbuilder",
             "labyrinth",
         ],
     );
@@ -610,12 +610,12 @@ fn inherited_and_direct_aliases_cover_every_dependency_table() -> TestResult {
     ] {
         for dependency in [
             "shared.workspace = true",
-            "renamed = { package = \"bevy_game_ui\", path = \"../ui/./\" }",
+            "renamed = { package = \"bevy-gamekit-ui\", path = \"../ui/./\" }",
         ] {
             let mut fixture = Fixture::new()?;
             fixture.package(
                 "gamekit/test",
-                "bevy_game_test",
+                "bevy-gamekit-testing",
                 &format!("[{table}]\n{dependency}\n"),
             )?;
             fixture.rebase()?;
@@ -624,10 +624,10 @@ fn inherited_and_direct_aliases_cover_every_dependency_table() -> TestResult {
                 &value,
                 &[
                     "bevy-gamekit",
-                    "bevy_game_test",
-                    "bevy_game_ui",
+                    "bevy-gamekit-testing",
+                    "bevy-gamekit-ui",
                     "carterfight",
-                    "deckbuilder_ui",
+                    "deckbuilder",
                     "labyrinth",
                 ],
             );
@@ -656,10 +656,10 @@ fn member_component_globs_and_exclusions_preserve_ownership() -> TestResult {
         &value,
         &[
             "bevy-gamekit",
-            "bevy_game_test",
-            "bevy_game_ui",
+            "bevy-gamekit-testing",
+            "bevy-gamekit-ui",
             "carterfight",
-            "deckbuilder_ui",
+            "deckbuilder",
             "labyrinth",
         ],
     );
@@ -690,11 +690,11 @@ fn malformed_committed_graphs_conservatively_select_every_check() -> TestResult 
         ("Cargo.toml", "[workspace]\nmembers = []\n"),
         ("Cargo.toml", "[workspace]\nmembers = [\"gamekit/*\"]\nexclude = 1\n"),
         ("gamekit/ui/Cargo.toml", "[package]\nname = \"--help\"\n"),
-        ("gamekit/ui/Cargo.toml", "[package]\nname = \"bevy_game_test\"\n"),
+        ("gamekit/ui/Cargo.toml", "[package]\nname = \"bevy-gamekit-testing\"\n"),
         ("gamekit/ui/Cargo.toml", "[package]\nname = 42\n"),
-        ("gamekit/test/Cargo.toml", "[package]\nname = \"bevy_game_test\"\n[dependencies]\nmissing.workspace = true\n"),
-        ("gamekit/test/Cargo.toml", "[package]\nname = \"bevy_game_test\"\n[dependencies]\nexternal = { path = \"../absent\" }\n"),
-        ("gamekit/test/Cargo.toml", "dependencies = 3\n[package]\nname = \"bevy_game_test\"\n"),
+        ("gamekit/test/Cargo.toml", "[package]\nname = \"bevy-gamekit-testing\"\n[dependencies]\nmissing.workspace = true\n"),
+        ("gamekit/test/Cargo.toml", "[package]\nname = \"bevy-gamekit-testing\"\n[dependencies]\nexternal = { path = \"../absent\" }\n"),
+        ("gamekit/test/Cargo.toml", "dependencies = 3\n[package]\nname = \"bevy-gamekit-testing\"\n"),
     ] {
         let mut fixture = Fixture::new()?;
         fixture.write(path, source)?;
@@ -711,7 +711,7 @@ fn removed_dependency_or_package_never_hides_previous_consumers() -> TestResult 
         if remove_package {
             std::fs::remove_dir_all(fixture.root().join("gamekit/ui"))?;
         } else {
-            fixture.package("gamekit/test", "bevy_game_test", "")?;
+            fixture.package("gamekit/test", "bevy-gamekit-testing", "")?;
         }
         fixture.write("docs/existing.md", "changed\n")?;
         // Cargo manifests are shared inputs; a removed edge cannot underselect

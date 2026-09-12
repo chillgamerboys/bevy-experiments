@@ -64,7 +64,7 @@ execution tests must remain distinct from demonstrated Windows runtime support.
    Handle renames and deletions using both paths. Fetch required history; if the
    comparison is unavailable, run the full suite rather than treating it as empty.
 2. Map files to owners using the longest matching package path. In particular,
-   `games/labyrinth/rules` owns `labyrinth_rules`, not the outer game package.
+   `games/labyrinth/rules` owns `labyrinth-rules`, not the outer game package.
    Use base and head workspace metadata and include normal, development, build and
    target-specific local dependencies when computing reverse consumers. Start
    conservatively: a changed package manifest or graph selects broader checks.
@@ -93,7 +93,7 @@ requiring the new aggregate is a separate repository-settings decision after its
 behavior is verified. This plan does not change those settings.
 
 Current local dependencies support this split: the three games consume the
-GameKit facade, and Labyrinth additionally consumes `labyrinth_rules`. The facade
+GameKit facade, and Labyrinth additionally consumes `labyrinth-rules`. The facade
 consumes the capability crates; discovery and multiplayer consume session, and
 the test crate consumes UI. Thus shared capability edits may legitimately select
 all game consumers, while a game-only change need not do so. Recompute this graph

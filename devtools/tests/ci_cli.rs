@@ -1,6 +1,6 @@
 //! Executable GitHub protocol and failure boundaries, without a Python interpreter.
 
-use gamekit_repo_tools::ci::{driver::parse_selection, Selection};
+use repo_devtools::ci::{driver::parse_selection, Selection};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::process::{Command, Output};
@@ -68,7 +68,7 @@ impl Repo {
         }
     }
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_gamekit-repo"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_repo-devtools"));
         command
             .arg("--root")
             .arg(self.directory.path())
@@ -445,10 +445,10 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
     std::fs::write(root.join("gamekit/core/src/main.rs"), "fn main() {}\n")
         .expect("fixture binary");
     std::fs::write(root.join("gamekit/core/Cargo.toml"),
-        "[package]\nname = 'core'\nversion = '0.1.0'\n[[bin]]\nname = 'gamekit-repo'\npath = 'src/main.rs'\n").expect("binary manifest");
+        "[package]\nname = 'core'\nversion = '0.1.0'\n[[bin]]\nname = 'repo-devtools'\npath = 'src/main.rs'\n").expect("binary manifest");
     std::fs::create_dir(root.join("gamekit/core/tests")).expect("integration test directory");
     std::fs::write(root.join("gamekit/core/tests/binary.rs"),
-        "#[test] fn compiled_binary_runs() { assert!(std::process::Command::new(env!(\"CARGO_BIN_EXE_gamekit-repo\")).status().expect(\"compiled binary\").success()); }\n").expect("binary consumer");
+        "#[test] fn compiled_binary_runs() { assert!(std::process::Command::new(env!(\"CARGO_BIN_EXE_repo-devtools\")).status().expect(\"compiled binary\").success()); }\n").expect("binary consumer");
     git(root, &["add", "."]);
     git(root, &["commit", "--quiet", "-m", "binary regression"]);
     let mut selection = repo.selection();
@@ -458,10 +458,10 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
     selection.rust = true;
     let controller = root
         .join("target/ci-controller/ci")
-        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX));
+        .join(format!("repo-devtools{}", std::env::consts::EXE_SUFFIX));
     std::fs::create_dir_all(controller.parent().expect("controller parent"))
         .expect("controller directory");
-    let source = std::fs::canonicalize(env!("CARGO_BIN_EXE_gamekit-repo"))
+    let source = std::fs::canonicalize(env!("CARGO_BIN_EXE_repo-devtools"))
         .expect("compiled controller path");
     let original = std::fs::read(&source).expect("controller source");
     // A parallel Unix fork can inherit fs::copy's temporarily writable file and
@@ -520,7 +520,7 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
     );
     let rebuilt = root
         .join("target/ci")
-        .join(format!("gamekit-repo{}", std::env::consts::EXE_SUFFIX));
+        .join(format!("repo-devtools{}", std::env::consts::EXE_SUFFIX));
     assert!(rebuilt.is_file());
     assert_ne!(
         std::fs::canonicalize(&controller).expect("preserved controller path"),

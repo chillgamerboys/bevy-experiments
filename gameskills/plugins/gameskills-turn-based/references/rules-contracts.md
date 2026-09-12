@@ -26,7 +26,7 @@ and different projections. Compare views under different hidden states with the
 same public facts; inspect derived values, error shape, labels and help as well as
 obvious fields.
 
-For GameKit, locate `bevy_game_turns` and `TurnOrder` in the exact resolved crate
+For GameKit, locate `bevy-gamekit-turns` and `TurnOrder` in the exact resolved crate
 source/Rustdoc. Inspect roster/cursor/round, typed advance/removal and serialized
 invariants rather than relying on this reference as an API inventory. Pure shared
 sequencing should not own cards, mana, movement, combat, AI, timers or victory.

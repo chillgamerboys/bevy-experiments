@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 use bevy_gamekit::ui::GameUiPlugin;
-use deckbuilder_ui::DeckbuilderPlugin;
+use deckbuilder::DeckbuilderPlugin;
 
 fn main() {
     App::new()

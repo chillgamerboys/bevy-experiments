@@ -1,5 +1,5 @@
 [package]
-name = "gamekit-repo-tools"
+name = "repo-devtools"
 version = "0.1.0-dev.2"
 edition.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ repository = "https://github.com/chillgamerboys/bevy-experiments"
 readme = "README.md"
 
 [[bin]]
-name = "gamekit-repo"
+name = "repo-devtools"
 path = "src/main.rs"
 
 [[example]]

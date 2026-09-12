@@ -6,7 +6,7 @@ use aeronet::io::{
     Session, SessionEndpoint,
 };
 use bevy::prelude::*;
-use bevy_game_session::PeerId;
+use bevy_gamekit_session::PeerId;
 
 /// Game admission attaches this to the exact authenticated transport entity.
 /// Adding it emits [`MultiplayerLifecycle::Authenticated`]. It does not grant

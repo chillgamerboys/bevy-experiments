@@ -35,7 +35,7 @@ execution needs no compiler or interpreter. Queue mutation and command supervisi
 currently require POSIX support.
 
 ```sh
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills validate
+cargo run --locked -p repo-devtools --profile ci -- skills validate
 cargo test --locked -p gameskills-cli --profile ci
 ```
 

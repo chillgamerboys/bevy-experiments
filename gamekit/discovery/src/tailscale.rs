@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use bevy_game_session::DiscoveredDirectTarget;
+use bevy_gamekit_session::DiscoveredDirectTarget;
 use serde_json::Value;
 
 use crate::{

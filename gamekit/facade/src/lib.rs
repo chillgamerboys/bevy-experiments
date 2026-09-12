@@ -10,22 +10,22 @@
 
 /// Provider-neutral discovery; listing a session does not grant admission.
 #[cfg(feature = "discovery")]
-pub use bevy_game_discovery as discovery;
+pub use bevy_gamekit_discovery as discovery;
 /// Pure hex geometry; no board or occupancy rules.
 #[cfg(feature = "hex")]
-pub use bevy_game_hex as hex;
+pub use bevy_gamekit_hex as hex;
 /// Explicitly composed transport and connection lifecycle infrastructure.
 #[cfg(feature = "multiplayer")]
-pub use bevy_game_multiplayer as multiplayer;
+pub use bevy_gamekit_multiplayer as multiplayer;
 /// Transport-independent identities, credentials and admission security.
 #[cfg(feature = "session")]
-pub use bevy_game_session as session;
+pub use bevy_gamekit_session as session;
 /// Deterministic Bevy test infrastructure, without game-specific assertions.
 #[cfg(feature = "testing")]
-pub use bevy_game_test as testing;
+pub use bevy_gamekit_testing as testing;
 /// Pure ordered-participant sequencing; no action legality or victory rules.
 #[cfg(feature = "turns")]
-pub use bevy_game_turns as turns;
+pub use bevy_gamekit_turns as turns;
 /// Native Bevy UI primitives and interaction infrastructure.
 #[cfg(feature = "ui")]
-pub use bevy_game_ui as ui;
+pub use bevy_gamekit_ui as ui;

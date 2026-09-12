@@ -83,7 +83,7 @@ struct PeerRecord {
 ///
 /// ```
 /// use std::time::Duration;
-/// use bevy_game_session::{AdmissionCredential, AdmissionLimits, SessionAdmissionAuthority};
+/// use bevy_gamekit_session::{AdmissionCredential, AdmissionLimits, SessionAdmissionAuthority};
 ///
 /// let mut host = SessionAdmissionAuthority::new(AdmissionLimits::default())?;
 /// let invite = host.issue_invite(Duration::ZERO, Duration::from_secs(600))?;
@@ -94,7 +94,7 @@ struct PeerRecord {
 /// let grant = host.acknowledge(42, offer.reconnect_credential, Duration::from_secs(1))?;
 /// assert_eq!(grant.peer, offer.peer);
 /// assert!(host.is_connection_admitted(42));
-/// # Ok::<(), bevy_game_session::AdmissionFlowError>(())
+/// # Ok::<(), bevy_gamekit_session::AdmissionFlowError>(())
 /// ```
 #[derive(Debug)]
 pub struct SessionAdmissionAuthority {

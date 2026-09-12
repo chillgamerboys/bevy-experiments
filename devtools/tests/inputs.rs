@@ -1,6 +1,6 @@
 //! Shared input regressions, including malformed data and containment boundaries.
 
-use gamekit_repo_tools::{markdown, support};
+use repo_devtools::{markdown, support};
 
 #[test]
 fn duplicate_json_keys_at_any_depth_and_malformed_numbers_fail() {

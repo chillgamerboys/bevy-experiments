@@ -14,13 +14,13 @@ the game-adapted balance harness; no universal combat model is planned.
 
 | Owner | Responsibility | Excludes |
 |---|---|---|
-| `bevy_game_hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
-| `bevy_game_turns` | Validated ordered roster, cursor and rounds | Initiative rolls, legality, victory |
-| `bevy_game_session` | Pure identity, credentials, admission security | Sockets, Bevy, seats, lobby rules |
-| `bevy_game_discovery` | Public listings, provider lifetime, route handoff | Admission or connection construction |
-| `bevy_game_multiplayer` | Secure transport adapter, lifecycle, credential stores | Game commands, authority, disclosure |
-| `bevy_game_ui` | Input, scoped focus, metrics, opt-in contextual help, skins and primitives | Screens, action enums, game view models |
-| `bevy_game_test` | Deterministic App/input/layout helpers | Game fixtures or visual sign-off |
+| `bevy-gamekit-hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
+| `bevy-gamekit-turns` | Validated ordered roster, cursor and rounds | Initiative rolls, legality, victory |
+| `bevy-gamekit-session` | Pure identity, credentials, admission security | Sockets, Bevy, seats, lobby rules |
+| `bevy-gamekit-discovery` | Public listings, provider lifetime, route handoff | Admission or connection construction |
+| `bevy-gamekit-multiplayer` | Secure transport adapter, lifecycle, credential stores | Game commands, authority, disclosure |
+| `bevy-gamekit-ui` | Input, scoped focus, metrics, opt-in contextual help, skins and primitives | Screens, action enums, game view models |
+| `bevy-gamekit-testing` | Deterministic App/input/layout helpers | Game fixtures or visual sign-off |
 | Game | Rules, orchestration, schedules, views, content, assets and UX | Other games' private implementation |
 
 Labyrinth's `rules/` package has no Bevy/network/filesystem dependency. Carterfight's

@@ -1,6 +1,6 @@
 //! Real Git provenance, reproducible payloads and drift rejection.
 
-use gamekit_repo_tools::{bundle, catalog::EXPECTED_SKILLS};
+use repo_devtools::{bundle, catalog::EXPECTED_SKILLS};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, error::Error, io::Read, path::Path, process::Command};
 

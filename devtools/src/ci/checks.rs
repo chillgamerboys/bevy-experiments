@@ -5,11 +5,11 @@ use serde_json::Value;
 use std::path::Path;
 
 const WASM: &[&str] = &[
-    "bevy_game_hex",
-    "bevy_game_session",
-    "bevy_game_turns",
-    "bevy_game_ui",
-    "labyrinth_rules",
+    "bevy-gamekit-hex",
+    "bevy-gamekit-session",
+    "bevy-gamekit-turns",
+    "bevy-gamekit-ui",
+    "labyrinth-rules",
 ];
 const PROCESS_TEST: &str =
     "network::tests::process::six_native_processes_survive_guest_kill_and_finish_the_fight";
@@ -119,7 +119,7 @@ fn repository_command(command: &str, action: &str) -> Vec<String> {
         "run",
         "--locked",
         "-p",
-        "gamekit-repo-tools",
+        "repo-devtools",
         "--profile",
         "ci",
         "--",
@@ -149,7 +149,7 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                 "test",
                 "--locked",
                 "-p",
-                "gamekit-repo-tools",
+                "repo-devtools",
                 "--profile",
                 "ci",
                 "--test",
@@ -177,7 +177,7 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                 || selection
                     .packages
                     .iter()
-                    .any(|name| matches!(name.as_str(), "gameskills-cli" | "gamekit-repo-tools"))
+                    .any(|name| matches!(name.as_str(), "gameskills-cli" | "repo-devtools"))
             {
                 commands.push(repository_command("bundle", "check"));
             }
@@ -239,7 +239,7 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                 commands.push(argv(&["cargo", "deny", "check"]));
             }
             if selection.minimal {
-                for name in ["bevy_game_discovery", "bevy_game_multiplayer"] {
+                for name in ["bevy-gamekit-discovery", "bevy-gamekit-multiplayer"] {
                     commands.push(argv(&[
                         "cargo",
                         "check",
@@ -252,7 +252,7 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                     "cargo",
                     "test",
                     "-p",
-                    "bevy_game_test",
+                    "bevy-gamekit-testing",
                     "--no-default-features",
                     "--profile",
                     "ci",
@@ -261,7 +261,7 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                     "cargo",
                     "test",
                     "-p",
-                    "bevy_game_ui",
+                    "bevy-gamekit-ui",
                     "--profile",
                     "ci",
                 ]));

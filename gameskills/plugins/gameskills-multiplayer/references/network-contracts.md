@@ -43,8 +43,8 @@ prove network payloads are filtered. Inspect serialized output for each recipien
 
 Resolve dependency source through Cargo metadata and read version-matched Rustdoc,
 public types, production composition and tests. For GameKit, search
-`bevy_game_session`, `SessionAdmissionAuthority`, `bevy_game_multiplayer`,
+`bevy-gamekit-session`, `SessionAdmissionAuthority`, `bevy-gamekit-multiplayer`,
 `GameMultiplayerPlugin`, `AuthorizedClient`, `AuthenticatedPeer`,
-`bevy_game_discovery`, `DiscoveryJoinRoute` and `FakeDiscoveryProvider`.
+`bevy-gamekit-discovery`, `DiscoveryJoinRoute` and `FakeDiscoveryProvider`.
 These identify seams to inspect, not current signatures or a complete API manual.
 Opt-in features and installing a plugin are not evidence a socket/service started.

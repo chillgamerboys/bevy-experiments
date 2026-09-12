@@ -7,8 +7,8 @@ primarily to Labyrinth. Energy, card effects, private hands and victory stay loc
 From the repository root or this directory:
 
 ```sh
-cargo run -p deckbuilder_ui
-cargo test -p deckbuilder_ui --profile ci
+cargo run -p deckbuilder
+cargo test -p deckbuilder --profile ci
 ```
 
 No `--all-features` is needed for ordinary play. Use pointer or Tab/Shift+Tab and
@@ -57,7 +57,7 @@ do not establish cross-machine LAN/Tailscale behavior.
 ## UI evidence
 
 ```sh
-cargo run -p deckbuilder_ui --example review_capture --profile ci -- \
+cargo run -p deckbuilder --example review_capture --profile ci -- \
   target/review/deckbuilder-1920-auto.png 1920 1080 auto match
 ```
 

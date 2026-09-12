@@ -18,7 +18,7 @@ unpublished. Prebuilt runtime adoption does not require a Rust compiler.
 cargo run                         # Labyrinth multiplayer menu
 cargo run -- --local              # local Labyrinth battle
 cargo run -p carterfight
-cargo run -p deckbuilder_ui
+cargo run -p deckbuilder
 ```
 
 Running from a game's directory selects that package. Assets must not depend on
@@ -44,10 +44,10 @@ The standard application entry point is the [facade](../gamekit/facade/README.md
 
 ```toml
 [dependencies]
-bevy_gamekit = { workspace = true, features = ["ui"] }
+bevy-gamekit = { workspace = true, features = ["ui"] }
 
 [dev-dependencies]
-bevy_gamekit = { workspace = true, features = ["testing-ui"] }
+bevy-gamekit = { workspace = true, features = ["testing-ui"] }
 ```
 
 Use `bevy_gamekit::ui` and `bevy_gamekit::testing`. Direct capability dependencies
@@ -60,7 +60,7 @@ automatically starts a service or composes a game. Networking is an explicit cho
 is short-lived agent scratch. Enduring requirements belong in normal docs. Build
 output and scratch stay out of Git. The explicit exception is the deterministic
 instruction snapshot under `gameskills/cli/bundle/`: commit it with its source
-pin after `gamekit-repo bundle prepare`, and verify it with `bundle check`.
+pin after `repo-devtools bundle prepare`, and verify it with `bundle check`.
 
 Cleanup is explicit maintenance after stopping workspace processes, never an
 automatic startup purge. Do not remove global caches/toolchains, game profiles,

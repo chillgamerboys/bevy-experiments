@@ -7,7 +7,7 @@ through independently composed games. Bevy 0.19; one Cargo workspace.
 |---|---|---|
 | [Labyrinth](games/labyrinth/README.md) | Primary game: six-player cooperative positional combat | `cargo run` |
 | [Carterfight](games/carterfight/README.md) | Pixel-art dialogue battle; contrasting UI adopter | `cargo run -p carterfight` |
-| [Deckbuilder](games/deckbuilder/README.md) | Runnable UI and multiplayer regression example | `cargo run -p deckbuilder_ui` |
+| [Deckbuilder](games/deckbuilder/README.md) | Runnable UI and multiplayer regression example | `cargo run -p deckbuilder` |
 
 For a local Labyrinth battle controlling the whole company: `cargo run -- --local`.
 Ordinary play does not require `--all-features`. The multiplayer menu opens no host
@@ -19,7 +19,7 @@ until requested. See each game's README for controls and supported behavior.
 cargo test --workspace --all-features --profile ci
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
-cargo run --locked -p gamekit-repo-tools --profile ci -- check
+cargo run --locked -p repo-devtools --profile ci -- check
 ```
 
 The CI profile optimizes compile time; normal `cargo run` uses the dev profile.

@@ -11,7 +11,7 @@ initiative, advance a turn, or authorize a command. Labyrinth's presentation lay
 separates public authored/base effects from target-specific outcomes and marks
 undisclosed information as unknown instead of substituting zero. Periodic effects
 describe their timing and remaining opportunities, not guaranteed future totals.
-These calculations and disclosure policies do not belong in `bevy_game_ui`.
+These calculations and disclosure policies do not belong in `bevy-gamekit-ui`.
 The current viewer contract leaves identity, allegiance, rank and standing/downed
 state public; exact HP amounts, conditions and inspection details can be unknown.
 Basic targeting legality can therefore still reflect public standing state.

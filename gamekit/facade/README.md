@@ -9,10 +9,10 @@ Inside this repository:
 
 ```toml
 [dependencies]
-bevy_gamekit = { workspace = true, features = ["ui"] }
+bevy-gamekit = { workspace = true, features = ["ui"] }
 
 [dev-dependencies]
-bevy_gamekit = { workspace = true, features = ["testing-ui"] }
+bevy-gamekit = { workspace = true, features = ["testing-ui"] }
 ```
 
 Use `bevy_gamekit::ui::GameUiPlugin` in the game's own Bevy `App`. Enabling a

@@ -12,7 +12,7 @@ use bevy_gamekit::ui::{
     resolve_ui_metrics, GameUiPlugin, GameUiSystems, ResolvedUiMetrics, UiScaleMode,
     UiScalePreference,
 };
-use deckbuilder_ui::DeckbuilderPlugin;
+use deckbuilder::DeckbuilderPlugin;
 
 #[derive(Resource)]
 struct CapturePlan {

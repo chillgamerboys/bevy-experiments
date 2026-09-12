@@ -1,6 +1,6 @@
 //! Required-result failures and selected command scopes preserve the Python CI contracts.
 
-use gamekit_repo_tools::ci::{checks, Job, Selection};
+use repo_devtools::ci::{checks, Job, Selection};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::path::Path;
@@ -334,7 +334,7 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
             "test",
             "--locked",
             "-p",
-            "gamekit-repo-tools",
+            "repo-devtools",
             "--profile",
             "ci",
             "--test",
@@ -358,7 +358,7 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
             "run",
             "--locked",
             "-p",
-            "gamekit-repo-tools",
+            "repo-devtools",
             "--profile",
             "ci",
             "--",
@@ -396,7 +396,7 @@ fn skills_and_distribution_call_rust_validators() -> TestResult {
 #[test]
 fn selected_policy_avoids_shared_checks_and_preserves_package_arguments() -> TestResult {
     let mut value = selection();
-    value.packages.push("deckbuilder_ui".into());
+    value.packages.push("deckbuilder".into());
     let commands = checks::commands(&value, Job::Policy)?;
     assert_eq!(
         commands,
@@ -415,7 +415,7 @@ fn selected_policy_avoids_shared_checks_and_preserves_package_arguments() -> Tes
                 "-p",
                 "carterfight",
                 "-p",
-                "deckbuilder_ui",
+                "deckbuilder",
                 "--all-targets",
                 "--all-features",
                 "--profile",
@@ -444,7 +444,7 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
             "cargo",
             "check",
             "-p",
-            "bevy_game_discovery",
+            "bevy-gamekit-discovery",
             "--no-default-features"
         ]))
     );
@@ -454,7 +454,7 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
             "cargo",
             "check",
             "-p",
-            "bevy_game_multiplayer",
+            "bevy-gamekit-multiplayer",
             "--no-default-features"
         ]))
     );
@@ -464,7 +464,7 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
             "cargo",
             "test",
             "-p",
-            "bevy_game_test",
+            "bevy-gamekit-testing",
             "--no-default-features",
             "--profile",
             "ci"
@@ -476,7 +476,7 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
             "cargo",
             "test",
             "-p",
-            "bevy_game_ui",
+            "bevy-gamekit-ui",
             "--profile",
             "ci"
         ]))
@@ -496,15 +496,15 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
             "cargo",
             "check",
             "-p",
-            "bevy_game_hex",
+            "bevy-gamekit-hex",
             "-p",
-            "bevy_game_session",
+            "bevy-gamekit-session",
             "-p",
-            "bevy_game_turns",
+            "bevy-gamekit-turns",
             "-p",
-            "bevy_game_ui",
+            "bevy-gamekit-ui",
             "-p",
-            "labyrinth_rules",
+            "labyrinth-rules",
             "--target",
             "wasm32-unknown-unknown",
         ]))
@@ -516,9 +516,9 @@ fn full_policy_keeps_deny_minimal_and_sorted_wasm_checks() -> TestResult {
 fn optional_policy_flags_and_wasm_intersection_are_independent() -> TestResult {
     let mut value = selection();
     value.packages = vec![
-        "labyrinth_rules".into(),
+        "labyrinth-rules".into(),
         "carterfight".into(),
-        "bevy_game_ui".into(),
+        "bevy-gamekit-ui".into(),
     ];
     value.wasm = true;
     let commands = checks::commands(&value, Job::Policy)?;
@@ -529,9 +529,9 @@ fn optional_policy_flags_and_wasm_intersection_are_independent() -> TestResult {
             "cargo",
             "check",
             "-p",
-            "bevy_game_ui",
+            "bevy-gamekit-ui",
             "-p",
-            "labyrinth_rules",
+            "labyrinth-rules",
             "--target",
             "wasm32-unknown-unknown",
         ]))

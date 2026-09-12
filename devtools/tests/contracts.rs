@@ -32,7 +32,7 @@ fn valid() -> Result<String, Box<dyn Error>> {
 
 #[test]
 fn complete_inventory_is_valid() -> Result<(), Box<dyn Error>> {
-    gamekit_repo_tools::contracts::validate(&valid()?)?;
+    repo_devtools::contracts::validate(&valid()?)?;
     Ok(())
 }
 
@@ -46,7 +46,7 @@ fn missing_duplicate_and_unknown_entries_are_rejected() -> Result<(), Box<dyn Er
             .and_then(Value::as_array_mut)
             .ok_or("array missing")?
             .pop();
-        assert!(gamekit_repo_tools::contracts::validate(&missing.to_string()).is_err());
+        assert!(repo_devtools::contracts::validate(&missing.to_string()).is_err());
         let mut duplicate: Value = serde_json::from_str(&valid)?;
         let rows = duplicate
             .get_mut(group)
@@ -54,7 +54,7 @@ fn missing_duplicate_and_unknown_entries_are_rejected() -> Result<(), Box<dyn Er
             .ok_or("array missing")?;
         let first = rows.first().ok_or("empty group")?.clone();
         rows.push(first);
-        assert!(gamekit_repo_tools::contracts::validate(&duplicate.to_string()).is_err());
+        assert!(repo_devtools::contracts::validate(&duplicate.to_string()).is_err());
         let mut unknown: Value = serde_json::from_str(&valid)?;
         let first = unknown
             .get_mut(group)
@@ -65,7 +65,7 @@ fn missing_duplicate_and_unknown_entries_are_rejected() -> Result<(), Box<dyn Er
             .as_object_mut()
             .ok_or("object missing")?
             .insert("source".into(), Value::String("unknown.py".into()));
-        assert!(gamekit_repo_tools::contracts::validate(&unknown.to_string()).is_err());
+        assert!(repo_devtools::contracts::validate(&unknown.to_string()).is_err());
     }
     Ok(())
 }
@@ -78,7 +78,7 @@ fn malformed_types_duplicate_fields_and_unexplained_changes_fail() -> Result<(),
         "\"schema_version\": 1, \"schema_version\": 1",
         1,
     );
-    assert!(gamekit_repo_tools::contracts::validate(&duplicate).is_err());
+    assert!(repo_devtools::contracts::validate(&duplicate).is_err());
     for (pointer, replacement) in [
         ("/schema_version", Value::Bool(true)),
         ("/reference_commit", Value::String("main".into())),
@@ -96,7 +96,7 @@ fn malformed_types_duplicate_fields_and_unexplained_changes_fail() -> Result<(),
             .pointer_mut(pointer)
             .ok_or("fixture pointer missing")? = replacement;
         assert!(
-            gamekit_repo_tools::contracts::validate(&value.to_string()).is_err(),
+            repo_devtools::contracts::validate(&value.to_string()).is_err(),
             "{pointer}"
         );
     }
@@ -110,7 +110,7 @@ fn actual_cli_marks_accounting_as_distinct_from_verification() -> Result<(), Box
     std::fs::create_dir(directory.path().join("devtools"))?;
     let path = directory.path().join("devtools/migration-contracts.json");
     std::fs::write(&path, &valid)?;
-    let result = std::process::Command::new(env!("CARGO_BIN_EXE_gamekit-repo"))
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_repo-devtools"))
         .args(["contracts", "check"])
         .current_dir(directory.path())
         .output()?;
@@ -119,13 +119,13 @@ fn actual_cli_marks_accounting_as_distinct_from_verification() -> Result<(), Box
     assert_eq!(value.get("ports_verified"), Some(&Value::Bool(false)));
     assert_eq!(value.get("reference_verified"), Some(&Value::Bool(false)));
     assert_eq!(std::fs::read_to_string(&path)?, valid);
-    let missing_history = std::process::Command::new(env!("CARGO_BIN_EXE_gamekit-repo"))
+    let missing_history = std::process::Command::new(env!("CARGO_BIN_EXE_repo-devtools"))
         .args(["contracts", "check", "--verify-reference"])
         .current_dir(directory.path())
         .output()?;
     assert_eq!(missing_history.status.code(), Some(2));
     std::fs::write(&path, "{}")?;
-    let bad_inventory = std::process::Command::new(env!("CARGO_BIN_EXE_gamekit-repo"))
+    let bad_inventory = std::process::Command::new(env!("CARGO_BIN_EXE_repo-devtools"))
         .args(["contracts", "check"])
         .current_dir(directory.path())
         .output()?;
@@ -136,7 +136,7 @@ fn actual_cli_marks_accounting_as_distinct_from_verification() -> Result<(), Box
 #[test]
 fn cutover_rejects_unfinished_missing_owners_python_sources_and_ci_setup(
 ) -> Result<(), Box<dyn Error>> {
-    use gamekit_repo_tools::contracts::cutover;
+    use repo_devtools::contracts::cutover;
     let directory = tempfile::tempdir()?;
     let root = directory.path();
     let mut inventory: Value = serde_json::from_str(&valid()?)?;
