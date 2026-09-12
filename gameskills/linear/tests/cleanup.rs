@@ -169,7 +169,10 @@ fn preview_has_no_mutations_and_unsupported_content_is_retained() -> Result<(), 
 #[cfg(unix)]
 fn private() -> Result<tempfile::TempDir, Box<dyn Error>> {
     use std::os::unix::fs::PermissionsExt;
-    let d = tempfile::tempdir()?;
+    // Fake-provider tests exercise the production guard against system temporary
+    // export roots. Keep their disposable private store under the user's directory.
+    let parent = std::env::var_os("HOME").ok_or("test requires a user directory")?;
+    let d = tempfile::tempdir_in(parent)?;
     std::fs::set_permissions(d.path(), std::fs::Permissions::from_mode(0o700))?;
     Ok(d)
 }
