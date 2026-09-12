@@ -28,6 +28,10 @@ Start with the [installation and workflow guide](docs/development.md),
 [complete contracts](docs/decisions/gameskills-catalog.md) and
 [Bevy companion direction](docs/decisions/gameskills-framework.md).
 
+The [workflow reliability and optional Linear plan](docs/decisions/workflow-reliability-and-linear.md)
+tracks the next audit, legacy consolidation, planning grill, and retention pilot.
+It describes proposed work, not currently installed capabilities.
+
 ## Validation
 
 Rust 1.97.1 builds the tools and Git supplies repository identity. Prebuilt CLI
