@@ -5,6 +5,9 @@ Owner: GameSkills. Resume when the user selects a product trial or support expan
 
 ## Retained work
 
+- Start the next GameSkills session with [skill evaluation](skill-evaluation.md).
+  These trials are explicitly non-blocking for merging PR #38.
+
 - Exercise GameSkills during real Labyrinth mechanical/presentation work; verify
   native interaction and enjoyment separately from command/structure success.
 - Use Deckbuilder as a contrasting adopter, without expanding it merely to fit a

@@ -364,4 +364,6 @@ independent behavior and Claude-native observations remain explicitly unavailabl
 Final source-bound command results and remote CI belong to PR #38's validation
 record. Retain this plan until its outcome lands, then remove it after any remaining
 acceptance has an owner. The separate reliability plan retains MCP-first tracking
-alignment and independent evaluation; Linear deletion and its live pilot stay deferred.
+alignment. Independent evaluation is explicitly non-blocking for this PR and moves
+to the [next-session plan](../../gameskills/docs/plans/skill-evaluation.md); Linear deletion
+and its live pilot stay deferred.

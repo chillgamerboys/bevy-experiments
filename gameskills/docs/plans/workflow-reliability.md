@@ -13,13 +13,15 @@ installation and troubleshooting docs. The docs-and-skills refactor is tracked i
 
 ## Remaining work
 
-- Align everyday tracking with connected MCP. The existing required observer in
-  this repository still invokes the standalone helper and needs separate credentials;
-  connected issue/PR verification does not make that programmatic observer pass.
-- Evaluate candidate skill behavior with realistic resume, absent-discovery and
-  docs-routing tasks. Report native discovery separately from forward behavior,
-  and independent trials separately from solo exercises. Claude authentication and
-  Windows supervision support are not established by portable structure tests.
+- Make the connected Linear MCP the primary tracking path. The skill can use the
+  host connection directly; the CLI currently launches a standalone observer instead.
+  This is an implementation choice, not an MCP limitation. Keep the helper optional
+  and distinguish actual host/MCP verification from checks executed by the CLI.
+  Do not require another API key for ordinary tracking. The current required observer
+  remains unaligned; do not report it passed merely because MCP verified the links.
+- Independent skill evaluation moves to the [next-session plan](skill-evaluation.md).
+  The user explicitly removed it from PR #38 merge acceptance; keep it discoverable
+  without treating the unrun trials as passed.
 - Reconcile observed delivery and remaining acceptance before declaring PR #38 ready.
   Merge/public release need their own authorization.
 
@@ -42,6 +44,6 @@ turns. All 20 GraphQL operations matched the inspected official schema; authenti
 provider behavior, quota effects and live deletion were not exercised. No tickets
 were deleted. Preserve original run/bundle records; do not relabel these passes.
 
-Completion requires the remaining tracking/behavior work to be resolved or explicitly
+Completion requires the remaining tracking work to be resolved or explicitly
 scoped out, current docs reconciled, and actual PR delivery verified. Retire this plan
 when the whole outcome is settled; retain durable rationale in current topic docs.
