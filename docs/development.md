@@ -8,9 +8,9 @@ Avahi. Native targets are macOS/Linux/Windows. Capability wasm compile checks do
 promise packaged browser games. Repository maintenance and GameSkills runtime logic
 are Rust; metadata and agent instructions remain data and Markdown.
 
-The [Rust GameSkills CLI](../tools/gameskills-cli/README.md) handles installation,
+The [Rust GameSkills CLI](../gameskills/cli/README.md) handles installation,
 configuration, queues and command evidence. The separate
-[repository tool](../tools/gamekit-repo-tools/README.md) owns validators, CI and
+[repository tool](../devtools/README.md) owns validators, CI and
 distribution checks. Both packages declare the tested Rust 1.97.1 minimum and remain
 unpublished. Prebuilt runtime adoption does not require a Rust compiler.
 
@@ -18,7 +18,7 @@ unpublished. Prebuilt runtime adoption does not require a Rust compiler.
 cargo run                         # Labyrinth multiplayer menu
 cargo run -- --local              # local Labyrinth battle
 cargo run -p carterfight
-cargo run -p deckbuilder_ui
+cargo run -p deckbuilder
 ```
 
 Running from a game's directory selects that package. Assets must not depend on
@@ -40,14 +40,14 @@ launch is not the documented default.
    game-name branches in shared UI. Add static and interactive presentation checks.
 6. Update navigation and verify launch from root and the game directory.
 
-The standard application entry point is the [facade](../crates/bevy_gamekit/README.md):
+The standard application entry point is the [facade](../gamekit/facade/README.md):
 
 ```toml
 [dependencies]
-bevy_gamekit = { workspace = true, features = ["ui"] }
+bevy-gamekit = { workspace = true, features = ["ui"] }
 
 [dev-dependencies]
-bevy_gamekit = { workspace = true, features = ["testing-ui"] }
+bevy-gamekit = { workspace = true, features = ["testing-ui"] }
 ```
 
 Use `bevy_gamekit::ui` and `bevy_gamekit::testing`. Direct capability dependencies
@@ -59,8 +59,8 @@ automatically starts a service or composes a game. Networking is an explicit cho
 `target/` is the only build tree; review output goes in `target/review/`. `.context/`
 is short-lived agent scratch. Enduring requirements belong in normal docs. Build
 output and scratch stay out of Git. The explicit exception is the deterministic
-instruction snapshot under `tools/gameskills-cli/bundle/`: commit it with its source
-pin after `gamekit-repo bundle prepare`, and verify it with `bundle check`.
+instruction snapshot under `gameskills/cli/bundle/`: commit it with its source
+pin after `repo-devtools bundle prepare`, and verify it with `bundle check`.
 
 Cleanup is explicit maintenance after stopping workspace processes, never an
 automatic startup purge. Do not remove global caches/toolchains, game profiles,

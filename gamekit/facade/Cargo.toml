@@ -1,0 +1,36 @@
+[package]
+name = "bevy-gamekit"
+description = "Opt-in capabilities for independently composed Bevy games"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+readme = "README.md"
+include = ["src/**", "Cargo.toml", "README.md"]
+
+[features]
+default = []
+hex = ["dep:bevy-gamekit-hex"]
+turns = ["dep:bevy-gamekit-turns"]
+turns-serde = ["turns", "bevy-gamekit-turns/serde"]
+ui = ["dep:bevy-gamekit-ui"]
+session = ["dep:bevy-gamekit-session"]
+multiplayer = ["dep:bevy-gamekit-multiplayer", "session"]
+direct = ["multiplayer", "bevy-gamekit-multiplayer/direct"]
+discovery = ["dep:bevy-gamekit-discovery", "session"]
+mdns = ["discovery", "bevy-gamekit-discovery/mdns"]
+tailscale-cli = ["discovery", "bevy-gamekit-discovery/tailscale-cli"]
+testing = ["dep:bevy-gamekit-testing"]
+testing-ui = ["testing", "ui", "bevy-gamekit-testing/ui"]
+
+[dependencies]
+bevy-gamekit-hex = { workspace = true, optional = true }
+bevy-gamekit-turns = { workspace = true, optional = true }
+bevy-gamekit-ui = { workspace = true, optional = true }
+bevy-gamekit-session = { workspace = true, optional = true }
+bevy-gamekit-multiplayer = { workspace = true, optional = true }
+bevy-gamekit-discovery = { workspace = true, optional = true }
+bevy-gamekit-testing = { workspace = true, optional = true }
+
+[lints]
+workspace = true

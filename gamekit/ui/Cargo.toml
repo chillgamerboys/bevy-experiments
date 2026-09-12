@@ -1,0 +1,13 @@
+[package]
+name = "bevy-gamekit-ui"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+bevy = { workspace = true, features = ["ui_api", "bevy_ui_widgets", "picking"] }
+zeroize = "1"
+
+[lints]
+workspace = true

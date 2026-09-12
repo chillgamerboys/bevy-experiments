@@ -17,12 +17,12 @@ path = "examples/review_capture.rs"
 
 [dependencies]
 bevy = { workspace = true, features = ["2d", "ui", "bevy_audio", "wav", "png"] }
-bevy_gamekit = { workspace = true, features = ["ui"] }
+bevy-gamekit = { workspace = true, features = ["ui"] }
 rand = "0.8"
 rand_chacha = "0.3"
 
 [dev-dependencies]
-bevy_gamekit = { workspace = true, features = ["testing-ui"] }
+bevy-gamekit = { workspace = true, features = ["testing-ui"] }
 
 [lints]
 workspace = true

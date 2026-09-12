@@ -5,7 +5,7 @@ Share a stable contract with independent tests and two plausible consumers, not
 merely similar code. Keep uncertain abstractions local until experiments establish
 the common behavior.
 
-Applications may consume the feature-gated [bevy-gamekit facade](../crates/bevy_gamekit/README.md)
+Applications may consume the feature-gated [bevy-gamekit facade](../gamekit/facade/README.md)
 or individual capabilities. The facade only re-exports types; it owns no plugin,
 rules or runtime state. Capabilities cannot depend back on it. Library-only external
 consumer checks enforce a boundary independent of the games' workspace builds.
@@ -14,13 +14,13 @@ the game-adapted balance harness; no universal combat model is planned.
 
 | Owner | Responsibility | Excludes |
 |---|---|---|
-| `bevy_game_hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
-| `bevy_game_turns` | Validated ordered roster, cursor and rounds | Initiative rolls, legality, victory |
-| `bevy_game_session` | Pure identity, credentials, admission security | Sockets, Bevy, seats, lobby rules |
-| `bevy_game_discovery` | Public listings, provider lifetime, route handoff | Admission or connection construction |
-| `bevy_game_multiplayer` | Secure transport adapter, lifecycle, credential stores | Game commands, authority, disclosure |
-| `bevy_game_ui` | Input, scoped focus, metrics, opt-in contextual help, skins and primitives | Screens, action enums, game view models |
-| `bevy_game_test` | Deterministic App/input/layout helpers | Game fixtures or visual sign-off |
+| `bevy-gamekit-hex` | Coordinates, neighbors, distance, layout/picking | Boards, pieces, movement rules |
+| `bevy-gamekit-turns` | Validated ordered roster, cursor and rounds | Initiative rolls, legality, victory |
+| `bevy-gamekit-session` | Pure identity, credentials, admission security | Sockets, Bevy, seats, lobby rules |
+| `bevy-gamekit-discovery` | Public listings, provider lifetime, route handoff | Admission or connection construction |
+| `bevy-gamekit-multiplayer` | Secure transport adapter, lifecycle, credential stores | Game commands, authority, disclosure |
+| `bevy-gamekit-ui` | Input, scoped focus, metrics, opt-in contextual help, skins and primitives | Screens, action enums, game view models |
+| `bevy-gamekit-testing` | Deterministic App/input/layout helpers | Game fixtures or visual sign-off |
 | Game | Rules, orchestration, schedules, views, content, assets and UX | Other games' private implementation |
 
 Labyrinth's `rules/` package has no Bevy/network/filesystem dependency. Carterfight's
@@ -28,103 +28,8 @@ backend stays pure Rust and local to that game. They do not need identical layou
 or a common combat engine. Labyrinth uses rolled initiative; deckbuilder uses cyclic
 turns. Carterfight's displayed HP follows narrated events after backend resolution.
 
-## UI flow
-
-Input eligibility -> entity activation -> game-local intent -> authoritative model
--> immutable view -> presentation. Independent consumers use independent readers;
-never drain shared messages or mutate rules from a widget. Public system sets expose
-actual dependencies; plugin insertion order is not a scheduling contract.
-
-Input mechanics do not prescribe a skin. Games opt into semantic painting and may
-override surfaces, fonts and interaction states. Scope focus identity with stable
-keys, not displayed text. Games own selection, inspection and scene composition;
-the toolkit owns reusable accessibility mechanics.
-
-### Local menus and activity feeds
-
-`UiMenuStack<Route>` stores bounded, deduplicated local page history using a
-game-owned route type. `menu_overlay`, `menu_panel` and `menu_actions_node` provide
-native layout and the existing modal focus contract. Labyrinth and deckbuilder
-adopt these templates, but own their menu labels, pages, leave consequences and
-settings actions. Opening a menu does not pause `Time<Virtual>`, send a network
-command, or suspend authority. A party-wide pause would be a separate game policy.
-
-`GameUiFeedPlugin` and `UiFeedScroll` follow a native scroll container's latest
-content until the reader scrolls away. Games supply a monotonic revision, choose
-retention/grouping and render a Latest/unread control; replace the component when
-switching feeds. The shared component holds no combat events or log strings.
-Labyrinth retains its typed authoritative history, groups action outcomes and
-opens disclosed ability explanations through the existing tooltip catalog. History
-is non-modal and can be fully hidden. Labyrinth's actor/initiative details use
-contextual cards rather than a second inspection menu. Only local game menus and
-explicit keyboard tooltip reading capture their respective input scopes.
-Passive tooltip previews do not consume Escape or history paging keys. Pinned,
-nested or actively read tooltips retain their own navigation priority.
-
-### Contextual information without a shared screen design
-
-`GameUiContextHelpPlugin` is opt-in beside `GameUiPlugin`. Games attach plain,
-already-disclosed `UiContextHelp { title, body }` content to existing native
-controls and consume `UiContextHelpState` after `UiContextHelpSystems::Resolve`
-in `Update`. This selects a hovered or keyboard-focused source; it does not draw
-a popup, change focus, emit an action, or introduce another pointer hit-test path.
-It shares activation eligibility for disabled, hidden and modal-blocked controls,
-and excludes sources with no visible clipped bounds. A new keyboard focus wins
-over stationary hover; fresh pointer activity can reclaim the context. Post-layout
-validation clears a removed, hidden or scrolled-away source.
-
-The same selection contract can serve a deckbuilder card, a Carterfight move, or
-a Labyrinth ability. The games still choose the information, inspection action,
-placement and skin. Labyrinth uses a stable character command dock and pinnable
-contextual cards; another adopter need not use either. An unavailable action that
-remains inspectable is a game-owned distinction, not permission for a disabled
-`UiAction` to activate. Keep explanations on an explicitly eligible inspection
-control when disabling activation entirely.
-
-Tooltip sizing is constrained before native layout. Floating placement translates
-the measured card and every descendant after `UiSystems::Layout` and before
-`PostLayout` clipping/text processing, within the same frame. It does not write
-late `Node` offsets or wait for a later frame to reveal valid geometry. The host
-is a full-target screen root; cards retain native layout and scroll behavior.
-Previews appear immediately and are pointer-transparent. Leaving before the
-configurable `UiTooltipSettings::lock_delay` (1 second by default) dismisses them
-immediately. Continuous hover locks a card until explicit dismissal, source
-replacement or a scope/disclosure change. An accent border and corner × indicate
-the locked state; there is no Pin/footer row. Retained click focus is not hover;
-keyboard inspection is explicit via T. This lifecycle is separate from placement
-and never delays display to mask invalid geometry. `UiTooltipDismissOnActivate`
-can suppress a transient hint on activation until its source is left.
-`UiTooltipAvoid` marks same-host surfaces, such as a visible activity log, whose
-measured rectangles placement should avoid. When space is insufficient, placement
-minimizes overlap; adopters still own surface organization. Labyrinth omits the
-log-toggle and game-menu tooltips entirely and separates non-interactive formation layout anchors
-from fitted-art input rectangles. Sprite rendering and those hit rectangles use
-the same art-fit calculation; moving the pointer over empty sky is not targeting.
-
-### Labyrinth forecasts and viewer knowledge
-
-Labyrinth keeps its combat organization, glyph vocabulary, ability/rank diagrams,
-target selection and confirmation local. Flat prototype surfaces are replaceable
-appearance, not a contract imposed on other games or future Labyrinth art.
-
-The pure rules package forecasts immediate ordered effects through the same
-resolver used by committed actions. A forecast does not consume RNG, roll
-initiative, advance a turn, or authorize a command. Labyrinth's presentation layer
-separates public authored/base effects from target-specific outcomes and marks
-undisclosed information as unknown instead of substituting zero. Periodic effects
-describe their timing and remaining opportunities, not guaranteed future totals.
-These calculations and disclosure policies do not belong in `bevy_game_ui`.
-The current viewer contract leaves identity, allegiance, rank and standing/downed
-state public; exact HP amounts, conditions and inspection details can be unknown.
-Basic targeting legality can therefore still reflect public standing state.
-
-**Current disclosure is a presentation seam, not network secrecy.** Labyrinth's
-multiplayer snapshots still contain the complete combat state, and the normal
-encounter is fully revealed. Hidden-information fixtures exercise what the UI can
-represent. Actual reveal abilities or concealed enemy facts will require
-recipient-filtered snapshots, events and logs before transmission, plus disclosure
-tests at that boundary. Hiding a widget or suppressing a log on a client cannot
-remove information already sent to it.
+See [shared UI integration](../gamekit/docs/ui.md) and
+[Labyrinth disclosure](../games/labyrinth/docs/disclosure.md) for detailed contracts.
 
 ## Network flow
 
@@ -137,4 +42,4 @@ disconnect policy. Lost peers cannot silently become local AI.
 Errors are typed and visible. Invalid persisted/network data cannot bypass domain
 invariants. Optional discovery failure does not disable Direct joining. Worker
 queues, deadlines and frame work stay bounded. See Rustdoc for public contracts and
-[network operations](multiplayer.md) for diagnostics.
+[network operations](../gamekit/docs/multiplayer.md) for diagnostics.

@@ -1,5 +1,9 @@
 # Focused Gamekit workspace
 
+Historical decision. Its flat-layout requirement is superseded by the
+[repository organization refactor](repository-organization.md); the ownership and
+single-workspace principles remain.
+
 Accepted 2026-09-09. Recovery baseline:
 `4add0a930ae76331d95ad747007d0cb4f4c13204` (merged PR #16).
 

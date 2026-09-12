@@ -1,7 +1,7 @@
 # GameKit and GameSkills distribution
 
 Status: proposed distribution design, requested September 10, 2026, alongside the
-[Rust migration plan](decisions/gameskills-rust-cli.md). No packages or releases have
+[Rust migration plan](../gameskills/docs/history/gameskills-rust-cli.md). No packages or releases have
 been published by this work. GameKit, GameSkills and the games stay in this repository;
 a repository split is not a release prerequisite.
 
@@ -16,8 +16,8 @@ Public distribution follows artifact verification and a separate release decisio
 |---|---|---|
 | GameKit libraries | crates.io source crates, with API documentation on docs.rs | Keep the `bevy-gamekit` facade and opt-in capability crates; default features stay empty. Games, GameSkills and repository tools are not library dependencies. |
 | GameSkills executable | A crates.io binary package plus prebuilt archives on GitHub Releases | Working package name `gameskills-cli`, executable `gameskills`. Source installation uses Cargo; prebuilt adoption requires neither Cargo nor Python. No Bevy dependency in the CLI. |
-| GameSkills instructions | A baseline bundle embedded in the CLI, plus a versioned standalone bundle archive | Canonical Markdown and native-client metadata remain in `plugins/`. Install the 12 core skills by default and only explicitly selected optional packages. |
-| Repository maintenance | Source-built `gamekit-repo-tools`, kept `publish = false` | Layout, CI and distribution checks belong to this repository, not the adopter's runtime. |
+| GameSkills instructions | A baseline bundle embedded in the CLI, plus a versioned standalone bundle archive | Canonical Markdown and native-client metadata remain in `gameskills/plugins/`. Install the 12 core skills by default and only explicitly selected optional packages. |
+| Repository maintenance | Source-built `repo-devtools`, kept `publish = false` | Layout, CI and distribution checks belong to this repository, not the adopter's runtime. |
 
 These are proposed names, not registry reservations. Settle ownership, consistent
 capability names and package metadata in R0/R1 before the first public release.
@@ -38,7 +38,7 @@ compatible baseline skill bundle in the executable. A fresh installation can ins
 the catalog and materialize selected instructions without a source checkout or a
 network bundle download. See [Cargo installation behavior](https://doc.rust-lang.org/cargo/commands/cargo-install.html).
 
-Keep `plugins/` as the only human-edited skill source. A Rust repository preparation
+Keep `gameskills/plugins/` as the only human-edited skill source. A Rust repository preparation
 command generates a deterministic, package-local bundle snapshot and manifest under
 the CLI package. The candidate includes that snapshot in the Cargo package and embeds it from
 within the package boundary. CI checks regeneration and the content digest. Do not
@@ -78,7 +78,7 @@ releases for every instruction edit.
 
 ## Current readiness gaps
 
-`gamekit-repo distribution check` retains Cargo-selected source consumer checks.
+`repo-devtools distribution check` retains Cargo-selected source consumer checks.
 `distribution archives` now produces actual Cargo archives in temporary staging,
 inspects their contents and normalized manifests, then tests the same empty/pure/UI/
 network cases against extracted sources. Staging adds matching versions to internal
@@ -155,57 +155,30 @@ requires working artifacts, but does not require a public release or new registr
 infrastructure. First-party executable release logic and preparation tools stay Rust;
 declarative workflow configuration and external release tools remain appropriate.
 
-## Optional later repository split
+## Future repository split
 
-The historical recipe below is retained only if a separate library repository is
-chosen later. Do not perform it as part of the current consolidation.
+Gamekit and GameSkills will share one repository; games will become independent
+adopters. The root-level organization prepares ownership without creating nested
+workspaces in this repository.
 
-Start with a **fresh disposable clone of a committed, flat-layout revision**.
-Never filter this working repository or the linked worktrees. Use a pinned
-`git-filter-repo` tool installation and review its output before adding any remote.
-The [official tool documentation](https://github.com/newren/git-filter-repo/blob/main/Documentation/git-filter-repo.txt)
-describes the path filter behavior.
+When extraction is scheduled:
 
-```sh
-git filter-repo \
-  --path gamekit/crates/ --path crates/ \
-  --path gamekit/skills/ --path skills/ \
-  --path gamekit/Cargo.toml --path Cargo.toml \
-  --path gamekit/Cargo.lock --path Cargo.lock \
-  --path gamekit/deny.toml --path deny.toml \
-  --path gamekit/rustfmt.toml --path rustfmt.toml
-```
+1. Select a committed revision and work in a fresh disposable clone. Preserve this
+   repository and its linked worktrees.
+2. Retain `gamekit/`, `gameskills/`, relevant `devtools/`, native marketplace metadata,
+   library/workflow documentation and required root configuration together. Inspect
+   historical paths as well as current paths before choosing history filters.
+3. Give the combined repository its own workspace, lockfile, README and CI. Remove
+   game membership/defaults and game-only commands; retain independent capability
+   and packaged-instruction consumers.
+4. Move each game with its complete source, assets, rules and documentation into its
+   adopter repository. Pin library versions or resolved Git revisions and install
+   compatible GameSkills artifacts. Local dependency overrides may support joint
+   development without becoming required checkout paths.
+5. Verify the actual resulting repositories and artifacts. Establish licensing,
+   release metadata and publication ownership through the separate release process.
 
-Do **not** rename historical `gamekit/` paths during filtering: old commits contain
-both nested Gamekit and legacy root manifests, so those destination names collide.
-Retain historical layouts; the selected HEAD is already flat. Both old and new paths
-are explicit because filtering does not automatically follow directory renames.
-
-Make a normal extraction-finalization commit setting root workspace membership to
-`["crates/*"]` and removing game-specific `default-members` and unused game-only
-workspace dependency entries. Add a library-specific README, licensing, CI and
-ignore rules. Historical commits may contain obsolete members; only the finalized
-HEAD is asserted buildable. Run:
-
-```sh
-cargo metadata --no-deps --format-version 1
-cargo test --workspace --all-features
-cargo test --workspace --doc --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo run --locked -p gamekit-repo-tools --profile ci -- skills legacy
-cargo test --locked -p gameskills-cli --profile ci
-```
-
-Let Cargo prune obsolete lockfile entries and commit the result. Check all retained
-history for accidentally included games/secrets, then configure the intended private
-remote and release tag as an explicit release task, not part of local cleanup.
-
-## Recipe verification
-
-On 2026-09-09, `git-filter-repo==2.47.0` was installed only in a temporary virtual
-environment. A disposable two-commit fixture modeled nested Gamekit plus legacy
-root manifests, followed by root promotion. Filtering retained both capability/skill
-histories, excluded game source from every tree and left the expected flat HEAD.
-After manifest finalization, `cargo metadata` and `cargo test --workspace` passed;
-the game lockfile entry disappeared. This validates path selection/collision handling,
-not a completed extraction or release of the real library. No remote was created.
+The old flat-library filtering recipe predates the current plugins and Rust CLI
+and is superseded. It must not be used to extract the combined product. The
+September 9 disposable fixture verified only its historical path-collision example,
+not an extraction of this repository.

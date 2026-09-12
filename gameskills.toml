@@ -20,7 +20,7 @@ path = "games/labyrinth"
 packages = ["gameskills-ui", "gameskills-turn-based", "gameskills-multiplayer"]
 
 [targets.deckbuilder]
-path = "games/deckbuilder_ui"
+path = "games/deckbuilder"
 packages = ["gameskills-ui", "gameskills-multiplayer"]
 
 [targets.carterfight]
@@ -28,26 +28,26 @@ path = "games/carterfight"
 packages = ["gameskills-ui"]
 
 [targets.gamekit]
-path = "crates"
+path = "gamekit"
 packages = ["gameskills-maintainer"]
 
 [commands.repo-check]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "check"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.skills-validate]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "validate"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "skills", "validate"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.legacy-skills-validate]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "skills", "legacy"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "skills", "legacy"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.distribution-check]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "check"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "distribution", "check"]
 timeout_seconds = 1800
 resources = ["project:cargo-target"]
 
@@ -58,7 +58,7 @@ resources = ["project:cargo-target"]
 requires = ["skills-validate"]
 
 [commands.repo-test]
-argv = ["cargo", "test", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--test", "ci_routing", "--test", "ci_checks", "--test", "ci_cli"]
+argv = ["cargo", "test", "--locked", "-p", "repo-devtools", "--profile", "ci", "--test", "ci_routing", "--test", "ci_checks", "--test", "ci_cli"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
@@ -67,27 +67,27 @@ argv = ["cargo", "fmt", "--all", "--", "--check"]
 timeout_seconds = 120
 
 [commands.tooling-test]
-argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "gamekit-repo-tools", "--profile", "ci"]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "repo-devtools", "--profile", "ci"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.migration-contracts]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "contracts", "check", "--verify-reference", "--cutover"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "contracts", "check", "--verify-reference", "--cutover"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.tooling-lint]
-argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "gamekit-repo-tools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
+argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "repo-devtools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.ui-test]
-argv = ["cargo", "test", "-p", "bevy_game_ui", "--profile", "ci"]
+argv = ["cargo", "test", "-p", "bevy-gamekit-ui", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
 [commands.rules-test]
-argv = ["cargo", "test", "-p", "labyrinth_rules", "--profile", "ci"]
+argv = ["cargo", "test", "-p", "labyrinth-rules", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
@@ -98,7 +98,7 @@ resources = ["project:cargo-target"]
 requires = ["rules-test"]
 
 [commands.labyrinth-lint]
-argv = ["cargo", "clippy", "--locked", "-p", "labyrinth", "-p", "labyrinth_rules", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
+argv = ["cargo", "clippy", "--locked", "-p", "labyrinth", "-p", "labyrinth-rules", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
@@ -133,12 +133,12 @@ timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
 [commands.bundle-check]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "bundle", "check"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "bundle", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.distribution-archives]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "distribution", "archives"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "distribution", "archives"]
 timeout_seconds = 1800
 resources = ["project:cargo-target"]
 
@@ -148,7 +148,7 @@ timeout_seconds = 900
 resources = ["project:cargo-target"]
 
 [commands.bundle-package-check]
-argv = ["cargo", "run", "--locked", "-p", "gamekit-repo-tools", "--profile", "ci", "--", "bundle", "verify-package"]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "bundle", "verify-package"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 requires = ["cli-package", "bundle-check"]

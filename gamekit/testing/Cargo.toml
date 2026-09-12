@@ -1,0 +1,17 @@
+[package]
+name = "bevy-gamekit-testing"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+default = []
+ui = ["dep:bevy-gamekit-ui"]
+
+[dependencies]
+bevy.workspace = true
+bevy-gamekit-ui = { workspace = true, optional = true }
+
+[lints]
+workspace = true
