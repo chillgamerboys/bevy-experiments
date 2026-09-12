@@ -2,8 +2,8 @@
 
 The unpublished `0.1.0-dev.2` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
-executes configured command graphs with verifiable evidence. Its 12 core skills
-use `plan` as the default entrypoint; nine optional skills live in five specialist
+executes configured command graphs with verifiable evidence. Its 13 core skills
+use `plan` as the default entrypoint; eleven optional skills live in five specialist
 packages. The internal Rust modules are not a stable public API.
 
 ```sh

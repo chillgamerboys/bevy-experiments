@@ -16,7 +16,7 @@ Public distribution follows artifact verification and a separate release decisio
 |---|---|---|
 | GameKit libraries | crates.io source crates, with API documentation on docs.rs | Keep the `bevy-gamekit` facade and opt-in capability crates; default features stay empty. Games, GameSkills and repository tools are not library dependencies. |
 | GameSkills executable | A crates.io binary package plus prebuilt archives on GitHub Releases | Working package name `gameskills-cli`, executable `gameskills`. Source installation uses Cargo; prebuilt adoption requires neither Cargo nor Python. No Bevy dependency in the CLI. |
-| GameSkills instructions | A baseline bundle embedded in the CLI, plus a versioned standalone bundle archive | Canonical Markdown and native-client metadata remain in `gameskills/plugins/`. Install the 12 core skills by default and only explicitly selected optional packages. |
+| GameSkills instructions | A baseline bundle embedded in the CLI, plus a versioned standalone bundle archive | Canonical Markdown and native-client metadata remain in `gameskills/plugins/`. Install the 13 core skills by default and only explicitly selected optional packages. |
 | Repository maintenance | Source-built `repo-devtools`, kept `publish = false` | Layout, CI and distribution checks belong to this repository, not the adopter's runtime. |
 
 These are proposed names, not registry reservations. Settle ownership, consistent
@@ -47,7 +47,7 @@ in a build script, or package the retired Python runtime. Inspect and build the
 actual archive using [Cargo packaging](https://doc.rust-lang.org/cargo/commands/cargo-package.html).
 
 The embedded payload may contain all six available packages, but installed native
-discovery paths expose only the selected packages: 12 core skills, with nine optional
+discovery paths expose only the selected packages: 13 core skills, with eleven optional
 skills available separately. The standalone bundle archive uses the same generated
 payload and preserves client metadata; it is not a second authored catalog. An
 explicit update may install a newer compatible bundle without replacing the binary.

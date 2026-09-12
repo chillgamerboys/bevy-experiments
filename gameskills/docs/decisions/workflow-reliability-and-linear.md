@@ -1,6 +1,6 @@
 # GameSkills workflow reliability and optional Linear integration
 
-Status: implementation plan for discussion, September 12, 2026.
+Status: approved; implementation and validation in progress, September 12, 2026.
 Tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), in Bevy Games.
 Baseline: `5a19b55e6ca94e8f97a4981f3d151b9c769905a2`, the merge of
 [PR #37](https://github.com/chillgamerboys/bevy-experiments/pull/37).
@@ -11,10 +11,10 @@ Make GameSkills carry authorized work to its requested endpoint, expose missing
 delivery steps, preserve the useful legacy craft lessons in one current catalog,
 and offer optional Linear tracking and on-demand retention cleanup.
 
-The current request ends with this reviewable plan and unresolved questions.
-Implementation, installation changes, and live deletion have not
-started. The Hex deletion pilot is part of the subsequent implementation plan.
-Do not interpret publishing this plan as completing HEX-98.
+The user approved implementation and the manual-sweep revision. PR #38 now carries
+the implementation, with HEX-98 kept in progress until the program's acceptance
+work is complete. The live Hex pilot still requires the private export destination
+and separately configured supported API credentials. No ticket has been deleted.
 
 No gameplay changes, repository extraction, new projects for the other games,
 team-prefix changes, or automatic adoption into linked workspaces are included.

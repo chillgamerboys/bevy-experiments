@@ -13,6 +13,7 @@ pub const EXPECTED_SKILLS: &[(&str, &[&str])] = &[
         &[
             "setup",
             "plan",
+            "grill",
             "dispatch",
             "debug",
             "test",
@@ -36,6 +37,7 @@ pub const EXPECTED_SKILLS: &[(&str, &[&str])] = &[
         &["evolve-gamekit", "author-skill", "evaluate-skills"],
     ),
     ("gameskills-bevy-contrib", &["prepare-contribution"]),
+    ("gameskills-linear", &["track", "cleanup"]),
 ];
 
 /// Passing this validator is not evidence of native installation or agent behavior.

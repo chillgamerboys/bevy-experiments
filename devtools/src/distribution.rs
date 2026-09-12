@@ -219,7 +219,7 @@ fn package_name(manifest: &Path) -> Result<String, String> {
 
 fn non_library_packages(root: &Path) -> Result<BTreeSet<String>, String> {
     let mut names = BTreeSet::new();
-    for directory in ["games", "gameskills/cli", "devtools"] {
+    for directory in ["games", "gameskills/cli", "gameskills/linear", "devtools"] {
         let directory = root.join(directory);
         if !directory.exists() {
             continue;

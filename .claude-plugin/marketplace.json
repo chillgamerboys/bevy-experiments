@@ -33,6 +33,11 @@
       "name": "gameskills-bevy-contrib",
       "source": "./gameskills/plugins/gameskills-bevy-contrib",
       "version": "0.1.0-dev.1"
+    },
+    {
+      "name": "gameskills-linear",
+      "source": "./gameskills/plugins/gameskills-linear",
+      "version": "0.1.0-dev.1"
     }
   ]
 }

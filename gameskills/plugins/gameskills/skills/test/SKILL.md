@@ -32,3 +32,8 @@ supply relevant specialist cases within this graph, not duplicate test pipelines
 Report source and commands, passed/failed/pending/unavailable results and what each
 artifact proves. Code tests cannot certify rendered quality, native interactions,
 cross-machine routes or human enjoyment without their corresponding evidence.
+
+Attach relevant run IDs to the existing delivery task. A passing command is
+verification evidence, not proof of push, PR, tracking or integration. If evidence
+is stale, report the changed input paths from validation before deciding what to
+rerun; preserve the original evidence.

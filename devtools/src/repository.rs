@@ -113,7 +113,11 @@ pub fn check(root: &Path) -> Vec<String> {
         {
             failures.push(format!("duplicate dependency lockfile: {relative}"));
         }
-        if path.extension().is_some_and(|extension| extension == "md") {
+        // Frozen compatibility bytes carry historical relative links. Their own
+        // validator checks skill references and the exact provenance hashes.
+        if path.extension().is_some_and(|extension| extension == "md")
+            && !path.starts_with(root.join("devtools/tests/fixtures/legacy"))
+        {
             match support::read_text(path) {
                 Ok(source) => {
                     for target in markdown::links(&source) {

@@ -114,12 +114,36 @@ fn render(
 /// All seven skills, trigger fixture shapes, local links, and client source equivalence are checked.
 /// Rendering is in memory and never invokes the legacy Python installer or either native client.
 pub fn validate(root: &Path) -> Vec<String> {
-    let root = if root.join("gameskills/legacy").is_dir() {
-        root.join("gameskills/legacy")
+    let root = if root.join("devtools/tests/fixtures/legacy").is_dir() {
+        root.join("devtools/tests/fixtures/legacy")
     } else {
         root.to_owned()
     };
     let mut failures = Vec::new();
+    let provenance = root.join("provenance.json");
+    if provenance.exists() {
+        use sha2::{Digest, Sha256};
+        match support::read_json(&provenance) {
+            Ok(value) => match value.get("sha256").and_then(Value::as_object) {
+                Some(entries) => {
+                    for (path, expected) in entries {
+                        match support::local_target(&root, &root.join("provenance.json"), path)
+                            .and_then(|path| {
+                                std::fs::read(path.ok_or("missing fixture path")?)
+                                    .map_err(|e| e.to_string())
+                            }) {
+                            Ok(bytes)
+                                if expected.as_str()
+                                    == Some(&format!("{:x}", Sha256::digest(&bytes))) => {}
+                            _ => failures.push(format!("frozen legacy fixture changed: {path}")),
+                        }
+                    }
+                }
+                None => failures.push("missing frozen fixture hashes".into()),
+            },
+            Err(e) => failures.push(e),
+        }
+    }
     let files = catalog::package_files(&root, &mut failures);
     if root.is_symlink() {
         return failures;

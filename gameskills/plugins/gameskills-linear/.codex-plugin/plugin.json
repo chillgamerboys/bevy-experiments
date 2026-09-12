@@ -1,0 +1,20 @@
+{
+  "name": "gameskills-linear",
+  "version": "0.1.0-dev.2",
+  "description": "Optional Linear issue tracking and manually invoked retention cleanup.",
+  "author": {
+    "name": "GameKit contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "GameSkills Linear",
+    "shortDescription": "Optional Linear issue tracking and manually invoked retention cleanup.",
+    "longDescription": "Optional Linear issue tracking and manually invoked retention cleanup.",
+    "developerName": "GameKit contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Use the relevant GameSkills tools for this task."
+  },
+  "repository": "https://github.com/chillgamerboys/bevy-experiments",
+  "license": "MIT OR Apache-2.0"
+}

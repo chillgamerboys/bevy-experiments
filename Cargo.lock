@@ -3297,6 +3297,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "gameskills-linear"
+version = "0.1.0-dev.2"
+dependencies = [
+ "clap",
+ "nix",
+ "regex",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "time",
+ "toml",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

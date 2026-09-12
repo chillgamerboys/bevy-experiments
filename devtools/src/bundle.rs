@@ -407,7 +407,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn report(prepared: &Prepared) -> Value {
-    json!({"source_commit":prepared.manifest.get("source_commit"),"source_commit_verified":prepared.source_commit_verified,"source_commit_notice":if prepared.source_commit_verified {"recorded commit and current inputs match"} else {"historical commit unavailable; current committed content verified"},"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":12,"optional_skills":9,"activation":"runtime"})
+    json!({"source_commit":prepared.manifest.get("source_commit"),"source_commit_verified":prepared.source_commit_verified,"source_commit_notice":if prepared.source_commit_verified {"recorded commit and current inputs match"} else {"historical commit unavailable; current committed content verified"},"content_sha256":prepared.manifest.get("content_sha256"),"archive_sha256":hash(&prepared.archive),"files":prepared.manifest.get("files").and_then(Value::as_object).map(|files| files.len()),"packages":EXPECTED_SKILLS.len(),"core_skills":EXPECTED_SKILLS.first().map_or(0,|(_,skills)|skills.len()),"optional_skills":EXPECTED_SKILLS.iter().skip(1).map(|(_,skills)|skills.len()).sum::<usize>(),"activation":"runtime"})
 }
 
 /// Prepare the fixed package-local snapshot from a full committed source ID.

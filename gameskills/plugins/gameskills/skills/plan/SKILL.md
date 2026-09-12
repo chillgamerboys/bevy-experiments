@@ -35,3 +35,10 @@ After implementation, invoke selected checks and documentation work, then
 Load these through the host; links alone do not invoke them. Preserve partial
 results and concrete blockers on interruption. Do not call a task complete merely
 because its plan, worker launch or implementation step finished.
+
+For material unresolved choices, use `gameskills:grill`; clear tasks skip the
+interview. For implementation work, read [delivery state](../../references/delivery.md)
+and start or resume the durable solo-task record with the accepted endpoint.
+Discover existing records before starting another after an interruption. Use the
+configured optional tracking package only when adopted; its absence never excuses
+missing publication. Plan-only discussions need no record, queue or ticket.

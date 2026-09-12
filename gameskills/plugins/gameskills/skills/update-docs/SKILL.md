@@ -30,3 +30,7 @@ For Bevy upstream documentation, follow the receiving project's current AI polic
 and the optional contribution workflow; do not prepare agent-authored public prose.
 For this project's authorized docs, deliver the reconciled material and evidence
 through the active task's requested endpoint.
+
+Keep the task's requested endpoint and remaining work in the delivery record.
+Documentation completion does not shorten the task to local edits. Include final
+scope and operational limitations in the PR and the task handoff.

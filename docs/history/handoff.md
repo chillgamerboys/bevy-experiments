@@ -167,7 +167,7 @@ timing policy used by resolution. Keep content semantics out of Gamekit tooltips
 
 ### P3 — optional skill reference describes superseded tooltip behavior
 
-Location: [Gamekit API reference](../../gameskills/legacy/references/gamekit-apis.md), tooltip section.
+Location: [Gamekit API reference](../../devtools/tests/fixtures/legacy/references/gamekit-apis.md), tooltip section.
 It still describes delayed previews, gap-tolerant reading and explicit pinning, whereas
 the current plugin implements immediate hover, immediate pre-lock dismissal and dwell
 locking. Source implementation/tests are authoritative. Refresh canonical prose and

@@ -1,0 +1,30 @@
+{
+  "source_commit": "af44a39f5103e43ce8dc3ff4be1280000f43e7c9",
+  "source_root": "gameskills/legacy",
+  "sha256": {
+    "README.md": "ac1ca8f1ed1f7ff7b3f30a9bb0761ff722ad59d60afd9f4357250817ada1307d",
+    "references/gamekit-apis.md": "fb656cf5320350e048ccc33d82c445224cfb99937fdf726c7463ff8a80a144d6",
+    "references/evidence.md": "5afe4c92346724c986c524d03b12777b0ce8ffe5839f51e79996742b42b21406",
+    "references/architecture-boundaries.md": "c5784f7eb3d0cf3af303359dba7cf877ad945f51362427cc8a45115c3103f939",
+    "references/bevy-0.19.md": "bc1e8069453e515a75b7510c33d3f9bdb02036076907b264c0abb246db96ee2b",
+    "tests/trigger-fixtures.json": "12f9db1a0d6164f6e54092f3df08d1930630aaca4da062c22d06c37e63f51714",
+    "source/architect-bevy-game/SKILL.md": "b67a7c979417c8e862cbeb770caea8c439f14b3bd5ec6b8da41aafdf30338234",
+    "source/test-bevy-game/SKILL.md": "6ebadecd8f864e6e86cb4a7f7836dae6206c23582170ebf69c9158e79f86eb68",
+    "source/review-bevy-change/SKILL.md": "826f3dd7898fc3cfd63e7c660b98d0c780d9513ff7049c0a9359b4041cb666a9",
+    "source/model-turn-based-game/SKILL.md": "297829d797d6953b459b11f8c93aaf61a9dc13385593c06fcf5780c772abbf02",
+    "source/build-bevy-ui/SKILL.md": "d0dbdd09022552cd4a754190220b6aec66f041e5488c33b0e777ecb81b68a050",
+    "source/debug-bevy-runtime/SKILL.md": "cf4e7ee140e6acc613bb498027eeea0c3680987917a47cd55dca0fbfe4602685",
+    "source/verify-bevy-ui/SKILL.md": "dafa11cbb2d50e211c63f98a276cdeb9dc394096080c291b75ac9a267103f05e",
+    "source/verify-bevy-ui/agents/openai.yaml": "f928583ca85290e970870ea0cf2e6477a00eb55385724593da5f6c6452f69f44",
+    "source/debug-bevy-runtime/agents/openai.yaml": "aa44ee4a1a5b019a4ad99731b5e464d553d00c3a8ab818556b12a9024aaa8a85",
+    "source/build-bevy-ui/agents/openai.yaml": "19d8827398ce86220c549426347d777a2687f6d130932258e8c40bebec6713cb",
+    "source/model-turn-based-game/agents/openai.yaml": "52a5b47eb9ffa79e7586afc4a5fe570a77fd945e9765339b1f5f4e9702142af7",
+    "source/review-bevy-change/agents/openai.yaml": "75db0a91399c52bf34cca02bbec16aa0eaf751808e7a2704c32d4f823428a8a1",
+    "source/test-bevy-game/agents/openai.yaml": "0464f96d47264029888a915b76646d13b3a57290af2afbeb9b09916ab64cfeeb",
+    "source/architect-bevy-game/agents/openai.yaml": "124ef71085f8cfe8d0770a5250e7ae2d5cd38c42872a5defce2b8bfc2786d562",
+    "maintainer/sync-bevy-skills/SKILL.md": "631dbeaeb6bc65183f573b4c5e007112492bac086e3a5e6fff1b8691006e7860",
+    "maintainer/install-bevy-skills/SKILL.md": "f8c55756974076c6c847bdcbfca47793a92420f7f61515dc2783429bf5c88632",
+    "maintainer/install-bevy-skills/agents/openai.yaml": "b38b8c9977774876e62b980e02bdec14042be47849314e51f130c56223f17121",
+    "maintainer/sync-bevy-skills/agents/openai.yaml": "4d0ebb468a47cdbbdc1906d89ec3ed71275fd52b785224321535ac4cb2cfea77"
+  }
+}

@@ -233,7 +233,7 @@ and a documentation update carried through a PR. Include a fresh Bevy project
 and a small engine-only reproduction to check that instructions do not assume
 our monorepo or require adopting GameKit. Reuse historical failure
 scenarios as regression cases while retaining independent tasks for evaluation.
-The [evidence reference](../../legacy/references/evidence.md) remains the current
+The [evidence reference](../../../devtools/tests/fixtures/legacy/references/evidence.md) remains the current
 contract until deliberately revised.
 
 ## GameKit's role and selective contributions to Bevy

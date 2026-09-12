@@ -46,3 +46,37 @@ assets and locally installed skills cannot conceal missing package contents.
 Report the prepared artifact and remaining blocker when publication is outside
 scope or not authorized. Preserve unreleased changes and existing releases; do not
 delete or replace a published identity to make a failed attempt look successful.
+
+## Durable solo tasks
+
+Use the configured runtime prefix (normally `gameskills`) for these commands:
+
+```text
+gameskills delivery start TASK --goal "Concrete result" --endpoint pr --repo OWNER/REPO --base main --check CHECK_NAME
+gameskills delivery show TASK
+gameskills delivery bind TASK --pr https://github.com/OWNER/REPO/pull/NUMBER
+gameskills delivery check TASK --evidence RUN_ID
+```
+
+`start` defaults to `project.delivery_target` and refuses to overwrite an existing
+task. Explicit narrower user scope takes precedence. Records under
+`.gameskills/delivery/` retain intent across interruption; `show` is historical,
+`check` rereads source and providers.
+Use `delivery note TASK --remaining TEXT --authorization TEXT` to preserve a
+concrete handoff; repeat remaining flags for multiple items. Omitting them clears
+the recorded list only after the work is actually handled. Notes grant no authority. List existing record filenames when resuming
+without an ID. Keep authorization in the session/handoff: a record is not a grant
+of permission. Bindings are unverified until checked. Checks cannot force an
+agent that never invokes them to finish delivery.
+
+`design` and `implementation` avoid PR requirements. PR checks observe the actual
+repository, remote source and base; merge additionally requires observed remote
+integration. Release acceptance remains with the release skill. Commands and
+external observations do not replace source review or gameplay acceptance.
+
+Optional tracking is a configured executable argv, with no shell interpolation:
+`[tracking] required = true` and `observer = ["gameskills-linear", "observe"]`.
+Bind `--issue UUID --project UUID` on the same task. The observer receives those
+flags plus `--pr URL` and returns JSON with `ok`, `linked`, `issue_id`,
+`project_id` and `pr_url`. All exact identities must agree. Core-only installations
+omit tracking and need no credentials. The separate plugin owns provider setup.

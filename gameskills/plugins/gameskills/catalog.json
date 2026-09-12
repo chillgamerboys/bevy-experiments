@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-dev.2",
   "packages": {
     "gameskills": {
       "skills": [
         "setup",
         "plan",
+        "grill",
         "dispatch",
         "debug",
         "test",
@@ -68,6 +69,16 @@
         "gameskills"
       ],
       "description": "Investigate engine defects and substantial gaps for human-reviewed contributions."
+    },
+    "gameskills-linear": {
+      "skills": [
+        "track",
+        "cleanup"
+      ],
+      "requires": [
+        "gameskills"
+      ],
+      "description": "Optional Linear issue tracking and manually invoked retention cleanup."
     }
   }
 }
