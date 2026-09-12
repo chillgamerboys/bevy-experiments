@@ -86,11 +86,14 @@ fn seven_canonical_skills_validate_with_two_source_equivalent_clients() -> TestR
 fn repository_root_and_direct_skills_root_are_supported() -> TestResult {
     let fixture = Canonical::new()?;
     let repository = tempfile::tempdir()?;
-    std::fs::create_dir(repository.path().join("gameskills"))?;
-    std::fs::rename(fixture.root(), repository.path().join("gameskills/legacy"))?;
+    std::fs::create_dir_all(repository.path().join("devtools/tests/fixtures"))?;
+    std::fs::rename(
+        fixture.root(),
+        repository.path().join("devtools/tests/fixtures/legacy"),
+    )?;
     assert_eq!(legacy::validate(repository.path()), Vec::<String>::new());
     assert_eq!(
-        legacy::validate(&repository.path().join("gameskills/legacy")),
+        legacy::validate(&repository.path().join("devtools/tests/fixtures/legacy")),
         Vec::<String>::new()
     );
     Ok(())

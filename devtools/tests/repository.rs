@@ -182,3 +182,50 @@ fn ownership_resolves_symlink_ancestor_before_missing_leaf() {
         .iter()
         .any(|error| error.contains("depends on game")));
 }
+
+#[test]
+fn local_anchors_follow_headings_and_ignore_examples() {
+    let d = fixture();
+    let r = d.path();
+    write(r,"guide.md","# **Café** and `snake_case`\n# Repeat\n# Repeat\nSetext title\n----\n<a id=\"custom\"></a>\n```md\n# Fake\n```\n");
+    write(r,"README.md","[unicode](guide.md#caf%C3%A9-and-snake_case)\n[dup](guide.md#repeat-1)\n[setext](guide.md#setext-title)\n[html](guide.md#custom)\n# Home\n[self](#home)\n[external](https://example.com/#unknown)\n");
+    assert!(check(r).is_empty(), "{:?}", check(r));
+    write(
+        r,
+        "README.md",
+        "[missing](guide.md#fake)\n[x][ref]\n[ref]: guide.md#repeat-2\n",
+    );
+    assert_eq!(
+        check(r)
+            .iter()
+            .filter(|s| s.contains("missing local anchor"))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn plan_lifecycle_and_configured_index_are_checked_without_fixture_deletion() {
+    let d = fixture();
+    let r = d.path();
+    write(r, "docs/plans/work.md", "# Work\nStatus: active\n");
+    write(
+        r,
+        "gameskills.toml",
+        "schema_version=1\n[docs]\nindex='docs/README.md'\n",
+    );
+    assert!(check(r)
+        .iter()
+        .any(|s| s.contains("configured documentation index")));
+    write(r, "docs/README.md", "# Docs\n[Work](plans/work.md)");
+    assert!(check(r).is_empty());
+    write(r, "docs/plans/work.md", "# Work\nStatus: completed\n");
+    assert!(check(r)
+        .iter()
+        .any(|s| s.contains("retire completed plans")));
+    write(r, "docs/history/old.md", "# Old");
+    assert!(check(r)
+        .iter()
+        .any(|s| s.contains("retired current documentation directory")));
+    assert!(r.join("docs/history/old.md").exists());
+}

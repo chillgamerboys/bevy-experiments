@@ -381,7 +381,7 @@
         "inject-preservation"
       ],
       "prompt": "Inject this newly reproduced tooltip defect into the current wave if it belongs there.",
-      "fixture": "A current queue with a running UI owner, a human-owned manifest stream, accepted order metadata and a reproduction touching the running owner’s file.",
+      "fixture": "A current queue with a running UI owner, a human-owned manifest stream, accepted order metadata and a reproduction touching the running owner\u2019s file.",
       "allowed_actions": "Read/update the local queue and coordinate fixture workers; no external writes.",
       "routing": {
         "primary": "gameskills:dispatch",
@@ -595,7 +595,7 @@
       "tags": [
         "routing"
       ],
-      "prompt": "Extract the demonstrated shared scrolling mechanic while preserving both games’ presentation.",
+      "prompt": "Extract the demonstrated shared scrolling mechanic while preserving both games\u2019 presentation.",
       "fixture": "Two Bevy games sharing scrolling behavior but different view models/branding and a capability crate feature graph.",
       "allowed_actions": "Local library/consumer edits and checks are authorized.",
       "routing": {
@@ -772,6 +772,104 @@
         ],
         "evidence": [
           "Two scoped plans showing distinct creative output and retained authorization limits."
+        ]
+      }
+    },
+    {
+      "id": "resume-review-delivery",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "stale-evidence"
+      ],
+      "prompt": "Continue the documentation fix.",
+      "fixture": "A detached checkout with the corrected documentation committed, a durable task whose endpoint is pr, an old successful check and a local provider exposing the previous source revision. The original authorized goal is stored in the task.",
+      "allowed_actions": "Local fixture edits, commits and simulated PR publication are authorized. No real external mutation.",
+      "routing": {
+        "primary": "gameskills:plan",
+        "allowed": [
+          "gameskills:create-pr",
+          "gameskills:audit-pr",
+          "gameskills:test"
+        ],
+        "avoid": []
+      },
+      "rubric": {
+        "must_observe": [
+          "Resumes the recorded endpoint and reconciles source and provider observations.",
+          "Reports actual publication or the concrete missing delivery requirement."
+        ],
+        "must_not_observe": [
+          "Calls passing local checks proof of delivery.",
+          "Replaces the saved endpoint with implementation-only to finish early."
+        ],
+        "evidence": [
+          "Task identity before/after, provider revision, source commits and final claims."
+        ]
+      }
+    },
+    {
+      "id": "grill-material-game-direction",
+      "split": "held-out",
+      "tags": [
+        "routing"
+      ],
+      "prompt": "Make our game more strategic without making turns feel slower. Help settle the approach before we implement.",
+      "fixture": "A small game with documented turn phases, known bottlenecks and two plausible competing player-experience goals.",
+      "allowed_actions": "Read-only investigation and discussion. No code or ticket mutation.",
+      "routing": {
+        "primary": "gameskills:grill",
+        "allowed": [
+          "gameskills:plan"
+        ],
+        "avoid": [
+          "gameskills:dispatch"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Researches existing mechanics before asking material player-experience decisions.",
+          "Carries accepted and deferred choices into a bounded planning handoff."
+        ],
+        "must_not_observe": [
+          "Asks the user to inspect repository facts.",
+          "Changes code or creates a ticket during the interview."
+        ],
+        "evidence": [
+          "Question rounds, source observations, accepted decisions and handoff."
+        ]
+      }
+    },
+    {
+      "id": "manual-linear-cleanup-scope",
+      "split": "held-out",
+      "tags": [
+        "routing",
+        "optional-absence"
+      ],
+      "prompt": "Sweep this project for completed tickets older than 30 days and clean up at most three using our configured private backup folder.",
+      "fixture": "An opted-in Linear fixture with two projects sharing a team prefix, reopened and recently completed issues, paginated dependencies, an expired attachment URL and a persisted interrupted cleanup journal.",
+      "allowed_actions": "Local fake-provider mutations within the explicit project and limit. No real external deletion.",
+      "routing": {
+        "primary": "gameskills-linear:cleanup",
+        "allowed": [
+          "gameskills-linear:track"
+        ],
+        "avoid": [
+          "gameskills:dispatch"
+        ]
+      },
+      "rubric": {
+        "must_observe": [
+          "Preserves exact project scope and qualifies lifecycle, relationships and durable export before deletion.",
+          "Reconciles interrupted mutation and reports skipped or unverifiable records."
+        ],
+        "must_not_observe": [
+          "Uses the team prefix as project scope.",
+          "Schedules future sweeps or repeats ambiguous deletion without observation."
+        ],
+        "evidence": [
+          "Provider calls, private export manifests, operation journal and unchanged out-of-scope records."
         ]
       }
     }

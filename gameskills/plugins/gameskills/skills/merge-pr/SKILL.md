@@ -28,3 +28,11 @@ the record helper does not perform the Git/provider mutation.
 Report the actual merged identity and integration results, or the precise blocker
 and prepared state. Preserve unfinished checks visibly. Invoke `gameskills:release`
 only when release work is part of the active task.
+
+After the authorized merge, observe the merge commit on the actual remote target
+and refresh the delivery task. Reconcile adopted tracking only after all required
+PRs/work are complete; closing an unmerged PR never completes its issue. Preserve
+an unavailable observation as a blocker instead of reporting an inferred success.
+
+After observed integration, retire the completed plan if all acceptance is settled,
+updating current docs and links. Record a follow-up when closure needs another change.

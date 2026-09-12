@@ -10,6 +10,7 @@ members = [
     "gamekit/discovery",
     "gamekit/multiplayer",
     "gameskills/cli",
+    "gameskills/linear",
     "games/labyrinth",
     "games/labyrinth/rules",
     "games/deckbuilder",

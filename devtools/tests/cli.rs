@@ -57,10 +57,10 @@ fn catalog_json_preserves_counts_and_structural_limitations_on_failure() {
         let (status, result) = run(temporary.path(), &command);
         assert_eq!(status, 1);
         for (field, count) in [
-            ("packages", 6),
-            ("skills", 21),
-            ("core_skills", 12),
-            ("optional_skills", 9),
+            ("packages", 7),
+            ("skills", 24),
+            ("core_skills", 13),
+            ("optional_skills", 11),
         ] {
             assert_eq!(result.get(field), Some(&Value::from(count)), "{field}");
         }

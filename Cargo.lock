@@ -3278,7 +3278,7 @@ dependencies = [
 
 [[package]]
 name = "gameskills-cli"
-version = "0.1.0-dev.2"
+version = "0.1.0-dev.3"
 dependencies = [
  "clap",
  "flate2",
@@ -3294,6 +3294,22 @@ dependencies = [
  "tempfile",
  "toml",
  "toml_edit",
+]
+
+[[package]]
+name = "gameskills-linear"
+version = "0.1.0-dev.2"
+dependencies = [
+ "clap",
+ "nix",
+ "regex",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "time",
+ "toml",
 ]
 
 [[package]]
@@ -5452,7 +5468,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "repo-devtools"
-version = "0.1.0-dev.2"
+version = "0.1.0-dev.3"
 dependencies = [
  "clap",
  "flate2",

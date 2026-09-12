@@ -5,33 +5,31 @@ description: Start or substantially revise a Bevy game, GameKit or GameSkills ta
 
 # Plan and carry the task
 
-Read [project context](../../references/project-context.md). Reuse accepted
-investigation, decisions and authorization. Identify the requested artifact and
-endpoint before expanding the workflow; a plan-only request ends with a plan.
-An implementation/delivery request continues through the applicable authorized
-checks and PR workflow after planning. A narrower user request takes precedence
-over a project's normal PR endpoint.
+Read [project context](../../references/project-context.md). Recover the user's
+outcome, requested endpoint, accepted choices and current task before planning.
+Read the affected owners' current architecture and Decisions sections; inspect
+source/callers when a constraint or claimed behavior matters. Use
+[creative levels](../../references/creative-levels.md), defaulting to level 2.
 
-Inspect relevant owners and call sites once. Record observed facts, important
-source locations, reproduction/design evidence and unresolved material choices.
-Apply [creative levels](../../references/creative-levels.md), defaulting to level 2.
-Resolve routine engineering choices yourself; distinguish an accepted design from
-an experiment. Keep GameKit optional and select craft/package guidance only for
-the work at hand.
+Use `grill` for material unresolved choices; routine implementation choices need
+no interview. Record the bounded change, preserved/changed constraints, owners,
+steps and relevant verification from the project's development/testing guidance.
+Name unfinished requirements. Substantial work may need a committed active plan;
+routine notes do not require a plan file, queue or ticket.
 
-Define a bounded result, retained/changed contracts, owners, acceptance claims and
-the evidence each requires. A solo change needs a compact plan and implementation
-by the current agent. Do not create an issue or queue just to satisfy a ritual.
+For implementation, read [delivery](../../references/delivery.md) and resume or
+start its solo record. Keep the requested endpoint through interruptions. A
+plan-only discussion ends at its plan; focused specialist requests retain their
+narrower scope. Optional tracking follows the adopted package and current tools.
 
-For an authorized parallel wave, read [work orders](../../references/work-orders.md).
-Produce self-contained orders and one durable queue; separate start dependencies
-from merge dependencies, reserve shared files/resources and include human-owned
-work. Validate with `plan validate --file PLAN.json` before `queue create --file
-PLAN.json`, using the common runtime prefix. Hand the established wave to
-`gameskills:dispatch`; the queue helper does not launch agents.
+Only for an authorized parallel wave, read [work orders](../../references/work-orders.md),
+validate a scoped plan with `plan validate --file PLAN.json`, then create one queue
+and hand it to `dispatch`. Capacity is not permission to launch agents. Solo work
+stays with the current agent.
 
-After implementation, invoke selected checks and documentation work, then
-`create-pr`, `audit-pr`, and authorized `merge-pr`/`release` as the endpoint requires.
-Load these through the host; links alone do not invoke them. Preserve partial
-results and concrete blockers on interruption. Do not call a task complete merely
-because its plan, worker launch or implementation step finished.
+Implement, verify through the project's configured checks, reconcile current docs
+and proceed through `create-pr`, `audit-pr`, and authorized merge/release work as
+the endpoint requires. Invoke skills through the host when available; links alone
+are not calls. Preserve concrete missing observations rather than claiming completion
+from local commands. Remove a completed plan after its useful conclusions reach
+current docs and its whole outcome is settled; do not delete outstanding acceptance.

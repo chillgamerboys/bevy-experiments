@@ -6,8 +6,8 @@ description: Establish engineering behavior for a Bevy game, library or skill ch
 # Test the claim at its owner
 
 Read [project context](../../references/project-context.md),
-[Bevy craft](../../references/bevy-craft.md) and
-[verification](../../references/verification.md). State the behavior to prove and
+[verification](../../references/verification.md). Read the owner's testing guidance;
+load [Bevy craft](../../references/bevy-craft.md) when Bevy behavior is involved. State the behavior to prove and
 choose the narrowest useful altitude: pure owner, minimal production-plugin app,
 headless structure/input, real runtime or target-platform integration.
 
@@ -32,3 +32,8 @@ supply relevant specialist cases within this graph, not duplicate test pipelines
 Report source and commands, passed/failed/pending/unavailable results and what each
 artifact proves. Code tests cannot certify rendered quality, native interactions,
 cross-machine routes or human enjoyment without their corresponding evidence.
+
+Attach relevant run IDs to the existing delivery task. A passing command is
+verification evidence, not proof of push, PR, tracking or integration. If evidence
+is stale, report the changed input paths from validation before deciding what to
+rerun; preserve the original evidence.

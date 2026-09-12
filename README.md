@@ -35,6 +35,6 @@ review captures live under `target/`; do not commit them or admission credential
 Gamekit is not a shared engine. Reuse stable algorithms and infrastructure without
 moving genre rules or orchestration into the library. New games go in `games/`
 following the [adopter checklist](docs/development.md), not into a shared game plugin.
-The [consolidation plan](docs/gamekit-consolidation.md) tracks the library boundary,
+The [consolidation plan](gamekit/docs/plans/capability-development.md) tracks the library boundary,
 adopter validation and upcoming pure balance harness. Games stay in this repository
 but are excluded from library distribution.

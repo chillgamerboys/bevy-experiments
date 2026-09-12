@@ -452,18 +452,20 @@ fn compare(root: &Path, base: &str, head: &str) -> Result<Selection, String> {
                 | "LICENSE-APACHE"
                 | "CHANGELOG.md"
         );
-        if matches!(path.as_str(), "gameskills.toml" | "gameskills.lock.json")
-            || [
-                "plugins/",
-                "skills/",
-                "gameskills/plugins/",
-                "gameskills/legacy/",
-                ".claude-plugin/",
-                ".codex-plugin/",
-                ".agents/",
-            ]
-            .iter()
-            .any(|prefix| path.starts_with(prefix))
+        if matches!(
+            path.as_str(),
+            "gameskills.toml" | "gameskills.lock.json" | "gameskills-linear.toml"
+        ) || [
+            "plugins/",
+            "skills/",
+            "gameskills/plugins/",
+            "devtools/tests/fixtures/legacy/",
+            ".claude-plugin/",
+            ".codex-plugin/",
+            ".agents/",
+        ]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
         {
             result.skills = true;
             result.reasons.push(format!(

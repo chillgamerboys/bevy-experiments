@@ -93,6 +93,9 @@ jobs:
       - name: Inspect the CLI archive's instruction payload
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
         run: cargo run --locked -p repo-devtools --profile ci -- bundle verify-package
+      - name: Verify the optional Linear helper Cargo package
+        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-linear')
+        run: cargo package --locked -p gameskills-linear
       - name: Verify the repository tool Cargo package
         if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'repo-devtools')
         run: cargo package --locked -p repo-devtools

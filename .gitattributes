@@ -1,0 +1,2 @@
+# Compatibility provenance hashes describe exact Git bytes on every checkout.
+devtools/tests/fixtures/legacy/** -text

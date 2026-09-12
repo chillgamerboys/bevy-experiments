@@ -1,0 +1,10 @@
+# Optional repository adoption. Credentials and private exports stay outside source.
+workspace = "3a0d88fd-fad4-4df4-9bca-e5401cd02ea0"
+team = "28b8704f-ced3-4884-9601-4ea07b2ca778"
+project = "401f99ba-c1ec-4494-ab0d-ebf0134d8b79"
+key_env = "LINEAR_API_KEY"
+retention_days = 30
+keep_projects = []
+
+[routes]
+"games/labyrinth" = "4196590c-753e-4152-9291-ff8c137eb468"

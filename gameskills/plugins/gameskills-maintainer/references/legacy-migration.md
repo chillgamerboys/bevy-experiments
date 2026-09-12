@@ -1,7 +1,7 @@
 # Legacy lesson destinations
 
 This ledger records instruction migration from the seven original craft skills and
-shared references into the 21-skill candidate. It describes authoring dispositions,
+shared references into the 24-skill candidate. It describes authoring dispositions,
 not demonstrated behavioral parity. Resolve named skills/packages through the host;
 source-tree paths below are historical provenance, not installed-package links.
 
@@ -35,3 +35,23 @@ release commands remain project-owned evidence. Their general failure lessons ar
 retained above without making those settings requirements for unrelated games.
 No old generated installation is automatically removed or rewritten by this
 ledger. Native migration and meaningful forward behavior require separate proof.
+
+## Consolidation evidence
+
+The seven original craft bodies, four shared references, native metadata, trigger
+inputs and installer redirects now live as frozen compatibility inputs in
+`devtools/tests/fixtures/legacy` in the source repository. Its SHA-256 manifest pins
+every original byte to the pre-consolidation commit. Never load that fixture as
+current guidance. Native importer overlays and adopter snapshots remain untouched.
+
+The architecture, UI, rules and Bevy craft references were inspected against every
+original workflow. Existing owners retain the observable behaviors in the table;
+no new architecture entrypoint is justified by an observed routing failure. Core
+plan already names ownership and extraction; review/debug route those lenses.
+The fixed pixel and all-feature policies remain deliberately retired.
+
+Deterministic legacy rendering, local-reference, trigger-shape and source-byte
+checks exercise compatibility, while native catalog and scenario validation check
+current reachability. These are not forward model behavior passes. Original
+trigger examples and held-out craft rubrics remain available for native trials;
+report actual client evaluation separately from this source inspection.

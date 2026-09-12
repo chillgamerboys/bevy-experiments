@@ -789,7 +789,7 @@ fn relocated_product_docs_and_plugins_keep_their_scoped_routes() -> TestResult {
     fixture.reset()?;
     let skills = fixture.changed(&[
         "gameskills/plugins/gameskills/skills/plan/SKILL.md",
-        "gameskills/legacy/source/example/SKILL.md",
+        "devtools/tests/fixtures/legacy/source/example/SKILL.md",
     ])?;
     assert!(!skills.full, "{skills:?}");
     assert_eq!(

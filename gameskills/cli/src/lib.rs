@@ -4,6 +4,8 @@
 
 pub mod cli;
 pub mod config;
+pub mod delivery;
+pub mod docs;
 pub mod installation;
 pub mod platform;
 pub mod runner;

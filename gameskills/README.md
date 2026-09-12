@@ -1,9 +1,9 @@
 # GameSkills
 
 GameSkills is GameKit's development companion for Bevy games. The default package
-has **12 core skills**, with **`gameskills:plan` as the daily entrypoint**:
+has **13 core skills**, with **`gameskills:plan` as the daily entrypoint**:
 
-`setup`, `plan`, `dispatch`, `debug`, `test`, `playtest`, `review`, `update-docs`,
+`setup`, `plan`, `grill`, `dispatch`, `debug`, `test`, `playtest`, `review`, `update-docs`,
 `create-pr`, `audit-pr`, `merge-pr`, `release`.
 
 `setup` handles initial adoption. `plan` investigates the task, defines the useful
@@ -18,15 +18,20 @@ The invoking agent carries work through the endpoint the user requested.
 | `gameskills-multiplayer` | `design-multiplayer`, `verify-multiplayer` |
 | `gameskills-maintainer` | `evolve-gamekit`, `author-skill`, `evaluate-skills` |
 | `gameskills-bevy-contrib` | `prepare-contribution` |
+| `gameskills-linear` | `track`, `cleanup` |
 
 Each package has one canonical source under [`plugins/`](plugins), with native
 Codex and Claude manifests. Optional packages are explicitly selected; the default
-installation does not include all 21 skills. The contribution package is reserved
+installation does not include all 24 skills. The contribution package is reserved
 for human-led investigation of verified Bevy bugs or compelling engine-level gaps.
 
-Start with the [installation and workflow guide](docs/development.md),
-[complete contracts](docs/decisions/gameskills-catalog.md) and
-[Bevy companion direction](docs/decisions/gameskills-framework.md).
+Start with the [installation and workflow guide](docs/installation.md),
+[skill responsibilities](docs/catalog.md) and
+[architecture and Decisions](docs/architecture.md).
+
+The [workflow reliability and optional Linear plan](docs/plans/workflow-reliability.md)
+tracks remaining delivery and tracking acceptance; deletion is deferred.
+Implementation and evaluation are in progress; installed pins are updated explicitly.
 
 ## Validation
 
@@ -45,7 +50,7 @@ agent passed them. See the implementation guide for candidate evidence and limit
 
 ## Legacy migration
 
-`legacy/source/`, `legacy/references/` and their trigger fixtures are frozen compatibility
+`devtools/tests/fixtures/legacy/source/`, `devtools/tests/fixtures/legacy/references/` and their trigger fixtures are frozen compatibility
 material for existing seven-skill adopters. They are not additional core workflows.
 The Python installer and sync entrypoints are retired. Use `gameskills legacy import`
 to inspect an existing installation, then deliberately apply the Rust installation.
@@ -55,8 +60,12 @@ records what was retained, rewritten or retired.
 Preserve generated client files, `.bevy-gamekit/overlays/` and recorded base snapshots.
 The importer checks their identity and does not delete local guidance. Finish active
 queues with their original runtime; old evidence remains historical. The retired
-[install](legacy/maintainer/install-bevy-skills/SKILL.md) and
-[sync](legacy/maintainer/sync-bevy-skills/SKILL.md) guidance redirects to this migration path.
+[install](../devtools/tests/fixtures/legacy/maintainer/install-bevy-skills/SKILL.md) and
+[sync](../devtools/tests/fixtures/legacy/maintainer/sync-bevy-skills/SKILL.md) guidance redirects to this migration path.
 
-The [CLI](cli/README.md), [plugins](plugins) and [legacy compatibility](legacy/README.md)
+The [CLI](cli/README.md), [plugins](plugins) and [legacy compatibility](../devtools/tests/fixtures/legacy/README.md)
 have separate owners. Active catalog evaluation fixtures live with the devtools tests.
+
+The optional `gameskills-linear` package adds `track` and `cleanup`. Use connected Linear tools for ordinary tracking. The separately installed helper
+is optional and its older cleanup prototype is deferred. Installing core does not
+connect Linear, require extra credentials or schedule deletion.

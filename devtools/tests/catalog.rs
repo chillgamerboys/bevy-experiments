@@ -413,13 +413,13 @@ fn structural_scope_and_failure_status_are_available_to_the_cli() -> TestResult 
     let fixture = Candidate::new()?;
     fixture.assert_valid();
     assert!(catalog::NOTICE.contains("do not prove native installation"));
-    assert_eq!(EXPECTED_SKILLS.len(), 6);
+    assert_eq!(EXPECTED_SKILLS.len(), 7);
     assert_eq!(
         EXPECTED_SKILLS
             .iter()
             .map(|(_, skills)| skills.len())
             .sum::<usize>(),
-        21
+        24
     );
     std::fs::remove_file(fixture.skill())?;
     assert!(!fixture.failures().is_empty());

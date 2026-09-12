@@ -4,8 +4,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::os::fd::{AsFd, OwnedFd};
 use std::path::{Component, Path};
-pub(super) struct Directory(pub(super) OwnedFd);
-pub(super) fn ordinary(fd: impl AsFd) -> Result<(), String> {
+pub(crate) struct Directory(pub(crate) OwnedFd);
+pub(crate) fn ordinary(fd: impl AsFd) -> Result<(), String> {
     let info = fs::fstat(fd).map_err(|e| e.to_string())?;
     if FileType::from_raw_mode(info.st_mode) != FileType::RegularFile
         || info.st_nlink != 1
@@ -17,7 +17,7 @@ pub(super) fn ordinary(fd: impl AsFd) -> Result<(), String> {
     Ok(())
 }
 impl Directory {
-    pub(super) fn root(path: &Path) -> Result<Self, String> {
+    pub(crate) fn root(path: &Path) -> Result<Self, String> {
         fs::open(
             path,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
@@ -26,7 +26,7 @@ impl Directory {
         .map(Self)
         .map_err(|e| format!("open directory {}: {e}", path.display()))
     }
-    pub(super) fn checked(fd: OwnedFd, private: bool) -> Result<Self, String> {
+    pub(crate) fn checked(fd: OwnedFd, private: bool) -> Result<Self, String> {
         let info = fs::fstat(&fd).map_err(|e| e.to_string())?;
         if FileType::from_raw_mode(info.st_mode) != FileType::Directory
             || private
@@ -36,7 +36,7 @@ impl Directory {
         }
         Ok(Self(fd))
     }
-    pub(super) fn name(name: &std::ffi::OsStr) -> Result<(), String> {
+    pub(crate) fn name(name: &std::ffi::OsStr) -> Result<(), String> {
         use std::os::unix::ffi::OsStrExt;
         let raw = name.as_bytes();
         if raw.is_empty()
@@ -48,7 +48,7 @@ impl Directory {
         }
         Ok(())
     }
-    pub(super) fn child(&self, name: &str, create: bool, exclusive: bool) -> Result<Self, String> {
+    pub(crate) fn child(&self, name: &str, create: bool, exclusive: bool) -> Result<Self, String> {
         Self::name(name.as_ref())?;
         if create {
             match fs::mkdirat(&self.0, name, Mode::RWXU) {
@@ -66,11 +66,11 @@ impl Directory {
         .map_err(|e| format!("open state directory {name}: {e}"))?;
         Self::checked(fd, true)
     }
-    pub(super) fn cwd(root: &Path, path: &Path) -> Result<Self, String> {
+    pub(crate) fn cwd(root: &Path, path: &Path) -> Result<Self, String> {
         Self::source_parent(root, path)?
             .ok_or_else(|| format!("missing command directory {}", path.display()))
     }
-    pub(super) fn source_parent(root: &Path, path: &Path) -> Result<Option<Self>, String> {
+    pub(crate) fn source_parent(root: &Path, path: &Path) -> Result<Option<Self>, String> {
         let mut directory = Self::root(root)?;
         for part in path.components() {
             match part {
@@ -99,7 +99,7 @@ impl Directory {
         }
         Ok(Some(directory))
     }
-    pub(super) fn open(&self, name: &str, create: bool, exclusive: bool) -> Result<File, String> {
+    pub(crate) fn open(&self, name: &str, create: bool, exclusive: bool) -> Result<File, String> {
         Self::name(name.as_ref())?;
         let flags = OFlags::NOFOLLOW
             | OFlags::NONBLOCK
@@ -126,14 +126,14 @@ impl Directory {
         ordinary(&fd)?;
         Ok(fd.into())
     }
-    pub(super) fn read(&self, name: &str) -> Result<Vec<u8>, String> {
+    pub(crate) fn read(&self, name: &str) -> Result<Vec<u8>, String> {
         let mut bytes = Vec::new();
         self.open(name, false, false)?
             .read_to_end(&mut bytes)
             .map_err(|e| e.to_string())?;
         Ok(bytes)
     }
-    pub(super) fn file_digest(&self, name: &str) -> Result<String, String> {
+    pub(crate) fn file_digest(&self, name: &str) -> Result<String, String> {
         use sha2::{Digest, Sha256};
         let mut file = self.open(name, false, false)?;
         let mut digest = Sha256::new();
@@ -147,7 +147,7 @@ impl Directory {
         }
         Ok(format!("{:x}", digest.finalize()))
     }
-    pub(super) fn write_json(
+    pub(crate) fn write_json(
         &self,
         name: &str,
         value: &impl serde::Serialize,
@@ -166,7 +166,7 @@ impl Directory {
         let _ = fs::unlinkat(&self.0, &temporary, AtFlags::empty());
         result
     }
-    pub(super) fn entries(&self) -> Result<Vec<String>, String> {
+    pub(crate) fn entries(&self) -> Result<Vec<String>, String> {
         let mut names = Vec::new();
         let mut entries = fs::Dir::read_from(&self.0).map_err(|e| e.to_string())?;
         for entry in &mut entries {
@@ -179,14 +179,14 @@ impl Directory {
         Ok(names)
     }
 }
-pub(super) fn lock(file: &File) -> Result<bool, String> {
+pub(crate) fn lock(file: &File) -> Result<bool, String> {
     match fs::flock(file, fs::FlockOperation::NonBlockingLockExclusive) {
         Ok(()) => Ok(true),
         Err(rustix::io::Errno::WOULDBLOCK) => Ok(false),
         Err(e) => Err(e.to_string()),
     }
 }
-pub(super) struct Resources {
+pub(crate) struct Resources {
     directory: Directory,
     common: String,
 }
@@ -208,7 +208,7 @@ fn resource_digest(scope: &str, resource: &str) -> Result<String, String> {
     Ok(super::hash(ascii))
 }
 impl Resources {
-    pub(super) fn new(common: &str) -> Result<Self, String> {
+    pub(crate) fn new(common: &str) -> Result<Self, String> {
         let directory = Directory::root(
             &Path::new("/tmp")
                 .canonicalize()
@@ -227,7 +227,7 @@ impl Resources {
             common: common.into(),
         })
     }
-    pub(super) fn acquire(&self, resources: &[String]) -> Result<Option<Vec<File>>, String> {
+    pub(crate) fn acquire(&self, resources: &[String]) -> Result<Option<Vec<File>>, String> {
         let mut held = Vec::new();
         for resource in resources {
             let scope = if resource.starts_with("project:") {

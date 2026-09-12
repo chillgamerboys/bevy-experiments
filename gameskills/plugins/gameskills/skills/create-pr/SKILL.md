@@ -27,3 +27,12 @@ source HEAD and base. After an uncertain result, inspect remote state before ret
 Record the actual PR and remaining checks. Invoke `gameskills:audit-pr` when the
 active endpoint includes acceptance; creating the artifact cannot declare it
 accepted, merged or released.
+
+Bind the observed PR to the existing delivery record. When optional tracking is
+required, resolve its installed tracking skill, link both objects and verify the
+exact project/issue UUID and PR. Run delivery check after publication; report
+pending or unverifiable requirements explicitly. Never replace a resumed PR task
+with an implementation-only task merely because local checks passed.
+
+Include affected current-doc and skill-pointer changes in the review artifact.
+State remaining acceptance explicitly when a substantial plan is still active.

@@ -17,5 +17,5 @@ GameSkills is the [development companion](../gameskills/README.md).
 
 Start with the [facade](facade/README.md) for feature selection and Rustdoc for
 individual APIs. See [UI integration](docs/ui.md), [multiplayer operations](docs/multiplayer.md),
-[workspace development](../docs/development.md) and [distribution](../docs/extraction.md).
+[workspace development](../docs/development.md) and [distribution](../docs/distribution.md).
 The library-only consumer checks exercise Gamekit without the games or GameSkills.

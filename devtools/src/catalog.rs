@@ -13,6 +13,7 @@ pub const EXPECTED_SKILLS: &[(&str, &[&str])] = &[
         &[
             "setup",
             "plan",
+            "grill",
             "dispatch",
             "debug",
             "test",
@@ -36,6 +37,7 @@ pub const EXPECTED_SKILLS: &[(&str, &[&str])] = &[
         &["evolve-gamekit", "author-skill", "evaluate-skills"],
     ),
     ("gameskills-bevy-contrib", &["prepare-contribution"]),
+    ("gameskills-linear", &["track", "cleanup"]),
 ];
 
 /// Passing this validator is not evidence of native installation or agent behavior.
@@ -280,7 +282,12 @@ fn target(
     failures: &mut Vec<String>,
 ) -> Option<PathBuf> {
     match support::local_target(boundary, source, raw) {
-        Ok(target) => target,
+        Ok(target) => {
+            if let Err(error) = markdown::check_anchor(source, target.as_deref(), raw) {
+                failures.push(format!("{}: {error}", source.display()));
+            }
+            target
+        }
         Err(error) => {
             failures.push(format!("{}: {error}", source.display()));
             None

@@ -30,3 +30,7 @@ implementer; reviewing alone does not take ownership of unrelated work.
 Report actionable findings, or no findings with specific residual validation gaps.
 A clean review is judgment about the reviewed scope/revision, not PR acceptance,
 merge authorization or proof that the artifact plays correctly.
+
+Compare changed behavior with the owner docs, Decisions and affected skill pointers.
+Report contradictions or unfinished work hidden by a planned document deletion;
+valid links alone do not establish accurate guidance.

@@ -1,6 +1,6 @@
 {
   "name": "gameskills-turn-based",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-dev.3",
   "description": "Model game-owned rules, legal actions and deterministic replay.",
   "author": {
     "name": "GameKit contributors"

@@ -155,7 +155,7 @@ mod posix {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let fixture = Fixture::new()?;
         let result = fixture.activate(2.0)?;
-        assert_eq!(at(&result, "/skills").as_array().ok_or("skills")?.len(), 14);
+        assert_eq!(at(&result, "/skills").as_array().ok_or("skills")?.len(), 15);
         assert!(at(&result, "/claim")
             .as_str()
             .ok_or("claim")?

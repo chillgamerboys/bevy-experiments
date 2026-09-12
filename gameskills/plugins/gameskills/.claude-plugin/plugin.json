@@ -1,6 +1,6 @@
 {
   "name": "gameskills",
-  "version": "0.1.0-dev.1",
+  "version": "0.1.0-dev.3",
   "description": "Plan and deliver Bevy games with measured evidence and bounded coordination.",
   "author": {
     "name": "GameKit contributors"

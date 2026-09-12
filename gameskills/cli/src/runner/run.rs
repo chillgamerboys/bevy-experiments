@@ -116,9 +116,10 @@ fn validate(directory: &Directory, record: &Value, root: &Path, config: &Value, 
         let (commands, order) = graph::graph(root, config, &selected)?;
         let current = identity::identity(root, config, &commands)?;
         if record.get("identity") != Some(&current) {
-            reasons.push(
-                "repository, source, configuration, command, or environment inputs changed".into(),
-            );
+            reasons.extend(identity::differences(
+                record.get("identity").unwrap_or(&Value::Null),
+                &current,
+            ));
         }
         if record.get("final_identity") != record.get("identity") {
             reasons.push("inputs changed during execution or final identity is unavailable".into());

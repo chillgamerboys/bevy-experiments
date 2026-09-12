@@ -33,3 +33,6 @@ before retrying; do not replace an existing published version to hide a failure.
 Report what can actually be installed or played, its verified versions/platforms,
 remaining limitations and publication state. A prepared release outside publication
 scope is a valid handoff; it is not a published release.
+
+Read the project's current distribution/support guidance; keep release proposals
+separate from installable behavior. Update the relevant current docs on delivery.

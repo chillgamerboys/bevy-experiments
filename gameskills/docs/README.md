@@ -1,14 +1,18 @@
 # GameSkills documentation
 
-- [Installation and development workflow](development.md)
-- [Packaged CLI smoke test](smoke-test.md)
-- [Framework direction](decisions/gameskills-framework.md)
-- [Catalog contracts](decisions/gameskills-catalog.md)
-- [CI scope](decisions/gameskills-ci-scope.md)
-- [Deferred external adoption pilot](decisions/port-vila-adoption.md)
+For adopters:
 
-Historical implementation/evidence records:
-[Rust migration](history/gameskills-rust-cli.md),
-[adoption and cutover](history/gameskills-rust-adoption.md), and
-[refinement observations](history/gameskills-refinement-results.md).
-These retain their recorded revisions and are not new passing observations.
+- [Install and update](installation.md)
+- [Daily workflow and delivery](workflow.md)
+- [Skill catalog](catalog.md)
+- [Troubleshooting](troubleshooting.md)
+
+For maintainers:
+
+- [Architecture and Decisions](architecture.md)
+- [Contributing and candidate verification](contributing.md)
+- [CLI commands](../cli/README.md)
+
+Active work: [workflow reliability](plans/workflow-reliability.md).
+Next session: [skill evaluation](plans/skill-evaluation.md), explicitly non-blocking for PR #38.
+Deferred work: [framework trials](plans/framework-followups.md) and [Hex adoption](plans/hex-adoption.md).

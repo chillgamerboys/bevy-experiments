@@ -30,7 +30,7 @@ capability dependencies pointing at games or back at the facade. Markdown checks
 cover inline/image destinations and reference definitions outside matching fences;
 they check local targets, not remote availability or Markdown rendering.
 
-`skills validate` checks the fixed 12 core and nine optional skills across six native
+`skills validate` checks the fixed 13 core and eleven optional skills across seven native
 packages, metadata, frontmatter and unexecuted scenario rubrics. It rejects duplicate
 JSON keys and native-package symlinks. `skills legacy` checks the seven frozen
 canonical sources, client metadata and trigger fixtures. Both are structural checks;
