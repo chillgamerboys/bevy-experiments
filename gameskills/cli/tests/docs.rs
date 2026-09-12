@@ -129,3 +129,20 @@ fn cli_resolves_before_setup_and_rejects_incomplete_arguments() {
     invalid.push("--path".into());
     assert_ne!(gameskills_cli::cli::execute(invalid).exit_code, 0);
 }
+
+#[test]
+fn existing_root_and_dot_relative_targets_keep_their_documentation() {
+    let d = tempfile::tempdir().expect("test fixture");
+    write(d.path(), "README.md", "# Root app");
+    write(d.path(), "game/README.md", "# Nested game");
+    let c = parse("[targets.app]\npath='.'\n[targets.game]\npath='./game/'");
+    let root = docs::resolve(d.path(), &c, &["./src/main.rs".into()]).expect("root target");
+    assert_eq!(root["indexes"], serde_json::json!(["README.md"]));
+    assert_eq!(root["owners"][1]["owner"], "app");
+    let nested = docs::resolve(d.path(), &c, &["./game//".into()]).expect("nested target");
+    assert_eq!(
+        nested["indexes"],
+        serde_json::json!(["README.md", "game/README.md"])
+    );
+    assert!(docs::resolve(d.path(), &c, &["game/../outside".into()]).is_err());
+}

@@ -29,7 +29,7 @@ fn portable(raw: &str, allow_dot: bool) -> Result<PathBuf, String> {
         || raw.contains(['\\', ':', '\0', '#', '?'])
         || raw
             .split('/')
-            .any(|part| part.is_empty() || part == ".." || (!allow_dot && part == "."))
+            .any(|part| part == ".." || (!allow_dot && (part.is_empty() || part == ".")))
     {
         return Err(format!(
             "expected a portable repository-relative path: {raw:?}"
@@ -162,7 +162,7 @@ pub fn resolve(root: &Path, config: &Table, paths: &[String]) -> Result<Json, St
                 }
                 continue;
             };
-            let source = portable(source, false)?;
+            let source = portable(source, true)?;
             contained(&root, &source)?;
             owners.push(Owner::load(&root, name, source, value.get("docs"))?);
         }
