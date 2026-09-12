@@ -1,6 +1,6 @@
 # Documentation and skill guidance refactor
 
-Status: active; implemented, final verification and PR delivery in progress.
+Status: active; implemented, awaiting PR acceptance and landing.
 Owner: shared repository work, tracked with [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows).
 Inspection baseline: `b1a14cfc34c1f443bd6d369e266a7ed813d83d25`.
 Related work: [GameSkills reliability](../../gameskills/docs/plans/workflow-reliability.md), draft PR #38.
@@ -32,7 +32,7 @@ split, edits to linked workspaces, merging, a public release, or parallel agents
 The MCP-first everyday tracking correction remains a separate open item in the
 reliability work; this docs refactor must not claim that runtime fix was completed.
 
-## Current problems to address
+## Problems at the inspection baseline
 
 Inspection found 31 documents in the five main docs trees, plus product/package
 READMEs and 24 skill entrypoints with packaged references. File count is not a

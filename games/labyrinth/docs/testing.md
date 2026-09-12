@@ -1,7 +1,7 @@
 # Labyrinth verification
 
-Repeatable checks for the current game. Historical results live in the
-[milestone record](testing.md).
+Repeatable checks for the current game. Record observations against the tested
+build and route; Git and PR history retain earlier results.
 
 Run from the repository root. CI profile uses the same source/features with faster unoptimized
 compilation; ordinary play uses the default development profile.
@@ -174,11 +174,6 @@ extra footer. Native pointer tests close the × over an underlying character and
 verify that stationary-pointer dismissal does not reveal a new tooltip. Render
 `labyrinth_review ... 1280 720 auto help` and `help-locked` for separate authored
 presentation states; those captures freeze timing and do not prove hover duration.
-
-See [Labyrinth](testing.md),
-[Carterfight](../../carterfight/README.md) and
-[deckbuilder](../../deckbuilder/README.md) for game-specific acceptance.
-Skill validation proves structure/rendering parity, not agent selection behavior.
 
 ## Unresolved verification
 

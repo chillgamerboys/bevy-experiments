@@ -82,10 +82,10 @@ process-supervision support. Authenticated Claude behavior remains a separate
 acceptance item when credentials are unavailable. The CLI is not a sandbox for
 configured commands.
 
-The migration's private artifact checks precede public publishing. Registry naming,
-license/notice completeness and public release ownership remain release gates in
-[the distribution plan](../../docs/distribution.md). Labyrinth mechanical and visual changes are
-the next collaborative product trial after review of this migration.
+Private artifact checks precede public publishing. Registry naming, license/notice
+completeness and public release ownership remain gates in
+[the distribution plan](../../docs/plans/distribution.md). Product trials are tracked
+in [framework follow-ups](plans/framework-followups.md).
 
 Documentation mappings are optional and require CLI 0.1.0-dev.3 or newer. Upgrade
 the executable before adopting them. See [architecture](architecture.md#documentation-discovery)

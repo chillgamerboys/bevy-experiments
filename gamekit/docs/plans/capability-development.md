@@ -6,7 +6,7 @@ Owner: Gamekit and consuming games. Resume when a capability or balance experime
 Current boundaries live in [architecture](../architecture.md). The following work
 is proposed, not an existing universal game engine.
 
-### 2. Shared UI and application mechanics — incremental refinement
+## Shared UI and application mechanics — incremental refinement
 
 Audit existing menu, tooltip, feed, focus and input contracts against both Labyrinth
 and Deckbuilder before moving more code. Consolidate only repeated mechanics such
@@ -20,7 +20,7 @@ interactive pointer/keyboard/menu/tooltip checks in both games. Carterfight chec
 that offline UI use remains lightweight. Passing structural tests is not visual
 sign-off.
 
-### 3. Multiplayer orchestration mechanics — separate bounded migrations
+## Multiplayer orchestration mechanics — separate bounded migrations
 
 Compare host/guest connection state, admission delivery, credential storage,
 discovery routing and cleanup across both games. Share lifecycle mechanics behind
@@ -38,7 +38,7 @@ host/guest leave; fresh-process guest reconnect against a running host; both gam
 existing integration checks. Local links and localhost do not replace distinct-host
 LAN and tailnet tests. Preserve the six-process Labyrinth regression gate.
 
-### 4. Pure balance harness — independent of UI/network consolidation
+## Pure balance harness — independent of UI/network consolidation
 
 Build a Bevy-independent capability for seeded experiments using game-supplied
 adapters. Its minimum contract is reset from a scenario and seed, current decision
@@ -83,16 +83,16 @@ justify it. It should wrap the same runner/rules and preserve legal-action masks
 actor observations and terminal/truncation semantics. Learned actors are balance
 instruments, not the shipped enemy AI and not proof of fun or perfect balance.
 
-### 5. First private distribution — explicit release task
+## First private distribution — explicit release task
 
 Distribute the facade and capability packages, plus the canonical skill pack under
 one pinned release tag. Exclude `games/`, game assets and game fixtures. No repository
 split is required. A source archive and a private registry release have different
 requirements; select the channel explicitly before preparing the first release.
-The [distribution proposal](../../../docs/distribution.md) carries this private candidate forward
-into eventual crates.io libraries/CLI and GitHub binary/bundle releases. It defines
-artifact verification and separate runtime/bundle compatibility during the Rust
-migration; public publication remains a later release decision.
+The [distribution plan](../../../docs/plans/distribution.md) carries this candidate
+forward into registry and binary releases. Current artifact verification and
+runtime/bundle compatibility are described in [distribution contracts](../../../docs/distribution.md);
+public publication remains a separate release decision.
 
 Acceptance: library-only builds/tests; reviewed package contents and licensing;
 versioned internal dependencies suitable for the chosen channel; documented feature
