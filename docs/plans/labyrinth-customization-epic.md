@@ -1,6 +1,6 @@
 # Labyrinth customization and package-quality epic
 
-Status: implementation integrated; final verification and reviewable PR delivery in progress.
+Status: implementation integrated; builder UX rejected by the user. Research and design discussion precede further UI implementation and delivery acceptance.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
@@ -17,10 +17,14 @@ Combined local evidence covers catalog/build/scenario validation, both-team edit
 actual encrypted custom builds and save/load, multi-character/spectator/reassignment
 policy, 12+ move input/inspection and a six-process guest kill/reconnect/completed
 fight. Metal frames cover setup/overflow at Auto/200%; static rendering is not a
-desktop playthrough. The final command graph and actual PR are recorded in delivery
-`labyrinth-customization` and the PR body.
+desktop playthrough. Draft [PR #39](https://github.com/chillgamerboys/bevy-experiments/pull/39)
+exists. The final source-bound command graph and delivery observation remain pending.
 
-Remaining acceptance belongs to S9/S10: current CI/review state, interactive desktop
+S6/S9 builder usability acceptance is explicitly reopened: the user rejected the
+unexplained button lists and organization despite the preceding checks. See the
+[research and alternatives](../../games/labyrinth/docs/plans/builder-ui-research.md).
+Reachability and unclipped screenshots did not establish understandable choices.
+Other remaining acceptance includes S9/S10: current CI/review state, interactive desktop
 feel and cross-machine network routes where available. S1 retains independent
 forward/native-client/cost evaluation gaps; the configured standalone Linear
 observer alignment remains separate from the connected MCP tracker. These are
@@ -308,6 +312,14 @@ Display participants with their assigned characters plus a distinct formation vi
 
 Full customization means roster/build/stat setup; the UI need not create weapon definitions, effect types, inventory grids or skill trees.
 
+Accepted UI revision (grill 7–8): B, squad preparation, with exactly one unified
+character editor for heroes and enemies. Keep equipment, innate/learned abilities
+and existing character battle parameters in that screen with a single draft
+lifecycle. The future character stat system remains unimplemented and out of this
+revision; when added, it belongs in the same editor. Plan for reuse as the detailed
+in-game character view without authorizing mid-battle editing. Internal navigation
+and responsive layouts may change; separate character editors may not proliferate.
+
 #### Ownership and dependencies
 
 Owner: Labyrinth.
@@ -318,6 +330,9 @@ Completion dependencies: S3, S5.
 #### Acceptance
 
 - [ ] Create a fresh custom local encounter and a co-op encounter from stock or saved data without editing Rust.
+- [ ] Squad selection opens one unified character editor for either team; character parameters and builds share its draft/apply/discard flow. Scenario settings do not introduce another character editor.
+- [ ] Before equipping/learning, a player can inspect effective moves, rank restrictions, prerequisites and the proposed changes; visible information agrees with the game-owned resolver, including upgrades and duplicate grants.
+- [ ] Switching characters or sections preserves or explicitly resolves draft changes; browsing never silently equips a choice. Separate information-availability evidence from actual observed player comprehension.
 - [ ] Host assigns multiple heroes to a guest and none to another; owners edit only permitted builds, all peers see accepted authoritative changes.
 - [ ] Changing footprint cannot overfill six spaces or evict another player's character silently; affected readiness is invalidated coherently.
 - [ ] Saved scenario contains game configuration, not connection credentials/peer identity; load is validated and failure leaves the prior draft intact.

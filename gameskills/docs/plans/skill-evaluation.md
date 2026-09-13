@@ -1,6 +1,6 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active implementation and bounded self-review exercises; independent native behavioral trials remain unobserved.
+Status: builder usability rejected by the user; corrective research/design discussion active. Independent native behavioral trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
@@ -12,6 +12,50 @@ explicitly gives the game and package improvements equal importance. Evaluation
 was deferred to let PR #38 land; it is part of this work, not another deferred
 prerequisite. Plan concrete acceptance for each owner and make evidence-backed
 package corrections throughout implementation, with explicit untested coverage.
+
+### Observed builder design failure (2026-09-13)
+
+The user rejected the integrated character editor's wall of weapon/ability buttons:
+it offered names without decision-relevant explanations and mixed many tasks into
+a long form. Existing Metal captures (`target/review/labyrinth-editor-1280.png`,
+`labyrinth-editor-actions-1280.png`, `labyrinth-editor-actions-200.png`) and earlier
+layout/input checks remain evidence of rendering/reachability, not usability.
+Preserve them as the negative case. S6/S9 usability acceptance is reopened; PR #39
+remains draft. The immediate endpoint is researched alternatives and numbered
+discussion, not another unreviewed UI implementation.
+
+This was an execution failure as well as a guidance gap. Existing creative-level
+guidance and this evaluation plan already called for alternatives and confusion
+observations. The agent treated unresolved screen organization as routine wiring.
+S6 specified editable fields, authority and input paths; the useful descriptions,
+rank restrictions and provenance requirements were confined to combat S7. The
+`build-ui` sequence starts with views/intents/states, while `verify-ui` distinguishes
+structural/rendered/native evidence without an explicit decision-information check.
+
+Proposed correction, not yet authored or behaviorally validated: `plan`/`build-ui`
+should establish the player's task, needed information, consequences, comparison
+and undo before constructing a new decision surface. An accepted mechanic is not
+an accepted screen design. Material unresolved organization warrants bounded
+alternatives even at creative level 2; routine edits do not need an approval gate.
+`verify-ui` should check whether the interface supplies accurate information for
+real choice tasks, separately from input correctness and observed comprehension.
+
+Evaluate any candidate with a fresh agent on an unfamiliar tactical-game builder,
+without prescribing a layout or mentioning this failure. A separate reviewer uses
+only the result to choose a front-pair attack, distinguish a new move from an
+upgrade, explain an incompatible choice, undo it and switch characters without
+confusing draft and committed state. Record correct explanations from visible
+evidence, missing information and unnecessary backtracking. Static review can
+establish information availability; actual player comprehension requires a player
+observation. Do not claim the correction works merely because its text exists.
+
+The [research brief](../../../games/labyrinth/docs/plans/builder-ui-research.md)
+contains sources, concrete alternatives and settled answers 7–8: squad preparation
+with one unified character editor, designed for eventual in-game detailed viewing.
+Future character stats belong in that same screen when implemented. Preserve this
+cross-context consistency constraint through UI redesigns and evaluation; do not
+split character editing into separate testing and gameplay screens. Canonical skill
+fallback and the immutable installed pin remain unchanged.
 
 The scoped implementation follows the epic:
 [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with),
