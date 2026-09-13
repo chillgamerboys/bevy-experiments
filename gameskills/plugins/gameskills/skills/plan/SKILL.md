@@ -18,14 +18,17 @@ Name unfinished requirements. Substantial work may need a committed active plan;
 routine notes do not require a plan file, queue or ticket.
 
 For implementation, read [delivery](../../references/delivery.md) and resume or
-start its solo record. Keep the requested endpoint through interruptions. A
+start its delivery record. Keep the requested endpoint through interruptions. A
 plan-only discussion ends at its plan; focused specialist requests retain their
 narrower scope. Optional tracking follows the adopted package and current tools.
 
 Only for an authorized parallel wave, read [work orders](../../references/work-orders.md),
 validate a scoped plan with `plan validate --file PLAN.json`, then create one queue
-and hand it to `dispatch`. Capacity is not permission to launch agents. Solo work
-stays with the current agent.
+and hand it to `dispatch`. Resolve authorization from the accepted session and
+applicable project instructions/configuration, including inherited authorization
+after a handoff. Keep task scope separate from execution strategy and authorization;
+report unresolved permission as such instead of rewriting scope. Capacity alone is
+not permission to launch agents. Solo work stays with the current agent.
 
 Implement, verify through the project's configured checks, reconcile current docs
 and proceed through `create-pr`, `audit-pr`, and authorized merge/release work as
