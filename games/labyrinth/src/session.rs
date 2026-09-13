@@ -233,6 +233,13 @@ impl SessionSnapshot {
                 .iter()
                 .find(|a| a.id == member.actor)
                 .ok_or("Unknown company character.")?;
+            let expected_hero = match configured.actor.appearance {
+                ActorKind::Hero(hero) => hero,
+                ActorKind::Enemy(_) => HeroClass::Gatekeeper,
+            };
+            if member.hero != expected_hero {
+                return Err("Company appearance does not match scenario.");
+            }
             if configured
                 .actor
                 .resolve(&self.catalog)

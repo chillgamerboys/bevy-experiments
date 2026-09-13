@@ -7,7 +7,7 @@ use zeroize::Zeroize as _;
 
 pub(super) const GAME_ID: &str = "gamekit-labyrinth";
 pub(super) const PROTOCOL: &str = "5";
-pub(super) const SCHEMA: &str = "labyrinth/v5;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
+pub(super) const SCHEMA: &str = "labyrinth/v5;scenario-v1;frozen-authored-abilities;actor-local-ability-index;custom-stats;front-pair-cleave;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
 
 #[derive(Serialize)]
 pub(super) struct WirePassword(pub String);

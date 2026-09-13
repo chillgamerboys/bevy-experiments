@@ -48,6 +48,7 @@ pub(super) struct ActorEditor {
     mounted: Option<u64>,
     error: Option<String>,
     pending_save: bool,
+    submitted_revision: Option<u64>,
 }
 impl ActorEditor {
     fn new(draft: ScenarioActor, revision: u64) -> Self {
@@ -66,6 +67,7 @@ impl ActorEditor {
             mounted: None,
             error: None,
             pending_save: false,
+            submitted_revision: None,
         }
     }
     fn validated(&self, catalog: &ContentCatalog) -> Result<ScenarioActor, String> {
@@ -92,6 +94,9 @@ impl ActorEditor {
                     .map_err(|_| "Starting HP must be blank or a whole number.")?,
             )
         };
+        if draft.starting_hp.is_some_and(|hp| hp > draft.actor.max_hp) {
+            return Err("Starting HP cannot exceed maximum HP.".into());
+        }
         draft.actor.resolve(catalog).map_err(|e| e.to_string())?;
         Ok(draft)
     }
@@ -99,6 +104,8 @@ impl ActorEditor {
 
 pub(super) fn change(ui: &mut UiState, field: BuildField, value: &str) {
     if let Some(editor) = &mut ui.editor {
+        editor.error = None;
+        editor.pending_save = false;
         match field {
             BuildField::Name => editor.name = value.into(),
             BuildField::MaxHp => editor.max_hp = value.into(),
@@ -142,9 +149,39 @@ pub(super) fn action(
         }
         SetupAction::Save => {
             let editor = ui.editor.as_mut()?;
+            editor.error = None;
+            editor.pending_save = false;
+            if editor.revision != view.setup_revision {
+                editor.error =
+                    Some("Setup changed. Reload this character before applying your draft.".into());
+                return None;
+            }
+            if !view.host
+                && !view
+                    .company
+                    .iter()
+                    .any(|m| m.actor == editor.id && Some(m.owner) == view.player)
+            {
+                editor.error = Some("This character is no longer assigned to you.".into());
+                return None;
+            }
             match editor.validated(catalog) {
                 Ok(actor) => {
+                    let mut candidate = scenario.clone();
+                    if let Some(current) = candidate
+                        .heroes
+                        .iter_mut()
+                        .chain(&mut candidate.enemies)
+                        .find(|a| a.id == actor.id)
+                    {
+                        *current = actor.clone();
+                    }
+                    if let Err(error) = candidate.validate(catalog) {
+                        editor.error = Some(error.to_string());
+                        return None;
+                    }
                     editor.pending_save = true;
+                    editor.submitted_revision = Some(view.revision);
                     return Some(LabyrinthIntent::CustomizeActor {
                         actor,
                         expected_revision: editor.revision,
@@ -169,6 +206,8 @@ pub(super) fn action(
             let editor = ui.editor.as_mut()?;
             editor.draft.actor.build.weapon = id;
             editor.generation += 1;
+            editor.error = None;
+            editor.pending_save = false;
         }
         SetupAction::Innate(id) => {
             let editor = ui.editor.as_mut()?;
@@ -182,6 +221,8 @@ pub(super) fn action(
                 });
             }
             editor.generation += 1;
+            editor.error = None;
+            editor.pending_save = false;
         }
         SetupAction::Learned(id) => {
             let editor = ui.editor.as_mut()?;
@@ -192,6 +233,8 @@ pub(super) fn action(
                 learned.push(id);
             }
             editor.generation += 1;
+            editor.error = None;
+            editor.pending_save = false;
         }
         SetupAction::Status(kind) => {
             let editor = ui.editor.as_mut()?;
@@ -213,6 +256,8 @@ pub(super) fn action(
                     });
             }
             editor.generation += 1;
+            editor.error = None;
+            editor.pending_save = false;
         }
         SetupAction::Stock(index) => return Some(LabyrinthIntent::StockScenario(index)),
         SetupAction::SaveFile => {
@@ -271,6 +316,8 @@ pub(super) fn action(
 struct EditorRoot;
 #[derive(Component)]
 struct EditorNotice;
+#[derive(Component)]
+struct EditorSave;
 
 pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
     if view.mode != ViewMode::Lobby || !view.admitted {
@@ -278,7 +325,10 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
     }
     if ui.editor.as_ref().is_some_and(|editor| {
         editor.pending_save
-            && view.setup_revision > editor.revision
+            && editor
+                .submitted_revision
+                .is_some_and(|revision| view.revision > revision)
+            && view.setup_revision >= editor.revision
             && view
                 .catalog
                 .as_ref()
@@ -319,6 +369,19 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         .iter_mut(world)
     {
         text.0.clone_from(&notice);
+    }
+    let can_apply = view.setup_revision == editor.revision
+        && (view.host
+            || view
+                .company
+                .iter()
+                .any(|m| m.actor == editor.id && Some(m.owner) == view.player));
+    let save_controls = world
+        .query_filtered::<Entity, With<EditorSave>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    for entity in save_controls {
+        set_disabled(world, entity, !can_apply);
     }
     if editor.mounted == Some(editor.generation) {
         return;
@@ -549,14 +612,15 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
     let notice_entity = label(world, panel, "Build Notice", notice, UiTextRole::Body);
     world.entity_mut(notice_entity).insert(EditorNotice);
     let actions = shell::row(world, panel, "Build Actions");
-    control(
+    let save_control = control(
         world,
         actions,
         "Apply Build",
         "Apply build",
         Action::Setup(SetupAction::Save),
-        view.setup_revision != editor.revision,
+        !can_apply,
     );
+    world.entity_mut(save_control).insert(EditorSave);
     control(
         world,
         actions,
