@@ -109,9 +109,9 @@ pub fn parse(source: &str) -> Result<Table, String> {
         let tracking = table(&value, "tracking")?;
         if tracking
             .keys()
-            .any(|s| !["required", "observer"].contains(&s.as_str()))
+            .any(|s| !["required", "mode", "observer"].contains(&s.as_str()))
         {
-            return Err("tracking accepts required and observer only".into());
+            return Err("tracking accepts required, mode and observer only".into());
         }
         if tracking
             .get("required")
@@ -137,10 +137,21 @@ pub fn parse(source: &str) -> Result<Table, String> {
                 return Err("tracking.observer requires nonempty arguments without NUL".into());
             }
         }
-        if tracking.get("required").and_then(Value::as_bool) == Some(true)
-            && !tracking.contains_key("observer")
-        {
-            return Err("required tracking needs an observer command".into());
+        match tracking.get("mode") {
+            None => {} // Existing argv adopters retain command mode; otherwise use MCP.
+            Some(Value::String(mode)) if mode == "mcp" => {
+                if tracking.contains_key("observer") {
+                    return Err(
+                        "tracking.mode mcp cannot also configure an observer command".into(),
+                    );
+                }
+            }
+            Some(Value::String(mode)) if mode == "command" => {
+                if !tracking.contains_key("observer") {
+                    return Err("tracking.mode command needs an observer command".into());
+                }
+            }
+            Some(_) => return Err("tracking.mode must be mcp or command".into()),
         }
     }
     if let Some(docs) = value.get("docs") {

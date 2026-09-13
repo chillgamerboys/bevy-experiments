@@ -309,3 +309,188 @@ echo '{"ok":true,"linked":true,"issue_id":"issue-id","project_id":"wrong","pr_ur
     );
     Ok(())
 }
+
+fn mcp_fixture() -> Result<tempfile::TempDir, Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    let mut config = std::fs::read_to_string(root.join("gameskills.toml"))?;
+    // New adopters default to MCP; existing observer argv still selects command mode.
+    config.push_str("\n[tracking]\nrequired=true\n");
+    std::fs::write(root.join("gameskills.toml"), config)?;
+    git(root, &["add", "gameskills.toml"])?;
+    git(root, &["commit", "-m", "MCP tracking"])?;
+    cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "mcp",
+            "--goal",
+            "Ship",
+            "--repo",
+            "test/game",
+        ],
+    )?;
+    cli(
+        root,
+        &[
+            "delivery",
+            "bind",
+            "mcp",
+            "--pr",
+            "https://github.com/test/game/pull/1",
+            "--issue",
+            "issue-id",
+            "--project",
+            "project-id",
+        ],
+    )?;
+    let mut pr = remote(root)?;
+    set(
+        &mut pr,
+        "/body",
+        json!("Tracks [issue](https://linear.app/test/issue/T-1/title)."),
+    );
+    std::fs::write(root.join("pr.json"), pr.to_string())?;
+    Ok(d)
+}
+
+fn mcp_snapshot(root: &Path) -> Result<Value, Box<dyn Error>> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    Ok(
+        json!({"schema_version":1,"transport":"mcp","tool":"linear.get_issue","evidence_reference":"host-call-1","task_id":"mcp","source_head":git(root, &["rev-parse", "HEAD"])? ,"observed_at":now,"issue":{"id":"issue-id","project_id":"project-id","url":"https://linear.app/test/issue/T-1/title","attachment_urls":["https://github.com/test/game/pull/1"]}}),
+    )
+}
+
+fn check_mcp(root: &Path, snapshot: &Value) -> Result<Value, Box<dyn Error>> {
+    std::fs::write(root.join(".gameskills/mcp.json"), snapshot.to_string())?;
+    cli(
+        root,
+        &[
+            "delivery",
+            "check",
+            "mcp",
+            "--tracker-observation",
+            ".gameskills/mcp.json",
+        ],
+    )
+}
+
+#[test]
+fn mcp_tracking_checks_live_backlink_without_standalone_helper() -> Result<(), Box<dyn Error>> {
+    let d = mcp_fixture()?;
+    let root = d.path();
+    assert!(!root.join("bin/tracker").exists());
+    let missing = cli(root, &["delivery", "check", "mcp"])?;
+    assert_eq!(at(&missing, "/ok"), false);
+    assert!(at(&missing, "/reasons")
+        .to_string()
+        .contains("no standalone executable"));
+    let receipt = mcp_snapshot(root)?;
+    let accepted = check_mcp(root, &receipt)?;
+    assert_eq!(at(&accepted, "/ok"), true, "{accepted}");
+    assert_eq!(at(&accepted, "/observations/tracker/observation"), &receipt);
+    assert!(at(&accepted, "/observations/tracker/claim")
+        .as_str()
+        .expect("claim")
+        .contains("caller-supplied"));
+    assert_eq!(
+        at(&accepted, "/observations/tracker/observation_sha256")
+            .as_str()
+            .expect("digest")
+            .len(),
+        64
+    );
+    for body in [
+        "",
+        "https://linear.app/test/issue/T-1/title-other",
+        "https://example.invalid/?url=https://linear.app/test/issue/T-1/title",
+    ] {
+        let mut pr = remote(root)?;
+        set(&mut pr, "/body", json!(body));
+        std::fs::write(root.join("pr.json"), pr.to_string())?;
+        let rejected = check_mcp(root, &receipt)?;
+        assert_eq!(at(&rejected, "/ok"), false, "{rejected}");
+        assert!(at(&rejected, "/reasons")
+            .to_string()
+            .contains("both directions"));
+    }
+    Ok(())
+}
+
+#[test]
+fn mcp_observation_rejects_stale_identity_provenance_and_boolean_shortcuts(
+) -> Result<(), Box<dyn Error>> {
+    let d = mcp_fixture()?;
+    let root = d.path();
+    let receipt = mcp_snapshot(root)?;
+    let now = at(&receipt, "/observed_at").as_u64().expect("time");
+    for (pointer, replacement) in [
+        ("/schema_version", json!(2)),
+        ("/transport", json!("command")),
+        ("/tool", json!("")),
+        ("/evidence_reference", json!("")),
+        ("/task_id", json!("another")),
+        ("/source_head", json!("stale")),
+        ("/observed_at", json!(now - 301)),
+        ("/observed_at", json!(now + 3600)),
+        ("/observed_at", Value::Null),
+        ("/issue/id", json!("wrong")),
+        ("/issue/project_id", json!("wrong")),
+        ("/issue/url", json!("")),
+        (
+            "/issue/attachment_urls",
+            json!(["https://github.com/test/game/pull/11"]),
+        ),
+    ] {
+        let mut invalid = receipt.clone();
+        set(&mut invalid, pointer, replacement);
+        set(&mut invalid, "/ok", json!(true));
+        set(&mut invalid, "/linked", json!(true));
+        let result = check_mcp(root, &invalid)?;
+        assert_eq!(at(&result, "/ok"), false, "accepted {pointer}: {result}");
+        assert!(at(&result, "/reasons")
+            .to_string()
+            .contains("tracking unverifiable"));
+    }
+    cli(
+        root,
+        &["delivery", "bind", "mcp", "--project", "new-project"],
+    )?;
+    assert_eq!(at(&check_mcp(root, &receipt)?, "/ok"), false);
+    std::os::unix::fs::symlink("mcp.json", root.join(".gameskills/link.json"))?;
+    let result = cli(
+        root,
+        &[
+            "delivery",
+            "check",
+            "mcp",
+            "--tracker-observation",
+            ".gameskills/link.json",
+        ],
+    )?;
+    assert_eq!(at(&result, "/ok"), false);
+    assert!(at(&result, "/reasons")
+        .to_string()
+        .contains("cannot read MCP observation"));
+    Ok(())
+}
+
+#[test]
+fn mcp_receipt_cannot_override_command_tracking() -> Result<(), Box<dyn Error>> {
+    let d = mcp_fixture()?;
+    let root = d.path();
+    let config = std::fs::read_to_string(root.join("gameskills.toml"))?;
+    std::fs::write(
+        root.join("gameskills.toml"),
+        format!("{config}observer=[\"tracker\"]\n"),
+    )?;
+    let result = check_mcp(root, &mcp_snapshot(root)?)?;
+    assert_eq!(at(&result, "/ok"), false);
+    assert!(result
+        .to_string()
+        .contains("requires required MCP tracking"));
+    Ok(())
+}

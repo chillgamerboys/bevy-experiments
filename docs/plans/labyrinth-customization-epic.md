@@ -3,7 +3,10 @@
 Status: active acceptance revision; hands-on feedback rejected the card-based preparation/player menus. Spatial construction and integrated ownership are implemented, with one unified editor; final integrated delivery and human acceptance remain outstanding.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
-Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
+Current endpoint: the user requested a fresh-agent handoff to verify the environment
+and merge PR #39 after acceptance. The preparing session resolves MCP tracking and
+publishes that handoff; the receiving agent owns verification and authorized merge.
+Release remains outside scope. This supersedes older endpoint notes below.
 
 ## Integrated outcome
 
@@ -28,10 +31,11 @@ inspection, effective mechanics, build comparisons and retained drafts. See the
 Reachability and unclipped screenshots did not establish understandable choices.
 Other remaining acceptance includes S9/S10: current CI/review state, interactive desktop
 feel and cross-machine network routes where available. S1 retains independent
-forward/native-client/cost evaluation gaps; the configured standalone Linear
-observer alignment remains separate from the connected MCP tracker. These are
-pending/unavailable observations, not passed requirements. No merge or release is
-authorized, and the deferred inventory/passive/gym scope remains unchanged.
+forward/native-client/cost evaluation gaps. MCP tracking now has a fresh snapshot
+path in the delivery checker; the helper and its credentials are optional. Retain
+pending/unavailable observations without calling them passes, and distinguish
+actual merge requirements from broader evaluation coverage during the fresh audit.
+The deferred inventory/passive/gym scope remains unchanged.
 
 ## Historical evidence at the prior UI revision
 
@@ -51,7 +55,7 @@ when the final copy or Git source changes.
 | S7 Hotbar | Complete granted list, overflow/input, provenance/forecast and stale displayed-build regression | Desktop feel and resizing walk pending |
 | S8 Gamekit | Shared focus fix and UI tests; composite source/disclosure/input/lifecycle contracts; demonstrated consumer hotbar fix | No newly extracted composite widget or package-release claim |
 | S9 Integration | Combined automated suites and rendered review; historical six-process kill/reconnect/fight evidence | Final-source process observation and unavailable manual routes must remain distinct |
-| S10 Delivery | Existing PR #39 and exact HEX-99/project bindings; current docs preserve unfinished scope | Final source/CI observation; standalone tracker observer unavailable; merge unauthorized |
+| S10 Delivery | Existing PR #39 and exact HEX-99/project bindings; MCP snapshot delivery and original-pin native registration corrections | Fresh-agent environment/acceptance audit and authorized merge; release outside scope |
 
 The source/static review found no further concrete hotbar or squad-shell defect
 after correction. Rendered review separately caught the roster breakpoint,

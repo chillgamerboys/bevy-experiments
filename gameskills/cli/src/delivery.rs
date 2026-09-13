@@ -67,6 +67,8 @@ mod posix {
             id: String,
             #[arg(long = "evidence")]
             evidence: Vec<String>,
+            #[arg(long)]
+            tracker_observation: Option<std::path::PathBuf>,
         },
     }
     fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -214,7 +216,21 @@ mod posix {
                     json!({"ok":true,"record":record,"claim":"recorded task handoff, not a grant of authority"}),
                 )
             }
-            Operation::Check { evidence, .. } => {
+            Operation::Check {
+                evidence,
+                tracker_observation,
+                ..
+            } => {
+                let tracking_required = config
+                    .pointer("/tracking/required")
+                    .and_then(Value::as_bool)
+                    == Some(true)
+                    && matches!(text(&record, "endpoint")?, "pr" | "merge" | "release");
+                if tracker_observation.is_some()
+                    && (!tracking_required || config.pointer("/tracking/observer").is_some())
+                {
+                    return Err("--tracker-observation requires required MCP tracking for a PR, merge or release task".into());
+                }
                 let mut reasons = Vec::new();
                 if let Some(work) = record.get("remaining_work").and_then(Value::as_array) {
                     for item in work {
@@ -280,13 +296,15 @@ mod posix {
                         Err(e) => reasons.push(format!("PR unverifiable: {e}")),
                     }
                 }
-                if config
-                    .pointer("/tracking/required")
-                    .and_then(Value::as_bool)
-                    == Some(true)
-                    && ["pr", "merge", "release"].contains(&endpoint)
-                {
-                    match observe_tracker(root, config, &record) {
+                if tracking_required {
+                    match observe_tracker(
+                        root,
+                        config,
+                        &record,
+                        &before,
+                        observations.get("pr").unwrap_or(&Value::Null),
+                        tracker_observation.as_deref(),
+                    ) {
                         Ok(v) => {
                             observations
                                 .as_object_mut()
@@ -347,7 +365,7 @@ mod posix {
         if repository.get("nameWithOwner").and_then(Value::as_str) != Some(repo) {
             return Err("remote repository identity mismatch".into());
         }
-        let mut v=json_command(root,"gh",&["pr","view",pr,"--repo",repo,"--json","url,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,mergeCommit"])?;
+        let mut v=json_command(root,"gh",&["pr","view",pr,"--repo",repo,"--json","url,body,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,mergeCommit"])?;
         if v.get("headRefOid") != source.pointer("/repository/head") {
             return Err(
                 "remote PR source differs from current HEAD; push the current commits".into(),
@@ -454,7 +472,14 @@ mod posix {
         }
         r
     }
-    fn observe_tracker(root: &Path, config: &Value, record: &Value) -> Result<Value, String> {
+    fn observe_tracker(
+        root: &Path,
+        config: &Value,
+        record: &Value,
+        source: &Value,
+        remote_pr: &Value,
+        host_file: Option<&Path>,
+    ) -> Result<Value, String> {
         let issue = record
             .pointer("/binding/issue")
             .and_then(Value::as_str)
@@ -467,6 +492,9 @@ mod posix {
             .pointer("/binding/pr")
             .and_then(Value::as_str)
             .ok_or("no PR binding")?;
+        if config.pointer("/tracking/observer").is_none() {
+            return observe_mcp(root, record, source, remote_pr, host_file);
+        }
         let argv = config
             .pointer("/tracking/observer")
             .and_then(Value::as_array)
@@ -487,5 +515,87 @@ mod posix {
             return Err("tracker has not verified the exact issue/project/PR link".into());
         }
         Ok(v)
+    }
+
+    fn observe_mcp(
+        root: &Path,
+        record: &Value,
+        source: &Value,
+        remote_pr: &Value,
+        file: Option<&Path>,
+    ) -> Result<Value, String> {
+        use sha2::{Digest, Sha256};
+        let file = file.ok_or("use connected tracker MCP tools, then pass a fresh --tracker-observation FILE; no standalone executable or API key is required")?;
+        let bytes = crate::platform::read_ordinary_file(&root.join(file))
+            .map_err(|e| format!("cannot read MCP observation: {e}"))?;
+        let receipt: Value =
+            serde_json::from_str(&bytes).map_err(|_| "invalid MCP observation JSON")?;
+        if receipt.get("schema_version") != Some(&json!(1))
+            || receipt.get("transport").and_then(Value::as_str) != Some("mcp")
+        {
+            return Err("MCP observation needs schema_version 1 and transport mcp".into());
+        }
+        for field in ["tool", "evidence_reference"] {
+            if text(&receipt, field)?.trim().is_empty() {
+                return Err(format!("MCP observation needs {field}"));
+            }
+        }
+        if receipt.get("task_id") != record.get("id")
+            || receipt.get("source_head") != source.pointer("/repository/head")
+        {
+            return Err("MCP observation belongs to another task or source HEAD".into());
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_secs();
+        let observed_at = receipt
+            .get("observed_at")
+            .and_then(Value::as_u64)
+            .ok_or("MCP observation needs observed_at as Unix seconds")?;
+        if observed_at > now || now - observed_at > 300 {
+            return Err("MCP observation is future-dated or older than 300 seconds; query the connector again".into());
+        }
+        let issue = receipt
+            .get("issue")
+            .ok_or("MCP observation needs an issue snapshot")?;
+        if issue.get("id") != record.pointer("/binding/issue")
+            || issue.get("project_id") != record.pointer("/binding/project")
+        {
+            return Err("MCP observation issue/project differs from the task binding".into());
+        }
+        let pr_url = record
+            .pointer("/binding/pr")
+            .and_then(Value::as_str)
+            .ok_or("no PR binding")?;
+        let attached = issue
+            .get("attachment_urls")
+            .and_then(Value::as_array)
+            .is_some_and(|urls| urls.iter().any(|url| url.as_str() == Some(pr_url)));
+        let issue_url = text(issue, "url")?;
+        if !issue_url.starts_with("https://")
+            || issue_url.len() <= 8
+            || issue_url.chars().any(char::is_whitespace)
+        {
+            return Err("MCP issue snapshot needs an HTTPS issue URL".into());
+        }
+        let backlink = remote_pr
+            .get("body")
+            .and_then(Value::as_str)
+            .is_some_and(|body| contains_url(body, issue_url));
+        if !attached || !backlink {
+            return Err("MCP issue attachment and current PR body must link the exact objects in both directions".into());
+        }
+        Ok(
+            json!({"ok":true,"linked":true,"issue_id":issue.get("id"),"project_id":issue.get("project_id"),"pr_url":pr_url,"transport":"mcp","observation":receipt,"observation_sha256":format!("{:x}", Sha256::digest(bytes.as_bytes())),"claim":"caller-supplied MCP snapshot and provenance; exact bindings and live GitHub backlink checked by CLI; MCP invocation, timestamp and evidence reference are not independently authenticated"}),
+        )
+    }
+
+    fn contains_url(body: &str, url: &str) -> bool {
+        // Match a complete URL, not an issue slug prefix or a URL embedded in another URL.
+        body.split(|c: char| {
+            c.is_whitespace() || matches!(c, '(' | ')' | '<' | '>' | '[' | ']' | '"' | '\'' | '`')
+        })
+        .any(|token| token.trim_end_matches(['.', ',', ';', '!']) == url)
     }
 }

@@ -192,10 +192,10 @@ argv = ["cargo", "package", "--locked", "-p", "gameskills-linear"]
 timeout_seconds = 900
 resources = ["project:cargo-target"]
 
-# Explicit repository opt-in; the helper receives no credentials from core.
+# Connected host MCP is the normal tracking path; no standalone credentials.
 [tracking]
 required = true
-observer = ["gameskills-linear", "observe", "--config", "gameskills-linear.toml"]
+mode = "mcp"
 
 
 [docs]

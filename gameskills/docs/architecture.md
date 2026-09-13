@@ -58,6 +58,14 @@ flags. Project trust, host overrides and existing-session reload remain explicit
 boundaries; no global configuration or trust edit is implicit in setup. Claude's
 session-scoped launcher does not establish persistent Claude registration.
 
+Tracking uses the host's connected MCP by default when no command observer is
+configured. Core validates a fresh, task/source-bound normalized issue snapshot
+and the live GitHub backlink; it records the snapshot and digest as caller-supplied
+evidence, not an authenticated MCP invocation. The agent owns the actual connector
+call and raw evidence. This keeps provider credentials out of core and avoids
+requiring an extra helper for a connection the host already supplies. Existing
+observer argv configurations retain command behavior; mixed modes fail explicitly.
+
 ## Command ref identity
 
 All refs remain the command default because trusted commands can read arbitrary

@@ -111,6 +111,21 @@ the planned public-release audit. See [distribution](../../docs/distribution.md)
 [adopter guidance](../docs/installation.md).
 
 
+## Tracker observations
+
+Required tracking defaults to connected host MCP when no `tracking.observer` argv
+is configured. Set `tracking.mode = "mcp"` explicitly for that choice. The invoking
+agent supplies a fresh issue snapshot with `delivery check TASK
+--tracker-observation FILE`; core checks its task/source/bindings and a live GitHub
+backlink. The [delivery contract](../plugins/gameskills/references/delivery.md#tracking-observations)
+defines the schema, 300-second freshness limit and caller-supplied evidence boundary.
+No standalone tracker or separate API key is required. Existing argv-only config
+retains command mode; `mode = "command"` makes that choice explicit. Conflicting
+modes and attempts to substitute MCP evidence for command mode are rejected.
+
+This additive configuration/flag belongs to the current development candidate;
+older executables reject it. Rebuild or update the executable before adoption.
+
 ## Documentation discovery
 
 `gameskills docs resolve --path PATH` reads optional `[docs]` and target docs

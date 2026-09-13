@@ -6,6 +6,33 @@ Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/str
 
 ## Scope and priority
 
+### MCP delivery contradiction and verification handoff
+
+The user challenged the extra standalone Linear check despite working connected
+MCP. The Linear setup skill already recommended MCP, while core configuration and
+delivery required an executable argv. Recording that mismatch as open work had not
+resolved the ordinary delivery path. This is a package integration failure, not a
+connector-authentication limitation.
+
+The correction makes MCP the default when no command observer is configured and
+adopts that mode here. The invoking agent preserves a fresh tool response and
+supplies a normalized task/source-bound snapshot. Core checks exact issue/project/
+PR identities, age and the live GitHub backlink; it retains the snapshot/digest as
+caller-supplied evidence without pretending to invoke or authenticate MCP. Existing
+command adopters keep their explicit adapter. Regression coverage includes absent
+and one-way links, stale/future data, wrong bindings, misleading boolean claims,
+unsafe receipt files and incompatible modes. Current instructions, workflow and
+troubleshooting now describe the same implemented contract.
+
+The requested next-agent endpoint is environment verification, a critical PR audit,
+then authorized merge of PR #39. Preserve the original instruction pin and prior
+evidence. A fresh conversation must inspect its actual exposed catalog separately
+from the ordinary app-server discovery already observed. UI/player acceptance and
+unrun independent behavior/cost or cross-machine trials remain distinct; the handoff
+does not turn those observations into passes or authorize a release.
+
+### Continuing evaluation scope
+
 Improve Labyrinth's mechanics and playability while comprehensively exercising
 and improving GameSkills and Gamekit through that same development work. The user
 explicitly gives the game and package improvements equal importance. Evaluation

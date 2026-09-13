@@ -18,6 +18,15 @@ include the issue URL in the PR body and the PR URL in Linear. Query by stable
 identity before retrying any ambiguous mutation. Do not create duplicates on
 network, authentication or rate-limit failures.
 
+For required MCP tracking, preserve the fresh issue lookup response and pass its
+normalized snapshot through core's `delivery check --tracker-observation FILE`.
+Read the resolved core's delivery reference for the schema and freshness contract;
+map Linear's stable issue UUID (which may be returned as `uuid`, with `id` holding
+the display identifier), project UUID, issue URL and actual attachment URLs. Do not
+invent a successful receipt or demand the standalone helper to reuse MCP access.
+The CLI validates supplied evidence and a live GitHub backlink; it does not itself
+invoke or authenticate the connector. Keep that distinction in the delivery claim.
+
 If capacity prevents creation, report the exact failure and current scope. Deletion
 is deferred; use `cleanup` for a specifically requested assessment, not an automatic
 apply or a new credential/backup requirement. Do not loop ambiguous retries.

@@ -67,7 +67,14 @@ run with ordinary process privileges; the CLI is not a sandbox.
 
 ## Linear verification is unavailable
 
-Core-only adoption needs no Linear account or key. Connected MCP can perform normal
-tracking operations; the optional standalone observer has its own authentication.
-A provider error is not proof an issue is absent. Its MCP-first integration remains
-open in the reliability plan. Issue deletion is deferred and is not a completion gate.
+Core-only adoption needs no Linear account or key. Required MCP tracking uses a
+fresh `delivery check --tracker-observation FILE` snapshot from the connected tools.
+Missing/stale snapshots, wrong UUIDs, changed task/source bindings or a missing link
+in either direction stay explicit in the check's reasons. Query the connector again;
+do not retimestamp old evidence. See the [snapshot contract](../plugins/gameskills/references/delivery.md#tracking-observations).
+
+An existing `tracking.observer` argv deliberately retains command mode and its own
+authentication. Change the adopter's configuration to `mode = "mcp"` and remove
+that argv when adopting the connected workflow; mixed modes are rejected. An older
+CLI may reject the new mode/flag and must be updated first. A provider error is not
+proof an issue is absent. Issue deletion is deferred and is not a completion gate.

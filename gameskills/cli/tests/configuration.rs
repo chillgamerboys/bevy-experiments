@@ -4,6 +4,29 @@ use serde_json::Value;
 use std::error::Error;
 
 #[test]
+fn tracking_modes_preserve_command_adopters_and_reject_ambiguous_setup() {
+    for tracking in [
+        "required=true",
+        "required=true\nmode=\"mcp\"",
+        "required=true\nobserver=[\"tracker\"]",
+        "required=true\nmode=\"command\"\nobserver=[\"tracker\"]",
+    ] {
+        let source = format!("schema_version=1\n[tracking]\n{tracking}\n");
+        assert!(gameskills_cli::config::parse(&source).is_ok(), "{tracking}");
+    }
+    for tracking in [
+        "required=true\nmode=\"mcp\"\nobserver=[\"tracker\"]",
+        "required=true\nmode=\"command\"",
+        "mode=\"automatic\"",
+        "mode=1",
+    ] {
+        let source = format!("schema_version=1\n[tracking]\n{tracking}\n");
+        let error = gameskills_cli::config::parse(&source).expect_err(tracking);
+        assert!(error.contains("tracking.mode"), "{tracking}: {error}");
+    }
+}
+
+#[test]
 fn configuration_contract_fixtures() -> Result<(), Box<dyn Error>> {
     let fixtures: Value = serde_json::from_str(include_str!("fixtures/configuration.json"))?;
     let cases = fixtures

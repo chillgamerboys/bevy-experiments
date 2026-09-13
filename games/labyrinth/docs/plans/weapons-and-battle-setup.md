@@ -5,7 +5,9 @@ Owner: Labyrinth. GameSkills and Gamekit have equal-priority evaluation and
 improvement outcomes in the [combined session plan](../../../../gameskills/docs/plans/skill-evaluation.md).
 Tracking: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with); see the
 [detailed epic and child issues](../../../../docs/plans/labyrinth-customization-epic.md).
-Current endpoint: reviewable implementation PR and observed delivery, not an unrequested merge.
+Current endpoint: the user requested a handoff for a fresh agent to verify the
+environment and PR acceptance, then merge PR #39. The preparing session publishes
+the MCP correction and handoff; release is outside scope.
 
 ## Accepted scope
 

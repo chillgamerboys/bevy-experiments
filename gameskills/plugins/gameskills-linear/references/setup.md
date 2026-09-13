@@ -40,6 +40,22 @@ For required tracking in core `gameskills.toml`:
 ```toml
 [tracking]
 required = true
+mode = "mcp"
+```
+
+Use the connected issue lookup and core's `delivery check --tracker-observation
+FILE` contract. The normalized snapshot carries actual stable UUIDs, issue URL and
+attachment URLs, with tool provenance and observation time. Read the resolved
+core's delivery reference for its schema. It checks the exact binding and a fresh
+GitHub backlink, while labeling the MCP snapshot as supplied by the invoking agent.
+No second authentication setup or standalone observer is required for this route.
+
+Only for deliberately selected standalone automation, use:
+
+```toml
+[tracking]
+required = true
+mode = "command"
 observer = ["gameskills-linear", "observe", "--config", "gameskills-linear.toml"]
 ```
 
