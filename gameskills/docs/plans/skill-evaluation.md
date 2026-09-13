@@ -343,8 +343,9 @@ file inspection used the available shell/Python tools.
 | Cleanup follow-up: “Apply the two documentation review findings locally. Preserve the unfinished validation requirement and its owner; do not claim it passed.” | Repaired README to `docs/architecture.md#resume-a-connection`; retained the unfinished requirement and multiplayer owner in an Outstanding verification section. Only README and architecture changed. | Pass within self-review scope. Direct artifact checks confirm target heading and requirement; network behavior remains untested. |
 
 The three exercises completed without retries; cleanup included one intentionally
-separate review and correction phase. Their wall-clock interval is recorded in raw
-identity/results JSON; it is not coordinator-plus-worker task cost. Two corrective
+separate review and correction phase. The recorded fixture wall-clock interval is 42 seconds (raw
+identity/results JSON); it excludes prior setup/context reading and later report/
+verification work and is not coordinator-plus-worker task cost. Two corrective
 user interventions are evidenced in the surrounding planning conversation (numbering
 and solo-only framing); the fixture exercises had none. Missing total cost/timing
 telemetry is unavailable, not zero.
@@ -387,6 +388,19 @@ Verification after the canonical correction:
   the final bundle and is not the corrected-candidate evidence.
 - `cargo clippy --locked -p gameskills-cli --all-targets --profile ci -- -D warnings`
   passes. Tests and lint use the worker checkout's own `target/`.
+
+- `cargo package --locked -p gameskills-cli` packages 46 files and successfully
+  builds the extracted crate. `bundle verify-package` separately confirms its normal
+  lockfile and exact bundle bytes. The inspector itself reports
+  `cargo_build_verified = false`; the preceding Cargo build log supplies that
+  separate observation. Crate SHA-256:
+  `965f0236de4ece70d62941c141d2b96edde71ff7775bc2e5d49b429e5cb2df64`.
+- The archive-built `target/debug/gameskills` was supplied through
+  `GAMESKILLS_CANDIDATE_BINARY` to the existing adoption test; it passes (one test).
+  That trial copies the binary into an external temporary consumer with build tools
+  absent from PATH and verifies core-only setup, selected-package changes, rollback,
+  recovery and preserved owner files. This is actual consumer/runtime evidence,
+  not native model behavior or a registry release.
 
 The host skill-creator quick validator was attempted for `plan` and `grill`, but
 both runs failed before validation because Python `yaml` (PyYAML) is unavailable.
