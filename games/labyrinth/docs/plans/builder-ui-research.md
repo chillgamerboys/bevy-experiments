@@ -1,7 +1,7 @@
 # Builder UI research and alternatives
 
-Status: active design revision after hands-on rejection of the card-based preparation and player menus.
-Answers 9–10 select spatial construction and integrated player ownership; implementation of this refinement is outstanding. Reopens S6/S9 in the
+Status: active acceptance revision after hands-on rejection of the card-based preparation and player menus.
+Answers 9–10 are implemented as spatial construction and integrated player ownership; final integrated delivery and human usability acceptance remain outstanding. Reopens S6/S9 in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
 The research/grill direction decision is settled; carry it into the scoped UI
 revision. Preserve all accepted customization, authority and inventory limits.
@@ -140,7 +140,7 @@ Check accurate visible information separately from native interaction and actual
 player comprehension. Keep the rejected captures and user correction as negative
 evidence in the [GameSkills evaluation](../../../../gameskills/docs/plans/skill-evaluation.md).
 
-## Implemented revision and review findings
+## Prior card revision and review findings (subsequently rejected)
 
 Preparation now separates Party, Enemies, Scenario and Players. Formation cards
 show rank, ownership, weapon and current battle parameters. Both teams enter the
@@ -199,9 +199,10 @@ through empty slots, actor replacement and multi-rank occupancy, then validate
 before constructing a deployable scenario. Do not misrepresent gaps as dummy
 actors or change targeting/death-compaction rules merely to support this UI.
 
-## Next design artifact and review
+## Spatial design artifact and review
 
-Produce an annotated visual design using actual available character art, authored
+The implementation specification in `.context/spatial-ui/visual-spec.md` uses
+actual available character art, authored
 types and representative long names. Specify the facing formations, rank anchors,
 selected/hovered/owned/empty states, character-picker placement, player strip,
 primary actions, detail surfaces and secondary test controls. Describe proportions,
@@ -229,5 +230,22 @@ and whether extra panels/text conceal the game. Preserve hierarchy and accessibl
 explanations while making the interaction more visual. Findings need a concrete
 state/task, observed consequence and correction; unclipped controls alone cannot
 accept the design. Human feedback, agent visual judgment and automated checks
-remain distinct. This discussion records design work; it does not claim the new
-constructor has been implemented or its usability accepted.
+remain distinct.
+
+The spatial candidate is implemented at `c1afeea`, with the model follow-up at
+`615d5fc`. The board retains sparse positions and shows a chosen type before an
+explicit place/replace action. Multi-rank movement targets exact ranks, ownership
+is assigned in the selected-place context, and both teams still open one editor.
+Deploy never compacts a draft; local play has one atomic Deploy action without a
+hidden co-op readiness step. Portable saves remain complete battle scenarios.
+
+Coordinator review of actual Metal frames drove further changes: remove redundant
+local participant controls, put type mechanics and current-rank usability before
+secondary details, show collision reasons above the browser, distinguish disabled
+placement, and shorten the board's unused headroom. Auto and 200% retain facing
+rank context; the compact picker switches between types and focused detail.
+The player strip shows all six participants at Auto with names, readiness and
+character counts. The five final 1280 states and review notes are retained under
+`.context/spatial-ui/`. These are agent visual judgments, not acceptance by the
+user who rejected the preceding revisions. Production input/policy/socket checks
+and final publication evidence remain separate from that human observation.

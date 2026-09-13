@@ -1,6 +1,6 @@
 # Weapons, character builds and configurable battles
 
-Status: active UI revision; prior builder usability rejected. [Selected UI direction](builder-ui-research.md): squad preparation with one unified character editor; the redesigned views are implemented; final delivery and interactive usability acceptance remain outstanding.
+Status: active UI acceptance revision; both earlier preparation designs were rejected. [Selected UI direction](builder-ui-research.md): facing spatial construction with one unified character editor; implemented, with final delivery and interactive usability acceptance outstanding.
 Owner: Labyrinth. GameSkills and Gamekit have equal-priority evaluation and
 improvement outcomes in the [combined session plan](../../../../gameskills/docs/plans/skill-evaluation.md).
 Tracking: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with); see the
@@ -16,6 +16,12 @@ character stats belong there when implemented; this revision does not introduce
 that stat system. Plan for the same screen to later serve as the detailed in-game
 character view, with context-appropriate edit permissions. Internal organization
 may evolve, but do not fork separate character editors for testing or gameplay.
+
+Answers 9–10 refine preparation: choose a rank and inspect a type before placement,
+allow gaps while constructing, require contiguous occupied ranks from the front
+before deployment, and assign ownership on the board with a compact player strip.
+Trailing unused capacity supports small tests. Combat stays compact; sparse lobby
+metadata is not a new battle rule or portable scenario schema.
 
 Moves come from innate grants, learned skills and one equipped weapon. Learned
 skills can add active moves or upgrade existing ones. Behavior and provenance are

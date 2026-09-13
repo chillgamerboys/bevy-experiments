@@ -1,6 +1,6 @@
 # Labyrinth customization and package-quality epic
 
-Status: active UI design revision; hands-on feedback rejected the card-based preparation/player menus. Spatial construction and integrated ownership are selected; retain one unified character editor.
+Status: active acceptance revision; hands-on feedback rejected the card-based preparation/player menus. Spatial construction and integrated ownership are implemented, with one unified editor; final integrated delivery and human acceptance remain outstanding.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
@@ -33,7 +33,7 @@ observer alignment remains separate from the connected MCP tracker. These are
 pending/unavailable observations, not passed requirements. No merge or release is
 authorized, and the deferred inventory/passive/gym scope remains unchanged.
 
-## Acceptance evidence at the UI revision
+## Historical evidence at the prior UI revision
 
 The combined preflight at `0291105` passed configured Labyrinth, rules, Gamekit UI,
 Clippy, formatting, docs and skill checks. Final publication-source results belong
@@ -58,6 +58,31 @@ after correction. Rendered review separately caught the roster breakpoint,
 200% first-fold information and misleading Parameters instructions. Correcting
 those findings supports visible information and layout claims; it does not supply
 the missing player observations. Plans remain active for that outstanding work.
+
+## Spatial preparation and installation correction
+
+The second hands-on rejection exposed an interaction-model failure: card grids
+obscured the actual six-rank formation, and adding a character skipped type choice.
+Answers 9–10 now drive one facing formation board with visual type previews,
+explicit placement, sparse construction, compact deployment and place ownership.
+Current contracts live in the game architecture/README; all character fields still
+use one editor. Focused policy, encrypted construction and production-input tests
+cover the new model. Actual rendered review corrected buried mechanics/rank limits,
+collision explanations and disabled-state emphasis. Human acceptance remains open.
+
+GameSkills plan/grill/build-ui/verify-ui now connect task goals, information
+hierarchy, interaction model, recurring views, authority and concrete final
+appearance. Spatial UI is one option, not a replacement for those other concerns.
+Review must challenge composition and complete-task friction despite passing bounds.
+
+The user also identified native installation readiness as a serious package gap.
+The original pin was staged correctly and discovered with generated launch flags,
+but ordinary host registration was absent. The added runtime scope is persistent
+Codex project registration, preservation/recovery, explicit readiness and ordinary
+discovery without injected enabling settings. Current-session exposure and native
+behavior must remain separate observations. Preserve the original pin and earlier
+negative evidence; final source-bound validation and actual registration outcome
+belong in the evaluation ledger and PR delivery record.
 
 ## Agreed contract
 

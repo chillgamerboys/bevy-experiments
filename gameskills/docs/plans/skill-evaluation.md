@@ -1,6 +1,6 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active; hands-on feedback rejected the revised preparation/player menus too. Broader planning/review refinements are authored; spatial-constructor implementation and artifact acceptance remain pending. Independent native behavioral trials remain unobserved.
+Status: active; spatial preparation and broader planning/review refinements are implemented after two hands-on UI rejections. Original-pin ordinary Codex discovery is now observed after registration repair; final integrated delivery and human UI acceptance remain pending. Independent native behavioral trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
@@ -780,3 +780,63 @@ coordinator observed no persistent GameSkills entries in the user configuration.
 That host registration/session exposure gap is separate from a broken bundle or
 global native unavailability. The user has requested its correction; root owns the
 separate runtime/setup work. Preserve the installed pin and these distinct outcomes.
+
+### Installation readiness was a missed serious gap
+
+The user explicitly challenged why the missing host catalog had not been treated
+as a package improvement. The coordinator had repeatedly reported canonical fallback
+without investigating the adoption boundary. That was an evaluation/execution
+failure: a valid staged bundle and a successful specially configured launch did
+not establish a usable ordinary installation. The old status caveat was truthful
+but insufficiently actionable. Preserve the user's correction as negative evidence.
+
+The runtime correction adds project Codex registration to setup, a pin-preserving
+`native codex --register --apply` repair, owned-setting/container preservation,
+recoverable transactions and explicit per-client registration readiness. It does
+not overwrite local disablement, user comments, unrelated settings or host trust.
+Claude-only setup without managed Codex state leaves unrelated Codex files alone.
+Independent review found and corrected both that cross-client coupling and pruning
+of pre-existing empty tables/comments. Ignored registration/configuration files
+also participate in verification identity; changing them can no longer retain a
+passing run as current. Setup/project-context guidance now treats selected skills
+missing from the host as an actionable readiness gap rather than normalizing it.
+
+The original root pin was registered using a frozen candidate executable with
+SHA-256 `ebfd082cefcd51f04e397b461d0a412fe39f0d38cb8dea4b94f4606b1c8e347b`.
+`native codex --verify-project` then succeeded with exact argv
+`codex app-server --stdio`, discovering all 23 selected skills for content
+`b069a3108dcb094766b89b3a35ad451f3088608a0e98e02bfdedbebed51c1f99`.
+Client identity was `codex_sdk_ts/0.153.4` on macOS 26.6.2/arm64. This verifier did
+not supply marketplace/plugin enable overrides. Hash comparison established that
+`gameskills.toml`, `gameskills.lock.json` and the user's global Codex configuration
+were unchanged. No trust setting was needed or changed. Evidence is retained in
+`.context/spatial-ui/native-registration-applied.json`,
+`native-project-verification.json` and `native-before-hashes.json`.
+
+This executable precedes final checked-access/lint cleanup; final committed-source
+verification is recorded separately rather than rewriting this observation.
+The current Conductor conversation still exposes its original skill catalog;
+fresh-process discovery does not demonstrate hot reload or native invocation in
+this conversation. The revised instruction candidate remains canonical source
+fallback here, with its generated distribution checked separately. Claude's
+persistent registration and Windows native verification are explicitly unsupported;
+neither is silently labeled ready. Discovery is not behavioral or comparative
+efficacy evidence. The registration problem is corrected without changing the
+evaluation baseline or claiming the broader independent trials are complete.
+
+### Spatial artifact and integration critique
+
+The implemented constructor uses actual facing character art, stable sparse ranks,
+type preview before placement, place ownership and the one character editor.
+Coordinator review of actual frames rejected the first picker for burying moves,
+redundant local ownership controls and an oversized preview highlight. Subsequent
+review caught current-rank limitations and collision reasons below the fold, plus
+insufficient disabled-state emphasis. The final 1280 Auto/200% frames put these
+facts before secondary details and preserve selected formation context. A wide
+frame exposes more moves in the same detail route. Independent source review also
+caught hidden local readiness, stale local placement candidates, unreachable
+overlapping multi-rank movement and reconnect eligibility; corrections have
+production-input/policy/socket regressions. These findings demonstrate concrete
+review interventions, not proof that wording changes caused better design or that
+the user accepts this third iteration. The two preceding user rejections remain
+negative evidence, and actual desktop/human acceptance is still outstanding.
