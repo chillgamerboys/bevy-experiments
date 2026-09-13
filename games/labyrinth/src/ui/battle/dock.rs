@@ -8,6 +8,7 @@ pub(super) struct DockNodes {
     pub skills: Entity,
     pub confirm: Entity,
     pub rematch: Entity,
+    utilities: Entity,
     portrait: Entity,
     identity: Entity,
     root: Entity,
@@ -273,6 +274,7 @@ pub(super) fn mount(world: &mut World, root: Entity, _stage: Entity) -> DockNode
         node.right = Val::Px(8.0);
     }
     DockNodes {
+        utilities,
         skills,
         confirm,
         rematch,
@@ -431,15 +433,18 @@ fn fixed_geometry(world: &mut World, nodes: &DockNodes) {
         .get::<Children>(nodes.skills)
         .map_or(0, |children| children.len());
     let rows = if count > 8 { 2.0 } else { 1.0 };
-    if let Some(mut skills) = world.get_mut::<Node>(nodes.skills) {
-        skills.display = if count > 8 {
-            Display::Grid
-        } else {
-            Display::Flex
-        };
-        skills.grid_template_rows = vec![RepeatedGridTrack::auto(if count > 8 { 2 } else { 1 })];
-        skills.grid_auto_flow = GridAutoFlow::Column;
-        skills.row_gap = Val::Px(3.0);
+    for entity in [nodes.skills, nodes.utilities] {
+        if let Some(mut skills) = world.get_mut::<Node>(entity) {
+            skills.display = if count > 8 {
+                Display::Grid
+            } else {
+                Display::Flex
+            };
+            skills.grid_template_rows =
+                vec![RepeatedGridTrack::auto(if count > 8 { 2 } else { 1 })];
+            skills.grid_auto_flow = GridAutoFlow::Column;
+            skills.row_gap = Val::Px(3.0);
+        }
     }
     let rail = rows * (62.0 * metrics.content_scale).max(44.0 * metrics.control_scale)
         + (rows - 1.0) * 3.0;

@@ -747,7 +747,7 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
 }
 
 #[test]
-fn six_seat_lobby_allows_repeated_class_selection_and_requires_every_ready_player() {
+fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators() {
     let mut app = app(1280, 720, UiScaleMode::Auto);
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
@@ -762,20 +762,31 @@ fn six_seat_lobby_allows_repeated_class_selection_and_requires_every_ready_playe
     let start = find_named(app.world_mut(), "Start Encounter").expect("start");
     assert!(app.world().get::<UiDisabled>(start).is_some());
     assert!(find_named(app.world_mut(), "Copy Invitation 4").is_some());
-    for hero in HeroClass::ALL {
-        let choose = find_named(app.world_mut(), &format!("Character 1 Choose {hero:?}"))
-            .expect("class choice");
-        assert!(app.world().get::<UiDisabled>(choose).is_none());
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.players
+            .last_mut()
+            .expect("sixth participant")
+            .actors
+            .clear();
+        view.players
+            .first_mut()
+            .expect("host")
+            .actors
+            .push(ActorId(6));
+        view.company
+            .iter_mut()
+            .find(|member| member.actor == ActorId(6))
+            .expect("hero")
+            .owner = 0;
+        view.player = Some(5);
     }
-    app.world_mut()
-        .resource_mut::<LabyrinthView>()
-        .players
-        .last_mut()
-        .expect("sixth seat")
-        .ready = true;
     run_frames(&mut app, 4);
     let start = find_named(app.world_mut(), "Start Encounter").expect("start");
     assert!(app.world().get::<UiDisabled>(start).is_none());
+    let ready = find_named(app.world_mut(), "Toggle Ready").expect("spectator readiness");
+    assert!(app.world().get::<UiDisabled>(ready).is_some());
+    assert_eq!(app.world().resource::<LabyrinthView>().players.len(), 6);
 }
 
 #[test]
