@@ -4,10 +4,17 @@
 #[path = "setup_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "setup/tests.rs"]
+mod decision_tests;
+mod details;
+mod layout;
+
 use super::*;
 use labyrinth_rules::build::{ActorBuild, InnateGrant};
 use labyrinth_rules::catalog::{ContentCatalog, ContentId};
 use labyrinth_rules::scenario::{Scenario, ScenarioActor};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum BuildField {
@@ -21,6 +28,12 @@ pub(super) enum BuildField {
 #[derive(Debug, Clone)]
 pub(super) enum SetupAction {
     Edit(ActorId),
+    Category(Category),
+    Inspect(Selection),
+    Browse,
+    ApplyInspected,
+    ConfirmDiscard,
+    KeepEditing,
     Preset(ContentId),
     Weapon(Option<ContentId>),
     Innate(ContentId),
@@ -38,9 +51,56 @@ pub(super) enum SetupAction {
     LoadFile,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum Category {
+    Equipment,
+    Innate,
+    Learned,
+    Parameters,
+    Moves,
+}
+impl Category {
+    const ALL: [Self; 5] = [
+        Self::Equipment,
+        Self::Innate,
+        Self::Learned,
+        Self::Parameters,
+        Self::Moves,
+    ];
+    fn name(self) -> &'static str {
+        match self {
+            Self::Equipment => "Equipment",
+            Self::Innate => "Innate",
+            Self::Learned => "Learned",
+            Self::Parameters => "Parameters",
+            Self::Moves => "Resulting moves",
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Selection {
+    Weapon(Option<ContentId>),
+    Innate(ContentId),
+    Learned(ContentId),
+    Preset(ContentId),
+    Move(ContentId),
+}
+#[derive(Debug, Clone)]
+enum ExitTarget {
+    Close,
+    Actor(ActorId),
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct ActorEditor {
     id: ActorId,
+    original: ScenarioActor,
+    category: Category,
+    selections: BTreeMap<Category, Selection>,
+    detail_only: bool,
+    scrolls: BTreeMap<Category, f32>,
+    pending_exit: Option<ExitTarget>,
+    compact: bool,
     revision: u64,
     draft: ScenarioActor,
     name: String,
@@ -58,6 +118,13 @@ impl ActorEditor {
     fn new(draft: ScenarioActor, revision: u64) -> Self {
         Self {
             id: draft.id,
+            original: draft.clone(),
+            category: Category::Equipment,
+            selections: BTreeMap::new(),
+            detail_only: false,
+            scrolls: BTreeMap::new(),
+            pending_exit: None,
+            compact: false,
             name: draft.actor.name.clone(),
             max_hp: draft.actor.max_hp.to_string(),
             speed: draft.actor.base_speed.to_string(),
@@ -72,6 +139,60 @@ impl ActorEditor {
             error: None,
             pending_save: false,
             submitted_revision: None,
+        }
+    }
+    fn dirty(&self) -> bool {
+        self.draft != self.original
+            || self.name != self.original.actor.name
+            || self.max_hp != self.original.actor.max_hp.to_string()
+            || self.speed != self.original.actor.base_speed.to_string()
+            || self.footprint != self.original.actor.footprint.to_string()
+            || self.starting_hp
+                != self
+                    .original
+                    .starting_hp
+                    .map_or_else(String::new, |hp| hp.to_string())
+    }
+    fn selection(&self) -> Option<&Selection> {
+        self.selections.get(&self.category)
+    }
+    fn ensure_selection(&mut self, catalog: &ContentCatalog) {
+        if self.selections.contains_key(&self.category) {
+            return;
+        }
+        let selection = match self.category {
+            Category::Equipment => Some(Selection::Weapon(
+                self.draft.actor.build.weapon.clone().or_else(|| {
+                    catalog
+                        .definition()
+                        .weapons
+                        .first()
+                        .map(|weapon| weapon.id.clone())
+                }),
+            )),
+            Category::Innate => catalog
+                .definition()
+                .abilities
+                .first()
+                .map(|a| Selection::Innate(a.id.clone())),
+            Category::Learned => catalog
+                .definition()
+                .learned_skills
+                .first()
+                .map(|a| Selection::Learned(a.id.clone())),
+            Category::Parameters => None,
+            Category::Moves => catalog
+                .resolve_build(&self.draft.actor.build)
+                .ok()
+                .and_then(|build| {
+                    build
+                        .abilities
+                        .first()
+                        .map(|a| Selection::Move(a.definition.id.clone()))
+                }),
+        };
+        if let Some(selection) = selection {
+            self.selections.insert(self.category, selection);
         }
     }
     fn validated(&self, catalog: &ContentCatalog) -> Result<ScenarioActor, String> {
@@ -150,18 +271,84 @@ fn actor(scenario: &Scenario, id: ActorId) -> Option<&ScenarioActor> {
 pub(super) fn action(
     view: &LabyrinthView,
     ui: &mut UiState,
-    action: SetupAction,
+    requested: SetupAction,
 ) -> Option<LabyrinthIntent> {
     let scenario = view.scenario.as_ref()?;
     let catalog = view.catalog.as_ref()?;
-    match action {
+    match requested {
         SetupAction::Edit(id) => {
+            if let Some(editor) = &mut ui.editor {
+                if editor.id == id {
+                    return None;
+                }
+                if editor.dirty() {
+                    editor.pending_exit = Some(ExitTarget::Actor(id));
+                    editor.generation += 1;
+                    return None;
+                }
+            }
             ui.editor = actor(scenario, id)
                 .cloned()
                 .map(|a| ActorEditor::new(a, view.setup_revision));
         }
         SetupAction::Cancel => {
-            ui.editor = None;
+            if let Some(editor) = &mut ui.editor {
+                if editor.pending_exit.is_some() {
+                    editor.pending_exit = None;
+                    editor.generation += 1;
+                } else if editor.compact && editor.detail_only {
+                    editor.detail_only = false;
+                    editor.generation += 1;
+                } else if editor.dirty() {
+                    editor.pending_exit = Some(ExitTarget::Close);
+                    editor.generation += 1;
+                } else {
+                    ui.editor = None;
+                }
+            }
+        }
+        SetupAction::ConfirmDiscard => {
+            let target = ui.editor.as_mut()?.pending_exit.take()?;
+            ui.editor = match target {
+                ExitTarget::Close => None,
+                ExitTarget::Actor(id) => actor(scenario, id)
+                    .cloned()
+                    .map(|a| ActorEditor::new(a, view.setup_revision)),
+            };
+        }
+        SetupAction::KeepEditing => {
+            let editor = ui.editor.as_mut()?;
+            editor.pending_exit = None;
+            editor.generation += 1;
+        }
+        SetupAction::Category(category) => {
+            let editor = ui.editor.as_mut()?;
+            editor.category = category;
+            editor.detail_only = false;
+            editor.ensure_selection(catalog);
+            editor.generation += 1;
+        }
+        SetupAction::Inspect(selection) => {
+            let editor = ui.editor.as_mut()?;
+            editor.selections.insert(editor.category, selection);
+            editor.detail_only = true;
+            editor.generation += 1;
+        }
+        SetupAction::Browse => {
+            let editor = ui.editor.as_mut()?;
+            editor.detail_only = false;
+            editor.generation += 1;
+        }
+        SetupAction::ApplyInspected => {
+            let selected = ui.editor.as_ref()?.selection()?.clone();
+            let edit = match selected {
+                Selection::Weapon(id) => SetupAction::Weapon(id),
+                Selection::Innate(id) => SetupAction::Innate(id),
+                Selection::Learned(id) => SetupAction::Learned(id),
+                Selection::Preset(id) => SetupAction::Preset(id),
+                Selection::Move(_) => return None,
+            };
+            return action(view, ui, edit);
         }
         SetupAction::Reload => {
             if let Some(editor) = &ui.editor {
@@ -220,7 +407,15 @@ pub(super) fn action(
                     let mut draft = editor.draft.clone();
                     draft.actor = build;
                     draft.starting_hp = None;
+                    let original = editor.original.clone();
+                    let category = editor.category;
+                    let selections = editor.selections.clone();
+                    let next_generation = editor.generation + 1;
                     *editor = ActorEditor::new(draft, editor.revision);
+                    editor.original = original;
+                    editor.category = category;
+                    editor.selections = selections;
+                    editor.generation = next_generation;
                 }
                 Err(error) => editor.error = Some(error.to_string()),
             }
@@ -335,329 +530,6 @@ pub(super) fn action(
     None
 }
 
-#[derive(Component)]
-struct EditorRoot;
-#[derive(Component)]
-struct EditorNotice;
-#[derive(Component)]
-struct EditorSave;
-
 pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
-    if view.mode != ViewMode::Lobby || !view.admitted {
-        ui.editor = None;
-    }
-    if ui.editor.as_ref().is_some_and(|editor| {
-        editor.pending_save
-            && editor
-                .submitted_revision
-                .is_some_and(|revision| view.revision > revision)
-            && view.setup_revision >= editor.revision
-            && view
-                .catalog
-                .as_ref()
-                .zip(view.scenario.as_ref())
-                .is_some_and(|(catalog, scenario)| {
-                    editor
-                        .validated(catalog)
-                        .is_ok_and(|draft| actor(scenario, editor.id) == Some(&draft))
-                })
-    }) {
-        ui.editor = None;
-    }
-    let Some(editor) = &mut ui.editor else {
-        despawn_marked::<EditorRoot>(world);
-        return;
-    };
-    let Some(catalog) = &view.catalog else {
-        return;
-    };
-    // An unrelated participant join must not remount editable text or lose its caret.
-    let conflict = if view.setup_revision != editor.revision {
-        "Setup changed. Reload this character before applying your draft."
-    } else {
-        ""
-    };
-    let notice = if !conflict.is_empty() {
-        conflict.to_owned()
-    } else {
-        editor
-            .error
-            .as_deref()
-            .or(view.notice.as_deref())
-            .unwrap_or("")
-            .to_owned()
-    };
-    for mut text in world
-        .query_filtered::<&mut Text, With<EditorNotice>>()
-        .iter_mut(world)
-    {
-        text.0.clone_from(&notice);
-    }
-    let can_apply = view.setup_revision == editor.revision
-        && (view.host
-            || view
-                .company
-                .iter()
-                .any(|m| m.actor == editor.id && Some(m.owner) == view.player));
-    let save_controls = world
-        .query_filtered::<Entity, With<EditorSave>>()
-        .iter(world)
-        .collect::<Vec<_>>();
-    for entity in save_controls {
-        set_disabled(world, entity, !can_apply);
-    }
-    if editor.mounted == Some(editor.generation) {
-        return;
-    }
-    despawn_marked::<EditorRoot>(world);
-    editor.mounted = Some(editor.generation);
-    let root = world
-        .spawn((
-            bevy_gamekit::ui::menu_overlay("Character Editor"),
-            EditorRoot,
-        ))
-        .id();
-    let panel = world
-        .spawn((
-            bevy_gamekit::ui::menu_panel("Character Build"),
-            ChildOf(root),
-        ))
-        .id();
-    world.entity_mut(panel).insert(Node {
-        width: Val::Percent(94.0),
-        max_width: Val::Px(1050.0),
-        max_height: Val::Percent(90.0),
-        overflow: Overflow::scroll_y(),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(8.0),
-        padding: UiRect::all(Val::Px(16.0)),
-        ..default()
-    });
-    label(
-        world,
-        panel,
-        "Build Title",
-        format!("Character {} · edit draft", editor.id.0),
-        UiTextRole::Title,
-    );
-    for (field_label, field, value, max) in [
-        ("Name", BuildField::Name, &editor.name, 128),
-        ("Maximum HP", BuildField::MaxHp, &editor.max_hp, 5),
-        ("Speed", BuildField::Speed, &editor.speed, 5),
-        (
-            "Formation spaces",
-            BuildField::Footprint,
-            &editor.footprint,
-            1,
-        ),
-        (
-            "Starting HP (blank = full)",
-            BuildField::StartingHp,
-            &editor.starting_hp,
-            5,
-        ),
-    ] {
-        label(
-            world,
-            panel,
-            &format!("Build {field:?} Label"),
-            field_label,
-            UiTextRole::Supporting,
-        );
-        let field_bundle =
-            bevy_gamekit::ui::text_field(world.resource::<UiFonts>(), field_label, value, max);
-        let entity = world
-            .spawn((
-                field_bundle,
-                UiSkin::Field,
-                Field::Build(field),
-                bevy_gamekit::ui::UiFocusId::new(
-                    "labyrinth-build",
-                    format!("{}:{field:?}", editor.id.0),
-                ),
-                ChildOf(panel),
-            ))
-            .id();
-        if matches!(field, BuildField::Footprint) && !view.host {
-            world
-                .entity_mut(entity)
-                .insert(bevy_gamekit::ui::UiDisabled);
-        }
-    }
-    let presets = shell::row(world, panel, "Build Presets");
-    for preset in &catalog.definition().actor_presets {
-        control(
-            world,
-            presets,
-            format!("Build Preset {}", preset.id),
-            &preset.name,
-            Action::Setup(SetupAction::Preset(preset.id.clone())),
-            false,
-        );
-    }
-    label(
-        world,
-        panel,
-        "Weapon Title",
-        "Weapon · one optional item",
-        UiTextRole::Body,
-    );
-    let weapons = shell::row(world, panel, "Build Weapons");
-    control(
-        world,
-        weapons,
-        "Weapon None",
-        "Unarmed",
-        Action::Setup(SetupAction::Weapon(None)),
-        editor.draft.actor.build.weapon.is_none(),
-    );
-    for weapon in &catalog.definition().weapons {
-        control(
-            world,
-            weapons,
-            format!("Weapon {}", weapon.id),
-            &weapon.name,
-            Action::Setup(SetupAction::Weapon(Some(weapon.id.clone()))),
-            editor.draft.actor.build.weapon.as_ref() == Some(&weapon.id),
-        );
-    }
-    label(
-        world,
-        panel,
-        "Innate Title",
-        "Innate active abilities",
-        UiTextRole::Body,
-    );
-    let innate = shell::row(world, panel, "Build Innate");
-    for ability in &catalog.definition().abilities {
-        let selected = editor
-            .draft
-            .actor
-            .build
-            .innate
-            .iter()
-            .any(|g| g.ability == ability.id);
-        control(
-            world,
-            innate,
-            format!("Innate {}", ability.id),
-            format!("{}{}", if selected { "[x] " } else { "" }, ability.name),
-            Action::Setup(SetupAction::Innate(ability.id.clone())),
-            false,
-        );
-    }
-    label(
-        world,
-        panel,
-        "Learned Title",
-        "Learned skills · additions and upgrades",
-        UiTextRole::Body,
-    );
-    let learned = shell::row(world, panel, "Build Learned");
-    for skill in &catalog.definition().learned_skills {
-        control(
-            world,
-            learned,
-            format!("Learned {}", skill.id),
-            format!(
-                "{}{}",
-                if editor.draft.actor.build.learned_skills.contains(&skill.id) {
-                    "[x] "
-                } else {
-                    ""
-                },
-                skill.name
-            ),
-            Action::Setup(SetupAction::Learned(skill.id.clone())),
-            false,
-        );
-    }
-    label(
-        world,
-        panel,
-        "Starting Status Title",
-        "Starting conditions",
-        UiTextRole::Body,
-    );
-    let statuses = shell::row(world, panel, "Starting Statuses");
-    for kind in [
-        labyrinth_rules::StatusKind::Bleed,
-        labyrinth_rules::StatusKind::Brace,
-        labyrinth_rules::StatusKind::Haste,
-        labyrinth_rules::StatusKind::Weakened,
-    ] {
-        control(
-            world,
-            statuses,
-            format!("Starting {kind:?}"),
-            format!(
-                "{}{kind:?}",
-                if editor
-                    .draft
-                    .starting_statuses
-                    .iter()
-                    .any(|s| s.kind == kind)
-                {
-                    "[x] "
-                } else {
-                    ""
-                }
-            ),
-            Action::Setup(SetupAction::Status(kind)),
-            false,
-        );
-    }
-    let summary = editor
-        .validated(catalog)
-        .and_then(|a| a.actor.resolve(catalog).map_err(|e| e.to_string()))
-        .map_or_else(
-            |error| error,
-            |build| {
-                format!(
-                    "{} available active abilities: {}",
-                    build.abilities.len(),
-                    build
-                        .abilities
-                        .iter()
-                        .map(|a| a.definition.name.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            },
-        );
-    label(
-        world,
-        panel,
-        "Resolved Build",
-        summary,
-        UiTextRole::Supporting,
-    );
-    let notice_entity = label(world, panel, "Build Notice", notice, UiTextRole::Body);
-    world.entity_mut(notice_entity).insert(EditorNotice);
-    let actions = shell::row(world, panel, "Build Actions");
-    let save_control = control(
-        world,
-        actions,
-        "Apply Build",
-        "Apply build",
-        Action::Setup(SetupAction::Save),
-        !can_apply,
-    );
-    world.entity_mut(save_control).insert(EditorSave);
-    control(
-        world,
-        actions,
-        "Reload Build",
-        "Reload current character",
-        Action::Setup(SetupAction::Reload),
-        false,
-    );
-    control(
-        world,
-        actions,
-        "Close Build",
-        "Close editor",
-        Action::Setup(SetupAction::Cancel),
-        false,
-    );
+    layout::present(world, view, ui);
 }

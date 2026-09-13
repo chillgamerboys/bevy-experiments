@@ -176,6 +176,7 @@ struct UiState {
     shell_key: Option<String>,
     overlay_key: Option<String>,
     editor: Option<setup::ActorEditor>,
+    lobby_page: u8,
     scenario_path: String,
     scenario_seed: String,
     scenario_seed_source: Option<u64>,
@@ -200,6 +201,7 @@ enum Action {
     Assign(ActorId, u8),
     AssignmentPause(bool),
     Setup(setup::SetupAction),
+    LobbyPage(u8),
     Start,
     Rematch,
     Copy(usize),
@@ -377,6 +379,10 @@ fn apply_action(world: &mut World, action: Action) {
                     } else {
                         None
                     }
+                }
+                Action::LobbyPage(page) => {
+                    ui.lobby_page = page;
+                    None
                 }
                 Action::Setup(action) => setup::action(&view, &mut ui, action),
                 Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
