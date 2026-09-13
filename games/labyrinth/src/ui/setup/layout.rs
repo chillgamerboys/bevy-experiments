@@ -526,20 +526,30 @@ fn mount_browser(
     view: &LabyrinthView,
     can_edit: bool,
 ) {
-    paragraph(
-        world,
-        parent,
-        "Browser Heading",
-        editor.category.name(),
-        UiTextRole::Title,
-    );
-    paragraph(
-        world,
-        parent,
-        "Browse Instruction",
-        "Select to inspect. Changes stay in your draft until Apply build.",
-        UiTextRole::Supporting,
-    );
+    if editor.category == Category::Parameters {
+        paragraph(
+            world,
+            parent,
+            "Parameter Explanation",
+            "Battle parameters · Scroll for more",
+            UiTextRole::Supporting,
+        );
+    } else {
+        paragraph(
+            world,
+            parent,
+            "Browser Heading",
+            editor.category.name(),
+            UiTextRole::Title,
+        );
+        paragraph(
+            world,
+            parent,
+            "Browse Instruction",
+            "Select to inspect. Changes stay in your draft until Apply build.",
+            UiTextRole::Supporting,
+        );
+    }
     match editor.category {
         Category::Equipment => {
             browser_row(
@@ -645,7 +655,6 @@ fn mount_browser(
             }
         },
         Category::Parameters => {
-            paragraph(world,parent,"Parameter Explanation","Configure health, speed, formation size and starting conditions for this encounter.",UiTextRole::Supporting);
             for (title, field, value, max) in [
                 ("Name", BuildField::Name, &editor.name, 128),
                 ("Maximum HP", BuildField::MaxHp, &editor.max_hp, 5),
@@ -922,7 +931,13 @@ fn mount_inspector(
         }
     }
     if matches!(editor.category, Category::Parameters) && editor.selection().is_none() {
-        paragraph(world,content,"Parameters Guide","HP is health at the start of battle. Speed contributes to the initiative roll. Formation spaces determine the ranks occupied by this actor. Starting HP may be blank for full health. Conditions use the existing combat rules.",UiTextRole::Body);
+        paragraph(
+            world,
+            content,
+            "Parameters Guide",
+            "HP is health at the start of battle. Speed contributes to the initiative roll. Formation spaces determine the ranks occupied by this actor. Starting HP may be blank for full health. Conditions use the existing combat rules.",
+            UiTextRole::Body,
+        );
     }
 }
 
