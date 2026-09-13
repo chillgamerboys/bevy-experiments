@@ -137,6 +137,23 @@ Host assignment pause/reassign/resume is explicit and never advances combat reso
 Setup revision guards drafts, while unchanged actor editor fields retain native
 entities/focus/caret across unrelated participant projections.
 
+Preparation separates party/enemy formation selection, scenario I/O and participant
+assignment. All actor customization uses one game-owned editor with category-local
+browsing and a single actor draft, source revision and apply/discard lifecycle.
+Inspection is distinct from mutation. Effective comparisons come from the catalog
+resolver, preserving duplicate grants and learned contributions rather than
+recalculating combat behavior in widgets. Character presentation and draft policy
+stay local; the same screen is intended to support later in-game inspection without
+authorizing combat-time editing. Existing prototype battle parameters do not define
+a future attribute/progression system.
+
+The battle action rail retains the subject and effective disclosed loadout actually
+mounted. Selection and confirmation reject an input batch if the current projection
+differs before Present can rebuild those controls. This complements turn/encounter
+and server-side authorization: an old actor-local position must never select a new
+build's move merely because the index remains legal. Mutable HP/uses do not change
+the frozen loadout identity; current action legality is still validated separately.
+
 All cooperative battle state is public, so peers receive full authoritative
 snapshots; only request sequence is recipient-specific. Host RNG, admission secrets
 and password verifier are never sent in them. Recent typed outcomes have monotonic

@@ -185,6 +185,22 @@ presentation states; those captures freeze timing and do not prove hover duratio
 
 ## Unresolved verification
 
+The unified editor and preparation require decision-information checks as well as
+input/layout checks. Compare a dagger and greatsword at different acting ranks,
+inspect a learned rank/damage upgrade, remove one of several grants, and explain
+the actual added/removed/changed moves before applying. Exercise category changes,
+dirty character switching, discard/reload, server conflicts and source replacement.
+Both teams use the same editor. Do not infer understandable choices from unclipped
+buttons alone; record what is visible separately from observed player comprehension.
+
+`ui::shell::lobby::tests` covers preparation navigation, retained seed drafts and
+the footer at Auto/200%. Editor lifecycle coverage remains in `ui/setup_tests.rs`
+and decision coverage in `ui/setup/tests.rs`. The queued-hotbar regression sends a
+synthetic `UiActivated` batch through production translation before Present, with
+an unchanged positive control and a replaced valid build. It tests source binding,
+not a desktop pointer reproduction. Preserve the baseline wrong-action failure
+and the fixed result in the UI revision evidence.
+
 Historical local reviews did not establish cross-machine LAN/Tailscale behavior,
 all window-resize paths or manual round-six corpse expiry. Deterministic lifecycle
 and localhost tests prove different claims. Recheck these routes when the related

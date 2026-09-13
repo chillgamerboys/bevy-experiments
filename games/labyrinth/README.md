@@ -42,7 +42,7 @@ No admission secrets are accepted on the command line.
 1. Host a company. For same-computer direct testing enter `127.0.0.1`; otherwise
    leave the advertised address empty to choose a local interface, or explicitly
    enter the reachable LAN/tailnet IP. The transport port defaults to UDP 7777.
-2. Copy a **different** private BGN1 invitation for each guest. Invitations are
+2. Open **Players** in preparation and copy a **different** private BGN1 invitation for each guest. Invitations are
    single-use after acknowledged admission and initially expire after one hour.
    Reissue an invitation from an open lobby when necessary. These codes are bearer
    secrets; do not put them in screenshots, public chat, logs, or bug reports.
@@ -59,14 +59,28 @@ No admission secrets are accepted on the command line.
 
 ### Configure a battle
 
-Choose Prototype, Weapon Comparison, Cleave or Rescue/Status, then edit either
-roster. Add/remove actors and move whole actors forward/back within six spaces.
-Edit names, maximum/starting HP, speed, visual preset, footprint, innate moves,
-learned skills, one optional weapon and starting conditions. Guests can edit owned
-builds; the host controls formation size/order, roster and enemies. Starting HP can
-be blank for full health or zero for a dying hero, provided another hero stands.
+Preparation groups **Party**, **Enemies**, **Scenario** and **Players** while keeping
+readiness and Start battle available. In Scenario, load Prototype, Weapon Comparison,
+Cleave or Rescue/Status; each option explains its test purpose. Party and Enemies
+show character cards in rank order. Add/remove actors or move whole actors within
+six formation spaces, then choose **Open character** for the unified editor.
 
-Set an explicit seed and use Save/Load with a local Scenario JSON path. Files contain
+The same character editor handles either team. Equipment, Innate, Learned,
+Parameters and Resulting moves organize one draft. Selecting a catalog entry only
+inspects it: read its effects, acting/target ranks, uses, prerequisites and proposed
+move changes before explicitly equipping or learning it. Resulting moves retains
+all grant and upgrade sources. Apply build submits the complete draft; Discard
+draft reloads the authoritative character. Leaving a changed draft requires an
+explicit discard decision. Sections and character navigation do not create another
+editor. Existing name/HP/speed/footprint/preset/starting-condition controls live in
+Parameters; a broader character stat system remains future work.
+
+Guests edit owned builds; the host controls formation size/order, roster and enemies.
+Starting HP can be blank for full health or zero for a dying hero, provided another
+hero stands. Readability scales retain the same editor with a browser/detail route
+when columns no longer fit.
+
+In Scenario, set an explicit seed and use Save/Load with a local Scenario JSON path. Files contain
 battle configuration, not credentials or participant identities. Rematch returns
 to the lobby with exactly the same configuration and seed. Saved JSON also exposes
 controller policies and initial status source/duration for test harnesses; the UI
