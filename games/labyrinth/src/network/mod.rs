@@ -251,7 +251,10 @@ fn network_tick(world: &mut World) {
             .is_some_and(|host| host.server == entity)
         {
             start::close(world);
-            notice(world, "Host listener closed; check the UDP port and network interface before hosting again.");
+            notice(
+                world,
+                "Host listener closed; check the UDP port and network interface before hosting again.",
+            );
         }
     }
     start::finish_host(world);
@@ -277,7 +280,10 @@ fn network_tick(world: &mut World) {
         .is_some_and(|at| at.elapsed() > Duration::from_secs(20))
     {
         start::disconnect_guest(world);
-        notice(world, "Connection/admission timed out. Check the host address and UDP firewall, then retry or reconnect.");
+        notice(
+            world,
+            "Connection/admission timed out. Check the host address and UDP firewall, then retry or reconnect.",
+        );
     }
 }
 
@@ -327,7 +333,10 @@ fn receive(world: &mut World) {
             .is_err()
         {
             start::disconnect_guest(world);
-            notice(world, "Could not save reconnect credentials. Admission was not committed; retry after fixing profile storage.");
+            notice(
+                world,
+                "Could not save reconnect credentials. Admission was not committed; retry after fixing profile storage.",
+            );
             continue;
         }
         world.write_message(Persisted {
@@ -462,6 +471,64 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
         LabyrinthIntent::AssignmentPause(paused) => {
             submit(world, SessionCommand::AssignmentPause(paused))?
         }
+        LabyrinthIntent::SetScenarioSeed {
+            seed,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::SetScenarioSeed {
+                seed,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::PlaceScenarioActor {
+            team,
+            rank,
+            preset,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::PlaceScenarioActor {
+                team,
+                rank,
+                preset,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::MoveScenarioActor {
+            actor,
+            rank,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::MoveScenarioActor {
+                actor,
+                rank,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::RemoveScenarioActor {
+            actor,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::RemoveScenarioActor {
+                actor,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::AssignFormationRank {
+            rank,
+            owner,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::AssignFormationRank {
+                rank,
+                owner,
+                expected_revision,
+            },
+        )?,
         LabyrinthIntent::ConfigureBattle {
             scenario,
             expected_revision,
@@ -565,6 +632,13 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
         LabyrinthIntent::SaveScenario(path) => {
             let view = world.resource::<LabyrinthView>();
             let scenario = view.scenario.as_ref().ok_or("No battle setup to save.")?;
+            let formation = view.formation.as_ref().ok_or("No formation to save.")?;
+            if let Some(error) = formation.deployment_error(scenario) {
+                return Err(error);
+            }
+            scenario
+                .validate(view.catalog.as_ref().ok_or("No content catalog to save.")?)
+                .map_err(|e| e.to_string())?;
             let path = if path.trim().is_empty() {
                 "labyrinth-scenario.json"
             } else {
@@ -736,6 +810,8 @@ fn publish(world: &mut World) {
         view.players = snapshot.player_views();
         view.company = snapshot.company;
         view.setup_revision = snapshot.setup_revision;
+        view.deployment_error = snapshot.formation.deployment_error(&snapshot.scenario);
+        view.formation = Some(snapshot.formation);
         view.scenario = Some(snapshot.scenario);
         view.catalog = Some(snapshot.catalog);
         view.assignment_revision = snapshot.assignment_revision;
@@ -754,6 +830,8 @@ fn publish(world: &mut World) {
         view.players.clear();
         view.company.clear();
         view.scenario = None;
+        view.formation = None;
+        view.deployment_error = None;
         view.catalog = None;
         view.events.clear();
         view.paused = false;

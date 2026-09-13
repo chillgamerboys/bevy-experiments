@@ -316,6 +316,7 @@ fn converged(apps: &mut [App]) -> bool {
                     && snapshot.players == expected.players
                     && snapshot.company == expected.company
                     && snapshot.scenario == expected.scenario
+                    && snapshot.formation == expected.formation
                     && snapshot.setup_revision == expected.setup_revision
                     && snapshot.assignment_revision == expected.assignment_revision
                     && snapshot.paused == expected.paused

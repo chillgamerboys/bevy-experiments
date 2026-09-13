@@ -6,7 +6,7 @@ use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroCl
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
-pub use crate::session::CompanyMember;
+pub use crate::session::{CompanyMember, FormationPlacement, LobbyFormation};
 
 /// Owned UI input which redacts diagnostics and clears its allocation on drop.
 #[derive(Clone, Default)]
@@ -119,6 +119,10 @@ pub struct LabyrinthView {
     pub setup_revision: u64,
     /// Symmetric editable battle specification, with no participant credentials.
     pub scenario: Option<labyrinth_rules::scenario::Scenario>,
+    /// Shared one-based construction positions and empty-place ownership.
+    pub formation: Option<LobbyFormation>,
+    /// Explicit reason an incomplete construction cannot be deployed or saved.
+    pub deployment_error: Option<String>,
     /// Validated authored definitions for build selection and disclosure.
     pub catalog: Option<labyrinth_rules::catalog::ContentCatalog>,
     /// Read-only pure rules snapshot; never host RNG or authority.
@@ -201,6 +205,49 @@ pub enum LabyrinthIntent {
     },
     /// Host enters or leaves the paused assignment flow.
     AssignmentPause(bool),
+    /// Change the seed while retaining sparse construction positions.
+    SetScenarioSeed {
+        /// Explicit deterministic battle seed.
+        seed: u64,
+        /// Setup generation shown to the player.
+        expected_revision: u64,
+    },
+    /// Commit a previously inspected type at a chosen place, replacing its occupant.
+    PlaceScenarioActor {
+        /// Formation side, independent of appearance.
+        team: labyrinth_rules::Team,
+        /// One-based rank; a covered rank replaces that character at its leading rank.
+        rank: u8,
+        /// Authored preset selected before committing construction.
+        preset: labyrinth_rules::catalog::ContentId,
+        /// Setup generation shown during type inspection.
+        expected_revision: u64,
+    },
+    /// Host moves a complete footprint to unoccupied construction places.
+    MoveScenarioActor {
+        /// Stable character identity.
+        actor: ActorId,
+        /// New one-based leading rank.
+        rank: u8,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
+    /// Host removes a character, retaining empty-place ownership and other ranks.
+    RemoveScenarioActor {
+        /// Stable character identity.
+        actor: ActorId,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
+    /// Host assigns an empty rank or every rank of its occupying character.
+    AssignFormationRank {
+        /// One-based party rank.
+        rank: u8,
+        /// Admitted participant slot; zero means host.
+        owner: u8,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
     /// Host replaces the lobby configuration after complete validation.
     ConfigureBattle {
         /// Full symmetric encounter input.

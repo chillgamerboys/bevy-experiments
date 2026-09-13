@@ -17,6 +17,9 @@ use labyrinth_rules::scenario::{ControllerPolicy, Scenario, ScenarioActor, Stock
 #[cfg(test)]
 mod tests;
 
+mod formation;
+pub use formation::{FormationPlacement, LobbyFormation};
+
 const RESULT_CACHE: usize = 64;
 const LOG_LIMIT: usize = 80;
 const MAX_SESSION_SNAPSHOT_BYTES: usize = 4 * 1024 * 1024;
@@ -71,6 +74,30 @@ pub struct CompanyMember {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SessionCommand {
+    SetScenarioSeed {
+        seed: u64,
+        expected_revision: u64,
+    },
+    PlaceScenarioActor {
+        team: labyrinth_rules::Team,
+        rank: u8,
+        preset: labyrinth_rules::catalog::ContentId,
+        expected_revision: u64,
+    },
+    MoveScenarioActor {
+        actor: ActorId,
+        rank: u8,
+        expected_revision: u64,
+    },
+    RemoveScenarioActor {
+        actor: ActorId,
+        expected_revision: u64,
+    },
+    AssignFormationRank {
+        rank: u8,
+        owner: u8,
+        expected_revision: u64,
+    },
     ConfigureBattle {
         scenario: Scenario,
         expected_revision: u64,
@@ -123,6 +150,7 @@ pub(crate) struct SessionSnapshot {
     pub assignment_revision: u64,
     pub setup_revision: u64,
     pub scenario: Scenario,
+    pub formation: LobbyFormation,
     pub catalog: ContentCatalog,
     pub combat: Option<CombatSnapshot>,
     pub log: Vec<String>,
@@ -141,6 +169,7 @@ struct UncheckedSessionSnapshot {
     assignment_revision: u64,
     setup_revision: u64,
     scenario: Scenario,
+    formation: LobbyFormation,
     catalog: ContentCatalog,
     combat: Option<CombatSnapshot>,
     log: Vec<String>,
@@ -162,6 +191,7 @@ impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
             assignment_revision: value.assignment_revision,
             setup_revision: value.setup_revision,
             scenario: value.scenario,
+            formation: value.formation,
             catalog: value.catalog,
             combat: value.combat,
             log: value.log,
@@ -191,8 +221,17 @@ impl SessionSnapshot {
             return Err("Session snapshot exceeds byte budget.");
         }
         self.scenario
-            .validate(&self.catalog)
+            .validate_preparation(&self.catalog)
             .map_err(|_| "Invalid battle configuration.")?;
+        self.formation.validate(&self.scenario)?;
+        if self
+            .formation
+            .hero_owners
+            .iter()
+            .any(|owner| !self.players.iter().any(|p| p.slot == *owner && p.occupied))
+        {
+            return Err("Every reserved place requires an admitted controller.");
+        }
         if self.setup_revision == 0 {
             return Err("Invalid setup revision.");
         }
@@ -200,7 +239,6 @@ impl SessionSnapshot {
             || self.assignment_revision == 0
             || self.next_sequence == 0
             || self.players.len() != usize::from(PLAYER_CAPACITY)
-            || self.company.is_empty()
             || self.company.len() > PARTY_SIZE
             || self.log.len() > LOG_LIMIT
             || self.events.len() > LOG_LIMIT
@@ -237,6 +275,11 @@ impl SessionSnapshot {
                 ActorKind::Hero(hero) => hero,
                 ActorKind::Enemy(_) => HeroClass::Gatekeeper,
             };
+            if self.formation.rank(member.actor).is_none_or(|rank| {
+                self.formation.hero_owners[usize::from(rank - 1)] != member.owner
+            }) {
+                return Err("Company control must match its reserved places.");
+            }
             if member.hero != expected_hero {
                 return Err("Company appearance does not match scenario.");
             }
@@ -259,6 +302,9 @@ impl SessionSnapshot {
             }
         }
         if let Some(combat) = &self.combat {
+            if self.formation.deployment_error(&self.scenario).is_some() {
+                return Err("Combat requires a compact deployed formation.");
+            }
             combat.validate().map_err(|_| "Invalid combat snapshot.")?;
             if combat.catalog != self.catalog
                 || combat.scenario_fingerprint
@@ -383,9 +429,25 @@ impl SessionSnapshot {
         if self.setup_revision < previous.setup_revision {
             return Err("Setup revision moved backwards.");
         }
+        if self.setup_revision == previous.setup_revision
+            && (self.scenario != previous.scenario
+                || self.catalog != previous.catalog
+                || self.formation.heroes != previous.formation.heroes
+                || self.formation.enemies != previous.formation.enemies)
+        {
+            return Err("Setup changed without a new revision.");
+        }
+        if self.formation.hero_owners != previous.formation.hero_owners
+            && self.assignment_revision <= previous.assignment_revision
+        {
+            return Err("Place ownership changed without a new revision.");
+        }
         if self.encounter == previous.encounter
             && previous.combat.is_some()
-            && (self.scenario != previous.scenario || self.catalog != previous.catalog)
+            && (self.scenario != previous.scenario
+                || self.catalog != previous.catalog
+                || self.formation.heroes != previous.formation.heroes
+                || self.formation.enemies != previous.formation.enemies)
         {
             return Err("Encounter configuration changed during combat.");
         }
@@ -423,6 +485,7 @@ pub(crate) struct PartyAuthority {
     assignment_pause: bool,
     setup_revision: u64,
     scenario: Scenario,
+    formation: LobbyFormation,
     catalog: ContentCatalog,
     combat: Option<Combat>,
     sequence: BTreeMap<u8, u64>,
@@ -493,12 +556,14 @@ impl PartyAuthority {
         scenario.validate(&catalog).map_err(|_| "Invalid roster.")?;
         let company =
             Self::company_for(&scenario, &catalog, &[]).map_err(|_| "Invalid company.")?;
+        let formation = LobbyFormation::compact(&scenario);
         Ok(Self {
             players,
             company,
             assignment_revision: 1,
             assignment_pause: false,
             setup_revision: 1,
+            formation,
             scenario,
             catalog,
             combat: None,
@@ -548,19 +613,11 @@ impl PartyAuthority {
         scenario
             .validate(&self.catalog)
             .map_err(|e| e.to_string())?;
-        Combat::from_scenario(&self.catalog, &scenario).map_err(|e| e.to_string())?;
-        if scenario == self.scenario {
-            return Ok(());
+        let mut formation = LobbyFormation::compact(&scenario);
+        for member in &self.company {
+            formation.assign_actor(&scenario, member.actor, member.owner);
         }
-        let company = Self::company_for(&scenario, &self.catalog, &self.company)?;
-        self.scenario = scenario;
-        self.company = company;
-        self.setup_revision += 1;
-        self.assignment_revision += 1;
-        for player in &mut self.players {
-            player.ready = false;
-        }
-        Ok(())
+        self.configure_draft(scenario, formation, expected_revision)
     }
 
     pub fn in_lobby(&self) -> bool {
@@ -638,10 +695,20 @@ impl PartyAuthority {
                     member.owner = 0;
                 }
             }
+            let released_slot = player.slot;
+            for owner in &mut self.formation.hero_owners {
+                if *owner == released_slot {
+                    *owner = 0;
+                }
+            }
+            for other in &mut self.players {
+                other.ready = false;
+            }
+            self.setup_revision += 1;
             self.assignment_revision += 1;
             // A new identity must not inherit replay history.
-            self.sequence.remove(&player.slot);
-            self.results.remove(&player.slot);
+            self.sequence.remove(&released_slot);
+            self.results.remove(&released_slot);
             self.revision += 1;
         }
     }
@@ -662,6 +729,7 @@ impl PartyAuthority {
             assignment_revision: self.assignment_revision,
             setup_revision: self.setup_revision,
             scenario: self.scenario.clone(),
+            formation: self.formation.clone(),
             catalog: self.catalog.clone(),
             combat: self.combat.as_ref().map(Combat::snapshot),
             log: self.log.iter().cloned().collect(),
@@ -733,6 +801,85 @@ impl PartyAuthority {
             return Err("That encounter has ended.".into());
         }
         match request.command {
+            SessionCommand::SetScenarioSeed {
+                seed,
+                expected_revision,
+            } => {
+                if slot != 0 {
+                    return Err("Only the host changes the encounter seed.".into());
+                }
+                let mut scenario = self.scenario.clone();
+                scenario.seed = seed;
+                self.configure_draft(scenario, self.formation.clone(), expected_revision)?;
+            }
+            SessionCommand::PlaceScenarioActor {
+                team,
+                rank,
+                preset,
+                expected_revision,
+            } => {
+                self.check_construction_revision(expected_revision, request.assignment_revision)?;
+                self.place_scenario_actor(slot, team, rank, &preset, expected_revision)?;
+            }
+            SessionCommand::MoveScenarioActor {
+                actor,
+                rank,
+                expected_revision,
+            } => {
+                if slot != 0 {
+                    return Err("Only the host moves formation places.".into());
+                }
+                self.check_construction_revision(expected_revision, request.assignment_revision)?;
+                self.move_scenario_actor(actor, rank, expected_revision)?;
+            }
+            SessionCommand::RemoveScenarioActor {
+                actor,
+                expected_revision,
+            } => {
+                if slot != 0 {
+                    return Err("Only the host removes formation characters.".into());
+                }
+                self.check_construction_revision(expected_revision, request.assignment_revision)?;
+                let mut scenario = self.scenario.clone();
+                let mut formation = self.formation.clone();
+                let team = self.actor_team(actor).ok_or("Unknown character.")?;
+                formation::roster_mut(&mut scenario, team).retain(|a| a.id != actor);
+                formation.placements_mut(team).retain(|p| p.actor != actor);
+                // Initial conditions cannot retain dangling source identities.
+                for configured in scenario.heroes.iter_mut().chain(&mut scenario.enemies) {
+                    for status in &mut configured.starting_statuses {
+                        if status.source == Some(actor) {
+                            status.source = None;
+                        }
+                    }
+                }
+                self.configure_draft(scenario, formation, expected_revision)?;
+            }
+            SessionCommand::AssignFormationRank {
+                rank,
+                owner,
+                expected_revision,
+            } => {
+                if slot != 0 {
+                    return Err("Only the host assigns formation places.".into());
+                }
+                self.check_construction_revision(expected_revision, request.assignment_revision)?;
+                if !(1..=PLAYER_CAPACITY).contains(&rank) {
+                    return Err("Choose a rank from 1–6.".into());
+                }
+                if !self.players.iter().any(|p| p.slot == owner && p.occupied) {
+                    return Err("Assign to an admitted participant.".into());
+                }
+                let mut formation = self.formation.clone();
+                if let Some(actor) =
+                    formation.occupant(&self.scenario, labyrinth_rules::Team::Heroes, rank)
+                {
+                    formation.assign_actor(&self.scenario, actor, owner);
+                } else {
+                    formation.hero_owners[usize::from(rank - 1)] = owner;
+                }
+                self.configure_draft(self.scenario.clone(), formation, expected_revision)?;
+            }
             SessionCommand::ConfigureBattle {
                 scenario,
                 expected_revision,
@@ -774,7 +921,7 @@ impl PartyAuthority {
                     return Err("Controller policy is host configuration.".into());
                 }
                 *current = actor;
-                self.configure(scenario, expected_revision)?;
+                self.configure_draft(scenario, self.formation.clone(), expected_revision)?;
             }
             SessionCommand::ChooseHero { actor, hero } => {
                 if request.assignment_revision != self.assignment_revision {
@@ -811,7 +958,7 @@ impl PartyAuthority {
                 }
                 configured.actor = replacement;
                 configured.starting_hp = None;
-                self.configure(scenario, self.setup_revision)?;
+                self.configure_draft(scenario, self.formation.clone(), self.setup_revision)?;
             }
             SessionCommand::AssignmentPause(paused) => {
                 if slot != 0 || self.combat.is_none() {
@@ -853,7 +1000,11 @@ impl PartyAuthority {
                     .ok_or("Unknown hero.")?;
                 if member.owner != owner {
                     member.owner = owner;
+                    self.formation.assign_actor(&self.scenario, actor, owner);
                     self.assignment_revision += 1;
+                    if self.in_lobby() {
+                        self.setup_revision += 1;
+                    }
                     if self.in_lobby() {
                         for p in &mut self.players {
                             p.ready = false;
@@ -875,6 +1026,12 @@ impl PartyAuthority {
                 if slot != 0 || !self.in_lobby() {
                     return Err("Only the host can start from the lobby.".into());
                 }
+                if let Some(error) = self.formation.deployment_error(&self.scenario) {
+                    return Err(error);
+                }
+                self.scenario
+                    .validate(&self.catalog)
+                    .map_err(|e| e.to_string())?;
                 if self.players.iter().any(|p| {
                     self.company.iter().any(|m| m.owner == p.slot) && (!p.connected || !p.ready)
                 }) {
