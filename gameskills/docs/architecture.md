@@ -20,6 +20,11 @@ the executable; they are not a promised stable public Rust library interface.
 
 ## Decisions
 
+Task scope, execution strategy and execution authorization are separate. Recover
+applicable existing authorization across handoffs; a worker limit describes capacity
+and does not by itself grant permission. Durable delivery records carry the endpoint
+for solo and coordinated work alike.
+
 Project configuration owns commands, targets and local workflow choices. Skills
 retain triggers, necessary judgment and completion criteria; current project docs
 own local facts. Resolve docs from the adopter root and APIs from its actual locked
