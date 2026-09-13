@@ -1909,9 +1909,12 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
     let source = before.actor(ActorId(1)).expect("custom hero");
     assert!(source.resolved_abilities().len() > 8);
     let index = source
-        .ability_index(&ContentId::new("dagger_throw").expect("ID"))
+        .ability_index(&ContentId::new("dagger_stab").expect("ID"))
         .expect("weapon ability");
     let target = *before.enemy_formation.first().expect("target");
+    assert!(before
+        .legal_actions(ActorId(1))
+        .contains(&CombatAction::Ability { index, target }));
     send_action(
         &mut apps,
         ActorId(1),

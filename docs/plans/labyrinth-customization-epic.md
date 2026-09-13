@@ -1,9 +1,8 @@
 # Labyrinth customization and package-quality epic
 
-Status: active; scoped and published as HEX-99. Gameplay implementation has not started.
+Status: active implementation; parallel streams integrated, combined verification and PR delivery in progress.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
-Current endpoint: create and detail the Linear epic. Later implementation ends at
-observed reviewable PRs; merge/release require separate authorization.
+Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
 
 ## Agreed contract
 

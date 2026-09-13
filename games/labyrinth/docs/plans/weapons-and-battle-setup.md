@@ -1,12 +1,11 @@
 # Weapons, character builds and configurable battles
 
-Status: active planning; gameplay implementation has not started.
+Status: active implementation; content, scenario, session and UI streams integrated.
 Owner: Labyrinth. GameSkills and Gamekit have equal-priority evaluation and
 improvement outcomes in the [combined session plan](../../../../gameskills/docs/plans/skill-evaluation.md).
 Tracking: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with); see the
 [detailed epic and child issues](../../../../docs/plans/labyrinth-customization-epic.md).
-Current endpoint: create and scope the epic. Subsequent implementation carries
-through reviewable PRs and observed delivery, not an unrequested merge.
+Current endpoint: reviewable implementation PR and observed delivery, not an unrequested merge.
 
 ## Accepted scope
 

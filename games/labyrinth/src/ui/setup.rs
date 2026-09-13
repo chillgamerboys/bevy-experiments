@@ -108,15 +108,22 @@ impl ActorEditor {
 
 pub(super) fn change(ui: &mut UiState, field: BuildField, value: &str) {
     if let Some(editor) = &mut ui.editor {
+        let current = match field {
+            BuildField::Name => &mut editor.name,
+            BuildField::MaxHp => &mut editor.max_hp,
+            BuildField::Speed => &mut editor.speed,
+            BuildField::Footprint => &mut editor.footprint,
+            BuildField::StartingHp => &mut editor.starting_hp,
+        };
+        // EditableText layout/caret updates can emit the unchanged value.
+        // Only an actual edit invalidates a submitted draft or its error.
+        if current == value {
+            return;
+        }
+        *current = value.into();
         editor.error = None;
         editor.pending_save = false;
-        match field {
-            BuildField::Name => editor.name = value.into(),
-            BuildField::MaxHp => editor.max_hp = value.into(),
-            BuildField::Speed => editor.speed = value.into(),
-            BuildField::Footprint => editor.footprint = value.into(),
-            BuildField::StartingHp => editor.starting_hp = value.into(),
-        }
+        editor.submitted_revision = None;
     }
 }
 
