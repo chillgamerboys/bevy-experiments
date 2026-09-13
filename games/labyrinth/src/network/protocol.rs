@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
 pub(super) const GAME_ID: &str = "gamekit-labyrinth";
-pub(super) const PROTOCOL: &str = "5";
-pub(super) const SCHEMA: &str = "labyrinth/v5;scenario-v1;frozen-authored-abilities;actor-local-ability-index;custom-stats;front-pair-cleave;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
+pub(super) const PROTOCOL: &str = "6";
+pub(super) const SCHEMA: &str = "labyrinth/v6;scenario-v1;sparse-preparation-v1;reserved-rank-owners;typed-preset-placement;frozen-authored-abilities;actor-local-ability-index;custom-stats;front-pair-cleave;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
 
 #[derive(Serialize)]
 pub(super) struct WirePassword(pub String);
@@ -103,7 +103,9 @@ pub(super) struct SnapshotEnvelope {
 impl Refused {
     pub fn notice(self) -> &'static str {
         match self {
-            Self::Admission => "The host refused admission. Check the temporary passphrase or use a fresh invitation.",
+            Self::Admission => {
+                "The host refused admission. Check the temporary passphrase or use a fresh invitation."
+            }
             Self::Incompatible => "This host uses a different game or rules version.",
             Self::Full => "The party is full or already in combat. Reserved players can reconnect.",
         }
