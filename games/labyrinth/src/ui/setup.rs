@@ -3,7 +3,7 @@
 use super::*;
 use labyrinth_rules::build::{ActorBuild, InnateGrant};
 use labyrinth_rules::catalog::{ContentCatalog, ContentId};
-use labyrinth_rules::{Scenario, ScenarioActor};
+use labyrinth_rules::scenario::{Scenario, ScenarioActor};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum BuildField {
@@ -206,7 +206,7 @@ pub(super) fn action(
                 editor
                     .draft
                     .starting_statuses
-                    .push(labyrinth_rules::StartingStatus {
+                    .push(labyrinth_rules::scenario::StartingStatus {
                         kind,
                         source: None,
                         remaining: None,
@@ -354,7 +354,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         format!("Character {} · edit draft", editor.id.0),
         UiTextRole::Title,
     );
-    for (label, field, value, max) in [
+    for (field_label, field, value, max) in [
         ("Name", BuildField::Name, &editor.name, 128),
         ("Maximum HP", BuildField::MaxHp, &editor.max_hp, 5),
         ("Speed", BuildField::Speed, &editor.speed, 5),
@@ -375,11 +375,11 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             world,
             panel,
             &format!("Build {field:?} Label"),
-            label,
+            field_label,
             UiTextRole::Supporting,
         );
         let field_bundle =
-            bevy_gamekit::ui::text_field(world.resource::<UiFonts>(), label, value, max);
+            bevy_gamekit::ui::text_field(world.resource::<UiFonts>(), field_label, value, max);
         let entity = world
             .spawn((
                 field_bundle,

@@ -487,12 +487,15 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
                 .get_resource::<PartyAuthority>()
                 .ok_or("Only the host chooses encounters.")?
                 .snapshot(0);
-            let choice = *labyrinth_rules::StockScenario::ALL
+            let choice = *labyrinth_rules::scenario::StockScenario::ALL
                 .get(index)
                 .ok_or("Unknown stock encounter.")?;
-            let scenario =
-                labyrinth_rules::Scenario::stock(choice, snapshot.scenario.seed, &snapshot.catalog)
-                    .map_err(|e| e.to_string())?;
+            let scenario = labyrinth_rules::scenario::Scenario::stock(
+                choice,
+                snapshot.scenario.seed,
+                &snapshot.catalog,
+            )
+            .map_err(|e| e.to_string())?;
             submit(
                 world,
                 SessionCommand::ConfigureBattle {
@@ -531,7 +534,7 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
                 .iter()
                 .find(|p| p.appearance == kind)
                 .ok_or("Default preset is unavailable.")?;
-            let actor = labyrinth_rules::ScenarioActor {
+            let actor = labyrinth_rules::scenario::ScenarioActor {
                 id: labyrinth_rules::ActorId(id),
                 actor: labyrinth_rules::build::ActorBuild::from_preset(
                     &snapshot.catalog,
@@ -539,9 +542,9 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
                 )
                 .map_err(|e| e.to_string())?,
                 controller: if team == labyrinth_rules::Team::Heroes {
-                    labyrinth_rules::ControllerPolicy::Manual
+                    labyrinth_rules::scenario::ControllerPolicy::Manual
                 } else {
-                    labyrinth_rules::ControllerPolicy::Ai
+                    labyrinth_rules::scenario::ControllerPolicy::Ai
                 },
                 starting_hp: None,
                 starting_statuses: Vec::new(),
@@ -585,11 +588,12 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             let mut source = String::new();
             std::fs::File::open(path)
                 .map_err(|e| format!("Cannot open scenario: {e}"))?
-                .take(labyrinth_rules::MAX_SCENARIO_BYTES as u64 + 1)
+                .take(labyrinth_rules::scenario::MAX_SCENARIO_BYTES as u64 + 1)
                 .read_to_string(&mut source)
                 .map_err(|e| format!("Cannot read scenario: {e}"))?;
-            let scenario = labyrinth_rules::Scenario::from_json(&source, &snapshot.catalog)
-                .map_err(|e| e.to_string())?;
+            let scenario =
+                labyrinth_rules::scenario::Scenario::from_json(&source, &snapshot.catalog)
+                    .map_err(|e| e.to_string())?;
             submit(
                 world,
                 SessionCommand::ConfigureBattle {

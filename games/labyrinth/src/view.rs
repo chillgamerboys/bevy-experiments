@@ -118,7 +118,7 @@ pub struct LabyrinthView {
     /// Configuration generation; stale editor drafts cannot overwrite new setup.
     pub setup_revision: u64,
     /// Symmetric editable battle specification, with no participant credentials.
-    pub scenario: Option<labyrinth_rules::Scenario>,
+    pub scenario: Option<labyrinth_rules::scenario::Scenario>,
     /// Validated authored definitions for build selection and disclosure.
     pub catalog: Option<labyrinth_rules::catalog::ContentCatalog>,
     /// Read-only pure rules snapshot; never host RNG or authority.
@@ -204,14 +204,14 @@ pub enum LabyrinthIntent {
     /// Host replaces the lobby configuration after complete validation.
     ConfigureBattle {
         /// Full symmetric encounter input.
-        scenario: labyrinth_rules::Scenario,
+        scenario: labyrinth_rules::scenario::Scenario,
         /// Generation on which the editor draft was based.
         expected_revision: u64,
     },
     /// Customize one owned actor without changing its team, rank or controller.
     CustomizeActor {
         /// Explicit actor configuration.
-        actor: labyrinth_rules::ScenarioActor,
+        actor: labyrinth_rules::scenario::ScenarioActor,
         /// Generation on which this edit was based.
         expected_revision: u64,
     },

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::view::{CombatInterruption, PlayerView, PresentedEvent};
 use labyrinth_rules::build::{ActorBuild, ResolvedBuild};
 use labyrinth_rules::catalog::ContentCatalog;
-use labyrinth_rules::{ControllerPolicy, Scenario, ScenarioActor, StockScenario};
+use labyrinth_rules::scenario::{ControllerPolicy, Scenario, ScenarioActor, StockScenario};
 
 #[cfg(test)]
 mod tests;
@@ -275,7 +275,7 @@ impl SessionSnapshot {
                             && actor.name() == configured.actor.name
                             && actor.max_hp == configured.actor.max_hp
                             && actor.base_speed == configured.actor.base_speed
-                            && actor.footprint() == configured.actor.footprint
+                            && actor.footprint == configured.actor.footprint
                             && actor.team() == team
                             && actor.build == configured.actor.build
                             && actor.controller == configured.controller
