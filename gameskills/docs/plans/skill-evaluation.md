@@ -183,7 +183,7 @@ Planning observations on 2026-09-12:
    fallback revision if used, actual client/version/model/effort where exposed,
    platform and relevant configuration. Read [contributing](../contributing.md)
    and resolve `gameskills:plan` and `gameskills-maintainer:evaluate-skills`.
-   Resume a delivery task for this combined work, or start a solo task with endpoint
+   Resume a delivery task for this combined work, or start its coordinator record with endpoint
    `pr`, base `main` and the agreed checks. Do not reuse completed HEX-98/PR #38.
    Required tracking uses the adopted Linear workflow and connected MCP; record an
    observer mismatch as a delivery limitation rather than requesting another API
@@ -271,6 +271,14 @@ telemetry is unavailable, not zero. Use pass/fail/partial/unavailable/not-run wi
 concrete observations, not a score inferred from structural validation.
 
 ### Observed planning feedback
+
+The user challenged the description of this epic as requiring solo work. The
+planner over-weighted the handoff's delegation caveat and under-weighted the
+owner-approved parallel configuration in `gameskills.toml`. An execution permission
+check was misleadingly presented as an epic scope constraint. Corrected the epic
+to allow either execution mode using applicable existing authorization and runtime
+capacity. This is an observed interpretation/communication failure; do not encode
+a new mandatory approval step in the skill as its remedy.
 
 On 2026-09-13 the user requested numbered grill questions so answers can refer to
 question numbers. Earlier rounds used unnumbered question titles and bullets,

@@ -1,7 +1,7 @@
 //! Small original typed content catalog. Masks use bit zero for front rank one.
 
 use crate::{ActorKind, Effect, EnemyKind, HeroClass, SkillId, StatusKind, StatusTag};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // Six linear ranks form three explicit two-rank reach zones. These masks are
 // content decisions, not an arithmetic expansion of the former four-rank board.
@@ -12,7 +12,7 @@ const REAR: u8 = 0b11_0000;
 const ALL_RANKS: u8 = 0b11_1111;
 
 /// Target allegiance/life-state rule, separate from source and target rank masks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TargetRule {
     /// Standing actor on the opposing team.
     EnemyStanding,

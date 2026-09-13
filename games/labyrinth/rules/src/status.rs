@@ -18,7 +18,7 @@ pub enum StatusKind {
 }
 
 /// Presentation and cleansing classification, not an implicit behavior selector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StatusTag {
     /// Beneficial modifier.
     Buff,
@@ -76,7 +76,7 @@ pub enum Reapplication {
 }
 
 /// Effects shared by skills and status triggers. Effects are resolved in order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Effect {
     /// Direct fixed damage before source/target modifiers.
     Damage(u16),

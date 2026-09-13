@@ -59,6 +59,12 @@ Do not publish a partially wired playable route simply to match issue boundaries
 Every actual PR needs its own relevant source-bound checks and issue links; the
 epic tracks the complete set. No exact dates or parallel staffing are assumed.
 
+Execution can be solo or delegated; this epic does not require one worker.
+`gameskills.toml` records owner-approved parallel implementation with at most five
+workers. Reconcile applicable existing authorization with current session
+instructions and runtime capacity before assigning independent scopes. Do not turn
+a handoff caveat or missing execution decision into a permanent epic constraint.
+
 ## Child issues
 
 Epic: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with) in Bevy Games.

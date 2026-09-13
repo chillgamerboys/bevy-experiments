@@ -13,6 +13,9 @@ frame the user already supplied.
 Ask only decisions whose answers change scope, architecture, player experience,
 risk or delivery. Prefer one to three questions per round, each with a concrete
 recommendation and its tradeoff. Resolve upstream choices before dependent ones.
+Give questions visible, stable numbers in both tool prompts and accompanying prose
+so the user can answer by number. Continue numbering across rounds; map replies
+back to their original decisions and carry settled answers into the plan.
 Use the host's available question tool; continue independent read-only research
 while waiting. Delegate routine implementation choices to your own judgment.
 
