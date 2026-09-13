@@ -10,7 +10,7 @@
     "queue_schema": 2,
     "schema_version": 1
   },
-  "content_sha256": "a3248a8e6ff90cba5955f7d913f628ab556086a3def665faae37d70a71e18d7f",
+  "content_sha256": "ba855e5917e4f48f2e05100b99216ddb6d9ced31b9cbad739beec7ef86f6de93",
   "default_packages": [
     "gameskills"
   ],
@@ -51,10 +51,10 @@
     "plugins/gameskills-ui/.claude-plugin/plugin.json": "4a53fb4434acd37bae8170f03a1a8accd734da7430ea7e78669fec23a302d06a",
     "plugins/gameskills-ui/.codex-plugin/plugin.json": "b2599d0f3a5c2a8fd5f198418f2579dcffbefb563adfe1e8de460a9ba2744825",
     "plugins/gameskills-ui/references/project-context.md": "363a3c95cdd5caa8372f1ea6885b612a65bd299fd59999d88b53199e39ac2f0e",
-    "plugins/gameskills-ui/references/ui-contracts.md": "c988964b3386cb43967d5337616829dd3dc36c38d4854252051fb8c58ca01c8d",
-    "plugins/gameskills-ui/references/ui-evidence.md": "d247c22dfe935e513db76fc8c1c9f2faf68236aeb3476eac7fb9f8a4885a940b",
-    "plugins/gameskills-ui/skills/build-ui/SKILL.md": "faf64d21fbfc79a89e19feb6c19ae1bba020011e2ae0eb75e53f94c0da9dad1e",
-    "plugins/gameskills-ui/skills/verify-ui/SKILL.md": "d02f1eaf3a47d954b6e1f400bffd2f5c52fc03bdf110a2f5e21894c0ef90b7ca",
+    "plugins/gameskills-ui/references/ui-contracts.md": "ecc824a7f677619a739ae3587ad7ae352486553840e92e3b13b203a23bcc8039",
+    "plugins/gameskills-ui/references/ui-evidence.md": "55765c3c85eb5fa1865588e9912b82857c2605127e97d6b59033ea2b8335c6f3",
+    "plugins/gameskills-ui/skills/build-ui/SKILL.md": "5eeeae0c8f8b5294f83625b5c7a388cffc1b96ad22777757e1e02da64efbf2c0",
+    "plugins/gameskills-ui/skills/verify-ui/SKILL.md": "4033590bbe954cc79cb1200ce1f83e188b827126ec5c029057547fc13fbc8f99",
     "plugins/gameskills/.claude-plugin/plugin.json": "621edace723676d5049c7a206f8b20ff6f9f557cc3b519474e65835d5cc120e9",
     "plugins/gameskills/.codex-plugin/plugin.json": "8ee76f7ee9057cfe31bf074dfff4dc878b265eaae1e77438e9cc11ff281c187d",
     "plugins/gameskills/catalog.json": "11e8be0f0136d7b8374599e64db32e4a334374359aba10d9239f51116aa6df5a",
@@ -70,9 +70,9 @@
     "plugins/gameskills/skills/create-pr/SKILL.md": "c37562c5ad8949741349b719a164a893b503a1d206dd8565715c3dfc12c9c5b8",
     "plugins/gameskills/skills/debug/SKILL.md": "f9681b5e2f42c16acbc4a70a6f489de857867257622d6c9be8fc742eb22ae5f7",
     "plugins/gameskills/skills/dispatch/SKILL.md": "741c00e5bd998ae4924703a9520982d5e0d282d1970c27219f8e377afca7292c",
-    "plugins/gameskills/skills/grill/SKILL.md": "95cf4c21713edca4bfdcc2cb5593246ef4c5e56aef0154e190cc514a8687e50e",
+    "plugins/gameskills/skills/grill/SKILL.md": "f85c0c8062c7a08431c2804178403e6076fe639f15a69d783c7cc20e26608d65",
     "plugins/gameskills/skills/merge-pr/SKILL.md": "a9e0c421ee89ca39a9fc3ec864b2b68cd2add4dc6ced065fd9ada45434bd899a",
-    "plugins/gameskills/skills/plan/SKILL.md": "0051517e0ed1096d6b3bf13ae2d2ef56a621756f1ef8ece623757ba60ee937da",
+    "plugins/gameskills/skills/plan/SKILL.md": "66ff6cf61f01b8b8b5780cb6a4c994fa61057225478055c4bf206575142718e1",
     "plugins/gameskills/skills/playtest/SKILL.md": "7cd37a16c2ebc39178ee9bd0fd964d1c14949b23660133c25e2bbc48f08c56f6",
     "plugins/gameskills/skills/release/SKILL.md": "f91971be622ff8e46c0c1e22b2fbc477c5c4af9f329dbe18afdddfd10b071643",
     "plugins/gameskills/skills/review/SKILL.md": "963e6dceb86172529355a1deaa24fe828f1369d84c87697586789f2943814de9",
@@ -82,5 +82,5 @@
   },
   "format": "gameskills-instructions",
   "schema_version": 1,
-  "source_commit": "1d7452fe2acc446077824bafef2d6211bcda00e9"
+  "source_commit": "f6b561691c4b807858acb3f2b57fe46ac6e060f7"
 }
