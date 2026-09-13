@@ -51,3 +51,9 @@ A second consumer supports an extraction decision; it is not a numeric prerequis
 Keep uncertain abstractions local, and use the smallest independent contract that
 solves a demonstrated need. Game-specific status semantics do not become a shared
 engine merely because two games use similar names.
+
+Action bars and character editors currently remain game compositions over shared
+UI primitives. Their [composite contracts](ui.md#composite-controls-action-bar-and-character-editor)
+make presentation, data, intent and lifecycle boundaries explicit before extraction.
+Sharing those controls must not move character schemas, build resolution or command
+authority into Gamekit; one game editor can serve editing and inspection modes.
