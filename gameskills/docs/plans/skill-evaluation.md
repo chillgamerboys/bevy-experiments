@@ -507,6 +507,52 @@ additional isolated consumer/package trials where source-only integration cannot
 support the intended claim. GameSkills must also be assessed on whether it guides
 these ownership, testing and migration choices effectively.
 
+## Integrated adopter findings (2026-09-13)
+
+Parallel implementation used isolated worktrees and revision-guarded work orders;
+ancestry-preserving integration retained worker sources and historical evidence.
+The coordinator preserved the implementation PR endpoint through the ownership,
+content, editor and verification work. Final publication remains a separate
+observed requirement, not a consequence of successful worker reports.
+
+Gamekit's current native controls, scroll/focus helpers, editable fields and
+contextual cards support the game-owned setup and complete ability list without
+an inventory/combat abstraction. The shared stale-focus correction is exercised
+by both capability regressions and the rebuilt Labyrinth controls. Game-specific
+formation, build validation, actor ownership and provenance remain in Labyrinth.
+This is concrete reuse and a bounded shared fix, not an extraction count target.
+
+Independent setup review then exposed an integration defect: Bevy editable layout
+can mark `EditableText` changed without changing its string, so repeated
+`UiTextChanged` messages cancelled Labyrinth's pending save acknowledgment.
+The adopter now compares strings before invalidating a submitted draft. The
+no-op save regression is retained; ordinary saves and cursor-only updates share
+that path. No Gamekit event-semantics change is claimed; deduplicating semantic
+text events centrally remains a possible separately reviewed improvement.
+
+Larger frozen-content snapshots exposed a test assumption that admission ACK and
+the initial snapshot arrived together. The reconnect flood test now explicitly
+waits for the authoritative baseline before checking the preserved watermark.
+Another new integration test initially selected a dagger throw from an illegal
+front rank; it now asserts a legal front-rank weapon action before submitting.
+These were test corrections, not failures of replay protection or weapon legality.
+Source review also closed a retained preset-adapter bypass: guest preset changes
+now preserve host-assigned footprint and reject obsolete assignment revisions.
+
+The local macOS test linker warns that `__eh_frame` exceeds its compact-unwind
+encoding range; a failed assertion can subsequently abort in libunwind. Captured
+`--nocapture` output preserves the real assertions before that abort. No global
+compiler workaround or successful failed-run claim is introduced. Desktop
+inspection is unavailable because the CUA tool reports
+`CUA_REPL_ENABLED_SURFACES is required`; production-plugin input and rendered
+fixtures do not establish an interactive desktop or cross-machine playthrough.
+
+Recommendation remains a scoped rollout with continued evaluation. The observed
+planning and evidence-runtime defects justify their corrections, and the game
+provides real consumer evidence for the focus fix and existing primitives.
+Independent skill routing/forward efficacy and comparative cost remain untested.
+Installed pins, adopter overlays and historical runs remain unchanged.
+
 ## Completion and retained gaps
 
 The session is complete when the agreed mechanic has appropriate owner checks and
