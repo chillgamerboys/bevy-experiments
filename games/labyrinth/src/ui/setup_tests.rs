@@ -6,6 +6,10 @@ use bevy_gamekit::testing::{find_named, focus_action, run_frames, TestAppBuilder
 use bevy_gamekit::ui::UiDisabled;
 use labyrinth_rules::scenario::StockScenario;
 
+#[expect(
+    clippy::panic,
+    reason = "Unexpected fixture variants must fail this regression test."
+)]
 fn fixture() -> LabyrinthView {
     let catalog = ContentCatalog::builtin().expect("builtin catalog");
     let scenario =
@@ -47,7 +51,12 @@ fn fixture() -> LabyrinthView {
 }
 
 fn first_actor(view: &LabyrinthView) -> &ScenarioActor {
-    &view.scenario.as_ref().expect("scenario").heroes[0]
+    view.scenario
+        .as_ref()
+        .expect("scenario")
+        .heroes
+        .first()
+        .expect("first hero")
 }
 
 fn edit(view: &LabyrinthView) -> UiState {
@@ -92,6 +101,10 @@ fn invalid_draft_numbers_do_not_submit_or_mutate_authoritative_scenario() {
 }
 
 #[test]
+#[expect(
+    clippy::panic,
+    reason = "Unexpected fixture variants must fail this regression test."
+)]
 fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fields() {
     let view = fixture();
     let authoritative = view.scenario.clone();
@@ -156,7 +169,7 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
         }]
     );
     let mut saved = view.scenario.clone().expect("scenario");
-    saved.heroes[0] = actor;
+    *saved.heroes.first_mut().expect("first hero") = actor;
     let json = saved.to_json().expect("save editor-produced scenario");
     assert_eq!(
         Scenario::from_json(&json, view.catalog.as_ref().expect("catalog")).expect("reload"),
@@ -172,6 +185,10 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
 }
 
 #[test]
+#[expect(
+    clippy::panic,
+    reason = "Unexpected fixture variants must fail this regression test."
+)]
 fn empty_starting_hp_is_full_and_toggle_removal_preserves_other_grant_sources() {
     let view = fixture();
     let mut ui = edit(&view);
@@ -218,9 +235,15 @@ fn stale_or_reassigned_draft_cannot_submit_against_a_new_configuration() {
     view.local = false;
     view.host = false;
     view.player = Some(1);
-    view.company[0].owner = 1;
+    view.company
+        .first_mut()
+        .expect("first company member")
+        .owner = 1;
     let mut ui = edit(&view);
-    view.company[0].owner = 2;
+    view.company
+        .first_mut()
+        .expect("first company member")
+        .owner = 2;
     assert!(action(&view, &mut ui, SetupAction::Save).is_none());
     assert!(ui.editor.as_ref().expect("draft retained").error.is_some());
 }
@@ -343,6 +366,10 @@ fn participant_refresh_keeps_native_field_text_focus_and_caret_while_conflict_di
 }
 
 #[test]
+#[expect(
+    clippy::panic,
+    reason = "Unexpected fixture variants must fail this regression test."
+)]
 fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_old_fields() {
     let mut app = editor_app();
     let initial = name_field(app.world_mut());
@@ -372,7 +399,13 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
         let mut current = app.world_mut().resource_mut::<LabyrinthView>();
         current.setup_revision += 1;
         current.revision += 1;
-        current.scenario.as_mut().expect("scenario").heroes[0] = submitted;
+        *current
+            .scenario
+            .as_mut()
+            .expect("scenario")
+            .heroes
+            .first_mut()
+            .expect("first hero") = submitted;
         current.notice = None;
     }
     run_frames(&mut app, 2);
@@ -392,7 +425,13 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
     {
         let mut current = app.world_mut().resource_mut::<LabyrinthView>();
         current.setup_revision += 1;
-        current.scenario.as_mut().expect("scenario").heroes[0]
+        current
+            .scenario
+            .as_mut()
+            .expect("scenario")
+            .heroes
+            .first_mut()
+            .expect("first hero")
             .actor
             .name = "Remote update".into();
     }
@@ -442,7 +481,14 @@ fn correction_clears_local_error_and_new_edits_cancel_pending_close() {
 fn enemy_starting_down_or_oversized_formation_is_rejected_without_scenario_mutation() {
     let view = fixture();
     let authoritative = view.scenario.clone();
-    let enemy = view.scenario.as_ref().expect("scenario").enemies[0].id;
+    let enemy = view
+        .scenario
+        .as_ref()
+        .expect("scenario")
+        .enemies
+        .first()
+        .expect("first enemy")
+        .id;
     let mut ui = UiState::default();
     action(&view, &mut ui, SetupAction::Edit(enemy));
     change(&mut ui, BuildField::StartingHp, "0");

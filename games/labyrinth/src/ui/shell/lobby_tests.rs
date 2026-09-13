@@ -10,8 +10,9 @@ use labyrinth_rules::{
 };
 
 fn app(scale: UiScaleMode) -> App {
-    let catalog = ContentCatalog::builtin().unwrap();
-    let scenario = Scenario::stock(StockScenario::WeaponComparison, 42, &catalog).unwrap();
+    let catalog = ContentCatalog::builtin().expect("builtin catalog");
+    let scenario =
+        Scenario::stock(StockScenario::WeaponComparison, 42, &catalog).expect("stock scenario");
     let company = scenario
         .heroes
         .iter()
@@ -21,7 +22,7 @@ fn app(scale: UiScaleMode) -> App {
                 ActorKind::Hero(hero) => hero,
                 _ => unreachable!(),
             },
-            abilities: actor.actor.resolve(&catalog).unwrap(),
+            abilities: actor.actor.resolve(&catalog).expect("resolved actor"),
             owner: 0,
         })
         .collect();
@@ -77,21 +78,24 @@ fn preparation_sections_keep_one_character_entry_and_preserve_scenario_draft() {
         .resource::<LabyrinthView>()
         .scenario
         .as_ref()
-        .unwrap()
-        .enemies[0]
+        .expect("scenario")
+        .enemies
+        .first()
+        .expect("first enemy")
         .id;
-    let button = find_named(app.world_mut(), &format!("Edit Actor {}", enemy.0)).unwrap();
+    let button = find_named(app.world_mut(), &format!("Edit Actor {}", enemy.0))
+        .expect("enemy editor entry");
     assert!(
         matches!(app.world().get::<Action>(button), Some(Action::Setup(setup::SetupAction::Edit(id))) if *id == enemy)
     );
     activate(&mut app, "Preparation Scenario");
     assert!(find_named(app.world_mut(), "Scenario seed").is_some());
-    let field = find_named(app.world_mut(), "Scenario seed").unwrap();
+    let field = find_named(app.world_mut(), "Scenario seed").expect("seed field");
     {
         let mut text = app
             .world_mut()
             .get_mut::<bevy::text::EditableText>(field)
-            .unwrap();
+            .expect("editable seed");
         text.queue_edit(bevy::text::TextEdit::SelectAll);
         text.queue_edit(bevy::text::TextEdit::Insert("771".into()));
     }
@@ -104,7 +108,7 @@ fn preparation_sections_keep_one_character_entry_and_preserve_scenario_draft() {
             .resource::<LabyrinthView>()
             .scenario
             .as_ref()
-            .unwrap()
+            .expect("scenario")
             .seed,
         42
     );
@@ -130,14 +134,17 @@ fn preparation_footer_stays_visible_while_roster_scrolls_at_supported_scales() {
                 "Lobby Settings",
                 "Lobby Leave",
             ] {
-                let entity = find_named(app.world_mut(), name).unwrap();
+                let entity = find_named(app.world_mut(), name).expect("footer control");
                 let visible = visible_control_rect(
                     app.world(),
                     entity,
                     Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
                 )
-                .unwrap_or_else(|| panic!("{page} {scale:?}: {name} clipped"));
-                let node = app.world().get::<ComputedNode>(entity).unwrap();
+                .expect("footer control intersects the viewport");
+                let node = app
+                    .world()
+                    .get::<ComputedNode>(entity)
+                    .expect("laid-out control");
                 let expected = node.size() * node.inverse_scale_factor;
                 assert!(
                     visible.width() + 0.5 >= expected.x && visible.height() + 0.5 >= expected.y,

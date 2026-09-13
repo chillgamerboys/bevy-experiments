@@ -449,7 +449,14 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present() 
             .is_none());
 
         if replace_build {
-            scenario.heroes[0].actor.build.innate.swap(0, 1);
+            scenario
+                .heroes
+                .first_mut()
+                .expect("first hero")
+                .actor
+                .build
+                .innate
+                .swap(0, 1);
             let replacement = Combat::from_scenario(&catalog, &scenario)
                 .expect("valid reordered build")
                 .snapshot();
