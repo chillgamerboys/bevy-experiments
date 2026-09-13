@@ -1,8 +1,31 @@
 # Labyrinth customization and package-quality epic
 
-Status: active implementation; parallel streams integrated, combined verification and PR delivery in progress.
+Status: implementation integrated; final verification and reviewable PR delivery in progress.
+Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
+
+## Integrated outcome
+
+The content/scenario, combat, ownership, setup and complete-ability UI streams are
+integrated together because their frozen model and wire changes share one boundary.
+Gamekit carries the demonstrated focus fix; GameSkills carries numbered grill,
+authorization interpretation and explicit verification-ref inputs. Independent
+worker sources and earlier evidence are retained in the durable execution queue.
+
+Combined local evidence covers catalog/build/scenario validation, both-team edits,
+actual encrypted custom builds and save/load, multi-character/spectator/reassignment
+policy, 12+ move input/inspection and a six-process guest kill/reconnect/completed
+fight. Metal frames cover setup/overflow at Auto/200%; static rendering is not a
+desktop playthrough. The final command graph and actual PR are recorded in delivery
+`labyrinth-customization` and the PR body.
+
+Remaining acceptance belongs to S9/S10: current CI/review state, interactive desktop
+feel and cross-machine network routes where available. S1 retains independent
+forward/native-client/cost evaluation gaps; the configured standalone Linear
+observer alignment remains separate from the connected MCP tracker. These are
+pending/unavailable observations, not passed requirements. No merge or release is
+authorized, and the deferred inventory/passive/gym scope remains unchanged.
 
 ## Agreed contract
 

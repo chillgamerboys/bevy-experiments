@@ -541,7 +541,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             world,
             innate,
             format!("Innate {}", ability.id),
-            format!("{}{}", if selected { "✓ " } else { "" }, ability.name),
+            format!("{}{}", if selected { "[x] " } else { "" }, ability.name),
             Action::Setup(SetupAction::Innate(ability.id.clone())),
             false,
         );
@@ -562,7 +562,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             format!(
                 "{}{}",
                 if editor.draft.actor.build.learned_skills.contains(&skill.id) {
-                    "✓ "
+                    "[x] "
                 } else {
                     ""
                 },
@@ -598,7 +598,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
                     .iter()
                     .any(|s| s.kind == kind)
                 {
-                    "✓ "
+                    "[x] "
                 } else {
                     ""
                 }

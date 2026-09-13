@@ -524,3 +524,20 @@ fn seed_field_tracks_loaded_configuration_without_losing_an_unapplied_draft() {
     let field = find_named(app.world_mut(), "Scenario seed").expect("loaded input");
     assert_eq!(field_text(app.world(), field), "456");
 }
+
+#[test]
+fn editor_escape_closes_locally_without_opening_background_menus() {
+    let mut app = editor_app();
+    let original = app.world().resource::<LabyrinthView>().scenario.clone();
+    let field = name_field(app.world_mut());
+    assert!(focus_action(app.world_mut(), field));
+    bevy_gamekit::testing::tap_key(&mut app, KeyCode::KeyK);
+    assert!(!app.world().resource::<UiState>().show_skillbook);
+    bevy_gamekit::testing::tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 2);
+    let ui = app.world().resource::<UiState>();
+    assert!(ui.editor.is_none());
+    assert!(!ui.menus.is_open());
+    assert!(app.world().get_entity(field).is_err());
+    assert_eq!(app.world().resource::<LabyrinthView>().scenario, original);
+}

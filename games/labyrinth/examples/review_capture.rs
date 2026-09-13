@@ -67,7 +67,7 @@ fn main() {
     let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
     let scenario = matches!(
         route.as_str(),
-        "lobby" | "editor" | "abilities" | "ability-help"
+        "lobby" | "editor" | "editor-actions" | "abilities" | "ability-help"
     )
     .then(|| {
         let mut scenario = labyrinth_rules::scenario::Scenario::stock(
@@ -228,7 +228,7 @@ fn main() {
     let view = LabyrinthView {
         mode: match route.as_str() {
             "menu" | "host" => ViewMode::Menu,
-            "lobby" | "editor" => ViewMode::Lobby,
+            "lobby" | "editor" | "editor-actions" => ViewMode::Lobby,
             _ => ViewMode::Combat,
         },
         local: !matches!(route.as_str(), "lobby" | "paused"),
@@ -440,9 +440,16 @@ fn capture(
     mut focus: ResMut<bevy::input_focus::InputFocus>,
 ) {
     capture.frame += 1;
-    if capture.route == "editor" && capture.frame == 2 {
+    if capture.route.starts_with("editor") && capture.frame == 2 {
         for (entity, name, _) in &mut controls {
             if name.as_str() == "Edit Actor 1" {
+                focus.set(entity, bevy::input_focus::FocusCause::Navigated);
+            }
+        }
+    }
+    if capture.route == "editor-actions" && capture.frame == 8 {
+        for (entity, name, _) in &mut controls {
+            if name.as_str() == "Apply Build" {
                 focus.set(entity, bevy::input_focus::FocusCause::Navigated);
             }
         }
@@ -455,7 +462,7 @@ fn capture(
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
-        ("editor", 4) => Some("Edit Actor 1"),
+        ("editor" | "editor-actions", 4) => Some("Edit Actor 1"),
         ("host", 4) => Some("Multiplayer"),
         ("host", 7) => Some("Host Company"),
         ("game-menu", 4) => Some("Battle Settings"),

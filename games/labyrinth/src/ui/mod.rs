@@ -281,6 +281,19 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     let focus = world.resource::<InputFocus>().get();
+    if world.resource::<UiState>().editor.is_some() {
+        let composing = focus
+            .and_then(|entity| world.get::<bevy::text::EditableText>(entity))
+            .is_some_and(bevy::text::EditableText::is_composing);
+        if !composing
+            && world
+                .resource::<ButtonInput<KeyCode>>()
+                .just_pressed(KeyCode::Escape)
+        {
+            apply_action(world, Action::Setup(setup::SetupAction::Cancel));
+        }
+        return;
+    }
     if focus.is_some_and(|entity| world.get::<UiTextField>(entity).is_some()) {
         return;
     }

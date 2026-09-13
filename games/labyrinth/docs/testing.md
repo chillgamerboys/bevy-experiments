@@ -46,7 +46,7 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 
 Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
 Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
-`paused`, `abilities` and `ability-help`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
+`paused`, `abilities`, `ability-help`, `editor` and `editor-actions`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.

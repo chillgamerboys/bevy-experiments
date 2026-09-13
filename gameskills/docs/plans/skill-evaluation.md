@@ -527,8 +527,13 @@ can mark `EditableText` changed without changing its string, so repeated
 `UiTextChanged` messages cancelled Labyrinth's pending save acknowledgment.
 The adopter now compares strings before invalidating a submitted draft. The
 no-op save regression is retained; ordinary saves and cursor-only updates share
-that path. No Gamekit event-semantics change is claimed; deduplicating semantic
-text events centrally remains a possible separately reviewed improvement.
+that path. Reload also ignores events from an unmounted replacement draft, preserving the
+new authoritative text. Seed fields track loaded configuration while retaining
+unapplied text through participant refreshes; Escape closes the editor without
+opening background menus. Render review replaced an unsupported selected-grant
+checkmark with a visible ASCII marker. No Gamekit event-semantics change is claimed;
+deduplicating semantic text events centrally remains a possible separately reviewed
+improvement.
 
 Larger frozen-content snapshots exposed a test assumption that admission ACK and
 the initial snapshot arrived together. The reconnect flood test now explicitly
