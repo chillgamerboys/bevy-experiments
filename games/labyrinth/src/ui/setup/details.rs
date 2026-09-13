@@ -77,6 +77,16 @@ pub(super) fn move_facts(
             |uses| format!("{uses} uses per encounter."),
         ),
     ];
+    for effect in &def.effects {
+        if let labyrinth_rules::Effect::ApplyStatus(kind) = effect {
+            let explanation = labyrinth_rules::status_definition(*kind)
+                .description
+                .to_owned();
+            if !facts.contains(&explanation) {
+                facts.push(explanation);
+            }
+        }
+    }
     let sources = ability
         .grants
         .iter()

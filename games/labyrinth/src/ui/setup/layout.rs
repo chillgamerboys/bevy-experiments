@@ -11,6 +11,8 @@ struct EditorSave;
 #[derive(Component)]
 struct EditorDirty;
 #[derive(Component)]
+struct EditorName;
+#[derive(Component)]
 struct DetailScroll;
 #[derive(Component)]
 struct BrowserScroll(Category);
@@ -118,7 +120,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
     let can_edit = editable(view, editor.id);
     let conflict = view.setup_revision != editor.revision;
     let notice = if conflict {
-        "Setup changed. Discard this draft to reload the latest character.".to_owned()
+        "Setup changed. Reload the latest character by discarding this draft.".to_owned()
     } else if !can_edit {
         "Viewing only. This character is assigned to another player.".into()
     } else {
@@ -135,18 +137,35 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
     {
         text.0.clone_from(&notice);
     }
+    let move_count = catalog
+        .resolve_build(&editor.draft.actor.build)
+        .map_or_else(
+            |_| "build needs correction".to_owned(),
+            |resolved| format!("{} active moves in draft", resolved.abilities.len()),
+        );
     let dirty = if editor.pending_save {
-        "Applying draft · waiting for host acknowledgment"
-    } else if editor.dirty() {
-        "Unapplied draft · battle setup is unchanged"
+        "Applying draft · waiting for host acknowledgment".to_owned()
     } else {
-        "Saved character · inspect a choice before changing it"
+        format!(
+            "{} · {move_count}",
+            if editor.dirty() {
+                "Unapplied changes"
+            } else {
+                "Saved character"
+            }
+        )
     };
     for mut text in world
         .query_filtered::<&mut Text, With<EditorDirty>>()
         .iter_mut(world)
     {
-        text.0 = dirty.into();
+        text.0.clone_from(&dirty);
+    }
+    for mut text in world
+        .query_filtered::<&mut Text, With<EditorName>>()
+        .iter_mut(world)
+    {
+        text.0.clone_from(&editor.name);
     }
     let controls = world
         .query_filtered::<Entity, With<EditorSave>>()
@@ -203,13 +222,16 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             ..box_node()
         },
     );
-    paragraph(
+    let name_label = paragraph(
         world,
         identity,
         "Build Title",
         &editor.name,
         UiTextRole::Title,
     );
+    world
+        .entity_mut(name_label)
+        .insert((EditorName, TextLayout::no_wrap()));
     let (team, start, end) = details::rank_span(view, editor);
     let weapon = editor
         .draft
@@ -761,9 +783,9 @@ fn mount_inspector(
     }
     paragraph(
         world,
-        parent,
+        top,
         "Details Navigation",
-        "Details · scroll or Page Up / Page Down",
+        "Scroll · PgUp / PgDn",
         UiTextRole::Supporting,
     );
     let content = column(
@@ -789,6 +811,85 @@ fn mount_inspector(
         &info.title,
         UiTextRole::Title,
     );
+    for change in info
+        .changes
+        .iter()
+        .filter(|change| change.starts_with("Changed") || change.starts_with("Cannot"))
+    {
+        paragraph(world, content, "Build Change", change, UiTextRole::Body);
+    }
+    for ability in &info.moves {
+        let definition = &ability.definition;
+        paragraph(
+            world,
+            content,
+            "Move Tactical Summary",
+            format!(
+                "{} · {}",
+                definition.name,
+                crate::presentation::effects_description(&definition.effects)
+            ),
+            UiTextRole::Body,
+        );
+        paragraph(
+            world,
+            content,
+            "Move Rank Summary",
+            format!(
+                "Acting ranks: {} · target ranks: {}",
+                details::ranks(definition.source_ranks),
+                details::ranks(definition.target_ranks)
+            ),
+            UiTextRole::Supporting,
+        );
+        if definition.target_pattern == labyrinth_rules::catalog::TargetPattern::FrontPair {
+            paragraph(
+                world,
+                content,
+                "Move Pattern Summary",
+                "Hits both front ranks 1–2; each occupant once.",
+                UiTextRole::Supporting,
+            );
+        }
+        if !(span.0..=span.1).any(|rank| definition.allows_source_rank(rank)) {
+            paragraph(
+                world,
+                content,
+                "Move Position Warning",
+                format!(
+                    "Unavailable at current rank {}. Still granted; reposition to use.",
+                    span.0
+                ),
+                UiTextRole::Supporting,
+            );
+        }
+    }
+    if info
+        .changes
+        .iter()
+        .any(|change| !change.starts_with("Changed") && !change.starts_with("Cannot"))
+    {
+        paragraph(
+            world,
+            content,
+            "Comparison Heading",
+            "Draft move changes",
+            UiTextRole::Body,
+        );
+        for change in info
+            .changes
+            .iter()
+            .filter(|change| !change.starts_with("Changed") && !change.starts_with("Cannot"))
+        {
+            paragraph(
+                world,
+                content,
+                "Build Change",
+                change,
+                UiTextRole::Supporting,
+            );
+        }
+    }
     paragraph(
         world,
         content,
@@ -799,33 +900,18 @@ fn mount_inspector(
     for fact in info.facts {
         paragraph(world, content, "Choice Fact", fact, UiTextRole::Supporting);
     }
-    if !info.changes.is_empty() {
-        paragraph(
-            world,
-            content,
-            "Comparison Heading",
-            "If applied to this draft",
-            UiTextRole::Body,
-        );
-        for change in info.changes {
-            paragraph(
-                world,
-                content,
-                "Build Change",
-                change,
-                UiTextRole::Supporting,
-            );
-        }
-    }
     for ability in info.moves {
         paragraph(
             world,
             content,
             "Effective Move Name",
-            &ability.definition.name,
+            format!("{} · usage and sources", ability.definition.name),
             UiTextRole::Body,
         );
-        for fact in details::move_facts(&ability, span, catalog) {
+        for fact in details::move_facts(&ability, span, catalog)
+            .into_iter()
+            .skip(3)
+        {
             paragraph(
                 world,
                 content,
