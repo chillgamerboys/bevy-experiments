@@ -329,8 +329,10 @@ maintainer `author-skill`, `evaluate-skills` and their evaluation/context refere
 host `skill-creator`; resolved root and GameSkills indexes, architecture, development,
 testing and candidate-verification guidance. Fixtures used only relevant owner
 indexes/guides after `docs resolve`. An attempted `review-pr` source lookup failed
-because the actual focused skill is `review`; the latter was read and used. No
-authoring change is justified by that lookup mistake. `rg` was unavailable; local
+because the actual focused skill is `review`; the latter was read and used.
+`debug` and `audit-pr` were also inspected during routing, but were unnecessary
+for these fixture tasks and were not executed. No authoring change is justified
+by that lookup mistake or those extra reads. `rg` was unavailable; local
 file inspection used the available shell/Python tools.
 
 | Case and raw task | Observed output | Evidence and limits |
@@ -367,6 +369,24 @@ Preserved negative results and narrow corrections:
    numbered grill. Prepare the bundle after committing canonical inputs, then
    check its content/provenance and actual Cargo archive. Never rewrite the installed
    pin, old bundle directories, overlays or legacy compatibility fixtures.
+
+Verification after the canonical correction:
+
+- Prepared source `c17cab770bfe92304eddd68324f9cb725f7607e5`; generated bundle
+  committed at `66bc86f`. Content SHA-256:
+  `32a72d8bb7e30e6b013ad30d5b431e5251eab21d1baae4539cf2fefef3f9abeb`.
+  Archive SHA-256:
+  `b9d0a7492760658fc3e640b0e53fc9f97c998f5e3a0a40914876a4cca4f3145d`.
+  `bundle check` verifies both current inputs and the recorded source commit.
+- `repo-devtools check`, `skills validate` (24 skills, seven packages) and
+  `skills legacy` pass. They establish structure and fixture compatibility only.
+- `cargo test --locked -p gameskills-cli --profile ci`: 140 tests pass after
+  rebuilding the corrected embedded bundle. This includes process-based consumer,
+  installation, recovery and fake native-peer regressions; fake peers do not
+  establish actual Codex/Claude behavior. An earlier suite also passed but predates
+  the final bundle and is not the corrected-candidate evidence.
+- `cargo clippy --locked -p gameskills-cli --all-targets --profile ci -- -D warnings`
+  passes. Tests and lint use the worker checkout's own `target/`.
 
 The host skill-creator quick validator was attempted for `plan` and `grill`, but
 both runs failed before validation because Python `yaml` (PyYAML) is unavailable.
