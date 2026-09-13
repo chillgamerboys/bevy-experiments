@@ -1,6 +1,6 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: builder usability rejected by the user; corrective research/design discussion active. Independent native behavioral trials remain unobserved.
+Status: active; builder usability rejected by the user, corrective design selected and implementation/evaluation in progress. Independent native behavioral trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
@@ -21,8 +21,8 @@ a long form. Existing Metal captures (`target/review/labyrinth-editor-1280.png`,
 `labyrinth-editor-actions-1280.png`, `labyrinth-editor-actions-200.png`) and earlier
 layout/input checks remain evidence of rendering/reachability, not usability.
 Preserve them as the negative case. S6/S9 usability acceptance is reopened; PR #39
-remains draft. The immediate endpoint is researched alternatives and numbered
-discussion, not another unreviewed UI implementation.
+remains draft. Research and numbered discussion subsequently selected the revised
+organization below; implementation is authorized, while usability remains unaccepted.
 
 This was an execution failure as well as a guidance gap. Existing creative-level
 guidance and this evaluation plan already called for alternatives and confusion
@@ -32,13 +32,44 @@ rank restrictions and provenance requirements were confined to combat S7. The
 `build-ui` sequence starts with views/intents/states, while `verify-ui` distinguishes
 structural/rendered/native evidence without an explicit decision-information check.
 
-Proposed correction, not yet authored or behaviorally validated: `plan`/`build-ui`
-should establish the player's task, needed information, consequences, comparison
-and undo before constructing a new decision surface. An accepted mechanic is not
-an accepted screen design. Material unresolved organization warrants bounded
-alternatives even at creative level 2; routine edits do not need an approval gate.
-`verify-ui` should check whether the interface supplies accurate information for
-real choice tasks, separately from input correctness and observed comprehension.
+The candidate correction is authored in canonical
+[plan](../../plugins/gameskills/skills/plan/SKILL.md),
+[grill](../../plugins/gameskills/skills/grill/SKILL.md),
+[build-ui](../../plugins/gameskills-ui/skills/build-ui/SKILL.md) and
+[verify-ui](../../plugins/gameskills-ui/skills/verify-ui/SKILL.md), with package-local
+UI contracts/evidence references. Plan and grill investigate the player's decisions,
+needed information, consequences and view hierarchy before construction. They
+recover recurring views and authority across contexts rather than assuming each
+entry point needs another editor. An accepted mechanic is not an accepted screen
+design. Material unanswered choices receive bounded alternatives and recommendations;
+settled answers and routine fixes do not trigger another interview or approval.
+Build and verification carry those decisions into accurate effective descriptions,
+comparisons and task-based information checks, separately from input correctness
+and observed player comprehension. No universal panel layout is prescribed.
+
+The correcting agent exercised this candidate on a fictional robot-racing brief:
+four owned racers, terrain-specific motor moves, a prerequisite firmware upgrade,
+captain-owned starting positions and read-only inspection during races. Its response
+recommended team preparation plus a recurring racer sheet, explained a guided
+alternative, asked one upstream audience/task question, and specified checks for
+the actual terrain/duration/compatibility tradeoffs. A settled-answer continuation
+retained one sheet without another interview. A routine clipping-fix brief proceeded
+without redesign. An unexplained-button artifact failed decision-information review
+despite preserving its narrow reachability/rendering passes.
+
+These are bounded self-review responses with known correction intent, not fresh
+agent or native-client trials and not a measurement of human comprehension. Raw
+briefs, responses and limitations are retained in coordinator scratch
+`.context/ui-research/workflow-evidence.md`. The authoring base is `a4e4aa3`;
+the committed canonical candidate is identified by the worker handoff/integration
+record. Native skill structural validation and the host skill-creator validator
+pass for the four changed skills. The host validator initially lacked PyYAML;
+an isolated scratch virtual environment supplied it without changing project or
+installed skill dependencies. These validators do not execute a model. The repository
+check initially rejected four inherited plan status lines; this owned plan now uses
+the required active status, and the coordinator owns the other three repairs.
+Bundle/archive checks and independent behavioral trials remain outstanding for
+this instruction revision. Wording and structural success do not prove improvement.
 
 Evaluate any candidate with a fresh agent on an unfamiliar tactical-game builder,
 without prescribing a layout or mentioning this failure. A separate reviewer uses

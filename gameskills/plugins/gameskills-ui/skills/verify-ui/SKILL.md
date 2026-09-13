@@ -10,6 +10,11 @@ Read [project context](../../references/project-context.md),
 [UI contracts](../../references/ui-contracts.md). State the exact claims and
 candidate identity, route, supported inputs and viewport/scale matrix.
 
+For decision-heavy views, verify the information needed for a concrete player
+task, not just reachable controls. Exercise inspection, comparison, consequences
+and correction using the presented information; check its accuracy against the
+game-owned model. Record missing or misleading decision information as a finding.
+
 Collect complementary evidence at the layers required by the change. Structural
 checks cover semantics, eligibility and reachability. Actual rendered frames cover
 static hierarchy, contrast and clipping. A native walk covers pointer/keyboard

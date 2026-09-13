@@ -12,6 +12,14 @@ automated regressions even when a manual pass is deferred.
 | Rendered frames | Text contrast/readability, hierarchy, density, alignment, selected/disabled states, overlap, help/modal stacking | Does not prove interaction, duration or motion |
 | Native interaction | Pointer and keyboard routes, focus trap/restore, scroll, resizing, state refresh, input containment, transitions | Does not prove all rule invariants or human enjoyment |
 
+For a choice-heavy route, use a task that requires understanding a tradeoff rather
+than reproducing the control sequence. From the interface alone, identify what a
+choice changes, relevant restrictions, and how to inspect or recover before
+committing. Check explanations against authoritative data, including modified and
+unavailable choices. Record where information is absent, misleading or requires
+unreasonable memorization. Agent inspection establishes information availability
+and accuracy; intended players' observed comprehension is separate evidence.
+
 Use real production plugin/input/layout wiring for relevant acceptance. Fixtures
 that directly set `Interaction` or geometry prove the selection logic that consumes
 those fields; they do not prove that the native cursor hits a control. Capture
