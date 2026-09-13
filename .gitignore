@@ -2,6 +2,8 @@
 /target/
 /.context/
 /.gameskills/
+# Native plugin registration contains this checkout's absolute bundle paths.
+/.codex/config.toml
 __pycache__/
 *.py[cod]
 .DS_Store
