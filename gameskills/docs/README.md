@@ -14,5 +14,5 @@ For maintainers:
 - [CLI commands](../cli/README.md)
 
 Active work: [workflow reliability](plans/workflow-reliability.md).
-Next session: [skill evaluation](plans/skill-evaluation.md), explicitly non-blocking for PR #38.
+Next session: [Labyrinth mechanics and skill evaluation](plans/skill-evaluation.md), with mechanic selection before implementation and evaluation alongside PR delivery.
 Deferred work: [framework trials](plans/framework-followups.md) and [Hex adoption](plans/hex-adoption.md).

@@ -223,3 +223,5 @@ See [architecture and extension contracts](docs/architecture.md)
 and [verification](docs/testing.md). The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.
+
+Planned work: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).
