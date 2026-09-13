@@ -4,6 +4,8 @@
 //! identities or rendering. Commands are transactional and public snapshots are
 //! validated on deserialization. A snapshot deliberately contains no host RNG.
 
+pub mod build;
+pub mod catalog;
 mod combat;
 mod content;
 mod formation;
@@ -146,3 +148,6 @@ pub fn rules_fingerprint() -> String {
         .expect("fixed typed catalogs contain only JSON-serializable values");
     format!("{:x}", Sha256::digest(bytes))
 }
+
+#[cfg(test)]
+mod catalog_tests;
