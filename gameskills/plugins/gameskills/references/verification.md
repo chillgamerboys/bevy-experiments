@@ -9,7 +9,7 @@ is a separate operation; reading evidence does not perform setup.
 
 The project owns `gameskills.toml`. A command names an argument vector, an
 optional repository-relative working directory, timeout, prerequisite commands,
-and exclusive resources:
+exclusive resources and optional declared Git ref inputs:
 
 ```toml
 [dispatch]
@@ -95,11 +95,23 @@ that deliberately close those descriptors or detach children are outside that
 recovery protection.
 
 The source identity includes canonical worktree and Git directories, HEAD and its
-symbolic branch identity, and a digest of actual Git ref names, tips and symbolic
-targets. Ref storage as loose files or packed refs does not change this identity.
-Advancing a review base invalidates prior evidence even when HEAD is unchanged.
-This is conservative: creating or changing unrelated branches/tags can also
-invalidate evidence until commands support narrower declared Git inputs.
+symbolic branch identity, and a digest of the selected Git ref names, tips and
+symbolic targets. Commands default to `git_refs = "all"`, preserving conservative
+invalidation for Git-sensitive checks. For commands with known Git inputs, the
+project may declare an exact list such as `git_refs = ["refs/remotes/origin/main"]`.
+The graph consumes the union across selected commands and prerequisites; any
+command using the default or `"all"` keeps all refs in that run's identity.
+
+List entries must be existing, full `refs/...` names, without revision expressions
+or patterns. Missing refs fail before execution. Include any review base or other
+ref the command consumes; the runner does not infer them from arguments. An explicit
+empty list fingerprints no additional refs, while HEAD, its symbolic identity and
+all non-ref inputs remain mandatory. Only use a narrower list when every command's
+Git dependencies are known; commands reading tags, branch inventories, `git describe`
+or unspecified refs should keep `"all"`. Unrelated worker branches then do not
+invalidate a suitably scoped test graph; advancing a declared base still does.
+Loose versus packed ref storage does not change the identity. Populated submodules
+and delivery's own repository observation remain all-ref conservative.
 The identity also includes staged changes, file modes and contents of tracked and nonignored untracked
 files, and nested Git identities for populated submodules. Generated
 `.gameskills/` state is excluded. `gameskills.toml` and `gameskills.lock.json`
@@ -156,6 +168,10 @@ acceptance, PR creation, merge or release automation.
 
 Rust execution records use schema 2 and identify runtime `rust`. Existing Python
 records remain historical and cannot validate or resume as Rust execution. Keep
-original records intact and rerun checks to create new evidence. Setup coordinates
+original records intact and rerun checks to create new evidence. Changes to runtime
+identity, command normalization or a configured ref policy also require new records;
+old evidence is never reinterpreted under a narrower policy. Earlier development
+binaries that ignore `git_refs` remain conservative and may invalidate on any ref.
+Setup coordinates
 with run registration and refuses updates while active run locks are held; an
 abrupt coordinator exit does not release a supervisor's command locks early.

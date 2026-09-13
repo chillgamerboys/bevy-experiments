@@ -1,4 +1,5 @@
 use super::{digest, graph::Spec, hash, state::Directory};
+use crate::config::GitRefs;
 use rustix::fs::{self, AtFlags, FileType, Mode, OFlags};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -56,6 +57,10 @@ fn text(root: &Path, args: &[&str]) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 pub(crate) fn repository(root: &Path) -> Result<Value, String> {
+    repository_with_refs(root, &GitRefs::All)
+}
+
+fn repository_with_refs(root: &Path, selection: &GitRefs) -> Result<Value, String> {
     let canonical = root.canonicalize().map_err(|e| e.to_string())?;
     let top = PathBuf::from(text(root, &["rev-parse", "--show-toplevel"])?)
         .canonicalize()
@@ -72,11 +77,33 @@ pub(crate) fn repository(root: &Path) -> Result<Value, String> {
     )?)
     .canonicalize()
     .map_err(|e| e.to_string())?;
+    let all_refs = git(
+        root,
+        &[
+            "for-each-ref",
+            "--sort=refname",
+            "--format=%(refname)%00%(objectname)%00%(symref)",
+        ],
+    )?;
+    let refs = match selection {
+        GitRefs::All => all_refs,
+        GitRefs::Selected(names) => {
+            let mut selected = Vec::new();
+            for name in names {
+                let row = all_refs
+                    .split_inclusive(|b| *b == b'\n')
+                    .find(|row| row.split(|b| *b == 0).next() == Some(name.as_bytes()))
+                    .ok_or_else(|| format!("selected Git ref is missing: {name}"))?;
+                selected.extend_from_slice(row);
+            }
+            selected
+        }
+    };
     Ok(
         json!({"root": canonical, "git_dir": git_dir, "common_dir": common_dir,
         "head": text(root, &["rev-parse", "--verify", "HEAD"])?,
         "head_ref": text(root, &["rev-parse", "--symbolic-full-name", "HEAD"])?,
-        "refs_digest": hash(git(root, &["for-each-ref", "--sort=refname", "--format=%(refname)%00%(objectname)%00%(symref)"])?) }),
+        "refs_digest": hash(refs) }),
     )
 }
 fn file_hash(mut file: File) -> Result<String, String> {
@@ -141,7 +168,25 @@ pub(super) fn identity(
     config: &Value,
     commands: &BTreeMap<String, Spec>,
 ) -> Result<Value, String> {
-    let repository = repository(root)?;
+    // A graph consumes the union of every selected command and prerequisite.
+    // Empty command sets are nested submodule identities and stay conservative.
+    let selection = if commands.is_empty()
+        || commands
+            .values()
+            .any(|spec| matches!(spec.git_refs, GitRefs::All))
+    {
+        GitRefs::All
+    } else {
+        let refs: std::collections::BTreeSet<_> = commands
+            .values()
+            .flat_map(|spec| match &spec.git_refs {
+                GitRefs::Selected(names) => names.clone(),
+                GitRefs::All => Vec::new(),
+            })
+            .collect();
+        GitRefs::Selected(refs.into_iter().collect())
+    };
+    let repository = repository_with_refs(root, &selection)?;
     let staged = hash(git(
         root,
         &[

@@ -415,6 +415,50 @@ recovery/removal in claimed clients, cross-machine play, broader creative-level
 comparisons, and total cost telemetry. Real parallel integration and final PR
 observations belong to the coordinator's ongoing delivery record.
 
+### Parallel evidence ref inputs (HEX-100 follow-up)
+
+Real parallel work exposed an additional limitation: catalog worker run
+`3fb6eab9e5c036187e74b33350a990b4` completed its commands, but the coordinator
+reported failed reuse because other workers advanced shared Git refs. Investigation
+started at `73a58454f820a936019bafe6e3a188b3d0049cf3`. Existing runner tests
+explicitly require all-ref invalidation, so removing it globally would break a
+deliberate contract. The coordinator accepted additive per-command declaration.
+
+A separate local adopter reproduced the issue with the previous executable:
+`/usr/bin/true` passed, adding another branch left HEAD/source and record bytes
+unchanged, and validation reported only `identity/repository/refs_digest` changed.
+The original reproducer record is preserved. The corrected executable created a
+fresh record which stayed valid when the unrelated branch advanced; editing the
+README then invalidated `identity/source_digest`. Revalidating the old record with
+the new executable still fails and leaves its bytes untouched. Raw commands,
+identities and outputs are in coordinator scratch `.context/evidence-ref-inputs/`
+(`baseline-repro.json` and `candidate-repro.json`). These are real CLI/process
+observations, not native model selection or an independent forward-agent trial.
+
+The correction adds `git_refs = "all"` (unchanged default) or an exact list of
+full `refs/...` names per command. Lists are validated without Git/setup; missing
+refs fail before command execution. Graphs use the union of selected commands and
+prerequisites, and any all-ref dependency keeps the graph conservative. HEAD, its
+symbolic identity, worktree/index, config, executable/runtime and environment
+remain mandatory. Delivery observations and nested submodules remain all-ref.
+Ordinary test graphs can declare their known review base; commands that enumerate
+branches/tags or use unknown Git inputs should retain the default. No argv inference
+or default weakening is introduced.
+
+Focused configuration and runner coverage passed (44 tests), including actual
+linked-worktree commits, declared-base changes/deletion, dependency policy union,
+symbolic ref retargeting, same-OID branch changes, packed refs and mid-run input
+changes. Existing source/index/config/lock/environment/executable protections are
+also exercised in scoped mode. An initial focused invocation failed all runner
+fixtures before behavior because this fresh target lacked `runner_probe`; that
+negative log is retained, followed by the explicit probe build and successful run.
+
+This is a demonstrated workflow correction selected by the real epic, not a
+synthetic performance claim. Prior evidence must be preserved and fresh runs
+collected after upgrading the runtime or changing configured ref inputs. Earlier
+development binaries may ignore the additive field and retain all-ref behavior;
+matching `0.1.0-dev.3` version text alone does not identify the corrected binary.
+
 ## Gamekit capability evaluation
 
 Resolve Gamekit owner docs and use `gameskills-maintainer:evolve-gamekit` for

@@ -83,3 +83,31 @@ the planned public-release audit. See [distribution](../../docs/distribution.md)
 mappings from the adopter root; repeat `--path` for mixed work. It works before
 setup, returns root/component indexes and diagnostics, and does not read all linked
 pages. See [mapping behavior](../docs/architecture.md#documentation-discovery).
+
+## Declared Git inputs for command evidence
+
+Commands conservatively fingerprint all refs by default. When a command's Git
+inputs are known, declare exact full refs to prevent unrelated worktree commits
+from invalidating its evidence:
+
+```toml
+[commands.rules-test]
+argv = ["cargo", "test", "-p", "my-rules"]
+git_refs = ["refs/remotes/origin/main"]
+
+[commands.review-diff]
+argv = ["git", "diff", "origin/main...HEAD"]
+git_refs = "all"
+```
+
+The runner unions selected commands and prerequisites; one omitted or `"all"`
+policy keeps the entire graph conservative. An explicit `[]` selects no additional
+refs. HEAD, symbolic branch identity, worktree/index contents, configuration,
+executables and environment remain required inputs in every mode. Named refs must
+exist; names, object IDs and symbolic targets are fingerprinted exactly. Declare
+all refs actually consumed, including the review base. No argv inference or general
+hermeticity is promised. See the complete [evidence contract](../plugins/gameskills/references/verification.md).
+
+This additive field belongs to the current development candidate. Earlier binaries
+may ignore it and continue hashing all refs. Updating the runtime or policy does
+not upgrade existing evidence: preserve old records and run fresh checks.

@@ -43,6 +43,22 @@ No helper forces an agent to invoke a skill or finish its task. Native discovery
 model behavior, command success, PR publication and human acceptance are different
 observations. [Contributing](contributing.md) describes their verification.
 
+## Command ref identity
+
+All refs remain the command default because trusted commands can read arbitrary
+Git state. A per-command `git_refs` list explicitly narrows that dependency to exact
+full refs; selected commands and prerequisites contribute a union. Any default or
+`"all"` policy preserves all-ref behavior for the graph. HEAD and its symbolic branch
+remain unconditional, as do source/index/configuration/executable/environment
+identities. A declared ref's deletion or movement invalidates evidence; unrelated
+branch activity need not invalidate a scoped graph. Missing named refs fail before
+execution. Delivery observations and nested submodule identities stay conservative.
+
+The policy is additive configuration, not a reinterpretation of historical evidence.
+Runtime/normalization/configuration changes require a new observation and preserve
+old records. The [CLI contract](../cli/README.md#declared-git-inputs-for-command-evidence)
+explains selection and development-version compatibility.
+
 ## Documentation discovery
 
 Optional `[docs]` and `[targets.NAME.docs]` tables accept `index` and `plans`, each
