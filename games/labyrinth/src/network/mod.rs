@@ -435,6 +435,7 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
                     sequence: 1,
                     encounter: 0,
                     decision: 0,
+                    assignment_revision: 1,
                     command: SessionCommand::Start,
                 },
             );
@@ -460,7 +461,15 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
         } => start::join_discovered(world, session, std::mem::take(&mut password.0))?,
         LabyrinthIntent::Reconnect => start::reconnect(world)?,
         LabyrinthIntent::Leave => start::close(world),
-        LabyrinthIntent::SelectHero(hero) => submit(world, SessionCommand::ChooseHero(hero))?,
+        LabyrinthIntent::SelectHero { actor, hero } => {
+            submit(world, SessionCommand::ChooseHero { actor, hero })?
+        }
+        LabyrinthIntent::Assign { actor, owner } => {
+            submit(world, SessionCommand::Assign { actor, owner })?
+        }
+        LabyrinthIntent::AssignmentPause(paused) => {
+            submit(world, SessionCommand::AssignmentPause(paused))?
+        }
         LabyrinthIntent::Ready(ready) => submit(world, SessionCommand::Ready(ready))?,
         LabyrinthIntent::StartEncounter => submit(world, SessionCommand::Start)?,
         LabyrinthIntent::Rematch => submit(world, SessionCommand::Rematch)?,
@@ -469,10 +478,11 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             action,
             encounter,
             decision,
+            assignment_revision,
         } => submit_at(
             world,
             SessionCommand::Act { actor, action },
-            Some((encounter, decision)),
+            Some((encounter, decision, assignment_revision)),
         )?,
         LabyrinthIntent::CopyInvite(index) => {
             let code = hosted_code(world, index).ok_or("No invitation is available.")?;
@@ -498,7 +508,7 @@ fn submit(world: &mut World, command: SessionCommand) -> Result<(), String> {
 fn submit_at(
     world: &mut World,
     command: SessionCommand,
-    boundary: Option<(u64, u64)>,
+    boundary: Option<(u64, u64, u64)>,
 ) -> Result<(), String> {
     let runtime = world.resource::<Runtime>();
     if !runtime.admitted {
@@ -516,16 +526,18 @@ fn submit_at(
     } else {
         runtime.sequence
     };
-    let (encounter, decision) = boundary.unwrap_or_else(|| {
+    let (encounter, decision, assignment_revision) = boundary.unwrap_or_else(|| {
         (
             snapshot.encounter,
             snapshot.combat.as_ref().map_or(0, |combat| combat.turn_id),
+            snapshot.assignment_revision,
         )
     });
     let request = GameRequest {
         sequence,
         encounter,
         decision,
+        assignment_revision,
         command,
     };
     if matches!(role, Role::Host | Role::Local) {
@@ -589,7 +601,9 @@ fn publish(world: &mut World) {
         };
         view.revision = snapshot.revision;
         view.encounter = snapshot.encounter;
-        view.players = snapshot.players.iter().map(|p| p.view()).collect();
+        view.players = snapshot.player_views();
+        view.company = snapshot.company;
+        view.assignment_revision = snapshot.assignment_revision;
         view.combat = snapshot.combat;
         view.paused = snapshot.paused || !data.2;
         view.interruption = if !data.2 {
@@ -603,6 +617,7 @@ fn publish(world: &mut World) {
         view.mode = ViewMode::Menu;
         view.combat = None;
         view.players.clear();
+        view.company.clear();
         view.events.clear();
         view.paused = false;
         view.interruption = crate::view::CombatInterruption::None;

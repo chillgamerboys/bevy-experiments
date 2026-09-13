@@ -91,6 +91,7 @@ pub(super) fn present(
     backdrop(world);
     let lobby_data = (view.mode == ViewMode::Lobby).then_some((
         &view.players,
+        &view.company,
         &view.invite_labels,
         &view.session_name,
     ));

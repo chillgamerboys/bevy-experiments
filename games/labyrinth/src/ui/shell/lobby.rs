@@ -29,28 +29,44 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
             world,
             lobby,
             &format!("Player {}", player.slot),
-            format!("{} | {} | {state}", player.name, player.hero.name()),
+            format!(
+                "{} | {} | {state}",
+                player.name,
+                if player.actors.is_empty() {
+                    "SPECTATOR".to_owned()
+                } else {
+                    format!("{} characters", player.actors.len())
+                }
+            ),
             UiTextRole::Body,
         );
     }
-    label(
-        world,
-        lobby,
-        "Hero Choice Title",
-        "Choose your class | classes may repeat; each player owns one hero",
-        UiTextRole::Supporting,
-    );
-    let roles = row(world, lobby, "Hero Choices");
-    for hero in HeroClass::ALL {
-        control(
+    for member in &view.company {
+        let section = surface(world, lobby, &format!("Character {}", member.actor.0));
+        label(
             world,
-            roles,
-            format!("Choose {hero:?}"),
-            hero.name(),
-            Action::Hero(hero),
-            !view.admitted,
+            section,
+            &format!("Character {} Label", member.actor.0),
+            format!("{} · character {}", member.hero.name(), member.actor.0),
+            UiTextRole::Body,
         );
+        let roles = row(
+            world,
+            section,
+            &format!("Character {} Builds", member.actor.0),
+        );
+        for hero in HeroClass::ALL {
+            control(
+                world,
+                roles,
+                format!("Character {} Choose {hero:?}", member.actor.0),
+                hero.name(),
+                Action::Hero(member.actor, hero),
+                !view.admitted || (!view.host && Some(member.owner) != view.player),
+            );
+        }
     }
+    assignments(world, lobby, view);
     let ready = view
         .players
         .iter()
@@ -70,7 +86,8 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
             && view
                 .players
                 .iter()
-                .all(|player| player.occupied && player.connected && player.ready);
+                .filter(|player| player.occupied)
+                .all(|player| player.connected && player.ready);
         control(
             world,
             actions,
@@ -130,6 +147,49 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
                 "Replace unused code",
                 Action::Reissue(index),
                 false,
+            );
+        }
+    }
+}
+
+/// Stable actor/participant keys survive admission updates and controller changes.
+pub(super) fn assignments(world: &mut World, parent: Entity, view: &LabyrinthView) {
+    for member in &view.company {
+        if view.combat.as_ref().is_some_and(|combat| {
+            combat
+                .actor(member.actor)
+                .is_none_or(|a| !a.standing() && !a.dying())
+        }) {
+            continue;
+        }
+        let controls = row(
+            world,
+            parent,
+            &format!("Character {} Controller", member.actor.0),
+        );
+        label(
+            world,
+            controls,
+            &format!("Character {} Owner", member.actor.0),
+            format!("{} · controller", member.hero.name()),
+            UiTextRole::Supporting,
+        );
+        for player in view.players.iter().filter(|p| p.occupied) {
+            control(
+                world,
+                controls,
+                format!("Assign {} To {}", member.actor.0, player.slot),
+                format!(
+                    "{}{}",
+                    player.name,
+                    if member.owner == player.slot {
+                        " ✓"
+                    } else {
+                        ""
+                    }
+                ),
+                Action::Assign(member.actor, player.slot),
+                !view.host || !player.connected || member.owner == player.slot,
             );
         }
     }

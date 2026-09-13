@@ -191,7 +191,9 @@ enum Action {
     ToggleLan,
     ToggleTailnet,
     Ready(bool),
-    Hero(HeroClass),
+    Hero(ActorId, HeroClass),
+    Assign(ActorId, u8),
+    AssignmentPause(bool),
     Start,
     Rematch,
     Copy(usize),
@@ -424,7 +426,9 @@ fn apply_action(world: &mut World, action: Action) {
                     }
                 }
                 Action::Ready(ready) => Some(LabyrinthIntent::Ready(ready)),
-                Action::Hero(hero) => Some(LabyrinthIntent::SelectHero(hero)),
+                Action::Hero(actor, hero) => Some(LabyrinthIntent::SelectHero { actor, hero }),
+                Action::Assign(actor, owner) => Some(LabyrinthIntent::Assign { actor, owner }),
+                Action::AssignmentPause(paused) => Some(LabyrinthIntent::AssignmentPause(paused)),
                 Action::Start => Some(LabyrinthIntent::StartEncounter),
                 Action::Rematch => Some(LabyrinthIntent::Rematch),
                 Action::Copy(index) => Some(LabyrinthIntent::CopyInvite(index)),
@@ -466,6 +470,7 @@ fn apply_action(world: &mut World, action: Action) {
                             action,
                             encounter: view.encounter,
                             decision: view.combat.as_ref().map_or(0, |snapshot| snapshot.turn_id),
+                            assignment_revision: view.assignment_revision,
                         })
                 }
                 Action::ToggleSkillbook => {

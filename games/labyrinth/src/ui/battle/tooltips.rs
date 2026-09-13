@@ -153,7 +153,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         } else {
             view.players
                 .iter()
-                .find(|p| p.actor == actor.id)
+                .find(|p| p.actors.contains(&actor.id))
                 .map_or("Host AI", |p| p.name.as_str())
         };
         let mut rows = vec![format!("{health} · {rank}"), format!("{speed} · {owner}")];

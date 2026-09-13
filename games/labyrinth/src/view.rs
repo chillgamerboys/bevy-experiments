@@ -41,6 +41,8 @@ pub enum CombatInterruption {
     None,
     /// The host is waiting for reserved players.
     WaitingForPlayers,
+    /// The host is editing character control while the combat state is frozen.
+    Assignments,
     /// This client is recovering admission; never sent as a host pause reason.
     Reconnecting,
     /// A rules failure requires host recovery, not a reconnect.
@@ -52,10 +54,8 @@ pub enum CombatInterruption {
 pub struct PlayerView {
     /// Stable zero-based player slot, never a formation rank.
     pub slot: u8,
-    /// Owned combatant identity, independent of class and formation rank.
-    pub actor: ActorId,
-    /// Selected hero.
-    pub hero: HeroClass,
+    /// Surviving owned characters; empty means spectator. Dying characters remain owned.
+    pub actors: Vec<ActorId>,
     /// Human-readable label.
     pub name: String,
     /// Reserved/admitted slot rather than vacant.
@@ -109,6 +109,10 @@ pub struct LabyrinthView {
     pub encounter: u64,
     /// Current lobby reservations.
     pub players: Vec<PlayerView>,
+    /// Configured heroes and controller assignments, independent of participants.
+    pub company: Vec<crate::session::CompanyMember>,
+    /// Stale commands must not cross a controller reassignment.
+    pub assignment_revision: u64,
     /// Read-only pure rules snapshot; never host RNG or authority.
     pub combat: Option<CombatSnapshot>,
     /// Ordered readable combat outcomes.
@@ -174,7 +178,21 @@ pub enum LabyrinthIntent {
     /// Explicitly leave/close the current session.
     Leave,
     /// Choose an available archetype in the lobby.
-    SelectHero(HeroClass),
+    SelectHero {
+        /// Character to customize.
+        actor: ActorId,
+        /// Visual/build preset to choose.
+        hero: HeroClass,
+    },
+    /// Host assigns one hero to an admitted participant.
+    Assign {
+        /// Surviving hero to assign.
+        actor: ActorId,
+        /// Admitted participant slot receiving control.
+        owner: u8,
+    },
+    /// Host enters or leaves the paused assignment flow.
+    AssignmentPause(bool),
     /// Change local readiness.
     Ready(bool),
     /// Host starts after all six players are ready.
@@ -191,6 +209,8 @@ pub enum LabyrinthIntent {
         encounter: u64,
         /// Decision/turn shown when the user confirmed this action.
         decision: u64,
+        /// Controller generation visible at confirmation.
+        assignment_revision: u64,
     },
     /// Explicit platform clipboard write for one invitation.
     CopyInvite(usize),

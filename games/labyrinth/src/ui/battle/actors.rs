@@ -536,7 +536,10 @@ pub(super) fn present(
             )
         };
         let identity = display_name(snapshot, actor);
-        let owner = view.players.iter().find(|player| player.actor == actor.id);
+        let owner = view
+            .players
+            .iter()
+            .find(|player| player.actors.contains(&actor.id));
         let yours = !view.local && owner.is_some_and(|player| Some(player.slot) == view.player);
         let ownership = if actor.team() == Team::Enemies {
             "Host-controlled enemy.".to_owned()

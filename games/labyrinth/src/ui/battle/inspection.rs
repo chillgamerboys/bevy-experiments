@@ -20,26 +20,12 @@ pub(crate) fn skills_disclosed(view: &LabyrinthView, disclosure: &CombatDisclosu
 
 pub(super) fn display_actor(view: &LabyrinthView) -> Option<&ActorSnapshot> {
     let snapshot = view.combat.as_ref()?;
-    if view.local {
-        snapshot
-            .active_actor
-            .and_then(|id| snapshot.actor(id))
-            .filter(|actor| actor.team() == Team::Heroes)
-            .or_else(|| {
-                snapshot
-                    .actors
-                    .iter()
-                    .find(|actor| actor.team() == Team::Heroes)
-            })
-    } else {
-        let player = view
-            .players
-            .iter()
-            .find(|player| Some(player.slot) == view.player)?;
-        snapshot
-            .actor(player.actor)
-            .filter(|actor| actor.team() == Team::Heroes)
-    }
+    let player = view.players.iter().find(|p| Some(p.slot) == view.player)?;
+    snapshot
+        .active_actor
+        .and_then(|id| snapshot.actor(id))
+        .filter(|actor| player.actors.contains(&actor.id))
+        .or_else(|| player.actors.iter().find_map(|id| snapshot.actor(*id)))
 }
 
 pub(super) fn action_for(choice: Choice, target: Option<ActorId>) -> Result<CombatAction, String> {

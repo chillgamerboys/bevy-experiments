@@ -148,7 +148,7 @@ pub(super) fn update(world: &mut World, snapshot: &CombatSnapshot) {
                 && view
                     .players
                     .iter()
-                    .any(|p| p.actor == id && Some(p.slot) == view.player)
+                    .any(|p| p.actors.contains(&id) && Some(p.slot) == view.player)
         });
         let identity = actors::display_name(snapshot, actor);
         let metrics = *world.resource::<ResolvedUiMetrics>();
