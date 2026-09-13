@@ -206,13 +206,41 @@ fn main() {
                 event,
             })
             .collect(),
-        players: heroes
-            .into_iter()
+        assignment_revision: 1,
+        company: heroes
+            .iter()
+            .copied()
             .enumerate()
-            .map(|(index, hero)| PlayerView {
+            .map(|(index, hero)| {
+                let actor = ActorId(u16::try_from(index + 1).expect("actor"));
+                labyrinth::view::CompanyMember {
+                    actor,
+                    hero,
+                    abilities: labyrinth_rules::HeroSetup::preset(actor, hero).abilities,
+                    owner: if matches!(route.as_str(), "lobby" | "paused") {
+                        u8::try_from(index).expect("owner")
+                    } else {
+                        0
+                    },
+                }
+            })
+            .collect(),
+        players: (0..6)
+            .map(|index| PlayerView {
                 slot: u8::try_from(index).expect("six-player index"),
-                actor: ActorId(u16::try_from(index + 1).expect("hero ID")),
-                hero,
+                actors: if matches!(route.as_str(), "lobby" | "paused") {
+                    if index < heroes.len() {
+                        vec![ActorId(u16::try_from(index + 1).expect("hero ID"))]
+                    } else {
+                        Vec::new()
+                    }
+                } else if index == 0 {
+                    (1..=u16::try_from(heroes.len()).expect("heroes"))
+                        .map(ActorId)
+                        .collect()
+                } else {
+                    Vec::new()
+                },
                 name: format!("Player {}", index + 1),
                 occupied: true,
                 connected: !(route == "paused" && index == 2),

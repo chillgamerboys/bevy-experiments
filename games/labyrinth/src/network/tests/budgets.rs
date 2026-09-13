@@ -28,6 +28,7 @@ fn ready(sequence: u64, encounter: u64) -> GameRequest {
         sequence,
         encounter,
         decision: 0,
+        assignment_revision: 1,
         command: SessionCommand::Ready(true),
     }
 }
