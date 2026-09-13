@@ -37,7 +37,11 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
                 .get(usize::from(member.owner))
                 .copied()
                 .expect("class");
-            member.abilities = HeroSetup::preset(member.actor, member.hero).abilities;
+            member.abilities = resolved_legacy(
+                HeroSetup::preset(member.actor, member.hero)
+                    .abilities
+                    .as_slice(),
+            );
         }
         for player in &mut view.players {
             player.actors.retain(|actor| actor.0 <= 5);

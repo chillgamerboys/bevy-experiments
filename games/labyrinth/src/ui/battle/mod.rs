@@ -59,7 +59,8 @@ struct BattleNodes {
     heroes: Entity,
     enemies: Entity,
     skills: Entity,
-    loadout: Vec<SkillId>,
+    loadout: Vec<labyrinth_rules::build::ResolvedAbility>,
+    ability_actor: Option<(u64, ActorId)>,
     confirm: Entity,
     rematch: Entity,
     dock: dock::DockNodes,
@@ -121,19 +122,19 @@ pub(super) fn present(
             snapshot,
             world.resource::<crate::presentation::CombatDisclosure>(),
         );
-        let loadout = inspection::display_actor(view)
+        let displayed = inspection::display_actor(view);
+        let ability_actor = displayed.map(|actor| (view.encounter, actor.id));
+        let loadout = displayed
             .and_then(|actor| presentation.actor(actor.id))
             .and_then(|actor| actor.details.as_known())
-            .map_or_else(Vec::new, |details| details.skills.clone());
-        if nodes.loadout != loadout {
-            dock::mount_skills(world, nodes.skills, &loadout);
+            .map_or_else(Vec::new, |details| details.abilities.clone());
+        if nodes.loadout != loadout || nodes.ability_actor != ability_actor {
+            dock::mount_skills(world, nodes.skills, view.encounter, displayed, &loadout);
             nodes.loadout = loadout;
-            // A loadout replacement must not leave an unequipped ability selected.
-            if matches!(ui.selected, Some(Choice::Skill(skill)) if !nodes.loadout.contains(&skill))
-            {
-                ui.selected = None;
-                ui.target = None;
-            }
+            nodes.ability_actor = ability_actor;
+            // An actor/index is meaningful only within this frozen build.
+            ui.selected = None;
+            ui.target = None;
         }
         feedback::update(&mut nodes, view, time);
         nodes.viewport = metrics.viewport;

@@ -62,7 +62,7 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
             activate(&mut app, old_skill, keyboard);
             assert_eq!(
                 app.world().resource::<UiState>().selected,
-                Some(Choice::Skill(SkillId::BackRankShot))
+                Some(Choice::Ability(0))
             );
             let target = find_named(app.world_mut(), "Actor 105").expect("rear enemy");
             activate(&mut app, target, keyboard);
@@ -104,8 +104,8 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
                 commands,
                 vec![(
                     ActorId(4),
-                    CombatAction::Skill {
-                        skill: SkillId::BackRankShot,
+                    CombatAction::Ability {
+                        index: 0,
                         target: ActorId(105),
                     },
                 )],
@@ -129,8 +129,8 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
 
             for (name, choice, heading) in [
                 ("Reposition", Choice::Reposition, "Reposition"),
-                ("Skill 0", Choice::Skill(SkillId::Mend), "Mend"),
-                ("Skill 1", Choice::Skill(SkillId::Staunch), "Staunch"),
+                ("Skill 0", Choice::Ability(0), "Mend"),
+                ("Skill 1", Choice::Ability(1), "Staunch"),
             ] {
                 let button = find_named(app.world_mut(), name).expect("medic control");
                 activate(&mut app, button, keyboard);

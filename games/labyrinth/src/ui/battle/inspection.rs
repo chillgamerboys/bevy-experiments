@@ -5,8 +5,10 @@ use crate::presentation::{CombatDisclosure, ForecastDisplay};
 
 pub(crate) fn select_skill_slot(view: &LabyrinthView, ui: &mut UiState, index: usize) {
     if let Some(actor) = display_actor(view) {
-        if let Some(skill) = actor.skills().get(index) {
-            ui.selected = Some(Choice::Skill(*skill));
+        if let Ok(index) = u8::try_from(index) {
+            if actor.ability(index).is_some() {
+                ui.selected = Some(Choice::Ability(index));
+            }
         }
     }
 }
@@ -31,6 +33,10 @@ pub(super) fn display_actor(view: &LabyrinthView) -> Option<&ActorSnapshot> {
 pub(super) fn action_for(choice: Choice, target: Option<ActorId>) -> Result<CombatAction, String> {
     let target = || target.ok_or_else(|| "Select a character to target.".to_owned());
     Ok(match choice {
+        Choice::Ability(index) => CombatAction::Ability {
+            index,
+            target: target()?,
+        },
         Choice::Skill(skill) => CombatAction::Skill {
             skill,
             target: target()?,
@@ -91,9 +97,14 @@ pub(crate) fn selected_action(
     Ok((actor.id, action))
 }
 
-pub(super) fn choice_title(choice: Option<Choice>) -> &'static str {
+pub(super) fn choice_title(actor: Option<&ActorSnapshot>, choice: Option<Choice>) -> &str {
     match choice {
-        Some(Choice::Skill(skill)) => skill_definition(skill).name,
+        Some(Choice::Ability(index)) => actor
+            .and_then(|a| a.ability(index))
+            .map_or("Unknown move", |d| d.name.as_str()),
+        Some(Choice::Skill(skill)) => actor
+            .and_then(|a| a.skill_index(skill).and_then(|i| a.ability(i)))
+            .map_or(skill_definition(skill).name, |d| d.name.as_str()),
         Some(Choice::Reposition) => "Move · swap with an adjacent ally",
         Some(Choice::Rescue) => "Rescue · revive a downed ally",
         Some(Choice::Defend) => "Guard · reduce direct damage by 2",

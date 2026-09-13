@@ -11,6 +11,7 @@ use labyrinth_rules::{
     MAX_EQUIPPED_ABILITIES,
 };
 
+mod abilities;
 mod dock;
 mod footprints;
 mod history;
@@ -18,6 +19,33 @@ mod menus;
 mod movement;
 mod overlay_stability;
 mod turn_refresh;
+
+fn resolved_legacy(skills: &[SkillId]) -> labyrinth_rules::build::ResolvedBuild {
+    labyrinth_rules::catalog::ContentCatalog::builtin()
+        .expect("catalog")
+        .resolve_build(&labyrinth_rules::scenario::legacy_build(skills))
+        .expect("resolved build")
+}
+
+fn set_legacy_skills(
+    snapshot: &mut labyrinth_rules::CombatSnapshot,
+    id: ActorId,
+    skills: &[SkillId],
+) {
+    let build = labyrinth_rules::scenario::legacy_build(skills);
+    let abilities = snapshot
+        .catalog
+        .resolve_build(&build)
+        .expect("resolved build");
+    let actor = snapshot
+        .actors
+        .iter_mut()
+        .find(|actor| actor.id == id)
+        .expect("actor");
+    actor.build = build;
+    actor.abilities = abilities;
+    actor.skill_uses.clear();
+}
 
 fn fixture() -> LabyrinthView {
     let combat = (0..128)
@@ -47,7 +75,7 @@ fn fixture() -> LabyrinthView {
                 crate::session::CompanyMember {
                     actor,
                     hero,
-                    abilities: HeroSetup::preset(actor, hero).abilities,
+                    abilities: resolved_legacy(HeroSetup::preset(actor, hero).abilities.as_slice()),
                     owner: 0,
                 }
             })
@@ -628,7 +656,11 @@ fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank(
         view.player = Some(5);
         for member in &mut view.company {
             member.hero = HeroClass::Gatekeeper;
-            member.abilities = HeroSetup::preset(member.actor, member.hero).abilities;
+            member.abilities = resolved_legacy(
+                HeroSetup::preset(member.actor, member.hero)
+                    .abilities
+                    .as_slice(),
+            );
             // Deliberately not slot+1: character control is independent of seats.
             if member.actor == ActorId(1) {
                 member.owner = 5;
@@ -701,20 +733,11 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
     tap_key(&mut app, KeyCode::Digit8);
     assert_eq!(
         app.world().resource::<UiState>().selected,
-        Some(Choice::Skill(SkillId::CleanBlade))
+        Some(Choice::Ability(7))
     );
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-        let hero = view
-            .combat
-            .as_mut()
-            .expect("combat")
-            .actors
-            .iter_mut()
-            .find(|actor| actor.id == ActorId(6))
-            .expect("owned hero");
-        hero.abilities = AbilityLoadout::new([]).expect("universal-only loadout");
-        hero.skill_uses.clear();
+        set_legacy_skills(view.combat.as_mut().expect("combat"), ActorId(6), &[]);
     }
     run_frames(&mut app, 4);
     assert_eq!(find_named(app.world_mut(), "Actor 6"), Some(actor));
@@ -767,7 +790,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
             .expect("combat");
         let actor = snapshot.active_actor.expect("hero decision");
         let source = snapshot.actor(actor).expect("source");
-        let (index, skill, target) = source
+        let (index, _skill, target) = source
             .skills()
             .iter()
             .enumerate()
@@ -830,7 +853,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
                 .count(),
             1
         );
-        assert!(intents.iter().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor: who, action: CombatAction::Skill { skill: chosen, target: hit }, .. } if *who == actor && *chosen == skill && *hit == target)));
+        assert!(intents.iter().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor: who, action: CombatAction::Ability { index: chosen, target: hit }, .. } if *who == actor && usize::from(*chosen) == index && *hit == target)));
     }
 }
 

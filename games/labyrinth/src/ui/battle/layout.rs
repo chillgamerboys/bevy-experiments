@@ -103,6 +103,7 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         enemies,
         skills: dock.skills,
         loadout: Vec::new(),
+        ability_actor: None,
         confirm: dock.confirm,
         rematch: dock.rematch,
         dock,
