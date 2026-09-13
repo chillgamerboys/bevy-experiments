@@ -10,7 +10,7 @@
     "queue_schema": 2,
     "schema_version": 1
   },
-  "content_sha256": "acc57aadc6834cd1b388b442c6c11f3a35bc6f9bd590925aab61db542f7aee58",
+  "content_sha256": "4e3b3d9ae0d43a4fabcad89b2194039651f202d9e3b55d6c9e73f5482ca2b5a0",
   "default_packages": [
     "gameskills"
   ],
@@ -24,9 +24,9 @@
     "plugins/gameskills-linear/.codex-plugin/plugin.json": "5db493a7f7f994a7a959bc4011152a00fc31e4e24d4589e29ce21cedd3182c61",
     "plugins/gameskills-linear/references/cleanup.md": "f3f85b88f82ac093f266396aedf29303a189a570b724447f1e48c6fa40a14f67",
     "plugins/gameskills-linear/references/project-context.md": "363a3c95cdd5caa8372f1ea6885b612a65bd299fd59999d88b53199e39ac2f0e",
-    "plugins/gameskills-linear/references/setup.md": "009cc1db29a331066794d66a2689b7ad7c0b08c2f2ea13b9936c4b6ebfdf17ea",
+    "plugins/gameskills-linear/references/setup.md": "2f20b9f441adc0ea85d49666252bfa660b71b66a9de13615e4865f018f1bdce1",
     "plugins/gameskills-linear/skills/cleanup/SKILL.md": "e1ba77e3fd89628dbd4531a2257b6130f95fa2ba438302a29e4a6503d97ede57",
-    "plugins/gameskills-linear/skills/track/SKILL.md": "3392249a6070d092b5001a2a3bc11f89d6edb9d12c1397da50883755b65b62e0",
+    "plugins/gameskills-linear/skills/track/SKILL.md": "e12e0cd2b8ea97aa42c17d61270c262b36ec50b986338e3326992c7f5dcfdb50",
     "plugins/gameskills-maintainer/.claude-plugin/plugin.json": "ef665354f3e1ae15c706d568d5bd910c2d9ee297c3c6c9a04bbcd5165210e514",
     "plugins/gameskills-maintainer/.codex-plugin/plugin.json": "bd0fc4b9d98f16808876179463b237940b86fad4dc67c3bcaf1ee6c4a557fdc6",
     "plugins/gameskills-maintainer/references/capability-design.md": "c6a5f287f8b40e3ab321301a6cdc9af53dbb14a05eca8eb236cad9147fd8648e",
@@ -61,7 +61,7 @@
     "plugins/gameskills/references/architecture.md": "e1be880a5272c8f2e803e9b284cee49850a78f98ddc595d47b8a4ffd01ffe33d",
     "plugins/gameskills/references/bevy-craft.md": "6c30127d7fa4ccba89df60c756972a83cfd55f31dc5b157f82b4d74642ff7d3e",
     "plugins/gameskills/references/creative-levels.md": "7a11de52c05675eb8d69bea0b6a856fe01fc3206de3434a7b8245962d8a83e99",
-    "plugins/gameskills/references/delivery.md": "b1a7803acea39fac19db0eec193e0f6a77cc93a0b85b6fd0156df4e152af299b",
+    "plugins/gameskills/references/delivery.md": "dd6afb4b038e2ec36c4f1004003d4a7b7f97a905ab56db53873544b6f67b5dbe",
     "plugins/gameskills/references/gamekit.md": "2cdce6326a299693da676cf6e7d5376cd4242fb49768478317e8957761a725ae",
     "plugins/gameskills/references/interface-design.md": "acc9415c9753b16d2230eddc8359ed925092096815e13f298bc31bed32dd3839",
     "plugins/gameskills/references/project-context.md": "24ba0bd3f797639265ece0c515b01ea6fe635c09339e77e102ae36b75aa02998",
@@ -83,5 +83,5 @@
   },
   "format": "gameskills-instructions",
   "schema_version": 1,
-  "source_commit": "c84f09ea07edf1f68db2b5b608817bb0bd43772f"
+  "source_commit": "b3c4aa5fff5ab25d58ccfebc76e7cc52f4fe0215"
 }
