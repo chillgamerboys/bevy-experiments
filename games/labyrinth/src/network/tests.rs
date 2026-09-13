@@ -315,6 +315,8 @@ fn converged(apps: &mut [App]) -> bool {
                 snapshot.combat == expected.combat
                     && snapshot.players == expected.players
                     && snapshot.company == expected.company
+                    && snapshot.scenario == expected.scenario
+                    && snapshot.setup_revision == expected.setup_revision
                     && snapshot.assignment_revision == expected.assignment_revision
                     && snapshot.paused == expected.paused
             })
@@ -1760,4 +1762,167 @@ fn real_udp_multiple_character_owner_and_spectator_disconnect_have_distinct_effe
     wait_guest_detached(&mut apps, controller);
     assert!(host_snapshot(&mut apps).paused);
     assert_eq!(combat(&mut apps), before);
+}
+
+#[test]
+fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
+    use labyrinth_rules::build::InnateGrant;
+    use labyrinth_rules::catalog::ContentId;
+    let directory = tempfile::tempdir().expect("scenario directory");
+    let path = directory.path().join("battle.json");
+    let mut apps = vec![socket_app(None), socket_app(None)];
+    open_default_host(&mut apps, "");
+    let code = hosted_code(app(&mut apps, 0).world(), 0).expect("invite");
+    start::join_code(app(&mut apps, 1).world_mut(), &code).expect("join");
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| all_admitted(apps) && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::Assign {
+            actor: ActorId(1),
+            owner: 1,
+        });
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps)
+            .company
+            .first()
+            .is_some_and(|m| m.owner == 1)
+            && converged(apps)
+    ));
+    let before = host_snapshot(&mut apps);
+    let mut custom = before.scenario.heroes.first().expect("hero").clone();
+    custom.actor.name = "Dagger laboratory".into();
+    custom.actor.base_speed = 100;
+    custom.actor.max_hp = 91;
+    custom.actor.build.innate = before
+        .catalog
+        .definition()
+        .abilities
+        .iter()
+        .map(|a| InnateGrant {
+            ability: a.id.clone(),
+            provenance: ContentId::new("innate").expect("ID"),
+        })
+        .collect();
+    custom.actor.build.weapon = Some(ContentId::new("dagger").expect("ID"));
+    let payload = GameRequest {
+        sequence: 100,
+        encounter: before.encounter,
+        decision: 0,
+        assignment_revision: before.assignment_revision,
+        command: SessionCommand::CustomizeActor {
+            actor: custom.clone(),
+            expected_revision: before.setup_revision,
+        },
+    };
+    let json_bytes = serde_json::to_vec(&payload).expect("encoded command").len();
+    assert!(
+        json_bytes > 1024 && json_bytes < 32768,
+        "representative full build must exercise the expanded bounded command gate"
+    );
+    app(&mut apps, 1)
+        .world_mut()
+        .write_message(LabyrinthIntent::CustomizeActor {
+            actor: custom.clone(),
+            expected_revision: before.setup_revision,
+        });
+    assert!(
+        pump_until(&mut apps, Duration::from_secs(10), |apps| host_snapshot(
+            apps
+        )
+        .scenario
+        .heroes
+        .first()
+            == Some(&custom)
+            && converged(apps)),
+        "large valid custom build failed encrypted admission: {}",
+        admission_diagnostics(&apps)
+    );
+    let saved = host_snapshot(&mut apps).scenario;
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::SaveScenario(
+            path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |_| path.exists()));
+    let catalog = host_snapshot(&mut apps).catalog;
+    assert_eq!(
+        labyrinth_rules::scenario::Scenario::from_json(
+            &std::fs::read_to_string(&path).expect("saved file"),
+            &catalog
+        )
+        .expect("validated reload"),
+        saved
+    );
+    let mut changed = saved.clone();
+    changed.seed = 123456;
+    let revision = host_snapshot(&mut apps).setup_revision;
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::ConfigureBattle {
+            scenario: changed,
+            expected_revision: revision,
+        });
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).scenario.seed == 123456 && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::LoadScenario(
+            path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).scenario == saved && converged(apps)
+    ));
+    for app in &mut apps {
+        app.world_mut().write_message(LabyrinthIntent::Ready(true));
+    }
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps)
+            .players
+            .iter()
+            .filter(|p| p.occupied)
+            .all(|p| p.ready)
+            && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| host_snapshot(apps).combat.is_some() && converged(apps)
+    ));
+    let before = combat(&mut apps);
+    assert_eq!(before.active_actor, Some(ActorId(1)));
+    let source = before.actor(ActorId(1)).expect("custom hero");
+    assert!(source.resolved_abilities().len() > 8);
+    let index = source
+        .ability_index(&ContentId::new("dagger_throw").expect("ID"))
+        .expect("weapon ability");
+    let target = *before.enemy_formation.first().expect("target");
+    send_action(
+        &mut apps,
+        ActorId(1),
+        CombatAction::Ability { index, target },
+    );
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| combat(apps).turn_id > before.turn_id && converged(apps)
+    ));
+    for app in &mut apps {
+        start::close(app.world_mut());
+    }
 }
