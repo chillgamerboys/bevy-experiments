@@ -275,9 +275,11 @@ impl SessionSnapshot {
                 ActorKind::Hero(hero) => hero,
                 ActorKind::Enemy(_) => HeroClass::Gatekeeper,
             };
-            if self.formation.rank(member.actor).is_none_or(|rank| {
-                self.formation.hero_owners[usize::from(rank - 1)] != member.owner
-            }) {
+            if self
+                .formation
+                .rank(member.actor)
+                .is_none_or(|rank| self.formation.owner(rank) != Some(member.owner))
+            {
                 return Err("Company control must match its reserved places.");
             }
             if member.hero != expected_hero {
@@ -876,7 +878,10 @@ impl PartyAuthority {
                 {
                     formation.assign_actor(&self.scenario, actor, owner);
                 } else {
-                    formation.hero_owners[usize::from(rank - 1)] = owner;
+                    *formation
+                        .hero_owners
+                        .get_mut(usize::from(rank - 1))
+                        .ok_or("Invalid rank.")? = owner;
                 }
                 self.configure_draft(self.scenario.clone(), formation, expected_revision)?;
             }

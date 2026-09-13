@@ -37,7 +37,7 @@ impl LobbyFormation {
                         actor: actor.id,
                         rank,
                     };
-                    rank += actor.actor.footprint;
+                    rank = rank.saturating_add(actor.actor.footprint);
                     placement
                 })
                 .collect()
@@ -73,6 +73,13 @@ impl LobbyFormation {
             .map(|p| p.rank)
     }
 
+    /// Participant reservation at a valid one-based hero rank.
+    pub fn owner(&self, rank: u8) -> Option<u8> {
+        self.hero_owners
+            .get(usize::from(rank.checked_sub(1)?))
+            .copied()
+    }
+
     /// Resolve every covered rank of a multi-rank character to the same identity.
     pub fn occupant(&self, scenario: &Scenario, team: Team, rank: u8) -> Option<ActorId> {
         self.placements(team).iter().find_map(|placement| {
@@ -105,11 +112,11 @@ impl LobbyFormation {
             return Some("Only the host constructs the enemy formation.".into());
         }
         if team == Team::Heroes {
-            let owner = self.hero_owners[usize::from(rank - 1)];
+            let owner = self.owner(rank).expect("rank bounds checked above");
             if player.is_some_and(|slot| slot != owner) {
                 return Some("Choose a character in your assigned places.".into());
             }
-            if (rank..end as u8).any(|r| self.hero_owners[usize::from(r - 1)] != owner) {
+            if (rank..end as u8).any(|r| self.owner(r) != Some(owner)) {
                 return Some("This footprint crosses places assigned to different players. The host must assign the whole span to one player.".into());
             }
         }
@@ -145,7 +152,7 @@ impl LobbyFormation {
                     roster(scenario, team)
                         .iter()
                         .find(|a| a.id == p.actor)
-                        .map(|a| p.rank + a.actor.footprint - 1)
+                        .map(|a| p.rank.saturating_add(a.actor.footprint).saturating_sub(1))
                 })
                 .max()
                 .unwrap_or(0);
@@ -177,7 +184,9 @@ impl LobbyFormation {
             let actors = roster(scenario, team);
             if placements.len() != actors.len()
                 || placements.len() > PARTY_SIZE
-                || placements.windows(2).any(|p| p[0].rank >= p[1].rank)
+                || placements
+                    .array_windows::<2>()
+                    .any(|[a, b]| a.rank >= b.rank)
             {
                 return Err("Formation placements must match the ordered roster.");
             }
@@ -195,10 +204,7 @@ impl LobbyFormation {
                     if !occupied.insert(rank) {
                         return Err("Formation footprints overlap.");
                     }
-                    if team == Team::Heroes
-                        && self.hero_owners[usize::from(rank - 1)]
-                            != self.hero_owners[usize::from(placement.rank - 1)]
-                    {
+                    if team == Team::Heroes && self.owner(rank) != self.owner(placement.rank) {
                         return Err("A character cannot span different controllers' places.");
                     }
                 }
@@ -215,8 +221,13 @@ impl LobbyFormation {
                 .find(|a| a.id == actor)
                 .map(|a| a.actor.footprint),
         ) {
-            for r in rank..rank + footprint {
-                self.hero_owners[usize::from(r - 1)] = owner;
+            for reservation in self
+                .hero_owners
+                .iter_mut()
+                .skip(usize::from(rank - 1))
+                .take(usize::from(footprint))
+            {
+                *reservation = owner;
             }
         }
     }
@@ -296,7 +307,7 @@ impl PartyAuthority {
             let rank = formation
                 .rank(member.actor)
                 .ok_or("Unknown character place.")?;
-            member.owner = formation.hero_owners[usize::from(rank - 1)];
+            member.owner = formation.owner(rank).ok_or("Invalid character place.")?;
         }
         self.scenario = scenario;
         self.formation = formation;

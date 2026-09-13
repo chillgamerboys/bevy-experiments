@@ -1577,3 +1577,5 @@ fn spectators_do_not_gate_ready_or_start_even_if_the_host_spectates() {
         .actors
         .is_empty());
 }
+
+mod spatial;
