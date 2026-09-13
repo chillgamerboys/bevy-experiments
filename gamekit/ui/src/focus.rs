@@ -42,18 +42,28 @@ struct ModalFocusFrame {
 }
 
 #[derive(Resource, Default)]
-pub(crate) struct ScopedFocusMemory(Option<UiFocusId>);
+pub(crate) struct ScopedFocusMemory(Option<(Entity, UiFocusId)>);
+
+impl ScopedFocusMemory {
+    fn identity_for(&self, entity: Entity) -> Option<&UiFocusId> {
+        self.0
+            .as_ref()
+            .filter(|(remembered, _)| *remembered == entity)
+            .map(|(_, identity)| identity)
+    }
+}
 
 pub(crate) fn remember_scoped_focus(
     focus: Res<InputFocus>,
     identities: Query<&UiFocusId>,
     mut memory: ResMut<ScopedFocusMemory>,
 ) {
-    let Some(entity) = focus.get() else { return };
-    let Ok(identity) = identities.get(entity) else {
-        return;
-    };
-    memory.0 = Some(identity.clone());
+    memory.0 = focus.get().and_then(|entity| {
+        identities
+            .get(entity)
+            .ok()
+            .map(|identity| (entity, identity.clone()))
+    });
 }
 
 /// Whether a control can receive activation now, including ancestors and modal scope.
@@ -228,13 +238,18 @@ pub(crate) fn sync_action_reachability(world: &mut World) {
     }
     let focused = world.resource::<InputFocus>().get();
     if let Some(entity) = focused.filter(|entity| !is_reachable(world, *entity)) {
-        let identity = world.resource::<ScopedFocusMemory>().0.clone();
+        let identity = world
+            .resource::<ScopedFocusMemory>()
+            .identity_for(entity)
+            .cloned();
         let replacement = if world.get_entity(entity).is_err() {
             restore_focus_target(world, None, identity.as_ref())
         } else {
             None
         };
-        let replacement = replacement.filter(|entity| activation_eligible(world, *entity));
+        // As with a surviving outer control, retain_modal_focus must see the
+        // rebuilt target before moving focus into a newly opened modal. It saves
+        // the return identity and contains focus before any input dispatch.
         let mut focus = world.resource_mut::<InputFocus>();
         if let Some(entity) = replacement {
             focus.set(entity, FocusCause::Navigated);
@@ -296,7 +311,14 @@ pub(crate) fn retain_modal_focus(world: &mut World) {
                         return_focus_id: current_focus
                             .and_then(|entity| world.get::<UiFocusId>(entity))
                             .cloned()
-                            .or_else(|| world.resource::<ScopedFocusMemory>().0.clone()),
+                            .or_else(|| {
+                                current_focus.and_then(|entity| {
+                                    world
+                                        .resource::<ScopedFocusMemory>()
+                                        .identity_for(entity)
+                                        .cloned()
+                                })
+                            }),
                     };
                     if !frames.is_empty()
                         && frames.iter().all(|frame| !is_reachable(world, frame.root))
