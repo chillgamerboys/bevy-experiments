@@ -26,9 +26,9 @@ Only for an authorized parallel wave, read [work orders](../../references/work-o
 validate a scoped plan with `plan validate --file PLAN.json`, then create one queue
 and hand it to `dispatch`. Resolve authorization from the accepted session and
 applicable project instructions/configuration, including inherited authorization
-after a handoff. Keep execution strategy separate from the task scope; do not
-turn an authorization uncertainty into a solo-only epic requirement. Capacity alone
-is not permission to launch agents. Solo work stays with the current agent.
+after a handoff. Keep task scope separate from execution strategy and authorization;
+report unresolved permission as such instead of rewriting scope. Capacity alone is
+not permission to launch agents. Solo work stays with the current agent.
 
 Implement, verify through the project's configured checks, reconcile current docs
 and proceed through `create-pr`, `audit-pr`, and authorized merge/release work as
