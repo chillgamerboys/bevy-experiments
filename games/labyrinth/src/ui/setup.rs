@@ -1,5 +1,9 @@
 //! Local actor drafts. Authority validates every submitted scenario/build again.
 
+#[cfg(test)]
+#[path = "setup_tests.rs"]
+mod tests;
+
 use super::*;
 use labyrinth_rules::build::{ActorBuild, InnateGrant};
 use labyrinth_rules::catalog::{ContentCatalog, ContentId};
