@@ -17,6 +17,16 @@ steps and relevant verification from the project's development/testing guidance.
 Name unfinished requirements. Substantial work may need a committed active plan;
 routine notes do not require a plan file, queue or ticket.
 
+For a new or materially changed player-facing workflow, plan from the player's
+decisions before listing controls. Identify the information needed to choose,
+compare and understand consequences; establish the screen/view hierarchy and
+which views recur across contexts with different editing or authority rules.
+Accepted mechanics do not establish a screen design. Investigate existing routes
+and requested references, then use `grill` for consequential unanswered choices
+with concrete alternatives and a recommendation. Carry the chosen experience and
+task-based acceptance into implementation; a routine fix to a settled view needs
+neither a new design exercise nor another approval.
+
 For implementation, read [delivery](../../references/delivery.md) and resume or
 start its delivery record. Keep the requested endpoint through interruptions. A
 plan-only discussion ends at its plan; focused specialist requests retain their

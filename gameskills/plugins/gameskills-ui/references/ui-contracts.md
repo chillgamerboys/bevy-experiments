@@ -1,5 +1,22 @@
 # Native UI ownership and lifecycle
 
+## Decision and information design
+
+Start with a concrete player task and the information needed to make its choices.
+Decide what stays visible, what is grouped or disclosed, and how the player moves
+between overview, inspection and editing without losing context. For an unresolved
+material organization, compare bounded alternatives using that task; a sketch or
+mockup can expose the tradeoffs before construction. Follow accepted references
+for their useful interaction principles without importing unrelated complexity.
+
+Explain meaningful effects, constraints and current-versus-proposed differences
+where the choice is made. Names and selected states alone do not explain a choice.
+Use game-owned effective data for descriptions and comparisons, including relevant
+modifiers; do not reconstruct rules in display code. Distinguish inspecting a
+candidate from committing it, and make changes and recovery understandable.
+Keep recurring views coherent across setup, play and differing authority; choose
+separate views for distinct player tasks, not merely different callers.
+
 ## View and intent
 
 Render from a game-owned immutable presentation model and return typed intent.
