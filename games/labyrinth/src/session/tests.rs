@@ -902,7 +902,7 @@ fn repeated_class_actors_cannot_be_swapped_between_owners_in_later_snapshots() {
 }
 
 #[test]
-fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
+fn local_rematch_class_change_redeploys_without_a_readiness_step() {
     let mut authority = PartyAuthority::new(42, true);
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
@@ -930,32 +930,6 @@ fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
         .players
         .iter()
         .all(|player| !player.ready));
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_some());
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
-        None
-    );
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .filter(|player| player.occupied)
-        .all(|player| player.ready));
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(false)).rejection,
-        None
-    );
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .all(|player| !player.ready));
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
-        None
-    );
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
         None

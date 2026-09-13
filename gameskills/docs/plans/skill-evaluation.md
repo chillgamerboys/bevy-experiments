@@ -824,6 +824,16 @@ neither is silently labeled ready. Discovery is not behavioral or comparative
 efficacy evidence. The registration problem is corrected without changing the
 evaluation baseline or claiming the broader independent trials are complete.
 
+Committed runtime `2ef59fee` subsequently passed all-target CLI Clippy and the
+11 final registration regressions, with earlier focused installation/native/recovery
+and ignored-setting staleness tests retained separately. Its frozen executable
+SHA-256 is `30879fecb0a44e919d4271a186f1c73ba71a06811226790aec8d35cf6d49ea3d`.
+The coordinator repeated registration (a no-op) and ordinary discovery using that
+executable: 23 skills, unchanged original pin, and the actual project configuration
+layer reported `loaded`. Final records are
+`.context/spatial-ui/native-registration-final.json` and `native-project-final.json`.
+Independent follow-up source review confirmed both preservation corrections.
+
 ### Spatial artifact and integration critique
 
 The implemented constructor uses actual facing character art, stable sparse ranks,
