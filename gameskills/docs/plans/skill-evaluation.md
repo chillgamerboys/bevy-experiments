@@ -681,3 +681,23 @@ observations: affected tests passed locally and on CI retry without code changes
 MCP observer alignment, live Linear deletion/pilot, backup export, registry release
 and linked-workspace migration are separate. This plan does not select maze,
 campaign, inventory or other future systems as the mechanic to build.
+
+## Publication packaging finding (2026-09-13)
+
+The UI revision's configured local graph passed at `bf87c33`, including tooling
+and skill tests, while CI correctly rejected the CLI's embedded instruction bundle
+as stale against the changed canonical source. The coordinator omitted bundle
+preparation/package verification from that local graph. This was an execution
+coverage gap: structural skill validation and tooling tests do not establish that
+the distributable contains the current authored instructions. Existing devtools
+packaging guidance already requires committed inputs followed by `bundle prepare`,
+`bundle check`, Cargo packaging and `bundle verify-package`; weakening that check
+or changing the adopter's installed pin would conceal the failure.
+
+Regenerate only the source-owned CLI bundle from committed canonical inputs and
+verify the actual Cargo artifact, then refresh publication/source evidence. Keep
+the original failed CI and earlier local passes under their actual source identities.
+This correction supplies packaging evidence, not native activation or proof of
+better planning behavior. No additional skill rule is inferred from this one
+missed step; apply the existing delivery/package instructions and retain the
+finding when assessing end-to-end execution.
