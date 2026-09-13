@@ -1145,8 +1145,7 @@ mod tests {
                 combat: Some(snapshot),
                 players: vec![crate::view::PlayerView {
                     slot: 0,
-                    actor: ActorId(1),
-                    hero: HeroClass::Gatekeeper,
+                    actors: vec![ActorId(1)],
                     name: "The hero's long player-owned display name".to_owned(),
                     occupied: true,
                     connected: true,

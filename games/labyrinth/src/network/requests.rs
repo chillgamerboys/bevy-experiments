@@ -118,6 +118,7 @@ mod tests {
             sequence,
             encounter: 0,
             decision: 0,
+            assignment_revision: 1,
             command: SessionCommand::Ready(true),
         }
     }

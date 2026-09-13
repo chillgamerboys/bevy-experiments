@@ -6,6 +6,8 @@ use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroCl
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
+pub use crate::session::CompanyMember;
+
 /// Owned UI input which redacts diagnostics and clears its allocation on drop.
 #[derive(Clone, Default)]
 pub struct SecretText(pub String);
@@ -110,7 +112,7 @@ pub struct LabyrinthView {
     /// Current lobby reservations.
     pub players: Vec<PlayerView>,
     /// Configured heroes and controller assignments, independent of participants.
-    pub company: Vec<crate::session::CompanyMember>,
+    pub company: Vec<CompanyMember>,
     /// Stale commands must not cross a controller reassignment.
     pub assignment_revision: u64,
     /// Read-only pure rules snapshot; never host RNG or authority.

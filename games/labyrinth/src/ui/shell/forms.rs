@@ -94,7 +94,7 @@ pub(super) fn host_form(world: &mut World, parent: Entity, ui: &UiState) {
         Action::ToggleTailnet,
         false,
     );
-    label(world, form, "Host Advice", "Three independent private invitation codes will be available in the lobby. Tailnet discovery requires external Tailscale installation and login.", UiTextRole::Supporting);
+    label(world, form, "Host Advice", "Five independent private invitation codes will be available in the lobby. Tailnet discovery requires external Tailscale installation and login.", UiTextRole::Supporting);
     let actions = row(world, form, "Host Actions");
     control(
         world,
