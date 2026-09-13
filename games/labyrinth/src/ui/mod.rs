@@ -355,6 +355,13 @@ fn apply_action(world: &mut World, action: Action) {
     let view = world.resource::<LabyrinthView>().clone();
     let seed = world.resource::<LabyrinthUiConfig>().seed;
     world.resource_scope(|world, mut ui: Mut<UiState>| {
+        if matches!(action, Action::SkillSlot(_) | Action::Confirm)
+            && !battle::input_matches_presented_build(world, &view)
+        {
+            ui.selected = None;
+            ui.target = None;
+            return;
+        }
         let intent =
             match action {
                 Action::Form(form) => {

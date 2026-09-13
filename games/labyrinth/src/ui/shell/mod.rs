@@ -106,6 +106,7 @@ pub(super) fn present(
         &view.invite_labels,
         &view.session_name,
         ui.lobby_page,
+        lobby::formation_columns(metrics),
     ));
     let listings = (ui.form == Form::Browser).then_some(&view.listings);
     let key = format!(

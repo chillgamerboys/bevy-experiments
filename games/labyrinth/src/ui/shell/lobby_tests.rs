@@ -48,7 +48,7 @@ fn app(scale: UiScaleMode) -> App {
             players,
             ..default()
         })
-        .insert_resource(UiScalePreference { mode: scale })
+        .insert_resource(UiScalePreference(scale))
         .add_plugins(LabyrinthUiPlugin);
     let mut app = builder.build();
     run_frames(&mut app, 5);
@@ -86,8 +86,16 @@ fn preparation_sections_keep_one_character_entry_and_preserve_scenario_draft() {
     );
     activate(&mut app, "Preparation Scenario");
     assert!(find_named(app.world_mut(), "Scenario seed").is_some());
-    // This is the same draft state maintained by actual editable-field input.
-    app.world_mut().resource_mut::<UiState>().scenario_seed = "771".into();
+    let field = find_named(app.world_mut(), "Scenario seed").unwrap();
+    {
+        let mut text = app
+            .world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .unwrap();
+        text.queue_edit(bevy::text::TextEdit::SelectAll);
+        text.queue_edit(bevy::text::TextEdit::Insert("771".into()));
+    }
+    run_frames(&mut app, 3);
     activate(&mut app, "Preparation Party");
     activate(&mut app, "Preparation Scenario");
     assert_eq!(app.world().resource::<UiState>().scenario_seed, "771");
@@ -129,8 +137,10 @@ fn preparation_footer_stays_visible_while_roster_scrolls_at_supported_scales() {
                     Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
                 )
                 .unwrap_or_else(|| panic!("{page} {scale:?}: {name} clipped"));
+                let node = app.world().get::<ComputedNode>(entity).unwrap();
+                let expected = node.size() * node.inverse_scale_factor;
                 assert!(
-                    visible.width() > 40.0 && visible.height() > 25.0,
+                    visible.width() + 0.5 >= expected.x && visible.height() + 0.5 >= expected.y,
                     "{page} {scale:?}: {name} {visible:?}"
                 );
             }

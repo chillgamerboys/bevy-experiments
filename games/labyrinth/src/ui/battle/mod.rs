@@ -70,6 +70,37 @@ struct BattleNodes {
     feedback: BTreeMap<ActorId, (String, f64)>,
 }
 
+fn displayed_loadout(
+    view: &LabyrinthView,
+    presentation: &crate::presentation::BattlePresentation,
+) -> (
+    Option<(u64, ActorId)>,
+    Vec<labyrinth_rules::build::ResolvedAbility>,
+) {
+    let actor = inspection::display_actor(view);
+    let subject = actor.map(|actor| (view.encounter, actor.id));
+    let abilities = actor
+        .and_then(|actor| presentation.actor(actor.id))
+        .and_then(|actor| actor.details.as_known())
+        .map_or_else(Vec::new, |details| details.abilities.clone());
+    (subject, abilities)
+}
+
+/// Positional actions are meaningful only for the subject/build actually shown.
+/// Input precedes Present, so reject a queued old button or confirmation while
+/// the current projection is waiting to replace the mounted action controls.
+pub(super) fn input_matches_presented_build(world: &World, view: &LabyrinthView) -> bool {
+    let (Some(nodes), Some(snapshot)) = (world.get_resource::<BattleNodes>(), &view.combat) else {
+        return false;
+    };
+    let presentation = crate::presentation::BattlePresentation::new(
+        snapshot,
+        world.resource::<crate::presentation::CombatDisclosure>(),
+    );
+    let (subject, abilities) = displayed_loadout(view, &presentation);
+    nodes.ability_actor == subject && nodes.loadout == abilities
+}
+
 pub(super) fn clear(world: &mut World) {
     despawn_marked::<BattleRoot>(world);
     world.remove_resource::<BattleNodes>();
@@ -123,11 +154,7 @@ pub(super) fn present(
             world.resource::<crate::presentation::CombatDisclosure>(),
         );
         let displayed = inspection::display_actor(view);
-        let ability_actor = displayed.map(|actor| (view.encounter, actor.id));
-        let loadout = displayed
-            .and_then(|actor| presentation.actor(actor.id))
-            .and_then(|actor| actor.details.as_known())
-            .map_or_else(Vec::new, |details| details.abilities.clone());
+        let (ability_actor, loadout) = displayed_loadout(view, &presentation);
         if nodes.loadout != loadout || nodes.ability_actor != ability_actor {
             dock::mount_skills(world, nodes.skills, view.encounter, displayed, &loadout);
             nodes.loadout = loadout;

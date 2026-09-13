@@ -235,6 +235,10 @@ fn editor_app() -> App {
     run_frames(&mut app, 4);
     let actor = first_actor(app.world().resource::<LabyrinthView>()).id;
     super::super::apply_action(app.world_mut(), Action::Setup(SetupAction::Edit(actor)));
+    super::super::apply_action(
+        app.world_mut(),
+        Action::Setup(SetupAction::Category(Category::Parameters)),
+    );
     run_frames(&mut app, 4);
     app
 }
@@ -378,6 +382,10 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
     super::super::apply_action(
         app.world_mut(),
         Action::Setup(SetupAction::Edit(first_actor(&view).id)),
+    );
+    super::super::apply_action(
+        app.world_mut(),
+        Action::Setup(SetupAction::Category(Category::Parameters)),
     );
     run_frames(&mut app, 2);
     let prior = name_field(app.world_mut());

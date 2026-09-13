@@ -414,3 +414,96 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
          .0
         .contains("encounter/2/actor/2/"));
 }
+
+#[test]
+fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present() {
+    use bevy::ecs::system::RunSystemOnce;
+
+    // Exercise the production translation boundary with queued native-entity
+    // messages. This is not a real-pointer or render-order reproduction.
+    for replace_build in [false, true] {
+        let (catalog, mut scenario) = authored_scenario();
+        let original = Combat::from_scenario(&catalog, &scenario)
+            .expect("original scenario")
+            .snapshot();
+        let mut app = app(1280, 720, UiScaleMode::Auto);
+        app.world_mut().resource_mut::<LabyrinthView>().combat = Some(original.clone());
+        run_frames(&mut app, 5);
+        let skill = find_named(app.world_mut(), "Skill 0").expect("original technique zero");
+        let target = find_named(app.world_mut(), "Actor 101").expect("target");
+        for control in [skill, target] {
+            assert!(focus_action(app.world_mut(), control));
+            tap_key(&mut app, KeyCode::Enter);
+        }
+        let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
+        assert!(activation_eligible(app.world_mut(), confirm));
+        assert_eq!(
+            app.world().resource::<UiState>().selected,
+            Some(Choice::Ability(0))
+        );
+        assert!(app
+            .world_mut()
+            .resource_mut::<Messages<LabyrinthIntent>>()
+            .drain()
+            .next()
+            .is_none());
+
+        if replace_build {
+            scenario.heroes[0].actor.build.innate.swap(0, 1);
+            let replacement = Combat::from_scenario(&catalog, &scenario)
+                .expect("valid reordered build")
+                .snapshot();
+            assert_eq!(replacement.active_actor, original.active_actor);
+            assert_eq!(replacement.turn_id, original.turn_id);
+            assert_ne!(
+                replacement
+                    .actor(ActorId(1))
+                    .expect("new actor")
+                    .ability(0)
+                    .expect("new zero")
+                    .id,
+                original
+                    .actor(ActorId(1))
+                    .expect("old actor")
+                    .ability(0)
+                    .expect("old zero")
+                    .id
+            );
+            app.world_mut().resource_mut::<LabyrinthView>().combat = Some(replacement);
+        }
+        // Both controls still belong to the displayed old build. Deliberately
+        // translate before Present can unmount them or clear positional selection.
+        app.world_mut().write_message(UiActivated { entity: skill });
+        app.world_mut()
+            .write_message(UiActivated { entity: confirm });
+        app.world_mut()
+            .run_system_once(collect_actions)
+            .expect("translate queued activations");
+        let commands = app
+            .world_mut()
+            .resource_mut::<Messages<LabyrinthIntent>>()
+            .drain()
+            .filter_map(|intent| match intent {
+                LabyrinthIntent::Combat { actor, action, .. } => Some((actor, action)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if replace_build {
+            assert!(
+                commands.is_empty(),
+                "an old button must not confirm the replacement slot's ability: {commands:?}"
+            );
+        } else {
+            assert_eq!(
+                commands,
+                vec![(
+                    ActorId(1),
+                    CombatAction::Ability {
+                        index: 0,
+                        target: ActorId(101)
+                    }
+                )]
+            );
+        }
+    }
+}

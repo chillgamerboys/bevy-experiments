@@ -316,42 +316,42 @@ effects = [{ Damage = 4 }]
 [[weapons]]
 id = "dagger"
 name = "Dagger"
-description = "Grants dagger stab, dagger throw."
+description = "A light blade combining close-range stabs with thrown attacks."
 handedness = "One"
 grants = ["dagger_stab", "dagger_throw"]
 
 [[weapons]]
 id = "greatsword"
 name = "Greatsword"
-description = "Grants greatsword cleave, greatsword thrust."
+description = "Cleave across the enemy front ranks or concentrate damage with a single-target thrust."
 handedness = "Two"
 grants = ["greatsword_cleave", "greatsword_thrust"]
 
 [[weapons]]
 id = "two_handed_axe"
 name = "Two-handed Axe"
-description = "Grants axe chop."
+description = "Heavy single-target damage for a fighter holding the front ranks."
 handedness = "Two"
 grants = ["axe_chop"]
 
 [[weapons]]
 id = "spear"
 name = "Spear"
-description = "Grants spear thrust, spear shove."
+description = "Reach past the frontline and push a nearby opponent backward."
 handedness = "Two"
 grants = ["spear_thrust", "spear_shove"]
 
 [[weapons]]
 id = "bow"
 name = "Bow"
-description = "Grants bow aimed shot, bow quick shot."
+description = "A strong aimed shot from the rear, with a quick shot for more flexible positioning."
 handedness = "Two"
 grants = ["bow_aimed_shot", "bow_quick_shot"]
 
 [[weapons]]
 id = "staff"
 name = "Staff"
-description = "Grants staff blow, staff push."
+description = "Strike and push to disrupt the enemy formation."
 handedness = "Two"
 grants = ["staff_blow", "staff_push"]
 

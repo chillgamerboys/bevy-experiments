@@ -89,6 +89,18 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView, ui:
     readiness(world, lobby, view);
 }
 
+// Cards use their own width budget rather than the combat HUD's viewport class.
+pub(super) fn formation_columns(metrics: ResolvedUiMetrics) -> u16 {
+    let readable_width = (metrics.logical_size.x.min(1600.0) - 96.0) / metrics.content_scale;
+    if readable_width >= 1000.0 {
+        3
+    } else if readable_width >= 650.0 {
+        2
+    } else {
+        1
+    }
+}
+
 fn roster(world: &mut World, parent: Entity, view: &LabyrinthView, team: labyrinth_rules::Team) {
     let Some(scenario) = &view.scenario else {
         return;
@@ -124,10 +136,7 @@ fn roster(world: &mut World, parent: Entity, view: &LabyrinthView, team: labyrin
         UiTextRole::Supporting,
     );
     let metrics = *world.resource::<ResolvedUiMetrics>();
-    let columns = match metrics.viewport {
-        UiViewportClass::Compact => 1,
-        _ => 3,
-    };
+    let columns = formation_columns(metrics);
     let grid = column(
         world,
         parent,
