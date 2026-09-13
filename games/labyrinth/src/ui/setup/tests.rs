@@ -1,4 +1,8 @@
 //! Resolver decision checks and production native-input messages; no human comprehension claim.
+#![expect(
+    clippy::panic,
+    reason = "Authored fixture invariants and typed-intent assertions"
+)]
 use super::*;
 use bevy_gamekit::testing::{
     find_named, focus_action, run_frames, tap_key, visible_control_rect, TestAppBuilder,
@@ -498,4 +502,24 @@ fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_f
     assert_eq!(app.world().resource::<InputFocus>().get(), Some(field));
     assert!(app.world().get::<EditableText>(field).is_some());
     let _ = value;
+}
+
+#[test]
+fn first_detail_fold_shows_effects_and_ranks_and_native_paging_reaches_sources() {
+    let mut app = app(1280, 720, UiScaleMode::Percent200);
+    activate(&mut app, "Weapon greatsword", false);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280., 720.));
+    for name in ["Move Tactical Summary", "Move Rank Summary"] {
+        let entity = find_named(app.world_mut(), name).expect("decision fact");
+        let rect = visible_control_rect(app.world(), entity, viewport)
+            .expect("mechanical fact visible without scroll");
+        assert!(rect.height() > 30., "{name} visible: {rect:?}");
+    }
+    let area = find_named(app.world_mut(), "Inspected Choice Scroll").expect("details");
+    tap_key(&mut app, KeyCode::End);
+    run_frames(&mut app, 3);
+    assert!(app.world().get::<ScrollPosition>(area).expect("scrolled").y > 0.);
+    tap_key(&mut app, KeyCode::Home);
+    run_frames(&mut app, 3);
+    assert_eq!(app.world().get::<ScrollPosition>(area).expect("top").y, 0.);
 }

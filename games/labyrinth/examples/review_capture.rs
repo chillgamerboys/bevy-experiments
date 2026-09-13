@@ -446,7 +446,12 @@ fn capture(
     capture.frame += 1;
     if capture.route.starts_with("editor") && capture.frame == 2 {
         for (entity, name, _) in &mut controls {
-            if name.as_str() == "Edit Actor 1" {
+            let target = if capture.route == "editor-rank4" {
+                "Edit Actor 4"
+            } else {
+                "Edit Actor 1"
+            };
+            if name.as_str() == target {
                 focus.set(entity, bevy::input_focus::FocusCause::Navigated);
             }
         }
@@ -466,6 +471,10 @@ fn capture(
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
+        ("editor-enemy", 2) => Some("Preparation Enemies"),
+        ("editor-enemy", 4) => Some("Edit Actor 101"),
+        ("editor-rank4", 4) => Some("Edit Actor 4"),
+        ("editor-rank4", 7) => Some("Weapon dagger"),
         (route, 4) if route.starts_with("editor") => Some("Edit Actor 1"),
         ("editor-compare", 7) => Some("Weapon greatsword"),
         ("editor-detail", 7) => Some("Weapon dagger"),
