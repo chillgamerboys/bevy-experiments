@@ -68,10 +68,38 @@ an isolated scratch virtual environment supplied it without changing project or
 installed skill dependencies. These validators do not execute a model. The repository
 check initially rejected four inherited plan status lines; this owned plan now uses
 the required active status, and the coordinator owns the other three repairs.
-Bundle/archive checks and independent behavioral trials remain outstanding for
-this instruction revision. Wording and structural success do not prove improvement.
+Bundle/archive checks remain outstanding for this instruction revision. Wording
+and structural success do not prove improvement.
 
-Evaluate any candidate with a fresh agent on an unfamiliar tactical-game builder,
+The coordinator then completed one bounded independent planning comparison using
+two fresh agents with no inherited conversation (`fork_turns="none"`):
+`ui_plan_trial` used candidate `3e453f8`, and `ui_baseline_trial` used baseline
+`a4e4aa3`. Both received the same raw tactical-space-fleet brief and were explicitly
+barred from reading Labyrinth plans, evaluation reports or repository history.
+Full responses are retained in those session agent records; the comparison summary
+is in `.context/ui-research/workflow-evidence.md`. This author records the coordinator's
+reported observations rather than claiming to have rerun or independently scored them.
+
+The candidate asked two material questions (fleet versus individual-ship emphasis,
+and action-first versus source-first organization), distinguished accepted mechanics
+from accepted screens, and proposed a shared campaign inspector with appropriate
+authority. Its plan covered effective grants/upgrades, duplicate-source comparison
+before committing, task-based acceptance and unknown source facts. The baseline
+also produced useful planning: one overview-versus-all-twelve-details question with
+a recommendation and sketches, effective move provenance and rule-owned duplicate
+handling, restricted campaign inspection, mutation authority, draft lifecycle and
+a comprehension walkthrough. The baseline did not reproduce the original failure.
+
+This single pair shows the candidate preserves useful planning behavior on this
+brief. It does not demonstrate improvement over the baseline or establish that the
+instruction change caused a fix. Neither agent built an interface, exercised native
+input or observed player comprehension; question count alone is not a quality or
+cost measure. Keep these independent planning observations separate from the earlier
+known-answer self-review exercises and from native skill selection/install evidence.
+The canonical wording is unchanged following this comparison; no further change is
+justified merely to produce a preferred evaluation result.
+
+Further evaluation should include produced interface artifacts, not only plans,
 without prescribing a layout or mentioning this failure. A separate reviewer uses
 only the result to choose a front-pair attack, distinguish a new move from an
 upgrade, explain an incompatible choice, undo it and switch characters without
