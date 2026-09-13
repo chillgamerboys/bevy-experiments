@@ -38,13 +38,30 @@ fn fixture() -> LabyrinthView {
         player: Some(0),
         encounter: 1,
         combat: Some(combat),
+        assignment_revision: 1,
+        company: DEFAULT_HERO_ROSTER
+            .into_iter()
+            .enumerate()
+            .map(|(index, hero)| {
+                let actor = ActorId(u16::try_from(index + 1).expect("actor"));
+                crate::session::CompanyMember {
+                    actor,
+                    hero,
+                    abilities: HeroSetup::preset(actor, hero).abilities,
+                    owner: 0,
+                }
+            })
+            .collect(),
         players: DEFAULT_HERO_ROSTER
             .into_iter()
             .enumerate()
-            .map(|(index, hero)| crate::view::PlayerView {
+            .map(|(index, _hero)| crate::view::PlayerView {
                 slot: u8::try_from(index).expect("six player index"),
-                actor: ActorId(u16::try_from(index + 1).expect("actor ID")),
-                hero,
+                actors: if index == 0 {
+                    (1..=6).map(ActorId).collect()
+                } else {
+                    Vec::new()
+                },
                 name: format!("Player {}", index + 1),
                 occupied: true,
                 connected: true,
@@ -52,6 +69,21 @@ fn fixture() -> LabyrinthView {
             })
             .collect(),
         ..LabyrinthView::default()
+    }
+}
+
+fn network_ownership(view: &mut LabyrinthView) {
+    view.local = false;
+    for (index, member) in view.company.iter_mut().enumerate() {
+        member.owner = u8::try_from(index).expect("six participant fixture");
+    }
+    for player in &mut view.players {
+        player.actors = view
+            .company
+            .iter()
+            .filter(|m| m.owner == player.slot)
+            .map(|m| m.actor)
+            .collect();
     }
 }
 
@@ -161,7 +193,7 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
 #[test]
 fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
-    app.world_mut().resource_mut::<LabyrinthView>().local = false;
+    network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
     let snapshot = app
         .world()
         .resource::<LabyrinthView>()
@@ -174,7 +206,7 @@ fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
         .resource::<LabyrinthView>()
         .players
         .iter()
-        .position(|player| player.actor != active)
+        .position(|player| !player.actors.contains(&active))
         .expect("different hero");
     app.world_mut().resource_mut::<LabyrinthView>().player =
         Some(u8::try_from(other).expect("slot"));
@@ -592,17 +624,26 @@ fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank(
     assert_eq!(combat.snapshot().active_actor, Some(ActorId(1)));
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-        view.local = false;
+        network_ownership(&mut view);
         view.player = Some(5);
+        for member in &mut view.company {
+            member.hero = HeroClass::Gatekeeper;
+            member.abilities = HeroSetup::preset(member.actor, member.hero).abilities;
+            // Deliberately not slot+1: character control is independent of seats.
+            if member.actor == ActorId(1) {
+                member.owner = 5;
+            }
+            if member.actor == ActorId(6) {
+                member.owner = 0;
+            }
+        }
+        let company = view.company.clone();
         for player in &mut view.players {
-            player.hero = HeroClass::Gatekeeper;
-            // Deliberately not slot+1: ownership survives an independent seat mapping.
-            if player.slot == 5 {
-                player.actor = ActorId(1);
-            }
-            if player.slot == 0 {
-                player.actor = ActorId(6);
-            }
+            player.actors = company
+                .iter()
+                .filter(|m| m.owner == player.slot)
+                .map(|m| m.actor)
+                .collect();
         }
         view.combat = Some(combat.snapshot());
     }
@@ -645,7 +686,7 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
     });
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-        view.local = false;
+        network_ownership(&mut view);
         view.player = Some(5);
         view.combat = Some(
             Combat::with_heroes(42, heroes)
@@ -688,7 +729,7 @@ fn six_seat_lobby_allows_repeated_class_selection_and_requires_every_ready_playe
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
         view.mode = ViewMode::Lobby;
-        view.local = false;
+        network_ownership(&mut view);
         view.invite_labels = (1..PARTY_SIZE)
             .map(|index| format!("Guest {index}"))
             .collect();
@@ -699,8 +740,8 @@ fn six_seat_lobby_allows_repeated_class_selection_and_requires_every_ready_playe
     assert!(app.world().get::<UiDisabled>(start).is_some());
     assert!(find_named(app.world_mut(), "Copy Invitation 4").is_some());
     for hero in HeroClass::ALL {
-        let choose =
-            find_named(app.world_mut(), &format!("Choose {hero:?}")).expect("class choice");
+        let choose = find_named(app.world_mut(), &format!("Character 1 Choose {hero:?}"))
+            .expect("class choice");
         assert!(app.world().get::<UiDisabled>(choose).is_none());
     }
     app.world_mut()
@@ -1001,4 +1042,64 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
     run_frames(&mut app, 3);
     assert!(activation_eligible(app.world_mut(), actor));
     assert_eq!(app.world().resource::<InputFocus>().get(), Some(actor));
+}
+
+#[test]
+fn multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm() {
+    let mut app = app(1280, 720, UiScaleMode::Auto);
+    let active = app
+        .world()
+        .resource::<LabyrinthView>()
+        .combat
+        .as_ref()
+        .expect("combat")
+        .active_actor
+        .expect("hero");
+    let other = app
+        .world()
+        .resource::<LabyrinthView>()
+        .company
+        .iter()
+        .find(|member| member.actor != active)
+        .expect("second hero")
+        .actor;
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.local = false;
+        view.host = false;
+        view.player = Some(1);
+        for member in &mut view.company {
+            member.owner = if [active, other].contains(&member.actor) {
+                1
+            } else {
+                0
+            };
+        }
+        let company = view.company.clone();
+        for player in &mut view.players {
+            player.actors = company
+                .iter()
+                .filter(|m| m.owner == player.slot)
+                .map(|m| m.actor)
+                .collect();
+        }
+    }
+    run_frames(&mut app, 3);
+    let wait = find_named(app.world_mut(), "Wait").expect("universal action");
+    assert!(click_action(&mut app, wait));
+    let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirmation");
+    assert!(activation_eligible(app.world_mut(), confirm));
+    assert!(click_action(&mut app, confirm));
+    assert!(app.world_mut().resource_mut::<Messages<LabyrinthIntent>>().drain().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor, assignment_revision: 1, .. } if actor == active)));
+    app.world_mut().resource_mut::<LabyrinthView>().player = Some(2);
+    run_frames(&mut app, 3);
+    let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirmation");
+    assert!(!activation_eligible(app.world_mut(), confirm));
+    tap_key(&mut app, KeyCode::Digit1);
+    tap_key(&mut app, KeyCode::Enter);
+    assert!(!app
+        .world_mut()
+        .resource_mut::<Messages<LabyrinthIntent>>()
+        .drain()
+        .any(|intent| matches!(intent, LabyrinthIntent::Combat { .. })));
 }

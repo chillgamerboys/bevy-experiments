@@ -31,9 +31,16 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
         }
         let mut view = fixture();
         view.combat = Some(combat.snapshot());
-        view.players.retain(|p| p.actor.0 <= 5);
-        for p in &mut view.players {
-            p.hero = heroes.get(usize::from(p.slot)).copied().expect("class");
+        view.company.retain(|member| member.actor.0 <= 5);
+        for member in &mut view.company {
+            member.hero = heroes
+                .get(usize::from(member.owner))
+                .copied()
+                .expect("class");
+            member.abilities = HeroSetup::preset(member.actor, member.hero).abilities;
+        }
+        for player in &mut view.players {
+            player.actors.retain(|actor| actor.0 <= 5);
         }
         let mut app = App::new();
         app.add_plugins(HeadlessUiPlugin::new(width, height))

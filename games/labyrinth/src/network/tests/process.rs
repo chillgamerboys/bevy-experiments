@@ -172,18 +172,37 @@ fn process_child_entry() {
         let slot = runtime.player;
         if admitted {
             if let Some(snapshot) = latest.as_ref() {
+                if role == "host" && snapshot.combat.is_none() {
+                    for (index, member) in snapshot.company.iter().enumerate() {
+                        let owner = u8::try_from(index).expect("six participant fixture");
+                        if member.owner != owner
+                            && snapshot
+                                .players
+                                .iter()
+                                .any(|p| p.slot == owner && p.connected)
+                        {
+                            child.world_mut().write_message(LabyrinthIntent::Assign {
+                                actor: member.actor,
+                                owner,
+                            });
+                        }
+                    }
+                }
                 if snapshot.combat.is_none() && !ready_sent {
                     let chosen = snapshot
-                        .players
+                        .company
                         .iter()
-                        .find(|player| Some(player.slot) == slot);
+                        .find(|player| Some(player.owner) == slot);
                     if role == RESTARTED_ROLE
                         && chosen.is_some_and(|player| player.hero != HeroClass::Knifehand)
                     {
                         if !class_sent {
                             child
                                 .world_mut()
-                                .write_message(LabyrinthIntent::SelectHero(HeroClass::Knifehand));
+                                .write_message(LabyrinthIntent::SelectHero {
+                                    actor: chosen.expect("assigned hero").actor,
+                                    hero: HeroClass::Knifehand,
+                                });
                             class_sent = true;
                         }
                     } else if directory.join("party-ready").exists() {
@@ -229,15 +248,16 @@ fn process_child_entry() {
                     if play && !snapshot.paused && combat.turn_id != acted_turn {
                         if let Some(actor) = combat.active_actor.filter(|actor| {
                             snapshot
-                                .players
+                                .company
                                 .iter()
-                                .any(|player| Some(player.slot) == slot && player.actor == *actor)
+                                .any(|player| Some(player.owner) == slot && player.actor == *actor)
                         }) {
                             child.world_mut().write_message(LabyrinthIntent::Combat {
                                 actor,
                                 action: aggressive_action(combat, actor),
                                 encounter: snapshot.encounter,
                                 decision: combat.turn_id,
+                                assignment_revision: snapshot.assignment_revision,
                             });
                             acted_turn = combat.turn_id;
                         }
@@ -301,9 +321,9 @@ fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
                 .and_then(|report| report.snapshot)
                 .is_some_and(|snapshot| {
                     snapshot
-                        .players
+                        .company
                         .iter()
-                        .any(|player| player.slot == 5 && player.hero == HeroClass::Knifehand)
+                        .any(|player| player.owner == 5 && player.hero == HeroClass::Knifehand)
                 })
         },
         "sixth player selects a repeated class before readiness",
@@ -354,7 +374,7 @@ fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
         .iter()
         .all(|player| player.connected && player.ready));
     let actor_ids: BTreeSet<_> = before_session
-        .players
+        .company
         .iter()
         .map(|player| player.actor)
         .collect();
@@ -362,14 +382,14 @@ fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
     let original = required_report(root, RESTARTED_ROLE);
     assert_eq!(original.slot, Some(5), "kill the actual sixth player");
     let owned = before_session
-        .players
+        .company
         .iter()
-        .find(|player| Some(player.slot) == original.slot)
+        .find(|player| Some(player.owner) == original.slot)
         .expect("late seat owns a hero")
         .clone();
     assert_eq!(owned.hero, HeroClass::Knifehand);
     assert!(before_session
-        .players
+        .company
         .iter()
         .any(|player| player.actor != owned.actor && player.hero == owned.hero));
     let before = before_session.combat.expect("stable combat");
@@ -435,9 +455,9 @@ fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
         .expect("recovered guest snapshot");
     assert_eq!(
         recovered
-            .players
+            .company
             .iter()
-            .find(|player| player.slot == owned.slot),
+            .find(|player| player.owner == owned.owner),
         Some(&owned),
         "sixth process restart changed the reserved actor, class or loadout"
     );
