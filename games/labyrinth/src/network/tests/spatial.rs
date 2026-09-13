@@ -233,3 +233,73 @@ fn spatial_encrypted_reservations_guest_type_choice_gaps_and_save_load_converge(
     started.validate().expect("complete compact snapshot");
     assert_eq!(started.combat.expect("combat").ranks(actor), Some(2..=2));
 }
+
+#[test]
+fn spatial_local_deploy_is_atomic_after_edits_and_still_rejects_gaps() {
+    let mut local = socket_app(None);
+    local
+        .world_mut()
+        .write_message(LabyrinthIntent::StartLocal(42));
+    local.update();
+    let original = local.world().resource::<PartyAuthority>().snapshot(0);
+    local
+        .world_mut()
+        .write_message(LabyrinthIntent::RemoveScenarioActor {
+            actor: ActorId(2),
+            expected_revision: original.setup_revision,
+        });
+    local.update();
+    let sparse = local.world().resource::<PartyAuthority>().snapshot(0);
+    assert!(sparse.players.iter().all(|player| !player.ready));
+    local
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    local.update();
+    let rejected = local.world().resource::<PartyAuthority>().snapshot(0);
+    assert!(rejected.combat.is_none());
+    assert_eq!(
+        rejected.players, sparse.players,
+        "rejected deployment must not run a separate Ready mutation"
+    );
+    assert_eq!(rejected.formation, sparse.formation);
+    assert!(local
+        .world()
+        .resource::<LabyrinthView>()
+        .notice
+        .as_deref()
+        .is_some_and(|error| error.contains("rank 2")));
+    let preset = original
+        .catalog
+        .definition()
+        .actor_presets
+        .iter()
+        .find(|preset| preset.appearance == labyrinth_rules::ActorKind::Hero(HeroClass::Gatekeeper))
+        .expect("selected character type")
+        .id
+        .clone();
+    local
+        .world_mut()
+        .write_message(LabyrinthIntent::PlaceScenarioActor {
+            team: Team::Heroes,
+            rank: 2,
+            preset,
+            expected_revision: sparse.setup_revision,
+        });
+    local.update();
+    let configured = local.world().resource::<PartyAuthority>().snapshot(0);
+    assert!(configured
+        .formation
+        .deployment_error(&configured.scenario)
+        .is_none());
+    assert!(configured.players.iter().all(|player| !player.ready));
+    local
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    local.update();
+    let deployed = local.world().resource::<PartyAuthority>().snapshot(0);
+    assert!(
+        deployed.combat.is_some(),
+        "one local Deploy must work after a valid edit without an unavailable Ready control"
+    );
+    deployed.validate().expect("complete local deployment");
+}

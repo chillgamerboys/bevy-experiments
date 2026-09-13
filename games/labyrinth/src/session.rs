@@ -1037,9 +1037,13 @@ impl PartyAuthority {
                 self.scenario
                     .validate(&self.catalog)
                     .map_err(|e| e.to_string())?;
-                if self.players.iter().any(|p| {
-                    self.company.iter().any(|m| m.owner == p.slot) && (!p.connected || !p.ready)
-                }) {
+                // Explicit local play controls the whole company; Deploy is its
+                // single confirmation after editing, with no participant-ready step.
+                if !self.local
+                    && self.players.iter().any(|p| {
+                        self.company.iter().any(|m| m.owner == p.slot) && (!p.connected || !p.ready)
+                    })
+                {
                     return Err("Every character controller must be connected and ready.".into());
                 }
                 self.combat = Some(
