@@ -2,6 +2,7 @@
 
 mod appearance;
 mod battle;
+mod constructor;
 mod glyphs;
 mod setup;
 mod shell;
@@ -177,6 +178,7 @@ struct UiState {
     overlay_key: Option<String>,
     editor: Option<setup::ActorEditor>,
     lobby_page: u8,
+    constructor: constructor::ConstructorState,
     scenario_path: String,
     scenario_seed: String,
     scenario_seed_source: Option<u64>,
@@ -202,6 +204,7 @@ enum Action {
     AssignmentPause(bool),
     Setup(setup::SetupAction),
     LobbyPage(u8),
+    Constructor(constructor::ConstructorAction),
     Start,
     Rematch,
     Copy(usize),
@@ -323,6 +326,16 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     if keys.just_pressed(KeyCode::Escape) {
+        if world.resource::<LabyrinthView>().mode == ViewMode::Lobby
+            && !world.resource::<UiState>().menus.is_open()
+            && world.resource::<UiState>().constructor.selection.is_some()
+        {
+            apply_action(
+                world,
+                Action::Constructor(constructor::ConstructorAction::Close),
+            );
+            return;
+        }
         apply_action(world, Action::Cancel);
         return;
     }
@@ -406,10 +419,11 @@ fn apply_action(world: &mut World, action: Action) {
                     }
                 }
                 Action::LobbyPage(page) => {
-                    ui.lobby_page = page;
+                    ui.lobby_page = if ui.lobby_page == page { 0 } else { page };
                     None
                 }
                 Action::Setup(action) => setup::action(&view, &mut ui, action),
+                Action::Constructor(action) => constructor::action(&view, &mut ui, action),
                 Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
                 Action::Host => {
                     let port = if ui.port.is_empty() {
@@ -616,6 +630,9 @@ fn apply_action(world: &mut World, action: Action) {
                     None
                 }
                 Action::ScrollDetails(direction) => {
+                    if view.mode == ViewMode::Lobby {
+                        constructor::scroll_details(world, direction, ui.lobby_page == 0);
+                    }
                     if ui.log_mode == LogMode::History {
                         battle::scroll_history(world, direction);
                     }

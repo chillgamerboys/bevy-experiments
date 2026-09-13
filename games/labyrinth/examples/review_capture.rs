@@ -66,7 +66,8 @@ fn main() {
     );
     let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
     let scenario = (matches!(route.as_str(), "lobby" | "abilities" | "ability-help")
-        || route.starts_with("editor"))
+        || route.starts_with("editor")
+        || route.starts_with("construction"))
     .then(|| {
         let mut scenario = labyrinth_rules::scenario::Scenario::stock(
             labyrinth_rules::scenario::StockScenario::Prototype,
@@ -229,13 +230,19 @@ fn main() {
         }
     }
     let company_snapshot = snapshot.clone();
-    let view = LabyrinthView {
+    let mut view = LabyrinthView {
         mode: match route.as_str() {
             "menu" | "host" => ViewMode::Menu,
-            route if route == "lobby" || route.starts_with("editor") => ViewMode::Lobby,
+            route
+                if route == "lobby"
+                    || route.starts_with("editor")
+                    || route.starts_with("construction") =>
+            {
+                ViewMode::Lobby
+            }
             _ => ViewMode::Combat,
         },
-        local: !matches!(route.as_str(), "lobby" | "paused"),
+        local: !matches!(route.as_str(), "lobby" | "paused" | "construction-owners"),
         host: true,
         admitted: true,
         player: Some(0),
@@ -312,6 +319,55 @@ fn main() {
         ],
         ..LabyrinthView::default()
     };
+    if route.starts_with("construction") {
+        let scenario = view.scenario.as_mut().expect("construction scenario");
+        let mut formation = labyrinth::view::LobbyFormation::compact(scenario);
+        if matches!(
+            route.as_str(),
+            "construction-picker"
+                | "construction-gap"
+                | "construction-enemy"
+                | "construction-owners"
+        ) {
+            // Authored sparse presentation, not evidence of an authority mutation.
+            let team = if route == "construction-enemy" {
+                &mut scenario.enemies
+            } else {
+                &mut scenario.heroes
+            };
+            let removed = team.remove(1).id;
+            formation.heroes.retain(|p| p.actor != removed);
+            formation.enemies.retain(|p| p.actor != removed);
+        }
+        if route == "construction-owners" {
+            formation.hero_owners = [0, 1, 1, 2, 0, 0];
+            for (player, name) in view
+                .players
+                .iter_mut()
+                .zip(["Captain Rowan", "Mira", "Jules"])
+            {
+                player.name = name.into();
+            }
+            view.company
+                .retain(|m| scenario.heroes.iter().any(|a| a.id == m.actor));
+            for member in &mut view.company {
+                member.owner = formation
+                    .rank(member.actor)
+                    .and_then(|rank| formation.owner(rank))
+                    .unwrap_or(0);
+            }
+            for player in &mut view.players {
+                player.actors = view
+                    .company
+                    .iter()
+                    .filter(|m| m.owner == player.slot)
+                    .map(|m| m.actor)
+                    .collect();
+            }
+        }
+        view.deployment_error = formation.deployment_error(scenario);
+        view.formation = Some(formation);
+    }
     let mut disclosure = CombatDisclosure::default();
     if route == "unknown" {
         for id in 101..=106 {
@@ -442,8 +498,20 @@ fn capture(
     mut capture: ResMut<Capture>,
     mut controls: Query<(Entity, &Name, &mut Interaction), With<Button>>,
     mut focus: ResMut<bevy::input_focus::InputFocus>,
+    mut scrolls: Query<(&Name, &mut ScrollPosition)>,
 ) {
     capture.frame += 1;
+    if capture.frame == 6
+        && capture.scale == UiScaleMode::Percent200
+        && capture.route == "construction-picker"
+    {
+        // Authored scroll position for this static frame; native scrolling is a separate test.
+        for (name, mut scroll) in &mut scrolls {
+            if name.as_str() == "Character Type Picker" {
+                scroll.x = 1000.0;
+            }
+        }
+    }
     if capture.route.starts_with("editor") && capture.frame == 2 {
         for (entity, name, _) in &mut controls {
             let target = if capture.route == "editor-rank4" {
@@ -471,16 +539,26 @@ fn capture(
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
-        ("editor-enemy", 2) => Some("Preparation Enemies"),
-        ("editor-enemy", 4) => Some("Edit Actor 101"),
+        ("editor-enemy", 2) => Some("Select Enemies Rank 1"),
+        ("editor-enemy", 4) => Some("Edit Actor 103"),
+        ("editor-rank4", 2) => Some("Select Heroes Rank 4"),
         ("editor-rank4", 4) => Some("Edit Actor 4"),
         ("editor-rank4", 7) => Some("Weapon dagger"),
+        (route, 2) if route.starts_with("editor") => Some("Select Heroes Rank 1"),
         (route, 4) if route.starts_with("editor") => Some("Edit Actor 1"),
         ("editor-compare", 7) => Some("Weapon greatsword"),
         ("editor-detail", 7) => Some("Weapon dagger"),
         ("editor-learned", 7) => Some("Category Learned"),
         ("editor-learned", 10) => Some("Learned duelist_dagger_power"),
         ("editor-parameters", 7) => Some("Category Parameters"),
+        ("construction", 4) => Some("Select Heroes Rank 1"),
+        ("construction-picker" | "construction-gap" | "construction-owners", 4) => {
+            Some("Select Heroes Rank 2")
+        }
+        ("construction-picker", 7) => Some("Inspect Type scout"),
+        ("construction-owners", 7) => Some("Assign Selected Place"),
+        ("construction-enemy", 4) => Some("Select Enemies Rank 2"),
+        ("construction-enemy", 7) => Some("Inspect Type ossuary_hauler"),
         ("host", 4) => Some("Multiplayer"),
         ("host", 7) => Some("Host Company"),
         ("game-menu", 4) => Some("Battle Settings"),
