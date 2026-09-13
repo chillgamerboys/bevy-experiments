@@ -8,8 +8,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    skill_definition, skills_for, status_definition, AbilityLoadout, RemovalReason, Stat,
-    StatusInstance, StatusKind, TargetRule, MAX_ACTORS, MAX_STATUSES, PARTY_SIZE,
+    skill_definition, skills_for, status_definition, RemovalReason, Stat, StatusInstance,
+    StatusKind, TargetRule, MAX_ACTORS, MAX_STATUSES, PARTY_SIZE,
 };
 
 /// Stable nonzero character identity, independent of player, class, and rank.
@@ -256,6 +256,13 @@ impl SkillId {
 /// A single action. Expected turn/player identity belongs in the app envelope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CombatAction {
+    /// Use a frozen actor-local ability slot; the encounter identity binds the index.
+    Ability {
+        /// Zero-based index into this actor's resolved abilities (0..64).
+        index: u8,
+        /// Selected anchor; FrontPair captures all eligible front-two occupants.
+        target: ActorId,
+    },
     /// Use an owned skill on a stable character ID.
     Skill {
         /// Authored skill.
@@ -349,23 +356,33 @@ pub struct ActorSnapshot {
     /// Immutable base speed.
     pub base_speed: u16,
     /// Explicit equipped abilities, independent of the class starter preset.
-    pub abilities: AbilityLoadout,
+    pub abilities: crate::build::ResolvedBuild,
+    /// Build selections whose resolved view is validated against the frozen catalog.
+    pub build: crate::build::CharacterBuild,
+    /// Custom display name independent of appearance.
+    pub display_name: String,
+    /// Allegiance independent of the visual archetype.
+    pub allegiance: Team,
+    /// Explicit immutable occupied ranks, independent of appearance.
+    pub footprint: u8,
+    /// Default decision producer; session ownership is maintained outside rules.
+    pub controller: crate::scenario::ControllerPolicy,
     /// Character-bound live effects.
     pub statuses: Vec<StatusInstance>,
     /// Number of times each limited skill has been used this encounter.
-    pub skill_uses: BTreeMap<SkillId, u8>,
+    pub skill_uses: BTreeMap<u8, u8>,
 }
 
 impl ActorSnapshot {
     /// Human-readable name.
     #[must_use]
-    pub const fn name(&self) -> &'static str {
-        self.kind.name()
+    pub fn name(&self) -> &str {
+        &self.display_name
     }
     /// Allegiance.
     #[must_use]
     pub const fn team(&self) -> Team {
-        self.kind.team()
+        self.allegiance
     }
     /// Whether this actor can act or be hit.
     #[must_use]
@@ -397,9 +414,52 @@ impl ActorSnapshot {
     }
     /// This actor's actual equipped abilities, not its class starter preset.
     #[must_use]
-    pub fn skills(&self) -> &[SkillId] {
-        self.abilities.as_slice()
+    pub fn skills(&self) -> Vec<SkillId> {
+        self.abilities
+            .abilities
+            .iter()
+            .filter_map(|a| {
+                SkillId::ALL
+                    .into_iter()
+                    .find(|s| crate::scenario::legacy_skill_id(*s) == a.definition.id)
+            })
+            .collect()
     }
+    /// All frozen effective abilities, including authored IDs with no legacy enum.
+    #[must_use]
+    pub fn resolved_abilities(&self) -> &[crate::build::ResolvedAbility] {
+        &self.abilities.abilities
+    }
+    /// Borrow the one effective definition used by legality, preview, AI and apply.
+    #[must_use]
+    pub fn ability(&self, index: u8) -> Option<&crate::catalog::AbilityDefinition> {
+        self.abilities
+            .abilities
+            .get(usize::from(index))
+            .map(|a| &a.definition)
+    }
+    /// Find a stable actor-local index by authored content identity.
+    #[must_use]
+    pub fn ability_index(&self, id: &crate::catalog::ContentId) -> Option<u8> {
+        self.abilities
+            .abilities
+            .iter()
+            .position(|a| &a.definition.id == id)
+            .and_then(|i| u8::try_from(i).ok())
+    }
+    /// Translate an old action ID into this actor's effective definition index.
+    #[must_use]
+    pub fn skill_index(&self, skill: SkillId) -> Option<u8> {
+        self.ability_index(&crate::scenario::legacy_skill_id(skill))
+    }
+    /// Remaining uses; absent means unlimited or an unknown index (check ability first).
+    #[must_use]
+    pub fn remaining_ability_uses(&self, index: u8) -> Option<u8> {
+        self.ability(index)?
+            .max_uses
+            .map(|limit| limit.saturating_sub(self.skill_uses.get(&index).copied().unwrap_or(0)))
+    }
+
     /// Effective speed; existing initiative entries never use this retroactively.
     #[must_use]
     pub fn speed(&self) -> u16 {
@@ -426,9 +486,7 @@ impl ActorSnapshot {
     /// Remaining uses of a limited skill; `None` means unlimited.
     #[must_use]
     pub fn remaining_uses(&self, skill: SkillId) -> Option<u8> {
-        skill_definition(skill)
-            .max_uses
-            .map(|limit| limit.saturating_sub(self.skill_uses.get(&skill).copied().unwrap_or(0)))
+        self.remaining_ability_uses(self.skill_index(skill)?)
     }
 }
 
@@ -436,6 +494,10 @@ impl ActorSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "SnapshotWire")]
 pub struct CombatSnapshot {
+    /// Validated definitions frozen for this encounter, including compatibility identity.
+    pub catalog: crate::catalog::ContentCatalog,
+    /// Reproducibility identity of initial catalog, scenario, seed and policy configuration.
+    pub scenario_fingerprint: String,
     /// Committed action revision.
     pub revision: u64,
     /// One-based round number.
@@ -463,6 +525,8 @@ pub struct CombatSnapshot {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SnapshotWire {
+    catalog: crate::catalog::ContentCatalog,
+    scenario_fingerprint: String,
     revision: u64,
     round: u32,
     turn_id: u64,
@@ -480,6 +544,8 @@ impl TryFrom<SnapshotWire> for CombatSnapshot {
     type Error = RuleError;
     fn try_from(wire: SnapshotWire) -> Result<Self, Self::Error> {
         let snapshot = Self {
+            catalog: wire.catalog,
+            scenario_fingerprint: wire.scenario_fingerprint,
             revision: wire.revision,
             round: wire.round,
             turn_id: wire.turn_id,
@@ -510,7 +576,16 @@ impl CombatSnapshot {
     }
     /// Validate all trusted projection invariants, including nested derived serde data.
     pub fn validate(&self) -> Result<(), RuleError> {
-        if self.round == 0
+        if self.scenario_fingerprint.len() != 64
+            || !self
+                .scenario_fingerprint
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit())
+            || serde_json::to_vec(self)
+                .map_err(|_| RuleError::InvalidState)?
+                .len()
+                > crate::MAX_COMBAT_SNAPSHOT_BYTES
+            || self.round == 0
             || self.turn_id == 0
             || self.actors.is_empty()
             || self.actors.len() > MAX_ACTORS
@@ -526,7 +601,18 @@ impl CombatSnapshot {
         for actor in &self.actors {
             if actor.id.0 == 0
                 || !actor_ids.insert(actor.id)
-                || (actor.max_hp, actor.base_speed) != actor.kind.stats()
+                || crate::catalog::validate_stats(
+                    "actor",
+                    actor.max_hp,
+                    actor.base_speed,
+                    actor.footprint,
+                )
+                .is_err()
+                || crate::catalog::text_field("actor.name", &actor.display_name, 128).is_err()
+                || self
+                    .catalog
+                    .validate_resolved(&actor.build, &actor.abilities)
+                    .is_err()
                 || actor.hp > actor.max_hp
                 || actor.statuses.len() > MAX_STATUSES
             {
@@ -558,11 +644,12 @@ impl CombatSnapshot {
             if !valid_life {
                 return Err(RuleError::InvalidState);
             }
-            if actor.skill_uses.iter().any(|(skill, used)| {
-                !actor.skills().contains(skill)
-                    || skill_definition(*skill)
+            if actor.skill_uses.iter().any(|(index, used)| {
+                actor.ability(*index).is_none_or(|definition| {
+                    definition
                         .max_uses
                         .is_none_or(|limit| *used == 0 || *used > limit)
+                })
             }) {
                 return Err(RuleError::InvalidState);
             }
@@ -628,7 +715,7 @@ impl CombatSnapshot {
                 .actors
                 .iter()
                 .filter(|a| a.team() == team)
-                .map(|a| usize::from(a.kind.footprint()))
+                .map(|a| usize::from(a.footprint))
                 .sum();
             if spaces == 0 || spaces > PARTY_SIZE {
                 return Err(RuleError::InvalidState);
@@ -739,50 +826,126 @@ impl CombatSnapshot {
                 Ok(())
             }
             CombatAction::Skill { skill, target } => {
-                if !source.skills().contains(&skill) {
-                    return Err(RuleError::UnknownSkill);
-                }
-                let definition = skill_definition(skill);
+                let index = source.skill_index(skill).ok_or(RuleError::UnknownSkill)?;
+                self.validate_action_target(actor, &CombatAction::Ability { index, target })
+            }
+            CombatAction::Ability { index, target } => {
+                let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
                 if self
                     .ranks(actor)
                     .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_source_rank(rank)))
                 {
                     return Err(RuleError::WrongRank);
                 }
-                if source.remaining_uses(skill) == Some(0) {
+                if source.remaining_ability_uses(index) == Some(0) {
                     return Err(RuleError::NoUses);
                 }
-                let recipient = self.actor(target).ok_or(RuleError::UnknownActor)?;
-                if self
-                    .ranks(target)
-                    .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_target_rank(rank)))
-                {
-                    return Err(RuleError::WrongTargetRank);
+                self.validate_ability_target(actor, index, target)?;
+                if definition.target_pattern == crate::catalog::TargetPattern::FrontPair {
+                    // A selected anchor is an eligible captured occupant, not an arbitrary actor.
+                    if !self
+                        .ability_targets(actor, index, target)?
+                        .contains(&target)
+                    {
+                        return Err(RuleError::WrongTarget);
+                    }
                 }
-                let valid_target = match definition.target_rule {
-                    TargetRule::EnemyStanding => {
-                        (source.team() != recipient.team() && recipient.damageable())
-                            || recipient.is_corpse()
-                    }
-                    TargetRule::AllyStanding => {
-                        source.team() == recipient.team() && recipient.standing()
-                    }
-                    TargetRule::SelfStanding => actor == target && recipient.standing(),
-                    TargetRule::OtherAlly => {
-                        source.team() == recipient.team()
-                            && actor != target
-                            && (recipient.standing() || recipient.dying())
-                    }
-                    TargetRule::AllyDowned => {
-                        source.team() == Team::Heroes
-                            && recipient.team() == Team::Heroes
-                            && recipient.dying()
-                    }
-                };
-                if valid_target {
-                    Ok(())
+                Ok(())
+            }
+        }
+    }
+    /// Translate either command spelling into the frozen actor-local ability index.
+    pub fn action_ability(
+        &self,
+        actor: ActorId,
+        action: CombatAction,
+    ) -> Result<Option<(u8, ActorId)>, RuleError> {
+        let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
+        match action {
+            CombatAction::Ability { index, target } => {
+                source.ability(index).ok_or(RuleError::UnknownSkill)?;
+                Ok(Some((index, target)))
+            }
+            CombatAction::Skill { skill, target } => Ok(Some((
+                source.skill_index(skill).ok_or(RuleError::UnknownSkill)?,
+                target,
+            ))),
+            _ => Ok(None),
+        }
+    }
+    fn validate_ability_target(
+        &self,
+        actor: ActorId,
+        index: u8,
+        target: ActorId,
+    ) -> Result<(), RuleError> {
+        let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
+        let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
+        let recipient = self.actor(target).ok_or(RuleError::UnknownActor)?;
+        if self
+            .ranks(target)
+            .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_target_rank(rank)))
+        {
+            return Err(RuleError::WrongTargetRank);
+        }
+        let valid = match definition.target_rule {
+            TargetRule::EnemyStanding => {
+                (source.team() != recipient.team() && recipient.damageable())
+                    || (recipient.is_corpse()
+                        && definition.target_pattern == crate::catalog::TargetPattern::Single)
+            }
+            TargetRule::AllyStanding => source.team() == recipient.team() && recipient.standing(),
+            TargetRule::SelfStanding => actor == target && recipient.standing(),
+            TargetRule::OtherAlly => {
+                source.team() == recipient.team()
+                    && actor != target
+                    && (recipient.standing() || recipient.dying())
+            }
+            TargetRule::AllyDowned => {
+                source.team() == Team::Heroes
+                    && recipient.team() == Team::Heroes
+                    && recipient.dying()
+            }
+        };
+        if valid {
+            Ok(())
+        } else {
+            Err(RuleError::WrongTarget)
+        }
+    }
+    /// Capture target identities once, in front-to-back order, before any effects.
+    /// Multi-rank actors occur once; empty ranks add nothing and corpses retain eligibility.
+    pub fn ability_targets(
+        &self,
+        actor: ActorId,
+        index: u8,
+        anchor: ActorId,
+    ) -> Result<Vec<ActorId>, RuleError> {
+        let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
+        let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
+        self.validate_ability_target(actor, index, anchor)?;
+        match definition.target_pattern {
+            crate::catalog::TargetPattern::Single => Ok(vec![anchor]),
+            crate::catalog::TargetPattern::FrontPair => {
+                let team = if source.team() == Team::Heroes {
+                    Team::Enemies
                 } else {
+                    Team::Heroes
+                };
+                let mut result = Vec::new();
+                for rank in 1..=2 {
+                    if let Some(id) = self.occupant(team, rank) {
+                        if !result.contains(&id)
+                            && self.validate_ability_target(actor, index, id).is_ok()
+                        {
+                            result.push(id);
+                        }
+                    }
+                }
+                if result.is_empty() {
                     Err(RuleError::WrongTarget)
+                } else {
+                    Ok(result)
                 }
             }
         }
@@ -794,11 +957,25 @@ impl CombatSnapshot {
             return Vec::new();
         };
         let mut candidates = Vec::new();
-        for skill in source.skills() {
+        for (position, ability) in source.resolved_abilities().iter().enumerate() {
+            let Ok(index) = u8::try_from(position) else {
+                continue;
+            };
             for target in &self.actors {
-                candidates.push(CombatAction::Skill {
-                    skill: *skill,
-                    target: target.id,
+                // Preserve the old action spelling for legacy IDs; both spellings
+                // normalize to the same frozen definition and use counter.
+                let skill = SkillId::ALL
+                    .into_iter()
+                    .find(|s| crate::scenario::legacy_skill_id(*s) == ability.definition.id);
+                candidates.push(match skill {
+                    Some(skill) => CombatAction::Skill {
+                        skill,
+                        target: target.id,
+                    },
+                    None => CombatAction::Ability {
+                        index,
+                        target: target.id,
+                    },
                 });
             }
         }
@@ -1061,6 +1238,7 @@ impl fmt::Display for CombatEvent {
                 actor.0,
                 match action {
                     CombatAction::Skill { skill, .. } => skill_definition(*skill).name,
+                    CombatAction::Ability { .. } => "Ability",
                     CombatAction::Reposition { .. } => "Reposition",
                     CombatAction::Rescue { .. } => "Rescue",
                     CombatAction::Defend => "Defend",

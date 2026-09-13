@@ -129,6 +129,18 @@ pub struct AbilityDefinition {
     /// Explicit execution order, using tested Rust primitives.
     pub effects: Vec<Effect>,
 }
+impl AbilityDefinition {
+    /// Whether one-based source rank is in this move's mask.
+    #[must_use]
+    pub fn allows_source_rank(&self, rank: u8) -> bool {
+        rank > 0 && rank <= 6 && self.source_ranks & (1 << (rank - 1)) != 0
+    }
+    /// Whether one-based target rank is in this move's mask.
+    #[must_use]
+    pub fn allows_target_rank(&self, rank: u8) -> bool {
+        rank > 0 && rank <= 6 && self.target_ranks & (1 << (rank - 1)) != 0
+    }
+}
 /// Descriptive handedness only; this slice has one weapon and no inventory slots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Handedness {
@@ -242,6 +254,7 @@ pub struct CatalogDefinition {
 #[serde(try_from = "CatalogDefinition", into = "CatalogDefinition")]
 pub struct ContentCatalog {
     definition: CatalogDefinition,
+    fingerprint: String,
 }
 impl TryFrom<CatalogDefinition> for ContentCatalog {
     type Error = ContentError;
@@ -304,7 +317,17 @@ impl ContentCatalog {
         definition.weapons.sort_by(|a, b| a.id.cmp(&b.id));
         definition.learned_skills.sort_by(|a, b| a.id.cmp(&b.id));
         definition.actor_presets.sort_by(|a, b| a.id.cmp(&b.id));
-        let catalog = Self { definition };
+        let bytes = serde_json::to_vec(&(
+            "labyrinth-build-v1",
+            crate::rules_fingerprint(),
+            &definition,
+        ))
+        .map_err(|e| ContentError::new("catalog", e.to_string()))?;
+        let fingerprint = format!("{:x}", Sha256::digest(bytes));
+        let catalog = Self {
+            definition,
+            fingerprint,
+        };
         for ability in &catalog.definition.abilities {
             validate_ability(ability)?;
         }
@@ -384,16 +407,18 @@ impl ContentCatalog {
     pub fn actor_preset(&self, id: &ContentId) -> Option<&ActorPreset> {
         self.definition.actor_presets.iter().find(|a| &a.id == id)
     }
+    /// Find a default actor preset for an existing visual archetype.
+    #[must_use]
+    pub fn preset_for_appearance(&self, appearance: ActorKind) -> Option<&ActorPreset> {
+        self.definition
+            .actor_presets
+            .iter()
+            .find(|preset| preset.appearance == appearance)
+    }
     /// SHA-256 over canonical data, schema and resolver interpretation revision.
     #[must_use]
     pub fn fingerprint(&self) -> String {
-        let bytes = serde_json::to_vec(&(
-            "labyrinth-build-v1",
-            crate::rules_fingerprint(),
-            &self.definition,
-        ))
-        .expect("validated content is JSON-serializable");
-        format!("{:x}", Sha256::digest(bytes))
+        self.fingerprint.clone()
     }
     /// Verify an untrusted resolved view by recomputing all grants/contributions.
     pub fn validate_resolved(

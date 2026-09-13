@@ -40,6 +40,7 @@ impl CombatSnapshot {
             next_status: &mut next_status,
             damage: Some(&mut damage),
             movement: Some(&mut movement),
+            defer_outcome: false,
         }
         .resolve_immediate(
             actor,
