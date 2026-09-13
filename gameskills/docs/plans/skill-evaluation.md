@@ -459,6 +459,35 @@ collected after upgrading the runtime or changing configured ref inputs. Earlier
 development binaries may ignore the additive field and retain all-ref behavior;
 matching `0.1.0-dev.3` version text alone does not identify the corrected binary.
 
+Final source and verification for this follow-up:
+
+- Runtime, tests and canonical reference source:
+  `1d7452fe2acc446077824bafef2d6211bcda00e9`; generated bundle committed at
+  `2743df9`. Bundle content SHA-256:
+  `a3248a8e6ff90cba5955f7d913f628ab556086a3def665faae37d70a71e18d7f`.
+- All 145 CLI tests pass after preparing/rebuilding that bundle; final all-target
+  CLI clippy, repository/docs checks, native skill structure, legacy structure
+  and bundle provenance checks pass. Logs are in the same isolated scratch folder.
+- Cargo successfully builds the extracted `gameskills-cli` archive; separate
+  archive inspection verifies the normal lockfile and exact bundle bytes. Crate
+  SHA-256: `3d693185e1f3671bef158a9e564f5037b39edec60e9aa7d666918c6392bc8888`.
+  The existing external consumer test passes using that archive-built executable
+  (one test; build tools removed from the consumer PATH).
+- `archive-ref-repro.json` records a direct trial of the archive-built CLI with
+  `git_refs = ["refs/heads/review-base"]`: fresh run
+  `4914a4ca00ceec7432a86c57cc5b2d25` remains valid after an unrelated branch advances,
+  then becomes invalid when its declared review base advances. Record bytes remain
+  unchanged. Earlier `candidate-repro.json` identifies the intermediate binary
+  before the updated instruction bundle was embedded; it is not the final package
+  identity. Neither trial retroactively validates the catalog worker's old run.
+
+The adopter config remains coordinator-owned: every command/prerequisite in a
+scoped test graph must declare its known refs, and a rebuilt runtime must collect
+fresh evidence. Installed bundles, pins, frozen fixtures, earlier skill-worktree
+commits and historical run records were not changed by this follow-up. Independent
+forward skill performance, actual native clients and total cost comparison remain
+unobserved; those gaps do not negate the measured local CLI correction.
+
 ## Gamekit capability evaluation
 
 Resolve Gamekit owner docs and use `gameskills-maintainer:evolve-gamekit` for
