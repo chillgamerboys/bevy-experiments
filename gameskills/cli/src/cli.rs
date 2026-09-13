@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 const SETUP_HELP: &str = "gameskills setup [--packages NAME ...] [--bundle PATH] [--apply]\ngameskills setup --recover\nWithout --apply, setup only prints a proposal.";
 const BUNDLE_HELP: &str = "gameskills bundle --out NEW_DIRECTORY [--packages NAME ...]\ngameskills bundle --source CHECKOUT --revision FULL_COMMIT_OR_TAG --out NEW_DIRECTORY";
-const NATIVE_HELP: &str = "gameskills native codex|claude [--launch] [-- CLIENT_ARGUMENTS ...]\ngameskills native codex --verify\nWithout --launch or --verify, print the selected client's command.";
+const NATIVE_HELP: &str = "gameskills native codex|claude [--launch] [-- CLIENT_ARGUMENTS ...]\ngameskills native codex --verify\ngameskills native codex --register [--apply | --recover]\ngameskills native codex --verify-project\nProject registration preserves the installed pin and global config. Verification does not activate an existing session.\nBare native codex|claude prints the selected client's command. --register is read-only until --apply.";
 const PLAN_HELP: &str = "gameskills plan validate --file PLAN.json";
 const QUEUE_HELP: &str = "gameskills queue create --file PLAN.json\ngameskills queue status QUEUE_ID\ngameskills queue inject QUEUE_ID --file ORDER.json --expected-revision N\ngameskills queue start|resume QUEUE_ID ORDER_ID --worktree PATH --expected-revision N\ngameskills queue block|report|integrated QUEUE_ID ORDER_ID --file OBSERVATION.json --expected-revision N";
 const RUN_HELP: &str = "gameskills run COMMAND ... [--max-workers N] [--resource-wait-seconds SECONDS] [--resume RUN_ID]\nCommands come from gameskills.toml; resume reruns the graph into a new record.";

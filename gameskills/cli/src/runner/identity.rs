@@ -290,6 +290,7 @@ pub(super) fn identity(
         };
         managed.insert(name, value);
     }
+    managed.extend(crate::installation::native_settings_identity(root, config)?);
     let executables = commands
         .iter()
         .map(|(name, spec)| Ok((name.clone(), executable(root, spec)?)))

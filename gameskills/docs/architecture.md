@@ -9,6 +9,7 @@ Gamekit is optional to an adopter. The [catalog](catalog.md) owns skill boundari
 - `cli/src/config.rs`: project configuration structure and defaults.
 - `cli/src/docs.rs`: read-only documentation discovery, independent of installation.
 - `cli/src/installation/`: bundle verification, atomic setup, native adapters and migration.
+- `cli/src/installation/registration.rs`: project-scoped Codex settings ownership and same-pin repair.
 - `cli/src/workflow/`: revision-guarded work queues; queues do not launch agents.
 - `cli/src/runner/`: configured commands, supervision, resource locks and evidence.
 - `cli/src/delivery.rs`: solo intent and observed PR/tracker delivery.
@@ -42,6 +43,20 @@ The validator names changed input categories without exposing their secret value
 No helper forces an agent to invoke a skill or finish its task. Native discovery,
 model behavior, command success, PR publication and human acceptance are different
 observations. [Contributing](contributing.md) describes their verification.
+
+Codex setup includes project registration, not just immutable file staging. Owned
+marketplace/plugin values are tracked separately from unrelated owner TOML. Setup
+recovers config, lock and registration together; targeted registration recovery
+changes only native settings and their ownership record. Both refuse intervening
+local edits and unsafe paths. Same-pin registration takes the setup lock but does
+not require queues/runs to be inactive; normal evidence identities still observe
+the changed project files, including ignored Codex config, its ownership record and
+an interrupted registration journal. Installation/pin changes retain the stronger exclusions.
+
+Ordinary-project discovery has a separate native probe with no injected enable
+flags. Project trust, host overrides and existing-session reload remain explicit
+boundaries; no global configuration or trust edit is implicit in setup. Claude's
+session-scoped launcher does not establish persistent Claude registration.
 
 ## Command ref identity
 
