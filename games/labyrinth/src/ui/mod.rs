@@ -287,6 +287,24 @@ fn keyboard_shortcuts(world: &mut World) {
         let composing = focus
             .and_then(|entity| world.get::<bevy::text::EditableText>(entity))
             .is_some_and(bevy::text::EditableText::is_composing);
+        if !composing && !focus.is_some_and(|entity| world.get::<UiTextField>(entity).is_some()) {
+            let keys = world.resource::<ButtonInput<KeyCode>>();
+            let page = if keys.just_pressed(KeyCode::PageDown) {
+                1
+            } else if keys.just_pressed(KeyCode::PageUp) {
+                -1
+            } else if keys.just_pressed(KeyCode::End) {
+                100
+            } else if keys.just_pressed(KeyCode::Home) {
+                -100
+            } else {
+                0
+            };
+            if page != 0 {
+                setup::scroll_details(world, page);
+                return;
+            }
+        }
         if !composing
             && world
                 .resource::<ButtonInput<KeyCode>>()

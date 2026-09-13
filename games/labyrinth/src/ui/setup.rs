@@ -29,9 +29,9 @@ pub(super) enum BuildField {
 pub(super) enum SetupAction {
     Edit(ActorId),
     Category(Category),
-    Inspect(Selection),
+    Inspect(ActorId, Selection),
     Browse,
-    ApplyInspected,
+    ApplyInspected(ActorId, Selection),
     ConfirmDiscard,
     KeepEditing,
     Preset(ContentId),
@@ -41,6 +41,7 @@ pub(super) enum SetupAction {
     Status(labyrinth_rules::StatusKind),
     Save,
     Cancel,
+    Close,
     Reload,
     Stock(usize),
     Add(labyrinth_rules::Team),
@@ -307,6 +308,16 @@ pub(super) fn action(
                 }
             }
         }
+        SetupAction::Close => {
+            if let Some(editor) = &mut ui.editor {
+                if editor.dirty() {
+                    editor.pending_exit = Some(ExitTarget::Close);
+                    editor.generation += 1;
+                } else {
+                    ui.editor = None;
+                }
+            }
+        }
         SetupAction::ConfirmDiscard => {
             let target = ui.editor.as_mut()?.pending_exit.take()?;
             ui.editor = match target {
@@ -328,8 +339,21 @@ pub(super) fn action(
             editor.ensure_selection(catalog);
             editor.generation += 1;
         }
-        SetupAction::Inspect(selection) => {
+        SetupAction::Inspect(id, selection) => {
             let editor = ui.editor.as_mut()?;
+            if editor.id != id {
+                return None;
+            }
+            let category = match selection {
+                Selection::Weapon(_) => Category::Equipment,
+                Selection::Innate(_) => Category::Innate,
+                Selection::Learned(_) => Category::Learned,
+                Selection::Preset(_) => Category::Parameters,
+                Selection::Move(_) => Category::Moves,
+            };
+            if editor.category != category {
+                return None;
+            }
             editor.selections.insert(editor.category, selection);
             editor.detail_only = true;
             editor.generation += 1;
@@ -339,8 +363,20 @@ pub(super) fn action(
             editor.detail_only = false;
             editor.generation += 1;
         }
-        SetupAction::ApplyInspected => {
-            let selected = ui.editor.as_ref()?.selection()?.clone();
+        SetupAction::ApplyInspected(id, selected) => {
+            let editor = ui.editor.as_ref()?;
+            if editor.id != id
+                || editor.selection() != Some(&selected)
+                || !layout::editable(view, id)
+            {
+                return None;
+            }
+            if details::inspection(editor, catalog)
+                .apply
+                .is_none_or(|(_, disabled)| disabled)
+            {
+                return None;
+            }
             let edit = match selected {
                 Selection::Weapon(id) => SetupAction::Weapon(id),
                 Selection::Innate(id) => SetupAction::Innate(id),
@@ -352,9 +388,16 @@ pub(super) fn action(
         }
         SetupAction::Reload => {
             if let Some(editor) = &ui.editor {
-                ui.editor = actor(scenario, editor.id)
-                    .cloned()
-                    .map(|a| ActorEditor::new(a, view.setup_revision));
+                let category = editor.category;
+                let selections = editor.selections.clone();
+                let scrolls = editor.scrolls.clone();
+                ui.editor = actor(scenario, editor.id).cloned().map(|a| {
+                    let mut refreshed = ActorEditor::new(a, view.setup_revision);
+                    refreshed.category = category;
+                    refreshed.selections = selections;
+                    refreshed.scrolls = scrolls;
+                    refreshed
+                });
             }
         }
         SetupAction::Save => {
@@ -532,4 +575,8 @@ pub(super) fn action(
 
 pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
     layout::present(world, view, ui);
+}
+
+pub(super) fn scroll_details(world: &mut World, direction: i8) {
+    layout::scroll_details(world, direction);
 }
