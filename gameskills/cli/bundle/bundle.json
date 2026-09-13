@@ -10,7 +10,7 @@
     "queue_schema": 2,
     "schema_version": 1
   },
-  "content_sha256": "32a72d8bb7e30e6b013ad30d5b431e5251eab21d1baae4539cf2fefef3f9abeb",
+  "content_sha256": "a3248a8e6ff90cba5955f7d913f628ab556086a3def665faae37d70a71e18d7f",
   "default_packages": [
     "gameskills"
   ],
@@ -64,7 +64,7 @@
     "plugins/gameskills/references/delivery.md": "b1a7803acea39fac19db0eec193e0f6a77cc93a0b85b6fd0156df4e152af299b",
     "plugins/gameskills/references/gamekit.md": "2cdce6326a299693da676cf6e7d5376cd4242fb49768478317e8957761a725ae",
     "plugins/gameskills/references/project-context.md": "708ca85d7370acd9b9256f4fe89dacf19de7c4de284ff723774650e9455dd0e0",
-    "plugins/gameskills/references/verification.md": "0f24713d5b3870d9c2b22fb9a3ffd031dd988e7130bbc031f36456b7e19f7415",
+    "plugins/gameskills/references/verification.md": "112463fd12d0785603630efdc48882bb885ff6040ad6a57e4aa80f19cdc1dcd8",
     "plugins/gameskills/references/work-orders.md": "1bc99a09deb25860469cfc9126ee45b356f63fbfa22c4349160bd5752bd3fae5",
     "plugins/gameskills/skills/audit-pr/SKILL.md": "c7752e6a4014293a7a516ab915a5de857cd58081afcd3cc0a3962cc808567cb3",
     "plugins/gameskills/skills/create-pr/SKILL.md": "c37562c5ad8949741349b719a164a893b503a1d206dd8565715c3dfc12c9c5b8",
@@ -82,5 +82,5 @@
   },
   "format": "gameskills-instructions",
   "schema_version": 1,
-  "source_commit": "c17cab770bfe92304eddd68324f9cb725f7607e5"
+  "source_commit": "1d7452fe2acc446077824bafef2d6211bcda00e9"
 }
