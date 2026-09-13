@@ -52,7 +52,7 @@ fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "0a1fdad6fcc990599e90a545c1ab40e4d313b5de1ce51060f70d8cc5cb2142e9"
+        "77e9ce8530575b8baa971a3aa83404898f55d4e2435b6dc027c90ca537e213ce"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }
@@ -747,7 +747,7 @@ fn limited_skills_reject_without_consuming_a_turn_and_healing_cannot_rescue() {
         .actor_mut(ActorId(1))
         .expect("hero")
         .skill_uses
-        .insert(crate::SkillId::FieldDressing, 2);
+        .insert(3, 2);
     let previous = combat.clone();
     assert_eq!(
         combat.apply(
@@ -780,7 +780,7 @@ fn snapshot_validation_rejects_malformed_nested_domain_values() {
     let valid = serde_json::to_value(combat.snapshot()).expect("snapshot JSON");
     for (path, replacement) in [
         ("/actors/0/hp", serde_json::json!(999)),
-        ("/actors/0/max_hp", serde_json::json!(999)),
+        ("/actors/0/max_hp", serde_json::json!(10001)),
         ("/actors/0/id", serde_json::json!(0)),
         ("/hero_formation/1", serde_json::json!(1)),
         ("/round", serde_json::json!(0)),

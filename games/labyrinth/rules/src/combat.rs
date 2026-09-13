@@ -1,16 +1,19 @@
 //! Atomic reducer and bounded automatic phase resolution.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::{
-    skill_definition, status_definition, AbilityLoadout, ActorId, ActorKind, ActorSnapshot,
-    Boundary, CombatAction, CombatEvent, CombatEventKind, CombatPhase, CombatSnapshot, Effect,
-    HeroClass, HeroSetup, InitiativeEntry, RemovalReason, RuleError, Team, DEFAULT_ENEMY_IDS,
-    DEFAULT_ENEMY_ROSTER, MAX_ACTORS, MAX_COMBAT_WORK, PARTY_SIZE,
+    status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction, CombatEvent,
+    CombatEventKind, CombatPhase, CombatSnapshot, Effect, HeroClass, HeroSetup, InitiativeEntry,
+    RemovalReason, RuleError, Team, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, MAX_ACTORS,
+    MAX_COMBAT_WORK, PARTY_SIZE,
 };
 
 #[cfg(test)]
-use crate::{CombatOutcome, DamageKind, Stat, StatusInstance, StatusKind, StatusTag};
+use crate::{
+    skill_definition, AbilityLoadout, CombatOutcome, DamageKind, Stat, StatusInstance, StatusKind,
+    StatusTag,
+};
 
 const MAX_WORK: usize = MAX_COMBAT_WORK;
 
@@ -72,6 +75,7 @@ impl Combat {
             next_status: &mut self.next_status,
             damage: None,
             movement: None,
+            defer_outcome: false,
         }
     }
 
@@ -117,92 +121,159 @@ impl Combat {
         heroes: Vec<HeroSetup>,
         enemies: Vec<(ActorId, crate::EnemyKind)>,
     ) -> Result<Self, RuleError> {
-        let hero_spaces: usize = heroes
+        if heroes
             .iter()
-            .map(|h| usize::from(ActorKind::Hero(h.class).footprint()))
-            .sum();
-        let enemy_spaces: usize = enemies
+            .any(|hero| hero.id.0 == 0 || DEFAULT_ENEMY_IDS.contains(&hero.id))
+        {
+            return Err(RuleError::InvalidActorId);
+        }
+        let mut ids = std::collections::BTreeSet::new();
+        if heroes
             .iter()
-            .map(|(_, k)| usize::from(ActorKind::Enemy(*k).footprint()))
-            .sum();
-        if hero_spaces == 0
-            || hero_spaces > PARTY_SIZE
-            || enemy_spaces == 0
-            || enemy_spaces > PARTY_SIZE
+            .map(|h| h.id)
+            .chain(enemies.iter().map(|(id, _)| *id))
+            .any(|id| !ids.insert(id))
         {
-            return Err(RuleError::InvalidState);
+            return Err(RuleError::DuplicateActor);
         }
-        let mut ids = BTreeSet::new();
-        for hero in &heroes {
-            if hero.id.0 == 0 || DEFAULT_ENEMY_IDS.contains(&hero.id) {
-                return Err(RuleError::InvalidActorId);
-            }
-            if !ids.insert(hero.id) {
-                return Err(RuleError::DuplicateActor);
-            }
-        }
-        for (id, _) in &enemies {
-            if id.0 == 0 {
-                return Err(RuleError::InvalidActorId);
-            }
-            if !ids.insert(*id) {
-                return Err(RuleError::DuplicateActor);
-            }
-        }
-        let enemy_formation = enemies.iter().map(|(id, _)| *id).collect();
-        let hero_formation = heroes.iter().map(|hero| hero.id).collect();
-        let mut actors = Vec::with_capacity(MAX_ACTORS);
-        for (id, kind, abilities) in heroes
-            .into_iter()
-            .map(|hero| (hero.id, ActorKind::Hero(hero.class), hero.abilities))
-            .chain(enemies.into_iter().map(|(id, kind)| {
-                let kind = ActorKind::Enemy(kind);
-                (
-                    id,
-                    kind,
-                    AbilityLoadout::new(crate::skills_for(kind).iter().copied())
-                        .expect("authored enemy presets are bounded and unique"),
-                )
-            }))
-        {
+        let catalog =
+            crate::catalog::ContentCatalog::builtin().map_err(|_| RuleError::InvalidState)?;
+        let actor_input = |id, kind: ActorKind, build| {
             let (max_hp, base_speed) = kind.stats();
-            actors.push(ActorSnapshot {
+            crate::scenario::ScenarioActor {
                 id,
-                kind,
-                hp: max_hp,
-                life: crate::LifeState::Alive,
-                max_hp,
-                base_speed,
-                abilities,
-                statuses: Vec::new(),
-                skill_uses: BTreeMap::new(),
-            });
+                actor: crate::build::ActorBuild {
+                    name: kind.name().into(),
+                    appearance: kind,
+                    max_hp,
+                    base_speed,
+                    footprint: kind.footprint(),
+                    build,
+                },
+                controller: if kind.team() == Team::Enemies {
+                    crate::scenario::ControllerPolicy::Ai
+                } else {
+                    crate::scenario::ControllerPolicy::Manual
+                },
+                starting_hp: None,
+                starting_statuses: vec![],
+            }
+        };
+        let scenario = crate::scenario::Scenario {
+            schema_version: crate::scenario::SCENARIO_SCHEMA_VERSION,
+            name: "Legacy encounter".into(),
+            seed,
+            heroes: heroes
+                .into_iter()
+                .map(|h| {
+                    actor_input(
+                        h.id,
+                        ActorKind::Hero(h.class),
+                        crate::scenario::legacy_build(h.abilities.as_slice()),
+                    )
+                })
+                .collect(),
+            enemies: enemies
+                .into_iter()
+                .map(|(id, k)| {
+                    let kind = ActorKind::Enemy(k);
+                    actor_input(
+                        id,
+                        kind,
+                        crate::scenario::legacy_build(crate::skills_for(kind)),
+                    )
+                })
+                .collect(),
+        };
+        Self::from_scenario(&catalog, &scenario).map_err(|_| RuleError::InvalidState)
+    }
+
+    /// Validate and freeze symmetric authored input before any combat state exists.
+    pub fn from_scenario(
+        catalog: &crate::catalog::ContentCatalog,
+        scenario: &crate::scenario::Scenario,
+    ) -> Result<Self, crate::catalog::ContentError> {
+        scenario.validate(catalog)?;
+        let scenario_fingerprint = scenario.fingerprint(catalog)?;
+        let mut next_status = 1_u64;
+        let mut actors = Vec::with_capacity(MAX_ACTORS);
+        for (allegiance, roster) in [
+            (Team::Heroes, &scenario.heroes),
+            (Team::Enemies, &scenario.enemies),
+        ] {
+            for input in roster {
+                let config = &input.actor;
+                let hp = input.starting_hp.unwrap_or(config.max_hp);
+                let mut statuses = Vec::new();
+                for initial in &input.starting_statuses {
+                    let definition = status_definition(initial.kind);
+                    statuses.push(crate::StatusInstance {
+                        id: next_status,
+                        kind: initial.kind,
+                        bearer: input.id,
+                        source: initial.source.unwrap_or(input.id),
+                        potency: definition.potency,
+                        remaining: initial.remaining.unwrap_or(definition.duration.ticks),
+                        eligible_boundary: 1,
+                    });
+                    next_status += 1;
+                }
+                actors.push(ActorSnapshot {
+                    id: input.id,
+                    kind: config.appearance,
+                    display_name: config.name.clone(),
+                    allegiance,
+                    footprint: config.footprint,
+                    controller: input.controller,
+                    hp,
+                    life: if hp == 0 {
+                        crate::LifeState::Dying { failures: 0 }
+                    } else {
+                        crate::LifeState::Alive
+                    },
+                    max_hp: config.max_hp,
+                    base_speed: config.base_speed,
+                    abilities: config.resolve(catalog)?,
+                    build: config.build.clone(),
+                    statuses,
+                    skill_uses: BTreeMap::new(),
+                });
+            }
         }
         let state = CombatSnapshot {
+            catalog: catalog.clone(),
+            scenario_fingerprint,
             revision: 0,
             round: 0,
             turn_id: 0,
             phase: CombatPhase::RoundStart,
             active_actor: None,
             actors,
-            hero_formation,
-            enemy_formation,
-            initiative: Vec::new(),
+            hero_formation: scenario.heroes.iter().map(|a| a.id).collect(),
+            enemy_formation: scenario.enemies.iter().map(|a| a.id).collect(),
+            initiative: vec![],
             outcome: None,
             boundary_sequence: 0,
         };
         let mut combat = Self {
             state,
-            rng: Rng(seed),
+            rng: Rng(scenario.seed),
             cursor: 0,
             next_event: 1,
-            next_status: 1,
+            next_status,
         };
         let mut events = Vec::new();
         let mut work = Work(MAX_WORK);
-        combat.start_round(&mut events, &mut work)?;
-        combat.seek_decision(&mut events, &mut work)?;
-        combat.state.validate()?;
+        let setup_error = |error: RuleError| {
+            crate::catalog::ContentError::new("scenario.combat", error.to_string())
+        };
+        combat
+            .start_round(&mut events, &mut work)
+            .map_err(setup_error)?;
+        combat
+            .seek_decision(&mut events, &mut work)
+            .map_err(setup_error)?;
+        combat.state.validate().map_err(setup_error)?;
         Ok(combat)
     }
 
@@ -261,32 +332,28 @@ impl Combat {
     pub fn ai_action(&self) -> Option<CombatAction> {
         let actor = self.state.active_actor?;
         let source = self.state.actor(actor)?;
-        if source.team() != Team::Enemies {
+        if source.controller != crate::scenario::ControllerPolicy::Ai {
             return None;
         }
         let legal = self.state.legal_actions(actor);
         legal
             .iter()
-            .filter_map(|action| match action {
-                CombatAction::Skill { skill, target }
-                    if skill_definition(*skill)
-                        .effects
-                        .iter()
-                        .any(|effect| matches!(effect, Effect::Damage(_))) =>
+            .filter_map(|action| {
+                let (index, target) = self.state.action_ability(actor, *action).ok()??;
+                if !source
+                    .ability(index)?
+                    .effects
+                    .iter()
+                    .any(|effect| matches!(effect, Effect::Damage(_)))
                 {
-                    self.state.actor(*target).map(|target_state| {
-                        (
-                            (
-                                target_state.is_corpse(),
-                                target_state.health().0,
-                                *target,
-                                *skill,
-                            ),
-                            *action,
-                        )
-                    })
+                    return None;
                 }
-                _ => None,
+                self.state.actor(target).map(|recipient| {
+                    (
+                        (recipient.is_corpse(), recipient.health().0, target, index),
+                        *action,
+                    )
+                })
             })
             .min_by_key(|(key, _)| *key)
             .map(|(_, action)| action)
@@ -761,3 +828,7 @@ mod preview_tests;
 #[cfg(test)]
 #[path = "lifecycle_tests.rs"]
 mod lifecycle_tests;
+
+#[cfg(test)]
+#[path = "runtime_tests.rs"]
+mod runtime_tests;

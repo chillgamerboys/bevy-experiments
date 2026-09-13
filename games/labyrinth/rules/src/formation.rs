@@ -18,7 +18,7 @@ impl CombatSnapshot {
         let actor = self.actor(id)?;
         let mut front = 1;
         for occupant in self.formation(actor.team()) {
-            let width = self.actor(*occupant)?.kind.footprint();
+            let width = self.actor(*occupant)?.footprint;
             if *occupant == id {
                 return Some(front..=front + width - 1);
             }
