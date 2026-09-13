@@ -101,7 +101,13 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
         select(&mut app, ActorId(104), keyboard);
         assert_eq!(
             app.world().resource::<UiState>().selected,
-            Some(Choice::Ability(1))
+            Some(Choice::Ability(
+                snapshot
+                    .actor(ActorId(1))
+                    .expect("hero")
+                    .skill_index(SkillId::DrivingBlow)
+                    .expect("Driving Blow")
+            ))
         );
         assert_eq!(app.world().resource::<UiState>().target, Some(ActorId(104)));
         let preview = crate::presentation::ForecastDisplay::build(

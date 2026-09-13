@@ -15,7 +15,7 @@ fn id(value: &str) -> ContentId {
     ContentId::new(value).expect("authored ID")
 }
 
-fn authored_combat() -> Combat {
+fn authored_scenario() -> (ContentCatalog, Scenario) {
     let builtin = ContentCatalog::builtin().expect("catalog");
     let mut definition = builtin.definition().clone();
     let template = definition.abilities.first().expect("ability").clone();
@@ -74,23 +74,25 @@ fn authored_combat() -> Combat {
             starting_statuses: vec![],
         }
     };
-    Combat::from_scenario(
-        &catalog,
-        &Scenario {
-            schema_version: SCENARIO_SCHEMA_VERSION,
-            name: "Twelve techniques".into(),
-            seed: 91,
-            heroes: vec![ScenarioActor {
-                id: ActorId(1),
-                actor: hero,
-                controller: ControllerPolicy::Manual,
-                starting_hp: None,
-                starting_statuses: vec![],
-            }],
-            enemies: vec![enemy(101), enemy(102)],
-        },
-    )
-    .expect("authored combat")
+    let scenario = Scenario {
+        schema_version: SCENARIO_SCHEMA_VERSION,
+        name: "Twelve techniques".into(),
+        seed: 91,
+        heroes: vec![ScenarioActor {
+            id: ActorId(1),
+            actor: hero,
+            controller: ControllerPolicy::Manual,
+            starting_hp: None,
+            starting_statuses: vec![],
+        }],
+        enemies: vec![enemy(101), enemy(102)],
+    };
+    (catalog, scenario)
+}
+
+fn authored_combat() -> Combat {
+    let (catalog, scenario) = authored_scenario();
+    Combat::from_scenario(&catalog, &scenario).expect("authored combat")
 }
 
 #[derive(Resource, Default)]
@@ -274,4 +276,101 @@ fn effective_multi_target_forecast_names_every_target_and_conceals_secondary_unk
         ForecastDisplay::build(&changed, &disclosure, ActorId(1), &action)
             .expect("same unknown forecast")
     );
+}
+
+#[test]
+fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names() {
+    let (catalog, mut scenario) = authored_scenario();
+    let mut apprentice = scenario.heroes.first().expect("captain").clone();
+    apprentice.id = ActorId(2);
+    apprentice.actor.name = "Apprentice Custom".into();
+    apprentice.actor.build.learned_skills.clear();
+    scenario.heroes.push(apprentice);
+    let snapshot = Combat::from_scenario(&catalog, &scenario)
+        .expect("two custom actors")
+        .snapshot();
+    let mut app = app(1280, 720, UiScaleMode::Auto);
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        network_ownership(&mut view);
+        view.combat = Some(snapshot);
+        view.player = Some(0);
+        view.events = vec![crate::view::PresentedEvent {
+            id: 1,
+            event: labyrinth_rules::CombatEvent {
+                id: 1,
+                kind: labyrinth_rules::CombatEventKind::Action {
+                    actor: ActorId(1),
+                    action: CombatAction::Ability {
+                        index: 0,
+                        target: ActorId(101),
+                    },
+                },
+            },
+        }];
+    }
+    run_frames(&mut app, 5);
+    let captain = find_named(app.world_mut(), "Skill 0").expect("captain move");
+    let captain_key = app
+        .world()
+        .get::<UiTooltipSource>(captain)
+        .expect("captain card")
+        .0
+        .clone();
+    assert!(focus_action(app.world_mut(), captain));
+    tap_key(&mut app, KeyCode::Enter);
+    app.world_mut().resource_mut::<LabyrinthView>().player = Some(1);
+    run_frames(&mut app, 4);
+    assert!(app.world().get_entity(captain).is_err());
+    assert_eq!(app.world().resource::<UiState>().selected, None);
+    let apprentice = find_named(app.world_mut(), "Skill 0").expect("apprentice move");
+    let apprentice_key = app
+        .world()
+        .get::<UiTooltipSource>(apprentice)
+        .expect("apprentice card")
+        .0
+        .clone();
+    assert_ne!(captain_key, apprentice_key);
+    for (key, power) in [
+        (&captain_key, "5 base damage"),
+        (&apprentice_key, "2 base damage"),
+    ] {
+        assert!(app
+            .world()
+            .resource::<UiTooltipCatalog>()
+            .0
+            .get(key)
+            .expect("actor effective card")
+            .facts
+            .iter()
+            .any(|fact| fact == power));
+    }
+    let history = find_named(app.world_mut(), "Battle Log Toggle").expect("history");
+    assert!(click_action(&mut app, history));
+    run_frames(&mut app, 4);
+    assert!(app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|text| text.0.contains("Captain Custom · Technique 0")));
+    app.world_mut().resource_mut::<LabyrinthView>().encounter += 1;
+    run_frames(&mut app, 4);
+    assert!(!app
+        .world()
+        .resource::<UiTooltipCatalog>()
+        .0
+        .contains_key(&captain_key));
+    assert!(!app
+        .world()
+        .resource::<UiTooltipCatalog>()
+        .0
+        .contains_key(&apprentice_key));
+    let current = find_named(app.world_mut(), "Skill 0").expect("new encounter move");
+    assert!(app
+        .world()
+        .get::<UiTooltipSource>(current)
+        .expect("scoped card")
+        .0
+         .0
+        .contains("encounter/2/actor/2/"));
 }
