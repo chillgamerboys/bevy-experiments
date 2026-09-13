@@ -115,6 +115,12 @@ pub struct LabyrinthView {
     pub company: Vec<CompanyMember>,
     /// Stale commands must not cross a controller reassignment.
     pub assignment_revision: u64,
+    /// Configuration generation; stale editor drafts cannot overwrite new setup.
+    pub setup_revision: u64,
+    /// Symmetric editable battle specification, with no participant credentials.
+    pub scenario: Option<labyrinth_rules::Scenario>,
+    /// Validated authored definitions for build selection and disclosure.
+    pub catalog: Option<labyrinth_rules::catalog::ContentCatalog>,
     /// Read-only pure rules snapshot; never host RNG or authority.
     pub combat: Option<CombatSnapshot>,
     /// Ordered readable combat outcomes.
@@ -195,6 +201,28 @@ pub enum LabyrinthIntent {
     },
     /// Host enters or leaves the paused assignment flow.
     AssignmentPause(bool),
+    /// Host replaces the lobby configuration after complete validation.
+    ConfigureBattle {
+        /// Full symmetric encounter input.
+        scenario: labyrinth_rules::Scenario,
+        /// Generation on which the editor draft was based.
+        expected_revision: u64,
+    },
+    /// Customize one owned actor without changing its team, rank or controller.
+    CustomizeActor {
+        /// Explicit actor configuration.
+        actor: labyrinth_rules::ScenarioActor,
+        /// Generation on which this edit was based.
+        expected_revision: u64,
+    },
+    /// Choose a stock encounter by its stable menu index.
+    StockScenario(usize),
+    /// Host adds an actor using editable defaults.
+    AddScenarioActor(labyrinth_rules::Team),
+    /// Write only battle configuration to a local file chosen in setup.
+    SaveScenario(String),
+    /// Host loads a bounded validated battle configuration from a local file.
+    LoadScenario(String),
     /// Change local readiness.
     Ready(bool),
     /// Host starts after all six players are ready.

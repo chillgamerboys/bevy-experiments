@@ -144,8 +144,8 @@ pub(super) fn finish_host(world: &mut World) {
     let providers = discovery::HostProviders::start(&prepared.settings, metadata.clone(), target);
     let session_id = code.session_id;
     let entity = prepared.transport.open(world);
-    // Client commands are fixed-size enums/IDs; even a maximum password Hello
-    // is under 1 KiB. Reserve separate handshake and admitted traffic budgets.
+    // Handshakes remain small. Admitted build edits use bounded actor definitions;
+    // game authority still rejects guest changes to full scenarios or enemy setup.
     world.entity_mut(entity).insert(InboundLimits {
         pending_connections: MAX_HANDSHAKES,
         admitted_connections: GUEST_CAPACITY,
@@ -157,7 +157,7 @@ pub(super) fn finish_host(world: &mut World) {
         admitted: InboundMessageLimit {
             messages: 144,
             bytes: 65536,
-            message_bytes: 1024,
+            message_bytes: 32768,
         },
     });
     let password_jobs = Arc::clone(&world.resource::<PasswordWorkBudget>().0);

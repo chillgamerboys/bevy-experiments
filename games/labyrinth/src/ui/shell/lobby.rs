@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
+pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView, ui: &mut UiState) {
     let lobby = surface(world, parent, "Company Lobby");
     label(
         world,
@@ -41,28 +41,152 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView) {
             UiTextRole::Body,
         );
     }
-    for member in &view.company {
-        let section = surface(world, lobby, &format!("Character {}", member.actor.0));
+    if let Some(scenario) = &view.scenario {
         label(
             world,
-            section,
-            &format!("Character {} Label", member.actor.0),
-            format!("{} · character {}", member.hero.name(), member.actor.0),
-            UiTextRole::Body,
+            lobby,
+            "Scenario Title",
+            format!("{} · seed {}", scenario.name, scenario.seed),
+            UiTextRole::Title,
         );
-        let roles = row(
-            world,
-            section,
-            &format!("Character {} Builds", member.actor.0),
-        );
-        for hero in HeroClass::ALL {
+        let stocks = row(world, lobby, "Stock Encounters");
+        for (index, name) in [
+            "Prototype",
+            "Weapon comparison",
+            "Two-rank cleave",
+            "Rescue and status",
+        ]
+        .into_iter()
+        .enumerate()
+        {
             control(
                 world,
-                roles,
-                format!("Character {} Choose {hero:?}", member.actor.0),
-                hero.name(),
-                Action::Hero(member.actor, hero),
-                !view.admitted || (!view.host && Some(member.owner) != view.player),
+                stocks,
+                format!("Stock Scenario {index}"),
+                name,
+                Action::Setup(setup::SetupAction::Stock(index)),
+                !view.host,
+            );
+        }
+        forms::field(
+            world,
+            lobby,
+            "Scenario seed",
+            Field::ScenarioSeed,
+            &ui.scenario_seed,
+            20,
+        );
+        control(
+            world,
+            lobby,
+            "Apply Scenario Seed",
+            "Apply seed",
+            Action::Setup(setup::SetupAction::ApplySeed),
+            !view.host,
+        );
+        forms::field(
+            world,
+            lobby,
+            "Scenario file (blank = labyrinth-scenario.json)",
+            Field::ScenarioPath,
+            &ui.scenario_path,
+            1024,
+        );
+        let files = row(world, lobby, "Scenario Files");
+        control(
+            world,
+            files,
+            "Save Scenario",
+            "Save setup",
+            Action::Setup(setup::SetupAction::SaveFile),
+            false,
+        );
+        control(
+            world,
+            files,
+            "Load Scenario",
+            "Load setup",
+            Action::Setup(setup::SetupAction::LoadFile),
+            !view.host,
+        );
+        for (team, roster) in [
+            (labyrinth_rules::Team::Heroes, &scenario.heroes),
+            (labyrinth_rules::Team::Enemies, &scenario.enemies),
+        ] {
+            let used = roster
+                .iter()
+                .map(|a| usize::from(a.actor.footprint))
+                .sum::<usize>();
+            label(
+                world,
+                lobby,
+                &format!("{team:?} Setup Title"),
+                format!("{team:?} · {used}/6 spaces · front to back"),
+                UiTextRole::Body,
+            );
+            let mut rank = 1_usize;
+            for (index, actor) in roster.iter().enumerate() {
+                let row = row(world, lobby, &format!("Actor {} Setup", actor.id.0));
+                let editable = view.host
+                    || view
+                        .company
+                        .iter()
+                        .any(|m| m.actor == actor.id && Some(m.owner) == view.player);
+                label(
+                    world,
+                    row,
+                    &format!("Actor {} Setup Label", actor.id.0),
+                    format!(
+                        "Ranks {}–{} · {} · HP {} · speed {}",
+                        rank,
+                        rank + usize::from(actor.actor.footprint) - 1,
+                        actor.actor.name,
+                        actor.actor.max_hp,
+                        actor.actor.base_speed
+                    ),
+                    UiTextRole::Body,
+                );
+                rank += usize::from(actor.actor.footprint);
+                control(
+                    world,
+                    row,
+                    format!("Edit Actor {}", actor.id.0),
+                    "Edit character",
+                    Action::Setup(setup::SetupAction::Edit(actor.id)),
+                    !editable,
+                );
+                control(
+                    world,
+                    row,
+                    format!("Move Actor {} Forward", actor.id.0),
+                    "Forward",
+                    Action::Setup(setup::SetupAction::Move(actor.id, -1)),
+                    !view.host || index == 0,
+                );
+                control(
+                    world,
+                    row,
+                    format!("Move Actor {} Back", actor.id.0),
+                    "Back",
+                    Action::Setup(setup::SetupAction::Move(actor.id, 1)),
+                    !view.host || index + 1 == roster.len(),
+                );
+                control(
+                    world,
+                    row,
+                    format!("Remove Actor {}", actor.id.0),
+                    "Remove",
+                    Action::Setup(setup::SetupAction::Remove(actor.id)),
+                    !view.host || roster.len() == 1,
+                );
+            }
+            control(
+                world,
+                lobby,
+                format!("Add {team:?}"),
+                format!("Add {team:?} character"),
+                Action::Setup(setup::SetupAction::Add(team)),
+                !view.host || used >= 6,
             );
         }
     }
@@ -171,7 +295,13 @@ pub(super) fn assignments(world: &mut World, parent: Entity, view: &LabyrinthVie
             world,
             controls,
             &format!("Character {} Owner", member.actor.0),
-            format!("{} · controller", member.hero.name()),
+            format!(
+                "{} · controller",
+                view.scenario
+                    .as_ref()
+                    .and_then(|s| s.heroes.iter().find(|a| a.id == member.actor))
+                    .map_or(member.hero.name(), |a| a.actor.name.as_str())
+            ),
             UiTextRole::Supporting,
         );
         for player in view.players.iter().filter(|p| p.occupied) {

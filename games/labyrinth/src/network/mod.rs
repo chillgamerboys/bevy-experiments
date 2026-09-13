@@ -211,7 +211,12 @@ fn fingerprint() -> [u8; 32] {
     // Catalog fingerprint supplied by the pure rules crate; includes wire schema.
     let mut digest = Sha256::new();
     digest.update(SCHEMA.as_bytes());
-    digest.update(labyrinth_rules::rules_fingerprint().as_bytes());
+    digest.update(
+        labyrinth_rules::catalog::ContentCatalog::builtin()
+            .expect("validated authored catalog")
+            .fingerprint()
+            .as_bytes(),
+    );
     digest.finalize().into()
 }
 fn fingerprint_text() -> String {
@@ -428,20 +433,7 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             if world.resource::<Runtime>().pending_close.is_some() {
                 return Err("Wait for the previous host to close.".into());
             }
-            let mut authority = PartyAuthority::new(seed, true);
-            let result = authority.apply(
-                0,
-                GameRequest {
-                    sequence: 1,
-                    encounter: 0,
-                    decision: 0,
-                    assignment_revision: 1,
-                    command: SessionCommand::Start,
-                },
-            );
-            if let Some(error) = result.rejection {
-                return Err(error);
-            }
+            let authority = PartyAuthority::new(seed, true);
             world.insert_resource(authority);
             let mut runtime = world.resource_mut::<Runtime>();
             runtime.role = Role::Local;
@@ -469,6 +461,142 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
         }
         LabyrinthIntent::AssignmentPause(paused) => {
             submit(world, SessionCommand::AssignmentPause(paused))?
+        }
+        LabyrinthIntent::ConfigureBattle {
+            scenario,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::ConfigureBattle {
+                scenario,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::CustomizeActor {
+            actor,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::CustomizeActor {
+                actor,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::StockScenario(index) => {
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host chooses encounters.")?
+                .snapshot(0);
+            let choice = *labyrinth_rules::StockScenario::ALL
+                .get(index)
+                .ok_or("Unknown stock encounter.")?;
+            let scenario =
+                labyrinth_rules::Scenario::stock(choice, snapshot.scenario.seed, &snapshot.catalog)
+                    .map_err(|e| e.to_string())?;
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
+        }
+        LabyrinthIntent::AddScenarioActor(team) => {
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host adds characters.")?
+                .snapshot(0);
+            let mut scenario = snapshot.scenario;
+            let used = scenario
+                .heroes
+                .iter()
+                .chain(&scenario.enemies)
+                .map(|a| a.id.0)
+                .collect::<std::collections::BTreeSet<_>>();
+            let id = (1..=u16::MAX)
+                .find(|id| !used.contains(id))
+                .ok_or("No free character identity.")?;
+            let kind = match team {
+                labyrinth_rules::Team::Heroes => {
+                    labyrinth_rules::ActorKind::Hero(labyrinth_rules::HeroClass::Gatekeeper)
+                }
+                labyrinth_rules::Team::Enemies => {
+                    labyrinth_rules::ActorKind::Enemy(labyrinth_rules::EnemyKind::AshBrute)
+                }
+            };
+            let preset = snapshot
+                .catalog
+                .definition()
+                .actor_presets
+                .iter()
+                .find(|p| p.appearance == kind)
+                .ok_or("Default preset is unavailable.")?;
+            let actor = labyrinth_rules::ScenarioActor {
+                id: labyrinth_rules::ActorId(id),
+                actor: labyrinth_rules::build::ActorBuild::from_preset(
+                    &snapshot.catalog,
+                    &preset.id,
+                )
+                .map_err(|e| e.to_string())?,
+                controller: if team == labyrinth_rules::Team::Heroes {
+                    labyrinth_rules::ControllerPolicy::Manual
+                } else {
+                    labyrinth_rules::ControllerPolicy::Ai
+                },
+                starting_hp: None,
+                starting_statuses: Vec::new(),
+            };
+            if team == labyrinth_rules::Team::Heroes {
+                scenario.heroes.push(actor);
+            } else {
+                scenario.enemies.push(actor);
+            }
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
+        }
+        LabyrinthIntent::SaveScenario(path) => {
+            let view = world.resource::<LabyrinthView>();
+            let scenario = view.scenario.as_ref().ok_or("No battle setup to save.")?;
+            let path = if path.trim().is_empty() {
+                "labyrinth-scenario.json"
+            } else {
+                path.trim()
+            };
+            std::fs::write(path, scenario.to_json().map_err(|e| e.to_string())?)
+                .map_err(|e| format!("Cannot save scenario: {e}"))?;
+            notice(world, format!("Saved battle configuration to {path}."));
+        }
+        LabyrinthIntent::LoadScenario(path) => {
+            use std::io::Read as _;
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host loads encounters.")?
+                .snapshot(0);
+            let path = if path.trim().is_empty() {
+                "labyrinth-scenario.json"
+            } else {
+                path.trim()
+            };
+            let mut source = String::new();
+            std::fs::File::open(path)
+                .map_err(|e| format!("Cannot open scenario: {e}"))?
+                .take(labyrinth_rules::MAX_SCENARIO_BYTES as u64 + 1)
+                .read_to_string(&mut source)
+                .map_err(|e| format!("Cannot read scenario: {e}"))?;
+            let scenario = labyrinth_rules::Scenario::from_json(&source, &snapshot.catalog)
+                .map_err(|e| e.to_string())?;
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
         }
         LabyrinthIntent::Ready(ready) => submit(world, SessionCommand::Ready(ready))?,
         LabyrinthIntent::StartEncounter => submit(world, SessionCommand::Start)?,
@@ -603,6 +731,9 @@ fn publish(world: &mut World) {
         view.encounter = snapshot.encounter;
         view.players = snapshot.player_views();
         view.company = snapshot.company;
+        view.setup_revision = snapshot.setup_revision;
+        view.scenario = Some(snapshot.scenario);
+        view.catalog = Some(snapshot.catalog);
         view.assignment_revision = snapshot.assignment_revision;
         view.combat = snapshot.combat;
         view.paused = snapshot.paused || !data.2;
@@ -618,6 +749,8 @@ fn publish(world: &mut World) {
         view.combat = None;
         view.players.clear();
         view.company.clear();
+        view.scenario = None;
+        view.catalog = None;
         view.events.clear();
         view.paused = false;
         view.interruption = crate::view::CombatInterruption::None;

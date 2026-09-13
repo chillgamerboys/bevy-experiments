@@ -92,6 +92,7 @@ pub(super) fn present(
     let lobby_data = (view.mode == ViewMode::Lobby).then_some((
         &view.players,
         &view.company,
+        &view.scenario,
         &view.invite_labels,
         &view.session_name,
     ));
@@ -160,7 +161,7 @@ pub(super) fn present(
         UiTextRole::Supporting,
     );
     if view.mode == ViewMode::Lobby {
-        lobby(world, content, view);
+        lobby(world, content, view, ui);
     } else {
         match ui.form {
             Form::Menu => menu(world, content),
@@ -193,7 +194,7 @@ fn surface(world: &mut World, parent: Entity, name: &str) -> Entity {
     entity
 }
 
-fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
+pub(super) fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
     column(
         world,
         parent,

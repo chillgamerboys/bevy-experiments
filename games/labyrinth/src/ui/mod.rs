@@ -3,6 +3,7 @@
 mod appearance;
 mod battle;
 mod glyphs;
+mod setup;
 mod shell;
 #[cfg(test)]
 mod tests;
@@ -173,6 +174,9 @@ struct UiState {
     local_notice: Option<String>,
     shell_key: Option<String>,
     overlay_key: Option<String>,
+    editor: Option<setup::ActorEditor>,
+    scenario_path: String,
+    scenario_seed: String,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -194,6 +198,7 @@ enum Action {
     Hero(ActorId, HeroClass),
     Assign(ActorId, u8),
     AssignmentPause(bool),
+    Setup(setup::SetupAction),
     Start,
     Rematch,
     Copy(usize),
@@ -218,6 +223,9 @@ enum Action {
 
 #[derive(Component, Debug, Clone, Copy)]
 enum Field {
+    Build(setup::BuildField),
+    ScenarioPath,
+    ScenarioSeed,
     Name,
     Address,
     Port,
@@ -237,6 +245,9 @@ fn collect_text(
 ) {
     for change in changed.read() {
         match fields.get(change.entity) {
+            Ok(Field::Build(field)) => setup::change(&mut ui, *field, &change.value),
+            Ok(Field::ScenarioPath) => ui.scenario_path.clone_from(&change.value),
+            Ok(Field::ScenarioSeed) => ui.scenario_seed.clone_from(&change.value),
             Ok(Field::Name) => ui.session_name.clone_from(&change.value),
             Ok(Field::Address) => ui.address.clone_from(&change.value),
             Ok(Field::Port) => ui.port.clone_from(&change.value),
@@ -353,6 +364,7 @@ fn apply_action(world: &mut World, action: Action) {
                         None
                     }
                 }
+                Action::Setup(action) => setup::action(&view, &mut ui, action),
                 Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
                 Action::Host => {
                     let port = if ui.port.is_empty() {
@@ -611,6 +623,7 @@ fn present(world: &mut World) {
             shell::present(world, &view, &mut ui, metrics);
         }
         shell::overlays(world, &view, &mut ui);
+        setup::present(world, &view, &mut ui);
     });
 }
 

@@ -5,18 +5,21 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use bevy::prelude::*;
 use bevy_gamekit::session::PeerId;
 use labyrinth_rules::{
-    AbilityLoadout, ActorId, ActorKind, Combat, CombatAction, CombatEvent, CombatSnapshot,
-    HeroClass, HeroSetup, PARTY_SIZE,
+    ActorId, ActorKind, Combat, CombatAction, CombatEvent, CombatSnapshot, HeroClass, PARTY_SIZE,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::view::{CombatInterruption, PlayerView, PresentedEvent};
+use labyrinth_rules::build::{ActorBuild, ResolvedBuild};
+use labyrinth_rules::catalog::ContentCatalog;
+use labyrinth_rules::{ControllerPolicy, Scenario, ScenarioActor, StockScenario};
 
 #[cfg(test)]
 mod tests;
 
 const RESULT_CACHE: usize = 64;
 const LOG_LIMIT: usize = 80;
+const MAX_SESSION_SNAPSHOT_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const PLAYER_CAPACITY: u8 = PARTY_SIZE as u8;
 const ACTORS: [ActorId; PARTY_SIZE] = [
     ActorId(1),
@@ -61,13 +64,21 @@ pub struct CompanyMember {
     /// Current visual and build preset.
     pub hero: HeroClass,
     /// Frozen active move selection for this character.
-    pub abilities: AbilityLoadout,
+    pub abilities: ResolvedBuild,
     /// Participant controller, independent of formation rank.
     pub owner: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SessionCommand {
+    ConfigureBattle {
+        scenario: Scenario,
+        expected_revision: u64,
+    },
+    CustomizeActor {
+        actor: ScenarioActor,
+        expected_revision: u64,
+    },
     ChooseHero {
         actor: ActorId,
         hero: HeroClass,
@@ -110,6 +121,9 @@ pub(crate) struct SessionSnapshot {
     pub players: Vec<PlayerState>,
     pub company: Vec<CompanyMember>,
     pub assignment_revision: u64,
+    pub setup_revision: u64,
+    pub scenario: Scenario,
+    pub catalog: ContentCatalog,
     pub combat: Option<CombatSnapshot>,
     pub log: Vec<String>,
     pub events: Vec<PresentedEvent>,
@@ -125,6 +139,9 @@ struct UncheckedSessionSnapshot {
     players: Vec<PlayerState>,
     company: Vec<CompanyMember>,
     assignment_revision: u64,
+    setup_revision: u64,
+    scenario: Scenario,
+    catalog: ContentCatalog,
     combat: Option<CombatSnapshot>,
     log: Vec<String>,
     events: Vec<PresentedEvent>,
@@ -143,6 +160,9 @@ impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
             players: value.players,
             company: value.company,
             assignment_revision: value.assignment_revision,
+            setup_revision: value.setup_revision,
+            scenario: value.scenario,
+            catalog: value.catalog,
             combat: value.combat,
             log: value.log,
             events: value.events,
@@ -163,18 +183,25 @@ impl SessionSnapshot {
         {
             return Err("Invalid host suspension reason.");
         }
+        if serde_json::to_vec(self)
+            .map_err(|_| "Cannot encode session snapshot.")?
+            .len()
+            > MAX_SESSION_SNAPSHOT_BYTES
+        {
+            return Err("Session snapshot exceeds byte budget.");
+        }
+        self.scenario
+            .validate(&self.catalog)
+            .map_err(|_| "Invalid battle configuration.")?;
+        if self.setup_revision == 0 {
+            return Err("Invalid setup revision.");
+        }
         if self.revision == 0
             || self.assignment_revision == 0
             || self.next_sequence == 0
             || self.players.len() != usize::from(PLAYER_CAPACITY)
             || self.company.is_empty()
             || self.company.len() > PARTY_SIZE
-            || self
-                .company
-                .iter()
-                .map(|h| usize::from(ActorKind::Hero(h.hero).footprint()))
-                .sum::<usize>()
-                > PARTY_SIZE
             || self.log.len() > LOG_LIMIT
             || self.events.len() > LOG_LIMIT
         {
@@ -196,7 +223,24 @@ impl SessionSnapshot {
                 return Err("Invalid or duplicate participant reservation.");
             }
         }
+        if self.company.len() != self.scenario.heroes.len() {
+            return Err("Company must match scenario heroes.");
+        }
         for member in &self.company {
+            let configured = self
+                .scenario
+                .heroes
+                .iter()
+                .find(|a| a.id == member.actor)
+                .ok_or("Unknown company character.")?;
+            if configured
+                .actor
+                .resolve(&self.catalog)
+                .map_err(|_| "Invalid character build.")?
+                != member.abilities
+            {
+                return Err("Derived company build does not match scenario.");
+            }
             if member.actor.0 == 0
                 || !actors.insert(member.actor)
                 || !self
@@ -209,6 +253,37 @@ impl SessionSnapshot {
         }
         if let Some(combat) = &self.combat {
             combat.validate().map_err(|_| "Invalid combat snapshot.")?;
+            if combat.catalog != self.catalog
+                || combat.scenario_fingerprint
+                    != self
+                        .scenario
+                        .fingerprint(&self.catalog)
+                        .map_err(|_| "Invalid configuration identity.")?
+            {
+                return Err("Combat configuration identity does not match setup.");
+            }
+            if combat.actors.len() != self.scenario.heroes.len() + self.scenario.enemies.len() {
+                return Err("Combat roster does not match setup.");
+            }
+            for (team, roster) in [
+                (labyrinth_rules::Team::Heroes, &self.scenario.heroes),
+                (labyrinth_rules::Team::Enemies, &self.scenario.enemies),
+            ] {
+                for configured in roster {
+                    if !combat.actor(configured.id).is_some_and(|actor| {
+                        actor.kind == configured.actor.appearance
+                            && actor.name() == configured.actor.name
+                            && actor.max_hp == configured.actor.max_hp
+                            && actor.base_speed == configured.actor.base_speed
+                            && actor.footprint() == configured.actor.footprint
+                            && actor.team() == team
+                            && actor.build == configured.actor.build
+                            && actor.controller == configured.controller
+                    }) {
+                        return Err("Frozen combat actor does not match scenario.");
+                    }
+                }
+            }
             if self.encounter == 0
                 || combat
                     .actors
@@ -220,10 +295,10 @@ impl SessionSnapshot {
                 return Err("Combat must match the configured company.");
             }
             for member in &self.company {
-                if !combat.actor(member.actor).is_some_and(|actor| {
-                    actor.kind == ActorKind::Hero(member.hero)
-                        && actor.abilities == member.abilities
-                }) {
+                if !combat
+                    .actor(member.actor)
+                    .is_some_and(|actor| actor.abilities == member.abilities)
+                {
                     return Err("Combat actor does not match its configured build.");
                 }
             }
@@ -235,7 +310,7 @@ impl SessionSnapshot {
             return Err("Suspension does not match required controllers.");
         }
         if self.events.iter().any(|e| e.id == 0)
-            || self.events.windows(2).any(|pair| pair[0].id >= pair[1].id)
+            || self.events.array_windows::<2>().any(|[a, b]| a.id >= b.id)
         {
             return Err("Invalid session event order.");
         }
@@ -298,6 +373,15 @@ impl SessionSnapshot {
     }
 
     pub fn validate_successor(&self, previous: &Self) -> Result<(), &'static str> {
+        if self.setup_revision < previous.setup_revision {
+            return Err("Setup revision moved backwards.");
+        }
+        if self.encounter == previous.encounter
+            && previous.combat.is_some()
+            && (self.scenario != previous.scenario || self.catalog != previous.catalog)
+        {
+            return Err("Encounter configuration changed during combat.");
+        }
         if self.assignment_revision < previous.assignment_revision {
             return Err("Controller revision moved backwards.");
         }
@@ -330,12 +414,14 @@ pub(crate) struct PartyAuthority {
     company: Vec<CompanyMember>,
     assignment_revision: u64,
     assignment_pause: bool,
+    setup_revision: u64,
+    scenario: Scenario,
+    catalog: ContentCatalog,
     combat: Option<Combat>,
     sequence: BTreeMap<u8, u64>,
     results: BTreeMap<u8, VecDeque<RequestResult>>,
     revision: u64,
     encounter: u64,
-    seed: u64,
     local: bool,
     log: VecDeque<String>,
     events: VecDeque<PresentedEvent>,
@@ -374,33 +460,100 @@ impl PartyAuthority {
                 ready: local && slot == 0,
             })
             .collect();
-        let company = ACTORS
+        let catalog = ContentCatalog::builtin().map_err(|_| "Invalid authored catalog.")?;
+        let mut scenario = Scenario::stock(StockScenario::Prototype, seed, &catalog)
+            .map_err(|_| "Invalid authored scenario.")?;
+        scenario.heroes = ACTORS
             .into_iter()
             .zip(roster.iter().copied())
-            .map(|(actor, hero)| CompanyMember {
-                actor,
-                hero,
-                abilities: HeroSetup::preset(actor, hero).abilities,
-                owner: 0,
+            .map(|(id, hero)| {
+                let preset = catalog
+                    .definition()
+                    .actor_presets
+                    .iter()
+                    .find(|p| p.appearance == ActorKind::Hero(hero))
+                    .ok_or("Missing visual preset.")?;
+                Ok(ScenarioActor {
+                    id,
+                    actor: ActorBuild::from_preset(&catalog, &preset.id)
+                        .map_err(|_| "Invalid preset.")?,
+                    controller: ControllerPolicy::Manual,
+                    starting_hp: None,
+                    starting_statuses: Vec::new(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, &'static str>>()?;
+        scenario.validate(&catalog).map_err(|_| "Invalid roster.")?;
+        let company =
+            Self::company_for(&scenario, &catalog, &[]).map_err(|_| "Invalid company.")?;
         Ok(Self {
             players,
             company,
             assignment_revision: 1,
             assignment_pause: false,
+            setup_revision: 1,
+            scenario,
+            catalog,
             combat: None,
             sequence: BTreeMap::new(),
             results: BTreeMap::new(),
             revision: 1,
             encounter: 0,
-            seed,
             local,
             log: VecDeque::new(),
             events: VecDeque::new(),
             next_event: 1,
             faulted: false,
         })
+    }
+
+    fn company_for(
+        scenario: &Scenario,
+        catalog: &ContentCatalog,
+        previous: &[CompanyMember],
+    ) -> Result<Vec<CompanyMember>, String> {
+        scenario
+            .heroes
+            .iter()
+            .map(|actor| {
+                Ok(CompanyMember {
+                    actor: actor.id,
+                    hero: match actor.actor.appearance {
+                        ActorKind::Hero(hero) => hero,
+                        ActorKind::Enemy(_) => HeroClass::Gatekeeper,
+                    },
+                    abilities: actor.actor.resolve(catalog).map_err(|e| e.to_string())?,
+                    owner: previous
+                        .iter()
+                        .find(|m| m.actor == actor.id)
+                        .map_or(0, |m| m.owner),
+                })
+            })
+            .collect()
+    }
+    fn configure(&mut self, scenario: Scenario, expected_revision: u64) -> Result<(), String> {
+        if !self.in_lobby() {
+            return Err("Battle builds and formation are configured in the lobby.".into());
+        }
+        if expected_revision != self.setup_revision {
+            return Err("Setup changed. Reload your draft before applying.".into());
+        }
+        scenario
+            .validate(&self.catalog)
+            .map_err(|e| e.to_string())?;
+        Combat::from_scenario(&self.catalog, &scenario).map_err(|e| e.to_string())?;
+        if scenario == self.scenario {
+            return Ok(());
+        }
+        let company = Self::company_for(&scenario, &self.catalog, &self.company)?;
+        self.scenario = scenario;
+        self.company = company;
+        self.setup_revision += 1;
+        self.assignment_revision += 1;
+        for player in &mut self.players {
+            player.ready = false;
+        }
+        Ok(())
     }
 
     pub fn in_lobby(&self) -> bool {
@@ -500,6 +653,9 @@ impl PartyAuthority {
             players: self.players.clone(),
             company: self.company.clone(),
             assignment_revision: self.assignment_revision,
+            setup_revision: self.setup_revision,
+            scenario: self.scenario.clone(),
+            catalog: self.catalog.clone(),
             combat: self.combat.as_ref().map(Combat::snapshot),
             log: self.log.iter().cloned().collect(),
             events: self.events.iter().cloned().collect(),
@@ -570,39 +726,75 @@ impl PartyAuthority {
             return Err("That encounter has ended.".into());
         }
         match request.command {
-            SessionCommand::ChooseHero { actor, hero } => {
-                if !self.in_lobby() {
-                    return Err("Builds are chosen in the lobby.".into());
+            SessionCommand::ConfigureBattle {
+                scenario,
+                expected_revision,
+            } => {
+                if slot != 0 {
+                    return Err("Only the host edits battle composition and enemies.".into());
                 }
-                let member = self
-                    .company
-                    .iter()
-                    .find(|m| m.actor == actor)
+                self.configure(scenario, expected_revision)?;
+            }
+            SessionCommand::CustomizeActor {
+                actor,
+                expected_revision,
+            } => {
+                if request.assignment_revision != self.assignment_revision {
+                    return Err("Character assignments changed. Refresh your draft.".into());
+                }
+                if slot != 0
+                    && !self
+                        .company
+                        .iter()
+                        .any(|m| m.actor == actor.id && m.owner == slot)
+                {
+                    return Err("Customize only your assigned characters.".into());
+                }
+                let mut scenario = self.scenario.clone();
+                let current = scenario
+                    .heroes
+                    .iter_mut()
+                    .chain(&mut scenario.enemies)
+                    .find(|a| a.id == actor.id)
                     .ok_or("Unknown character.")?;
-                if slot != 0 && member.owner != slot {
+                if slot != 0 && actor.actor.footprint != current.actor.footprint {
+                    return Err(
+                        "The host assigns formation spaces. Ask the host to change this footprint."
+                            .into(),
+                    );
+                }
+                if actor.controller != current.controller {
+                    return Err("Controller policy is host configuration.".into());
+                }
+                *current = actor;
+                self.configure(scenario, expected_revision)?;
+            }
+            SessionCommand::ChooseHero { actor, hero } => {
+                if slot != 0
+                    && !self
+                        .company
+                        .iter()
+                        .any(|m| m.actor == actor && m.owner == slot)
+                {
                     return Err("That is not your character.".into());
                 }
-                let used: usize = self
-                    .company
+                let preset = self
+                    .catalog
+                    .definition()
+                    .actor_presets
                     .iter()
-                    .filter(|m| m.actor != actor)
-                    .map(|m| usize::from(ActorKind::Hero(m.hero).footprint()))
-                    .sum();
-                if used + usize::from(ActorKind::Hero(hero).footprint()) > PARTY_SIZE {
-                    return Err("That build exceeds six formation spaces. The host must adjust the roster first.".into());
-                }
-                if member.hero != hero {
-                    let member = self
-                        .company
-                        .iter_mut()
-                        .find(|m| m.actor == actor)
-                        .ok_or("Unknown character.")?;
-                    member.hero = hero;
-                    member.abilities = HeroSetup::preset(actor, hero).abilities;
-                    for player in &mut self.players {
-                        player.ready = false;
-                    }
-                }
+                    .find(|p| p.appearance == ActorKind::Hero(hero))
+                    .ok_or("Unknown preset.")?;
+                let mut scenario = self.scenario.clone();
+                let configured = scenario
+                    .heroes
+                    .iter_mut()
+                    .find(|a| a.id == actor)
+                    .ok_or("Unknown hero.")?;
+                configured.actor = ActorBuild::from_preset(&self.catalog, &preset.id)
+                    .map_err(|e| e.to_string())?;
+                configured.starting_hp = None;
+                self.configure(scenario, self.setup_revision)?;
             }
             SessionCommand::AssignmentPause(paused) => {
                 if slot != 0 || self.combat.is_none() {
@@ -673,18 +865,8 @@ impl PartyAuthority {
                 {
                     return Err("Every reserved participant must be connected and ready.".into());
                 }
-                let heroes: Vec<HeroSetup> = self
-                    .company
-                    .iter()
-                    .map(|p| HeroSetup {
-                        id: p.actor,
-                        class: p.hero,
-                        abilities: p.abilities.clone(),
-                    })
-                    .collect();
-                // Company order is the host-selected starting formation.
                 self.combat = Some(
-                    Combat::with_party(self.seed.wrapping_add(self.encounter), heroes)
+                    Combat::from_scenario(&self.catalog, &self.scenario)
                         .map_err(|e| e.to_string())?,
                 );
                 self.encounter += 1;
