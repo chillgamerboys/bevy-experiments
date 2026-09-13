@@ -225,6 +225,23 @@ fn twelve_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable
             // Restore the previous command focus so the next ability is reached by Tab.
             assert!(focus_action(app.world_mut(), control));
         }
+        // The final scrolled move also uses the normal native pointer path.
+        let last = *controls.last().expect("twelfth move");
+        let target = find_named(app.world_mut(), "Actor 101").expect("target");
+        let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
+        for control in [last, target, confirm] {
+            pointer_control(&mut app, control, Vec2::new(1280.0, 720.0));
+        }
+        assert_eq!(
+            std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0),
+            vec![(
+                ActorId(1),
+                CombatAction::Ability {
+                    index: 11,
+                    target: ActorId(101)
+                }
+            )]
+        );
     }
 }
 
