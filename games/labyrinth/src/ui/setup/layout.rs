@@ -11,9 +11,11 @@ struct EditorSave;
 #[derive(Component)]
 struct EditorDirty;
 #[derive(Component)]
+struct DetailScroll;
+#[derive(Component)]
 struct BrowserScroll(Category);
 
-fn editable(view: &LabyrinthView, id: ActorId) -> bool {
+pub(super) fn editable(view: &LabyrinthView, id: ActorId) -> bool {
     view.mode == ViewMode::Lobby
         && view.admitted
         && (view.host
@@ -151,7 +153,11 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         .iter(world)
         .collect::<Vec<_>>();
     for entity in controls {
-        set_disabled(world, entity, !can_edit || conflict || editor.pending_save);
+        set_disabled(
+            world,
+            entity,
+            !can_edit || conflict || editor.pending_save || editor.pending_exit.is_some(),
+        );
     }
     if editor.mounted == Some(editor.generation) {
         return;
@@ -444,7 +450,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         actions,
         "Close Build",
         "Close editor",
-        SetupAction::Cancel,
+        SetupAction::Close,
         false,
     );
 }
@@ -464,7 +470,7 @@ fn browser_row(
         parent,
         key.clone(),
         title,
-        SetupAction::Inspect(selection),
+        SetupAction::Inspect(editor.id, selection),
         false,
     );
     let appearance = world.resource::<LabyrinthAppearance>().clone();
@@ -617,7 +623,7 @@ fn mount_browser(
             }
         },
         Category::Parameters => {
-            paragraph(world,parent,"Parameter Explanation","Battle values and initial conditions. Changing them does not introduce character progression.",UiTextRole::Supporting);
+            paragraph(world,parent,"Parameter Explanation","Configure health, speed, formation size and starting conditions for this encounter.",UiTextRole::Supporting);
             for (title, field, value, max) in [
                 ("Name", BuildField::Name, &editor.name, 128),
                 ("Maximum HP", BuildField::MaxHp, &editor.max_hp, 5),
@@ -746,10 +752,20 @@ fn mount_inspector(
             top,
             "Apply Inspected Choice",
             title,
-            SetupAction::ApplyInspected,
+            SetupAction::ApplyInspected(
+                editor.id,
+                editor.selection().expect("inspected choice").clone(),
+            ),
             *disabled || !can_edit,
         );
     }
+    paragraph(
+        world,
+        parent,
+        "Details Navigation",
+        "Details · scroll or Page Up / Page Down",
+        UiTextRole::Supporting,
+    );
     let content = column(
         world,
         parent,
@@ -761,6 +777,7 @@ fn mount_inspector(
             ..box_node()
         },
     );
+    world.entity_mut(content).insert(DetailScroll);
     let appearance = world.resource::<LabyrinthAppearance>().clone();
     world
         .entity_mut(content)
@@ -821,4 +838,24 @@ fn mount_inspector(
     if matches!(editor.category, Category::Parameters) && editor.selection().is_none() {
         paragraph(world,content,"Parameters Guide","HP is health at the start of battle. Speed contributes to the initiative roll. Formation spaces determine the ranks occupied by this actor. Starting HP may be blank for full health. Conditions use the existing combat rules.",UiTextRole::Body);
     }
+}
+
+pub(super) fn scroll_details(world: &mut World, direction: i8) {
+    let Some((entity, node, position)) = world
+        .query_filtered::<(Entity, &ComputedNode, &ScrollPosition), With<DetailScroll>>()
+        .iter(world)
+        .next()
+    else {
+        return;
+    };
+    let height = node.size().y * node.inverse_scale_factor;
+    let max = ((node.content_size().y - node.size().y) * node.inverse_scale_factor).max(0.);
+    let next = match direction {
+        100.. => max,
+        ..=-100 => 0.,
+        _ => (position.y + f32::from(direction) * height * 0.85).clamp(0., max),
+    };
+    world
+        .entity_mut(entity)
+        .insert(ScrollPosition(Vec2::new(0., next)));
 }

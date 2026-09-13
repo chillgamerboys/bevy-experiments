@@ -65,10 +65,8 @@ fn main() {
             | "movement-blocked"
     );
     let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
-    let scenario = matches!(
-        route.as_str(),
-        "lobby" | "editor" | "editor-actions" | "abilities" | "ability-help"
-    )
+    let scenario = (matches!(route.as_str(), "lobby" | "abilities" | "ability-help")
+        || route.starts_with("editor"))
     .then(|| {
         let mut scenario = labyrinth_rules::scenario::Scenario::stock(
             labyrinth_rules::scenario::StockScenario::Prototype,
@@ -94,6 +92,12 @@ fn main() {
                     .collect(),
                 ..default()
             };
+        }
+        if route.starts_with("editor") {
+            for actor in scenario.heroes.iter_mut().chain(&mut scenario.enemies) {
+                actor.actor.build.weapon =
+                    Some(labyrinth_rules::catalog::ContentId::new("dagger").expect("weapon"));
+            }
         }
         scenario
     });
@@ -228,7 +232,7 @@ fn main() {
     let view = LabyrinthView {
         mode: match route.as_str() {
             "menu" | "host" => ViewMode::Menu,
-            "lobby" | "editor" | "editor-actions" => ViewMode::Lobby,
+            route if route == "lobby" || route.starts_with("editor") => ViewMode::Lobby,
             _ => ViewMode::Combat,
         },
         local: !matches!(route.as_str(), "lobby" | "paused"),
@@ -462,7 +466,12 @@ fn capture(
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
-        ("editor" | "editor-actions", 4) => Some("Edit Actor 1"),
+        (route, 4) if route.starts_with("editor") => Some("Edit Actor 1"),
+        ("editor-compare", 7) => Some("Weapon greatsword"),
+        ("editor-detail", 7) => Some("Weapon dagger"),
+        ("editor-learned", 7) => Some("Category Learned"),
+        ("editor-learned", 10) => Some("Learned duelist_dagger_power"),
+        ("editor-parameters", 7) => Some("Category Parameters"),
         ("host", 4) => Some("Multiplayer"),
         ("host", 7) => Some("Host Company"),
         ("game-menu", 4) => Some("Battle Settings"),

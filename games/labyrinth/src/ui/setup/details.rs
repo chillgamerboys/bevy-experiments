@@ -98,7 +98,11 @@ pub(super) fn move_facts(
         })
         .collect::<Vec<_>>()
         .join("; ");
-    facts.push(format!("Granted by {sources}."));
+    facts.push(if sources.is_empty() {
+        "Not granted by this build. Previewing the base definition.".into()
+    } else {
+        format!("Granted by {sources}.")
+    });
     for upgrade in &ability.upgrades {
         facts.push(format!(
             "Upgraded by {} ({}) · {}",
@@ -171,12 +175,47 @@ pub(super) fn changes(before: &ResolvedBuild, after: &ResolvedBuild) -> Vec<Stri
             .find(|new| new.definition.id == old.definition.id)
         {
             None => lines.push(format!("Removed · {}", old.definition.name)),
-            Some(new) if new.definition != old.definition => lines.push(format!(
-                "Changed · {}: {} → {}",
-                new.definition.name,
-                crate::presentation::effects_description(&old.definition.effects),
-                crate::presentation::effects_description(&new.definition.effects)
-            )),
+            Some(new) if new.definition != old.definition => {
+                let mut changed = Vec::new();
+                if old.definition.effects != new.definition.effects {
+                    changed.push(format!(
+                        "{} → {}",
+                        crate::presentation::effects_description(&old.definition.effects),
+                        crate::presentation::effects_description(&new.definition.effects)
+                    ));
+                }
+                if old.definition.source_ranks != new.definition.source_ranks {
+                    changed.push(format!(
+                        "acting ranks {} → {}",
+                        ranks(old.definition.source_ranks),
+                        ranks(new.definition.source_ranks)
+                    ));
+                }
+                if old.definition.target_ranks != new.definition.target_ranks {
+                    changed.push(format!(
+                        "target ranks {} → {}",
+                        ranks(old.definition.target_ranks),
+                        ranks(new.definition.target_ranks)
+                    ));
+                }
+                if old.definition.max_uses != new.definition.max_uses {
+                    changed.push(format!(
+                        "uses {:?} → {:?}",
+                        old.definition.max_uses, new.definition.max_uses
+                    ));
+                }
+                if old.definition.target_pattern != new.definition.target_pattern {
+                    changed.push(format!(
+                        "target pattern {:?} → {:?}",
+                        old.definition.target_pattern, new.definition.target_pattern
+                    ));
+                }
+                lines.push(format!(
+                    "Changed · {}: {}",
+                    new.definition.name,
+                    changed.join("; ")
+                ));
+            }
             Some(new) if new.grants != old.grants || new.upgrades != old.upgrades => {
                 lines.push(format!(
                     "Retained · {} · grant sources {} → {}. Other grants keep this move available.",
@@ -215,7 +254,7 @@ pub(super) struct Inspection {
     pub apply: Option<(String, bool)>,
 }
 pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Inspection {
-    let mut result=Inspection {title:"Battle parameters".into(),description:"Existing prototype values for this encounter. These are not a character attribute or progression system.".into(),facts:vec![],moves:vec![],changes:vec![],apply:None};
+    let mut result=Inspection {title:"Battle parameters".into(),description:"Set health, initiative speed, occupied ranks and starting conditions for this encounter.".into(),facts:vec![],moves:vec![],changes:vec![],apply:None};
     let Some(selected) = editor.selection() else {
         return result;
     };
@@ -295,7 +334,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 result.description = skill.description.clone();
                 move_ids = skill.grants.clone();
                 result.facts.push(format!(
-                    "Discipline: {}. This is a source label, not a class restriction.",
+                    "Discipline: {}. Available to any character with the required move.",
                     skill.provenance
                 ));
                 for upgrade in &skill.upgrades {
@@ -330,7 +369,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
         Selection::Preset(id) => {
             if let Some(preset) = catalog.actor_preset(id) {
                 result.title = preset.name.clone();
-                result.description="Replace this draft with the preset's appearance, build and battle values. Actor identity and ownership remain.".into();
+                result.description="Use this preset's appearance, equipment, innate moves and starting values in your draft.".into();
                 result.facts.push(format!("Maximum HP {} → {} · speed {} → {} · formation spaces {} → {}. Starting HP resets to full.",editor.max_hp,preset.max_hp,editor.speed,preset.base_speed,editor.footprint,preset.footprint));
                 move_ids = catalog.resolve_build(&preset.build).map_or_else(
                     |_| vec![],
