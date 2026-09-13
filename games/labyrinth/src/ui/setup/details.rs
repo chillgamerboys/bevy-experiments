@@ -15,11 +15,17 @@ pub(super) fn rank_span(view: &LabyrinthView, editor: &ActorEditor) -> (Team, u8
     } else {
         (Team::Enemies, &scenario.enemies)
     };
-    let start = 1 + roster
-        .iter()
-        .take_while(|a| a.id != editor.id)
-        .map(|a| a.actor.footprint)
-        .sum::<u8>();
+    let start = view
+        .formation
+        .as_ref()
+        .and_then(|f| f.rank(editor.id))
+        .unwrap_or_else(|| {
+            1 + roster
+                .iter()
+                .take_while(|a| a.id != editor.id)
+                .map(|a| a.actor.footprint)
+                .sum::<u8>()
+        });
     let width = editor
         .footprint
         .parse::<u8>()
@@ -27,7 +33,7 @@ pub(super) fn rank_span(view: &LabyrinthView, editor: &ActorEditor) -> (Team, u8
         .clamp(1, 6);
     (team, start, start.saturating_add(width - 1).min(6))
 }
-pub(super) fn ranks(mask: u8) -> String {
+pub(in crate::ui) fn ranks(mask: u8) -> String {
     (1..=6)
         .filter(|rank| mask & (1 << (rank - 1)) != 0)
         .map(|rank| rank.to_string())
@@ -41,7 +47,7 @@ pub(super) fn move_summary(ability: &AbilityDefinition) -> String {
         ranks(ability.source_ranks)
     )
 }
-pub(super) fn move_facts(
+pub(in crate::ui) fn move_facts(
     ability: &ResolvedAbility,
     span: (u8, u8),
     catalog: &ContentCatalog,

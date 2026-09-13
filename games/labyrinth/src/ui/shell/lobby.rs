@@ -7,63 +7,68 @@ use super::*;
 mod tests;
 
 pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView, ui: &mut UiState) {
-    let lobby = surface(world, parent, "Company Lobby");
-    world.entity_mut(lobby).insert(Node {
-        width: Val::Percent(100.0),
-        flex_grow: 1.0,
-        flex_shrink: 1.0,
-        min_height: Val::Px(0.0),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(12.0),
-        padding: UiRect::all(Val::Px(16.0)),
-        ..default()
-    });
-    label(
+    let lobby = column(
         world,
-        lobby,
+        parent,
+        "Company Lobby",
+        Node {
+            width: Val::Percent(100.0),
+            flex_grow: 1.0,
+            flex_shrink: 1.0,
+            min_height: Val::Px(0.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(8.0),
+            ..default()
+        },
+    );
+    let header = row(world, lobby, "Preparation Header");
+    let title = label(
+        world,
+        header,
         "Lobby Title",
-        "Prepare your company",
+        "Prepare for battle",
         UiTextRole::Title,
     );
-    if let Some(scenario) = &view.scenario {
-        label(
+    world.entity_mut(title).insert(Node {
+        flex_grow: 1.0,
+        ..default()
+    });
+    control(
+        world,
+        header,
+        "Preparation Scenario",
+        if ui.lobby_page == 2 {
+            "Back to formation"
+        } else {
+            "Scenario"
+        },
+        Action::LobbyPage(2),
+        false,
+    );
+    if !view.local {
+        control(
             world,
-            lobby,
-            "Scenario Title",
-            format!("{}  ·  Seed {}", scenario.name, scenario.seed),
-            UiTextRole::Supporting,
-        );
-    }
-    let tabs = row(world, lobby, "Preparation Navigation");
-    for (page, title) in [
-        (0, "Party"),
-        (1, "Enemies"),
-        (2, "Scenario"),
-        (3, "Players"),
-    ] {
-        let active = ui.lobby_page == page;
-        let button = control(
-            world,
-            tabs,
-            format!("Preparation {title}"),
-            if active {
-                format!("{title} · selected")
+            header,
+            "Preparation Lobby",
+            if ui.lobby_page == 3 {
+                "Back to formation"
             } else {
-                title.into()
+                "Lobby"
             },
-            Action::LobbyPage(page),
+            Action::LobbyPage(3),
             false,
         );
-        if active {
-            let theme = world.resource::<UiTheme>();
-            let overrides = UiSkinOverrides {
-                background: Some(theme.control_hovered),
-                border: Some(theme.accent),
-                ..default()
-            };
-            world.entity_mut(button).insert(overrides);
-        }
     }
+    control(
+        world,
+        header,
+        "Lobby Settings",
+        "Settings",
+        Action::Settings,
+        false,
+    );
+    control(world, header, "Lobby Leave", "Leave", Action::Leave, false);
+    player_strip(world, lobby, view);
     let body = column(
         world,
         lobby,
@@ -74,216 +79,126 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView, ui:
             flex_grow: 1.0,
             flex_basis: Val::Px(0.0),
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(16.0),
+            row_gap: Val::Px(8.0),
             padding: UiRect::right(Val::Px(8.0)),
-            overflow: Overflow::scroll_y(),
+            overflow: if ui.lobby_page == 0 {
+                Overflow::clip()
+            } else {
+                Overflow::scroll_y()
+            },
             ..default()
         },
     );
     match ui.lobby_page {
-        1 => roster(world, body, view, labyrinth_rules::Team::Enemies),
         2 => scenario_controls(world, body, view, ui),
         3 => participants(world, body, view),
-        _ => roster(world, body, view, labyrinth_rules::Team::Heroes),
+        _ => {
+            constructor::board(world, body, view, ui);
+            let context = column(
+                world,
+                body,
+                "Construction Detail Scroll",
+                Node {
+                    width: Val::Percent(100.0),
+                    min_height: Val::Px(0.0),
+                    flex_grow: 1.0,
+                    flex_basis: Val::Px(0.0),
+                    flex_direction: FlexDirection::Column,
+                    overflow: Overflow::scroll_y(),
+                    ..default()
+                },
+            );
+            constructor::context(world, context, view, ui);
+        }
     }
-    readiness(world, lobby, view);
+    readiness(world, lobby, view, ui);
 }
 
-// Cards use their own width budget rather than the combat HUD's viewport class.
-pub(super) fn formation_columns(metrics: ResolvedUiMetrics) -> u16 {
-    let readable_width = (metrics.logical_size.x.min(1600.0) - 96.0) / metrics.content_scale;
-    if readable_width >= 1000.0 {
-        3
-    } else if readable_width >= 650.0 {
-        2
-    } else {
-        1
-    }
-}
-
-fn roster(world: &mut World, parent: Entity, view: &LabyrinthView, team: labyrinth_rules::Team) {
-    let Some(scenario) = &view.scenario else {
-        return;
-    };
-    let roster = if team == labyrinth_rules::Team::Heroes {
-        &scenario.heroes
-    } else {
-        &scenario.enemies
-    };
-    let used = roster
-        .iter()
-        .map(|a| usize::from(a.actor.footprint))
-        .sum::<usize>();
-    label(
+fn player_strip(world: &mut World, parent: Entity, view: &LabyrinthView) {
+    let strip = column(
         world,
         parent,
-        &format!("{team:?} Setup Title"),
-        format!(
-            "{} · {used}/6 formation spaces",
-            if team == labyrinth_rules::Team::Heroes {
-                "Party"
-            } else {
-                "Enemies"
-            }
-        ),
-        UiTextRole::Body,
-    );
-    label(
-        world,
-        parent,
-        "Formation Advice",
-        "Front to back, in rank order. Open a character to inspect its moves and customize its build.",
-        UiTextRole::Supporting,
-    );
-    let metrics = *world.resource::<ResolvedUiMetrics>();
-    let columns = formation_columns(metrics);
-    let grid = column(
-        world,
-        parent,
-        "Formation Cards",
+        "Company Player Strip",
         Node {
-            display: Display::Grid,
             width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(20.0),
+            overflow: Overflow::scroll_x(),
             flex_shrink: 0.0,
-            grid_template_columns: RepeatedGridTrack::flex(columns, 1.0),
-            column_gap: Val::Px(12.0),
-            row_gap: Val::Px(12.0),
+            padding: UiRect::vertical(Val::Px(4.0)),
             ..default()
         },
     );
-    let mut rank = 1;
-    for (index, actor) in roster.iter().enumerate() {
-        let card = surface(world, grid, &format!("Actor {} Setup", actor.id.0));
-        if let Some(mut node) = world.get_mut::<Node>(card) {
-            node.padding = UiRect::all(Val::Px(12.0));
-            node.row_gap = Val::Px(8.0);
-            node.min_width = Val::Px(0.0);
+    if view.local {
+        label(
+            world,
+            strip,
+            "Player 0",
+            "You · Whole company",
+            UiTextRole::Supporting,
+        );
+        if let Some(scenario) = &view.scenario {
+            label(
+                world,
+                strip,
+                "Scenario Title",
+                format!("{} · Seed {}", scenario.name, scenario.seed),
+                UiTextRole::Supporting,
+            );
         }
-        let end = rank + usize::from(actor.actor.footprint) - 1;
-        let ranks = if end == rank {
-            format!("Rank {rank}")
-        } else {
-            format!("Ranks {rank}–{end}")
-        };
-        rank = end + 1;
-        label(
+        return;
+    }
+    for player in view.players.iter().filter(|p| p.occupied) {
+        let entry = column(
             world,
-            card,
-            &format!("Actor {} Rank", actor.id.0),
-            ranks,
-            UiTextRole::Supporting,
+            strip,
+            &format!("Player {} Summary", player.slot),
+            Node {
+                flex_grow: 1.0,
+                flex_basis: Val::Px(0.0),
+                min_width: Val::Px(150.0),
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
         );
         label(
             world,
-            card,
-            &format!("Actor {} Setup Label", actor.id.0),
-            &actor.actor.name,
-            UiTextRole::Title,
-        );
-        let owner = view.company.iter().find(|member| member.actor == actor.id);
-        let controller = if team == labyrinth_rules::Team::Enemies {
-            format!(
-                "{} · host configures",
-                match actor.controller {
-                    labyrinth_rules::scenario::ControllerPolicy::Ai => "AI controlled",
-                    labyrinth_rules::scenario::ControllerPolicy::Manual => "Manual controller",
-                    labyrinth_rules::scenario::ControllerPolicy::External => "External controller",
-                }
-            )
-        } else {
-            owner
-                .and_then(|member| view.players.iter().find(|p| p.slot == member.owner))
-                .map_or_else(
-                    || "Host controlled".into(),
-                    |player| format!("Controlled by {}", player.name),
-                )
-        };
-        label(
-            world,
-            card,
-            &format!("Actor {} Controller Label", actor.id.0),
-            controller,
-            UiTextRole::Supporting,
-        );
-        let weapon = actor.actor.build.weapon.as_ref().and_then(|id| {
-            view.catalog
-                .as_ref()?
-                .definition()
-                .weapons
-                .iter()
-                .find(|w| &w.id == id)
-        });
-        label(
-            world,
-            card,
-            &format!("Actor {} Equipment", actor.id.0),
-            format!(
-                "{}  ·  {} HP",
-                weapon.map_or("Unarmed", |w| w.name.as_str()),
-                actor.actor.max_hp
-            ),
+            entry,
+            &format!("Player {}", player.slot),
+            format!("P{} · {}", player.slot + 1, player.name),
             UiTextRole::Body,
         );
-        let editable = view.host || owner.is_some_and(|m| Some(m.owner) == view.player);
-        control(
+        label(
             world,
-            card,
-            format!("Edit Actor {}", actor.id.0),
-            if editable {
-                "Open character"
-            } else {
-                "Assigned to another player"
-            },
-            Action::Setup(setup::SetupAction::Edit(actor.id)),
-            !editable,
-        );
-        if view.host {
-            let order = row(
-                world,
-                card,
-                &format!("Actor {} Formation Actions", actor.id.0),
-            );
-            control(
-                world,
-                order,
-                format!("Move Actor {} Forward", actor.id.0),
-                "Forward",
-                Action::Setup(setup::SetupAction::Move(actor.id, -1)),
-                index == 0,
-            );
-            control(
-                world,
-                order,
-                format!("Move Actor {} Back", actor.id.0),
-                "Back",
-                Action::Setup(setup::SetupAction::Move(actor.id, 1)),
-                index + 1 == roster.len(),
-            );
-            control(
-                world,
-                order,
-                format!("Remove Actor {}", actor.id.0),
-                "Remove",
-                Action::Setup(setup::SetupAction::Remove(actor.id)),
-                roster.len() == 1,
-            );
-        }
-    }
-    if view.host {
-        control(
-            world,
-            parent,
-            format!("Add {team:?}"),
+            entry,
+            &format!("Player {} State", player.slot),
             format!(
-                "Add {} character",
-                if team == labyrinth_rules::Team::Heroes {
-                    "party"
+                "{} · {}",
+                if !player.connected {
+                    "Offline"
+                } else if player.actors.is_empty() {
+                    "Spectating"
+                } else if player.ready {
+                    "Ready"
                 } else {
-                    "enemy"
+                    "Preparing"
+                },
+                if player.actors.is_empty() {
+                    "No characters".to_owned()
+                } else {
+                    format!(
+                        "{} {}",
+                        player.actors.len(),
+                        if player.actors.len() == 1 {
+                            "character"
+                        } else {
+                            "characters"
+                        }
+                    )
                 }
             ),
-            Action::Setup(setup::SetupAction::Add(team)),
-            used >= 6,
+            UiTextRole::Supporting,
         );
     }
 }
@@ -300,7 +215,7 @@ fn scenario_controls(world: &mut World, parent: Entity, view: &LabyrinthView, ui
         world,
         parent,
         "Stock Advice",
-        "Loading a stock or saved encounter replaces both formations. Save your current setup to keep it. Character changes use Open character in Party or Enemies.",
+        "Loading a stock or saved encounter replaces both formations. Save your current setup to keep it. Select a character on the formation and choose Customize to edit its build.",
         UiTextRole::Supporting,
     );
     for (index, title, description) in [
@@ -404,41 +319,10 @@ fn participants(world: &mut World, parent: Entity, view: &LabyrinthView) {
         world,
         parent,
         "Players Title",
-        "Players & assignments",
+        "Invitations & connection",
         UiTextRole::Title,
     );
-    label(
-        world,
-        parent,
-        "Assignment Advice",
-        "A player may control several characters or spectate. The host assigns characters; formation rank is configured in Party.",
-        UiTextRole::Supporting,
-    );
-    for player in &view.players {
-        let state = if !player.occupied {
-            "Open slot"
-        } else if !player.connected {
-            "Disconnected · reserved"
-        } else if player.actors.is_empty() {
-            "Spectating"
-        } else if player.ready {
-            "Ready"
-        } else {
-            "Not ready"
-        };
-        label(
-            world,
-            parent,
-            &format!("Player {}", player.slot),
-            format!(
-                "{} · {} characters · {state}",
-                player.name,
-                player.actors.len()
-            ),
-            UiTextRole::Body,
-        );
-    }
-    assignments(world, parent, view);
+    label(world, parent, "Assignment Advice", "Select a place on the formation to assign its player. Each player can choose and customize their own characters, or spectate.", UiTextRole::Supporting);
     if !view.host {
         return;
     }
@@ -484,76 +368,99 @@ fn participants(world: &mut World, parent: Entity, view: &LabyrinthView) {
     }
 }
 
-fn readiness(world: &mut World, parent: Entity, view: &LabyrinthView) {
-    let current = view
-        .players
-        .iter()
-        .find(|player| Some(player.slot) == view.player);
+fn readiness(world: &mut World, parent: Entity, view: &LabyrinthView, ui: &UiState) {
+    let current = view.players.iter().find(|p| Some(p.slot) == view.player);
     let ready = current.is_some_and(|p| p.ready);
     let spectator = current.is_none_or(|p| p.actors.is_empty());
-    let required = view
+    let waiting = view
         .players
         .iter()
-        .filter(|p| p.occupied && !p.actors.is_empty())
-        .collect::<Vec<_>>();
-    let waiting = required
-        .iter()
-        .filter(|p| !p.connected || !p.ready)
+        .filter(|p| p.occupied && !p.actors.is_empty() && (!p.connected || !p.ready))
         .map(|p| p.name.as_str())
         .collect::<Vec<_>>();
-    let can_start = !view.players.is_empty() && waiting.is_empty();
-    label(
+    let error = view.deployment_error.clone().or_else(|| {
+        view.scenario
+            .as_ref()
+            .and_then(|s| constructor::formation(view).deployment_error(s))
+    });
+    let footer = row(world, parent, "Lobby Actions");
+    world
+        .entity_mut(footer)
+        .insert(BackgroundColor(Color::srgba(0.025, 0.04, 0.04, 0.96)));
+    let text = label(
         world,
-        parent,
+        footer,
         "Readiness Summary",
-        if waiting.is_empty() {
-            "Company ready".into()
+        if let Some(error) = &error {
+            constructor::deployment_summary(view).unwrap_or_else(|| error.clone())
+        } else if waiting.is_empty() || view.local {
+            "Formation ready".into()
         } else {
             format!("Waiting for {}", waiting.join(", "))
         },
         UiTextRole::Supporting,
     );
-    let actions = row(world, parent, "Lobby Actions");
-    control(
-        world,
-        actions,
-        "Toggle Ready",
-        if spectator {
-            "Spectating"
-        } else if ready {
-            "Not ready"
-        } else {
-            "Ready"
-        },
-        Action::Ready(!ready),
-        !view.admitted || spectator,
-    );
-    if view.host {
+    world.entity_mut(text).insert(Node {
+        flex_grow: 1.0,
+        flex_basis: Val::Px(200.0),
+        min_width: Val::Px(0.0),
+        ..default()
+    });
+    if ui.lobby_page == 0 {
+        constructor::commit(world, footer, view, ui);
+    }
+    if !view.local {
         control(
             world,
-            actions,
-            "Start Encounter",
-            "Start battle",
-            Action::Start,
-            !can_start,
+            footer,
+            "Toggle Ready",
+            if spectator {
+                "Spectating"
+            } else if ready {
+                "Not ready"
+            } else {
+                "Ready"
+            },
+            Action::Ready(!ready),
+            !view.admitted || spectator || error.is_some(),
         );
     }
-    control(
-        world,
-        actions,
-        "Lobby Settings",
-        "Readability & motion",
-        Action::Settings,
-        false,
-    );
-    control(
-        world,
-        actions,
-        "Lobby Leave",
-        "Return to menu",
-        Action::Leave,
-        false,
-    );
+    if view.host {
+        let start = control(
+            world,
+            footer,
+            "Start Encounter",
+            "Deploy",
+            Action::Start,
+            error.is_some() || (!view.local && (view.players.is_empty() || !waiting.is_empty())),
+        );
+        world.entity_mut(start).insert(UiSkinOverrides {
+            background: Some(if ui.constructor.selection.is_none() {
+                Color::srgb(0.26, 0.25, 0.13)
+            } else {
+                Color::NONE
+            }),
+            disabled: Some(Color::srgb(0.07, 0.08, 0.08)),
+            border: Some(if error.is_some() {
+                Color::srgb(0.23, 0.26, 0.25)
+            } else {
+                Color::srgb(0.60, 0.55, 0.35)
+            }),
+            ..default()
+        });
+        if error.is_some() {
+            let children = world
+                .get::<Children>(start)
+                .map(|c| c.iter().collect::<Vec<_>>())
+                .unwrap_or_default();
+            for child in children {
+                world.entity_mut(child).insert(UiSkinOverrides {
+                    text: Some(Color::srgb(0.45, 0.48, 0.46)),
+                    ..default()
+                });
+            }
+        }
+    }
 }
 /// Stable actor/participant keys survive admission updates and controller changes.
 pub(super) fn assignments(world: &mut World, parent: Entity, view: &LabyrinthView) {

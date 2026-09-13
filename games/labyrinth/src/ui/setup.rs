@@ -7,7 +7,7 @@ mod tests;
 #[cfg(test)]
 #[path = "setup/tests.rs"]
 mod decision_tests;
-mod details;
+pub(super) mod details;
 mod layout;
 
 use super::*;
@@ -44,9 +44,6 @@ pub(super) enum SetupAction {
     Close,
     Reload,
     Stock(usize),
-    Add(labyrinth_rules::Team),
-    Remove(ActorId),
-    Move(ActorId, i8),
     ApplySeed,
     SaveFile,
     LoadFile,
@@ -429,7 +426,27 @@ pub(super) fn action(
                     {
                         *current = actor.clone();
                     }
-                    if let Err(error) = candidate.validate(catalog) {
+                    if let Some(formation) = &view.formation {
+                        let team = if scenario.heroes.iter().any(|a| a.id == actor.id) {
+                            labyrinth_rules::Team::Heroes
+                        } else {
+                            labyrinth_rules::Team::Enemies
+                        };
+                        if let Some(rank) = formation.rank(actor.id) {
+                            if let Some(error) = formation.placement_error(
+                                scenario,
+                                team,
+                                rank,
+                                actor.actor.footprint,
+                                Some(actor.id),
+                                if view.host { None } else { view.player },
+                            ) {
+                                editor.error = Some(error);
+                                return None;
+                            }
+                        }
+                    }
+                    if let Err(error) = candidate.validate_preparation(catalog) {
                         editor.error = Some(error.to_string());
                         return None;
                     }
@@ -529,10 +546,8 @@ pub(super) fn action(
         }
         SetupAction::ApplySeed => match ui.scenario_seed.parse::<u64>() {
             Ok(seed) => {
-                let mut draft = scenario.clone();
-                draft.seed = seed;
-                return Some(LabyrinthIntent::ConfigureBattle {
-                    scenario: draft,
+                return Some(LabyrinthIntent::SetScenarioSeed {
+                    seed,
                     expected_revision: view.setup_revision,
                 });
             }
@@ -541,34 +556,6 @@ pub(super) fn action(
                     Some("Seed must be a whole number from 0 to 18446744073709551615.".into())
             }
         },
-        SetupAction::Remove(id) => {
-            let mut draft = scenario.clone();
-            draft.heroes.retain(|a| a.id != id);
-            draft.enemies.retain(|a| a.id != id);
-            return Some(LabyrinthIntent::ConfigureBattle {
-                scenario: draft,
-                expected_revision: view.setup_revision,
-            });
-        }
-        SetupAction::Move(id, step) => {
-            let mut draft = scenario.clone();
-            let roster = if draft.heroes.iter().any(|a| a.id == id) {
-                &mut draft.heroes
-            } else {
-                &mut draft.enemies
-            };
-            if let Some(index) = roster.iter().position(|a| a.id == id) {
-                let next = index.saturating_add_signed(isize::from(step));
-                if next < roster.len() {
-                    roster.swap(index, next);
-                }
-            }
-            return Some(LabyrinthIntent::ConfigureBattle {
-                scenario: draft,
-                expected_revision: view.setup_revision,
-            });
-        }
-        SetupAction::Add(team) => return Some(LabyrinthIntent::AddScenarioActor(team)),
     }
     None
 }
