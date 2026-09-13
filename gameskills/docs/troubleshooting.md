@@ -2,13 +2,31 @@
 
 ## A skill is absent from the session
 
-Run `gameskills status` to inspect the installed pin and package selection. Canonical
-source can be newer than the installed bundle without either being corrupt. Setup
-stages instructions; it does not prove an already-running host loaded them.
-`gameskills native codex --verify` observes native discovery without a model turn;
-Claude launch construction is a separate operation. Use explicit source fallback
-only when needed and identify it as such. Do not claim native activation from reading
-SKILL.md or silently edit installed caches.
+Run `gameskills status`. Bundle validity and `native_clients.codex.registration`
+are separate: `missing`, `outdated` or `conflict` is an actionable host-registration
+gap, even when the pinned bundle is valid. An older installation may have staged
+all files without making them discoverable to an ordinary host. Repair the same pin
+with `gameskills native codex --register --apply`, then observe ordinary discovery
+with `gameskills native codex --verify-project`.
+
+For `conflict`, inspect the reported project setting or interrupted transaction;
+GameSkills will not overwrite a newer local edit or silently enable a disabled
+plugin. Use `native codex --register --recover` for an interrupted targeted repair,
+or `setup --recover` for an interrupted installation. A copied checkout's absolute
+marketplace path is `outdated`; re-register after its pinned bundle is hydrated.
+
+If project registration is present but ordinary discovery fails, check whether the
+project is trusted, the host ignores/overrides project configuration, or its Codex
+version lacks the needed plugin support. GameSkills does not change global trust
+or retry with injected flags. `native codex --verify` uses explicit session overrides
+and can pass while ordinary-host discovery fails. A missing executable is distinct
+from either result. Claude persistent registration is not yet supported.
+
+Start a new Codex/Conductor session or restart its host to load changed registration.
+An already-running session's catalog is a separate observation. Canonical source can
+be newer than the installed bundle without corruption. Explicit source fallback can
+continue useful work, but does not close the registration/discovery defect; reading
+SKILL.md is not native activation. Preserve installed caches and the recorded pin.
 
 ## Local checks pass but delivery is unfinished
 

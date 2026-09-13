@@ -1,7 +1,9 @@
 //! Actual compiled native protocol peers and byte-bound cache checks.
 #[cfg(unix)]
 mod posix {
-    use gameskills_cli::installation::{activate_codex, execute, native_argv};
+    use gameskills_cli::installation::{
+        activate_codex, execute, native_argv, verify_project_codex,
+    };
     use serde_json::{json, Value};
     use std::{
         ffi::OsString,
@@ -109,6 +111,67 @@ mod posix {
             Ok(())
         }
     }
+    #[test]
+    fn project_discovery_uses_no_enable_flags_and_reports_ignored_config() -> Result {
+        let _guard = NATIVE_PROCESS_TEST
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut fixture = Fixture::new()?;
+        assert!(
+            verify_project_codex(&fixture.bundle, &fixture.root, &fixture.executable, 2.0)
+                .expect_err("unregistered")
+                .contains("registration is not current")
+        );
+        assert!(!fixture.root.join("pid").exists());
+        let installation = execute(
+            &fixture.root,
+            "setup",
+            &[
+                "--bundle",
+                "bundle",
+                "--packages",
+                "gameskills",
+                "gameskills-ui",
+                "--apply",
+            ]
+            .map(OsString::from),
+        )?;
+        fixture.bundle = PathBuf::from(
+            at(&installation, "/destination")
+                .as_str()
+                .ok_or("destination")?,
+        );
+        fs::write(
+            fixture.root.join("scenario.json"),
+            serde_json::to_vec(&fixture.scenario)?,
+        )?;
+        let observed =
+            verify_project_codex(&fixture.bundle, &fixture.root, &fixture.executable, 2.0)?;
+        assert_eq!(
+            at(&observed, "/configuration_mode"),
+            "project; no generated enable flags"
+        );
+        let args: Value = serde_json::from_slice(&fs::read(fixture.root.join("argv.json"))?)?;
+        assert_eq!(args, json!(["app-server", "--stdio"]));
+        assert_eq!(
+            at(&observed, "/skills").as_array().ok_or("skills")?.len(),
+            15
+        );
+        fixture.dead()?;
+        *fixture.scenario.get_mut("mode").ok_or("mode")? = json!("untrusted");
+        fs::write(
+            fixture.root.join("scenario.json"),
+            serde_json::to_vec(&fixture.scenario)?,
+        )?;
+        assert!(
+            verify_project_codex(&fixture.bundle, &fixture.root, &fixture.executable, 2.0)
+                .expect_err("ignored project config")
+                .contains("project is not trusted")
+        );
+        fixture.dead()?;
+        Ok(())
+    }
+
     #[test]
     fn native_argv_binds_selected_packages_without_config_writes() -> Result {
         let _guard = NATIVE_PROCESS_TEST

@@ -572,6 +572,28 @@ mod unix {
         Ok(())
     }
     #[test]
+    fn ignored_native_settings_are_managed_inputs_and_midrun_changes_are_stale() -> Test {
+        let mut f = Fixture::new()?;
+        fs::write(f.root.join(".gitignore"), ".gameskills/\n.codex/\n")?;
+        f.command(
+            "mutate",
+            &["mutate", ".codex/config.toml", "# changed host settings"],
+            json!({"git_refs":[]}),
+        )?;
+        let result = f.run(&["mutate"])?;
+        assert_eq!(status(&result, "mutate"), Some("passed"));
+        assert_eq!(result.get("status"), Some(&json!("stale")));
+        let validation = f.evidence(f.id(&result)?, "validate")?;
+        assert!(!ok(&validation));
+        assert!(
+            validation
+                .to_string()
+                .contains("managed_files/.codex/config.toml"),
+            "{validation}"
+        );
+        Ok(())
+    }
+    #[test]
     fn input_change_during_successful_command_marks_run_stale() -> Test {
         let mut f = Fixture::new()?;
         f.command(

@@ -31,9 +31,17 @@ This repository selects UI, turn-based, multiplayer, maintainer and Linear packa
 `gameskills.toml`. Other games do not inherit those selections. Proposals are
 read-only until `--apply`. Applying stages immutable files in `.gameskills/bundles/`,
 records their content and runtime compatibility in `gameskills.lock.json`, and
-preserves unrelated configuration and project-owned instructions. Commit the
+registers selected Codex plugins in project `.codex/config.toml`, preserving
+unrelated settings and comments. Commit the
 configuration and lock; keep `.gameskills/` out of Git. Hydrating a fresh checkout
 is an explicit setup operation.
+
+Codex local marketplaces require an absolute source path, so generated registration
+entries in `.codex/config.toml` are machine/worktree-local: exclude a generated-only
+file from shared commits, or omit the generated entries when that file also contains
+shared owner settings. GameSkills does not change Git ignores or global Codex config.
+Each checkout needs its own hydration/registration; a copied path is reported as
+outdated. Ownership lives in `.gameskills/native-registration.json`.
 
 Use `setup --bundle PATH --apply` to select a verified compatible bundle for an
 update or rollback. Export one with `gameskills bundle --out NEW_DIRECTORY`; pinned
@@ -41,8 +49,10 @@ source export uses `--source CHECKOUT --revision FULL_COMMIT`. Canonical prepara
 is the repository tool's responsibility, not an implicit runtime download.
 Old immutable bundles remain available. Modified installed content is an error;
 edit canonical source or project-owned guidance instead of installed caches.
-`setup --recover` restores an interrupted config/lock transaction and refuses to
-overwrite subsequent user edits.
+`setup --recover` restores an interrupted config/lock/project-registration transaction
+and refuses to overwrite subsequent user edits. Changed or disabled owned native
+values are conflicts; setup will not silently re-enable them. Updates remove obsolete
+owned registration values only while they still match the previous write.
 
 ## Native clients
 
@@ -50,17 +60,46 @@ overwrite subsequent user edits.
 gameskills native codex
 gameskills native claude
 gameskills native codex --verify
+gameskills native codex --register
+gameskills native codex --register --apply
+gameskills native codex --verify-project
 gameskills native codex --launch
 # Additional native arguments follow --.
 gameskills native claude --launch -- --help
 ```
 
-Without `--launch` or `--verify`, `native` returns a command proposal. Codex discovery
+Bare `native codex` or `native claude` returns a command proposal. Codex discovery
 uses a bounded app-server session to materialize and hash-check the selected native
 plugin cache without requesting a model turn. Launch verifies that discovery first.
 Claude uses session-scoped `--plugin-dir` arguments. These operations preserve
 global user configuration. Native discovery, authentication and actual model
 behavior are different observations; report each against the actual client version.
+
+For an installation staged by an older runtime, `native codex --register --apply`
+registers its **existing pin**, without selecting the new executable's embedded
+bundle or changing `gameskills.toml`/`gameskills.lock.json`. Its proposal is read-only.
+This targeted repair may run during an unfinished queue because it does not change
+the pin; it still takes the setup lock. Native settings changes remain source/evidence
+inputs and may invalidate an active check's observation. Recover an interrupted
+repair with `native codex --register --recover`.
+
+Use `--verify-project` to test an ordinary `codex app-server --stdio` process with
+no generated marketplace/plugin enable flags. It checks selected native skills and
+cache bytes, and fails if project loading, client support or discovery is missing.
+The older `--verify` tests explicit session overrides; it does not establish that an
+ordinary host will discover the plugins. Project config loads only for trusted
+projects; GameSkills never grants that trust or overrides host policy.
+
+`status` reports bundle validity separately from each selected client's registration,
+discovery and session state. A successful registration is not a discovery observation.
+Start a new Codex/Conductor session or restart its host after changing registration;
+verification of a new process does not prove that an existing session reloaded it.
+Claude currently retains session-scoped launch support; persistent registration is
+reported as unsupported rather than inferred from staging or Codex success.
+
+The supported registration fields and trusted-project loading are documented in
+the official [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+and [configuration basics](https://learn.chatgpt.com/docs/config-file/config-basic).
 
 
 ## Compatibility and support

@@ -14,6 +14,7 @@ gameskills setup
 gameskills setup --apply
 gameskills status
 gameskills native codex --verify
+gameskills native codex --verify-project
 ```
 
 Initial setup uses the instruction snapshot embedded in the executable. It needs
@@ -25,9 +26,34 @@ runtime dependency. Configuration and instructions remain TOML, JSON and Markdow
 `setup` reports a proposal until `--apply` is supplied. Core-only installation is
 the default. `--packages gameskills gameskills-ui` selects an explicit combination.
 Use `setup --bundle PATH --apply` for a compatible immutable update or rollback,
-and `setup --recover` to recover an interrupted config/lock transaction. Local
+and `setup --recover` to recover an interrupted config/lock/registration transaction. Local
 instructions, overlays and previous bundles retain their ownership. Updates that
 conflict with newer local edits fail with paths to inspect.
+
+Selected Codex clients receive persistent project `.codex/config.toml` registration
+as part of setup. The generated marketplace source is absolute and machine-local;
+keep those entries out of shared commits while preserving existing owner settings.
+`.gameskills/native-registration.json` records owned values for safe updates and
+cleanup. Disabled or changed owned settings are conflicts, not repair permission.
+Neither setup nor native commands change global Codex configuration or project trust.
+
+Repair an older staged installation without repinning:
+
+```sh
+gameskills native codex --register
+gameskills native codex --register --apply
+gameskills native codex --verify-project
+# Recover only an interrupted targeted registration transaction:
+gameskills native codex --register --recover
+```
+
+Registration is serialized with setup but can repair the existing pin during an
+unfinished queue; it leaves the GameSkills config and lock unchanged. Changed project
+settings invalidate command evidence even when Git ignores the native config or
+ownership record. Copied absolute paths are reported as
+outdated. `--verify-project` uses plain `codex app-server --stdio`, never generated
+enable flags or automatic trust elevation. It reports observed catalog/cache results
+separately from registration and any existing host session's activation.
 
 An interrupted queue write may leave a `.queue-<pid>-<serial>.tmp` file. Setup and
 recovery preserve recognized ordinary files under the queue lock without treating
@@ -40,6 +66,14 @@ directory. `catalog`, help and version do not require an installation. `native`
 prints literal client arguments; `--launch` starts the selected client and
 `native codex --verify` checks bounded app-server discovery without a model turn.
 Neither structural validation nor discovery proves model behavior.
+
+`status` scopes its top-level `ok` to valid installed files/configuration and exposes
+`native_clients`: Codex has `registration`, `project_registration_ready`, mismatched
+settings or conflict detail, and separate discovery/session/trust states. Discovery
+is unobserved until a verifier runs; status does not relabel an earlier result as
+current. Missing/drifted registration is an actionable defect. Claude persistent
+registration remains unsupported; its explicit session launch is still available.
+After registration, open a new Codex/Conductor session or restart the host as needed.
 
 Plans retain authored schema 1; Rust installation locks, queues and evidence use
 schema 2 with an explicit runtime identity. Finish active Python queues with their

@@ -1,5 +1,5 @@
 //! Bounded native discovery; no model turns, installation RPCs or global edits.
-use super::{archive, installed, strings};
+use super::{archive, installed, registration, strings};
 #[cfg(unix)]
 use super::{files, package_files, InstructionBundle};
 use serde_json::{json, Value};
@@ -60,12 +60,37 @@ pub fn native_argv(
 }
 pub(super) fn execute(root: &Path, args: &[String]) -> Result<Value, String> {
     let client = args.first().ok_or("native requires codex or claude")?;
+    if args
+        .iter()
+        .skip(1)
+        .take_while(|arg| *arg != "--")
+        .any(|arg| arg == "--register")
+    {
+        if client != "codex"
+            || args
+                .iter()
+                .skip(1)
+                .any(|arg| !matches!(arg.as_str(), "--register" | "--apply" | "--recover"))
+        {
+            return Err("use native codex --register [--apply | --recover]".into());
+        }
+        let unique = args.iter().collect::<std::collections::BTreeSet<_>>();
+        if unique.len() != args.len() {
+            return Err("duplicate native registration argument".into());
+        }
+        return registration::execute(
+            root,
+            args.iter().any(|arg| arg == "--apply"),
+            args.iter().any(|arg| arg == "--recover"),
+        );
+    }
     let (_, config, bundle) = installed(root)?;
     if !strings(&config, "clients")?.contains(client) {
         return Err("native client is not selected in project configuration".into());
     }
     let mut launch = false;
     let mut verify = false;
+    let mut verify_project = false;
     let mut passthrough = false;
     let mut extra = Vec::new();
     for arg in args.iter().skip(1) {
@@ -77,17 +102,27 @@ pub(super) fn execute(root: &Path, args: &[String]) -> Result<Value, String> {
             "--" => passthrough = true,
             "--launch" => launch = true,
             "--verify" => verify = true,
+            "--verify-project" => verify_project = true,
             _ => extra.push(arg.clone()),
         }
     }
-    if launch && verify {
-        return Err("select either --launch or --verify".into());
+    if [launch, verify, verify_project]
+        .iter()
+        .filter(|enabled| **enabled)
+        .count()
+        > 1
+    {
+        return Err("select one of --launch, --verify or --verify-project".into());
     }
-    if verify {
+    if verify || verify_project {
         if client != "codex" || !extra.is_empty() {
             return Err("native --verify supports only codex without extra arguments".into());
         }
-        return activate_codex(&bundle, root, Path::new("codex"), 30.0);
+        return if verify_project {
+            verify_project_codex(&bundle, root, Path::new("codex"), 30.0)
+        } else {
+            activate_codex(&bundle, root, Path::new("codex"), 30.0)
+        };
     }
     let argv = native_argv(&bundle, client, &extra)?;
     if launch {
@@ -295,17 +330,48 @@ pub fn activate_codex(
     executable: &Path,
     timeout_seconds: f64,
 ) -> Result<Value, String> {
+    verify_codex(bundle, root, executable, timeout_seconds, false)
+}
+
+/// Observe ordinary project-configured discovery without generated enable flags.
+/// Project trust is never changed. Existing hosts must separately reload their sessions.
+pub fn verify_project_codex(
+    bundle: &Path,
+    root: &Path,
+    executable: &Path,
+    timeout_seconds: f64,
+) -> Result<Value, String> {
+    let bundle_source = archive::source(bundle)?;
+    let path = bundle.canonicalize().map_err(|e| e.to_string())?;
+    let status = registration::status(root, &bundle_source, &path, &["codex".into()]);
+    if status
+        .pointer("/codex/registration")
+        .and_then(Value::as_str)
+        != Some("registered")
+    {
+        return Err(format!("project Codex registration is not current; use native codex --register --apply: {status}"));
+    }
+    verify_codex(bundle, root, executable, timeout_seconds, true)
+}
+
+fn verify_codex(
+    bundle: &Path,
+    root: &Path,
+    executable: &Path,
+    timeout_seconds: f64,
+    project: bool,
+) -> Result<Value, String> {
     if !timeout_seconds.is_finite() || timeout_seconds <= 0.0 || timeout_seconds > 120.0 {
         return Err("native timeout must be greater than zero and at most 120 seconds".into());
     }
     #[cfg(not(unix))]
     {
-        let _ = (bundle, root, executable);
+        let _ = (bundle, root, executable, project);
         Err("native verification requires the tested POSIX process-group backend; Windows native verification is unsupported".into())
     }
     #[cfg(unix)]
     {
-        posix::activate(bundle, root, executable, timeout_seconds)
+        posix::activate(bundle, root, executable, timeout_seconds, project)
     }
 }
 
@@ -540,16 +606,21 @@ mod posix {
         root: &Path,
         executable: &Path,
         timeout: f64,
+        project: bool,
     ) -> Result<Value, String> {
         let bundle = archive::source(bundle_path)?;
         let bundle_path = bundle_path.canonicalize().map_err(|e| e.to_string())?;
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         let market = archive::marketplace(&bundle);
-        let args = native_argv(
-            &bundle_path,
-            "codex",
-            &["app-server".into(), "--stdio".into()],
-        )?;
+        let args = if project {
+            vec!["codex".into(), "app-server".into(), "--stdio".into()]
+        } else {
+            native_argv(
+                &bundle_path,
+                "codex",
+                &["app-server".into(), "--stdio".into()],
+            )?
+        };
         let mut rpc = start_rpc(executable, &args, &root, timeout)?;
         let deadline = rpc.deadline;
         let initialized = rpc.call("initialize", json!({"clientInfo":{"name":"gameskills","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}))?;
@@ -567,8 +638,23 @@ mod posix {
             .map_err(|e| e.to_string())?
             .join("plugins/cache");
         rpc.send(&json!({"method":"initialized","params":{}}))?;
+        let project_loading = if project {
+            let layers = rpc.call("config/read", json!({"cwd":root,"includeLayers":true}))?;
+            let layer = layers.get("layers").and_then(Value::as_array).and_then(|layers| layers.iter().find(|layer| {
+                layer.pointer("/name/type").and_then(Value::as_str) == Some("project") &&
+                    layer.pointer("/name/dotCodexFolder").and_then(Value::as_str).is_some_and(|path| Path::new(path) == root.join(".codex"))
+            })).ok_or("Codex did not report this project's config layer; check project trust, root discovery and client support; no trust or enable flags were changed")?;
+            if let Some(reason) = layer.get("disabledReason").and_then(Value::as_str) {
+                return Err(format!("Codex skipped project configuration: {reason}; trust and host policy are unchanged"));
+            }
+            json!({"state":"loaded","path":root.join(registration::CONFIG),"version":layer.get("version")})
+        } else {
+            Value::Null
+        };
         let params = json!({"cwds":[root],"forceRefetch":false,"marketplaceKinds":["local"]});
-        let initial = plugins(&rpc.call("plugin/list", params.clone())?, &market)?;
+        let initial = plugins(&rpc.call("plugin/list", params.clone())?, &market).map_err(|error| {
+            if project { format!("{error}; ordinary Codex did not load the project registration. Check trusted-project loading, host config overrides and client support; GameSkills does not change trust.") } else { error }
+        })?;
         let expected = bundle
             .selected
             .iter()
@@ -600,7 +686,7 @@ mod posix {
                             == Some(&Value::Bool(true))
                     }) {
                         return Ok(
-                            json!({"ok":true,"client":"codex","client_identity":initialized.get("userAgent"),"content_sha256":bundle.identity(),"marketplace":market,"packages":bundle.selected,"skills":skills,"installed_plugin_ids":expected,"claim":"native installation and skill discovery observed; model invocation and behavior not tested"}),
+                            json!({"ok":true,"client":"codex","client_identity":initialized.get("userAgent"),"content_sha256":bundle.identity(),"marketplace":market,"packages":bundle.selected,"skills":skills,"installed_plugin_ids":expected,"configuration_mode":if project{"project; no generated enable flags"}else{"session overrides"},"project_config":project_loading,"argv":args,"global_configuration_writes":false,"session_activation":"not observed; restart or open a new host session to load changed registration","claim":"native installation and skill discovery observed; model invocation and behavior not tested"}),
                         );
                     }
                     "Codex has not confirmed selected plugins are installed".to_owned()

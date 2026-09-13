@@ -34,6 +34,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_owned();
     let scenario: Value = serde_json::from_slice(&fs::read(root.join("scenario.json"))?)?;
     observation(&root, "pid", std::process::id().to_string())?;
+    observation(
+        &root,
+        "argv.json",
+        serde_json::to_vec(&std::env::args().skip(1).collect::<Vec<_>>())?,
+    )?;
     let mode = scenario
         .get("mode")
         .and_then(Value::as_str)
@@ -91,7 +96,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 json!({"codexHome":scenario.get("home"),"userAgent":"rust-native-probe/1"})
             }
             "plugin/list" => {
-                json!({"marketplaces":[{"name":scenario.get("market"),"plugins":scenario.get("plugins")}]})
+                if mode == "untrusted" {
+                    json!({"marketplaces":[]})
+                } else {
+                    json!({"marketplaces":[{"name":scenario.get("market"),"plugins":scenario.get("plugins")}]})
+                }
+            }
+            "config/read" => {
+                json!({"layers":[{"name":{"type":"project","dotCodexFolder":Path::new(request.pointer("/params/cwd").and_then(Value::as_str).ok_or("cwd")?).join(".codex")},"version":"fixture","disabledReason":if mode == "untrusted" {Some("project is not trusted")}else{None}}]})
             }
             "skills/list" => {
                 if mode == "hang" {
