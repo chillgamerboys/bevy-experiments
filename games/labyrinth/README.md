@@ -42,7 +42,7 @@ No admission secrets are accepted on the command line.
 1. Host a company. For same-computer direct testing enter `127.0.0.1`; otherwise
    leave the advertised address empty to choose a local interface, or explicitly
    enter the reachable LAN/tailnet IP. The transport port defaults to UDP 7777.
-2. Open **Players** in preparation and copy a **different** private BGN1 invitation for each guest. Invitations are
+2. Open **Lobby** in preparation and copy a **different** private BGN1 invitation for each guest. Invitations are
    single-use after acknowledged admission and initially expire after one hour.
    Reissue an invitation from an open lobby when necessary. These codes are bearer
    secrets; do not put them in screenshots, public chat, logs, or bug reports.
@@ -50,20 +50,35 @@ No admission secrets are accepted on the command line.
    LAN discovery (or explicit development tailnet discovery) with an 8–64 character
    printable ASCII temporary passphrase (no leading/trailing spaces), and guests
    select its listing and enter it.
-4. The host assigns zero, one or several heroes to each participant and sets their
-   formation order. Unassigned heroes belong to the host. Guests begin as spectators
-   and can edit the builds of their assigned heroes; the host controls enemy setup.
-   Only participants with assigned heroes must connect and ready before host Start.
-   Spectators, including a host with no heroes, do not gate Ready/Start. Changing
+4. The host assigns places directly on the formation to give each participant zero,
+   one or several characters. Guests can choose a character type in their assigned
+   places and customize owned builds; the host controls enemy setup and movement.
+   Unassigned places belong to the host. Guests begin as spectators.
+   Only participants with assigned characters must connect and ready before Deploy.
+   Empty reservations and spectators, including a host with no heroes, do not gate deployment. Changing
    battle setup or ownership clears readiness.
 
 ### Configure a battle
 
-Preparation groups **Party**, **Enemies**, **Scenario** and **Players** while keeping
-readiness and Start battle available. In Scenario, load Prototype, Weapon Comparison,
-Cleave or Rescue/Status; each option explains its test purpose. Party and Enemies
-show character cards in rank order. Add/remove actors or move whole actors within
-six formation spaces, then choose **Open character** for the unified editor.
+Preparation shows the party and enemies facing each other on one six-rank board.
+Select an empty rank to browse character types, inspect their build and footprint,
+then explicitly place the chosen type. Select an existing character to Customize,
+Replace, Move or Remove it. Multi-rank creatures occupy their actual span. Replacing
+keeps the character's identity/controller and resets its build and starting
+conditions to the selected type. Moving keeps the build and takes the destination's
+player assignment; removing leaves the other characters in their chosen places.
+
+Gaps are allowed while constructing either side. **Deploy** requires occupied ranks
+to be contiguous from the front; its explanation identifies gaps to repair. Smaller
+test formations may leave unused ranks at the rear. Deployment never silently
+reorders the lineup. The player strip shows who is preparing, ready or spectating;
+co-op ownership controls sit beside the selected place. Local mode controls the
+whole company without participant configuration.
+
+In **Scenario**, load Prototype, Weapon Comparison, Cleave or Rescue/Status; each
+option explains its test purpose. **Lobby** contains co-op connection/invitation
+details. Select a character on either side and choose **Customize** for the same
+unified editor.
 
 The same character editor handles either team. Equipment, Innate, Learned,
 Parameters and Resulting moves organize one draft. Selecting a catalog entry only
@@ -75,13 +90,16 @@ explicit discard decision. Sections and character navigation do not create anoth
 editor. Existing name/HP/speed/footprint/preset/starting-condition controls live in
 Parameters; a broader character stat system remains future work.
 
-Guests edit owned builds; the host controls formation size/order, roster and enemies.
-Starting HP can be blank for full health or zero for a dying hero, provided another
-hero stands. Readability scales retain the same editor with a browser/detail route
+Guests edit owned builds and select types in reserved places; the host controls
+formation movement/removal, assignment and enemies. Starting HP can be blank for
+full health or zero for a dying hero. An all-down draft is allowed, but at least one
+hero must stand before deployment. Readability scales retain the same editor with a browser/detail route
 when columns no longer fit.
 
-In Scenario, set an explicit seed and use Save/Load with a local Scenario JSON path. Files contain
-battle configuration, not credentials or participant identities. Rematch returns
+In Scenario, set an explicit seed and use Save/Load with a local Scenario JSON path.
+Save requires a deployable formation. Files contain battle configuration, not
+construction gaps, credentials or participant identities. Loading restores compact
+ranks; changing only the seed preserves current construction positions. Rematch returns
 to the lobby with exactly the same configuration and seed. Saved JSON also exposes
 controller policies and initial status source/duration for test harnesses; the UI
 selects existing content rather than authoring new effect definitions.
@@ -214,8 +232,8 @@ uses, initiative and status clocks do not advance. Stale commands are rejected e
 if the same hero was assigned away and back. A rules fault cannot be cleared this way.
 Host process restart ends the session; guest credentials cannot recover a lost world.
 
-The current Labyrinth protocol is **v5**, including frozen authored abilities,
-scenario configuration and separate participant/assignment revisions. It is
+The current Labyrinth protocol is **v6**, including frozen authored abilities,
+sparse lobby positions, rank reservations and separate setup/assignment revisions. It is
 incompatible with earlier builds. All participants need matching builds/catalogs
 and a new hosted company; existing credentials are not silently repurposed.
 
