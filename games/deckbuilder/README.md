@@ -53,6 +53,9 @@ Tests distinguish actual encrypted joins/recovery/private gameplay from fake-pro
 listing/handoff. They cover wrong passwords, extra guests, duplicate Hello/ACK, lost
 initial/rotating offers and ACKs, stale-attempt messages and failed persistence. They
 do not establish cross-machine LAN/Tailscale behavior.
+Socket-admission failures retain bounded handshake stages, host connection and
+reservation counts, frame gaps and sanitized disconnect categories to distinguish
+transport failure from game admission without exposing credentials or endpoints.
 
 ## UI evidence
 
