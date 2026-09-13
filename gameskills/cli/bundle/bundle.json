@@ -10,7 +10,7 @@
     "queue_schema": 2,
     "schema_version": 1
   },
-  "content_sha256": "9ae9c95f125698befd17b92a5e4f16bccb54e79e6a2f88740258c59e6f6595bf",
+  "content_sha256": "32a72d8bb7e30e6b013ad30d5b431e5251eab21d1baae4539cf2fefef3f9abeb",
   "default_packages": [
     "gameskills"
   ],
@@ -72,7 +72,7 @@
     "plugins/gameskills/skills/dispatch/SKILL.md": "741c00e5bd998ae4924703a9520982d5e0d282d1970c27219f8e377afca7292c",
     "plugins/gameskills/skills/grill/SKILL.md": "95cf4c21713edca4bfdcc2cb5593246ef4c5e56aef0154e190cc514a8687e50e",
     "plugins/gameskills/skills/merge-pr/SKILL.md": "a9e0c421ee89ca39a9fc3ec864b2b68cd2add4dc6ced065fd9ada45434bd899a",
-    "plugins/gameskills/skills/plan/SKILL.md": "44021dd285335d8d35a4c866a85c11e5bdf10d307bff23f55d4982106e5403e2",
+    "plugins/gameskills/skills/plan/SKILL.md": "0051517e0ed1096d6b3bf13ae2d2ef56a621756f1ef8ece623757ba60ee937da",
     "plugins/gameskills/skills/playtest/SKILL.md": "7cd37a16c2ebc39178ee9bd0fd964d1c14949b23660133c25e2bbc48f08c56f6",
     "plugins/gameskills/skills/release/SKILL.md": "f91971be622ff8e46c0c1e22b2fbc477c5c4af9f329dbe18afdddfd10b071643",
     "plugins/gameskills/skills/review/SKILL.md": "963e6dceb86172529355a1deaa24fe828f1369d84c87697586789f2943814de9",
@@ -82,5 +82,5 @@
   },
   "format": "gameskills-instructions",
   "schema_version": 1,
-  "source_commit": "e014bc1d0965e3b07ddc1bbfb28a09379abd611d"
+  "source_commit": "c17cab770bfe92304eddd68324f9cb725f7607e5"
 }
