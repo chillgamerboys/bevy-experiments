@@ -23,12 +23,12 @@ cargo test --locked -p gameskills-cli --profile ci
 
 | Evidence | Claims | Does not establish |
 |---|---|---|
-| Pure rules tests | Seeded order, rank legality, status boundaries, atomic rollback, complete fights | UI or networking |
-| Session policy tests | Six-player readiness, repeated-class actor ownership, durable replay watermark, pause/rematch | Physical socket behavior |
-| Multi-App socket tests | One host + five encrypted clients, password/direct admission, command convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
+| Pure rules tests | Catalog/build validation, scenario roundtrip, seeded order, transactional cleave/preview parity, statuses and complete fights | UI or networking |
+| Session policy tests | Independent participants/actors, owned/stale setup, spectator readiness, reassignment replay guards, exact-seed rematch | Physical socket behavior |
+| Multi-App socket tests | One host + five encrypted clients, password/direct admission, large authored build/save-load commands, command convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
 | Explicit six-process test | Abrupt sixth-seat guest kill, profile lock release, same-peer/actor/class/loadout/status recovery, subsequent completed fight | Cross-machine LAN/Tailscale reachability |
 | Fake discovery tests | Provider-neutral listing/removal/compatibility and encrypted join handoff | Real multicast or Tailscale |
-| UI behavioral/structural tests | Typed intents, focus/modal behavior, target eligibility, viewport control bounds | Visual quality or real pointer hardware |
+| UI behavioral/structural tests | Draft preservation/save ACK, 12+ authored moves via native keyboard/pointer messages, scoped provenance/forecast, focus/modal behavior and bounds | Visual quality or real pointer hardware |
 | Native rendered frames | Static composition at the captured logical sizes | Interactive behavior or six-player correctness |
 | Manual network routes | Behavior on the recorded machines/interfaces/firewalls | Arbitrary networks or future Steam integration |
 
@@ -46,14 +46,15 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 
 Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
 Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
-`paused`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
+`paused`, `abilities` and `ability-help`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
 
-For the current description/dock correction, prioritize normal-scale play and
-ordinary window resizing. The 200% option and existing automated regressions remain,
-but a manual 200% review is deferred and is not a release gate for this pass.
+For customization, review lobby, character editor and complete-ability overflow at
+1280×720 and 1920×1080, including 200% scaling. Automatic focus scrolling is part
+of usability; verify controls can be reached beyond the first visible rows.
+Static frames and headless native-input messages remain distinct from a desktop walk.
 
 The overlay regressions compare all twelve native actor anchors and actual atlas
 sprite transforms across selection, targeting, utilities and detail drawers. They
@@ -69,9 +70,16 @@ Use independent profiles as described in [the game README](../README.md).
 Keep artifacts in a private temporary directory and redact codes and credentials.
 
 - Direct route: both discovery providers disabled, five different invitations,
-  all six ready, correct hero ownership and host-only start/rematch. Pick repeated
-  classes, verify independent actor control and uses, and reject a seventh guest.
-  Changing a class invalidates readiness; six seats do not require six classes.
+  assign zero/one/multiple heroes, then verify controller-only readiness and host-only
+  Start/rematch. Spectators (including host) do not gate Start or pause on disconnect.
+  Verify six participant capacity with a two-rank wagon and reject a seventh guest.
+  Change a build and verify readiness invalidation and rejection of stale drafts.
+- Configure both sides' stats/builds and all six weapon types. Save/load the same
+  Scenario JSON and repeat the exact seed. Verify 12+ moves, upgrades/provenance,
+  unlimited throws and front-pair cleave against distinct and multi-rank occupants.
+- Pause for assignment, move heroes between connected participants and resume.
+  Confirm no combat resource/clock changes and rejection of old commands after
+  assignment away/back. Dying retains ownership for rescue; dead-only owners spectate.
 - Same LAN: host discovery enabled, a passphrase, real guest listing present for
   at least a minute, wrong password rejected and correct password admitted. Check
   occupancy updates and removal when the host closes.

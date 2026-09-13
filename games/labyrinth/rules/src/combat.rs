@@ -325,7 +325,7 @@ impl Combat {
         Ok(events)
     }
 
-    /// Choose a deterministic legal action only when the active actor is an enemy.
+    /// Choose a deterministic legal action when the active actor's policy is AI.
     /// Prefer damaging skills against lowest HP, then stable target identity. A
     /// displaced bruiser repositions toward the front when no attack is reachable.
     #[must_use]

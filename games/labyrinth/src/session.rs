@@ -777,6 +777,9 @@ impl PartyAuthority {
                 self.configure(scenario, expected_revision)?;
             }
             SessionCommand::ChooseHero { actor, hero } => {
+                if request.assignment_revision != self.assignment_revision {
+                    return Err("Character assignments changed. Refresh your draft.".into());
+                }
                 if slot != 0
                     && !self
                         .company
@@ -798,8 +801,15 @@ impl PartyAuthority {
                     .iter_mut()
                     .find(|a| a.id == actor)
                     .ok_or("Unknown hero.")?;
-                configured.actor = ActorBuild::from_preset(&self.catalog, &preset.id)
+                let replacement = ActorBuild::from_preset(&self.catalog, &preset.id)
                     .map_err(|e| e.to_string())?;
+                if slot != 0 && replacement.footprint != configured.actor.footprint {
+                    return Err(
+                        "The host assigns formation spaces. Ask the host to change this footprint."
+                            .into(),
+                    );
+                }
+                configured.actor = replacement;
                 configured.starting_hp = None;
                 self.configure(scenario, self.setup_revision)?;
             }

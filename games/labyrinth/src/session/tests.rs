@@ -1404,6 +1404,40 @@ fn owned_build_edits_cannot_change_enemy_roster_formation_or_a_newer_draft() {
     .is_none());
     assert_eq!(authority.scenario.heroes.get(1), Some(&hero));
     let changed = authority.snapshot(1);
+    // The retained preset adapter obeys the same authority as authored edits.
+    assert_eq!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::ChooseHero {
+                actor: hero.id,
+                hero: HeroClass::LanternWagon,
+            }
+        )
+        .rejection
+        .as_deref(),
+        Some("The host assigns formation spaces. Ask the host to change this footprint.")
+    );
+    let sequence = authority.next_sequence(1);
+    assert_eq!(
+        authority
+            .apply(
+                1,
+                GameRequest {
+                    sequence,
+                    encounter: changed.encounter,
+                    decision: 0,
+                    assignment_revision: changed.assignment_revision - 1,
+                    command: SessionCommand::ChooseHero {
+                        actor: hero.id,
+                        hero: HeroClass::Gatekeeper,
+                    },
+                }
+            )
+            .rejection
+            .as_deref(),
+        Some("Character assignments changed. Refresh your draft.")
+    );
     let mut stale = hero.clone();
     stale.actor.max_hp = 99;
     assert!(request(
