@@ -1,6 +1,6 @@
 ---
 name: verify-ui
-description: Verify rendered native Bevy/GameKit UI and actual pointer/keyboard interactions, including focus, hidden state, modal lifecycle, clipping and supported scales. Use for UI acceptance or regressions; does not certify gameplay rules or player enjoyment.
+description: Critique rendered native Bevy/GameKit UI for visual quality and task usability, and verify actual pointer/keyboard interaction, lifecycle and supported scales. Use for UI acceptance or regressions; does not certify gameplay rules or player enjoyment.
 ---
 
 # Verify the rendered and interactive UI
@@ -15,9 +15,16 @@ task, not just reachable controls. Exercise inspection, comparison, consequences
 and correction using the presented information; check its accuracy against the
 game-owned model. Record missing or misleading decision information as a finding.
 
+Actively critique the rendered composition and complete task flow using the
+evidence guide. Challenge visual quality, attention competition, discoverability,
+unnecessary steps, repeated editing and context loss. Cite the problematic state,
+its consequence and a concrete correction. Keep material design findings open
+even when every control is reachable and unclipped; separate agent judgment from
+mechanical checks and observed user feedback.
+
 Collect complementary evidence at the layers required by the change. Structural
 checks cover semantics, eligibility and reachability. Actual rendered frames cover
-static hierarchy, contrast and clipping. A native walk covers pointer/keyboard
+composition, hierarchy, readability and clipping. A native walk covers pointer/keyboard
 parity, focus, scrolling, resize, modal return and timing. Missing one layer stays
 visible; don't substitute a log or fabricated capture.
 

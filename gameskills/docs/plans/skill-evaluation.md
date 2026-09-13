@@ -1,6 +1,6 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active; hands-on feedback rejected the revised preparation/player menus too. Spatial-constructor and broader planning/review refinements are being specified. Independent native behavioral trials remain unobserved.
+Status: active; hands-on feedback rejected the revised preparation/player menus too. Broader planning/review refinements are authored; spatial-constructor implementation and artifact acceptance remain pending. Independent native behavioral trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
@@ -32,7 +32,7 @@ rank restrictions and provenance requirements were confined to combat S7. The
 `build-ui` sequence starts with views/intents/states, while `verify-ui` distinguishes
 structural/rendered/native evidence without an explicit decision-information check.
 
-The candidate correction is authored in canonical
+The first candidate correction was authored in canonical
 [plan](../../plugins/gameskills/skills/plan/SKILL.md),
 [grill](../../plugins/gameskills/skills/grill/SKILL.md),
 [build-ui](../../plugins/gameskills-ui/skills/build-ui/SKILL.md) and
@@ -739,8 +739,44 @@ retain material unresolved design findings instead of accepting mere absence of
 clipping. Separate agent judgment, observed user feedback and mechanical test
 evidence. Evaluate produced designs and interfaces, not just articulate plans.
 
-These are requirements for the next canonical plan/grill/UI review revision, not
-a claim that the current installed or packaged skills already implement them.
+The second canonical revision now carries these requirements in plan/grill and
+the core package-local [interface design reference](../../plugins/gameskills/references/interface-design.md),
+plus build-ui/verify-ui and their UI contracts/evidence references. Entry skills
+route to focused design guidance instead of adding a mandatory questionnaire.
 Keep Gamekit composite quality tied to the same task and visual standards. The
 [Labyrinth design](../../../games/labyrinth/docs/plans/builder-ui-research.md) records
 answers 9–10 and the required next artifact; future grill numbering starts at 11.
+
+The author performed a bounded critique of three preserved real UI captures from
+the rejected revision, identified in `.context/spatial-ui/workflow-evidence.md`.
+The preparation frame fails formation comprehension at a glance: large repeated
+cards put later ranks below the fold and translate a single rank sequence into
+two rows. That finding remains consequential even if scrolling reaches everything.
+The equipment frame does provide a positive information case: visible Greatsword
+Cleave details explain hitting both front ranks and the removed/added moves; the
+browser/detail organization need not become spatial. Its draft-versus-preview
+wording remains ambiguous. The large-text learned frame clearly explains the
+5→7 upgrade while devoting much of its height to navigation; that is a composition
+tradeoff to inspect through the complete task, not a native-input failure inferred
+from a still. Settled-answer and routine-copy-fix continuations retain the selected
+design without another interview. These known-context author exercises neither
+compare independent agents nor establish efficacy, human comprehension or cost gain.
+New interface artifacts and complete native tasks still require critical review.
+
+Existing local `repo-devtools check`, `skills validate` (24 skills, seven packages)
+and the host skill-creator quick validator for all four changed entry skills pass.
+No Cargo/GPU work was run by this author; the coordinator owns generated bundle,
+archive and integrated publication verification after canonical source is committed.
+The candidate is canonical source fallback in this session and has not been installed.
+
+Native availability now has a narrower observed boundary. The coordinator's frozen
+CLI `native codex --verify` succeeded for the original installed content pin
+`b069a3108dcb094766b89b3a35ad451f3088608a0e98e02bfdedbebed51c1f99`, discovering 23 skills
+through generated marketplace/plugin launch flags; the record is
+`.context/spatial-ui/native-verification.json`. This establishes that pin's native
+installation/discovery, not invocation or behavior of this new candidate. The
+current Conductor session still exposes no GameSkills catalog entries, and the
+coordinator observed no persistent GameSkills entries in the user configuration.
+That host registration/session exposure gap is separate from a broken bundle or
+global native unavailability. The user has requested its correction; root owns the
+separate runtime/setup work. Preserve the installed pin and these distinct outcomes.

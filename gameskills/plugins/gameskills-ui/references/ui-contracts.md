@@ -1,13 +1,26 @@
 # Native UI ownership and lifecycle
 
-## Decision and information design
+## Interaction, information and visual design
 
-Start with a concrete player task and the information needed to make its choices.
-Decide what stays visible, what is grouped or disclosed, and how the player moves
-between overview, inspection and editing without losing context. For an unresolved
-material organization, compare bounded alternatives using that task; a sketch or
-mockup can expose the tradeoffs before construction. Follow accepted references
-for their useful interaction principles without importing unrelated complexity.
+Start with the player's goals, frequent tasks and information needed to choose.
+Use spatial relationships where they help the player understand or manipulate the
+subject; use comparisons, forms or other structures where those better serve the
+task. A card grid or icon replacement is not a design rationale. Decide what stays
+visible, what is grouped or disclosed, and how the player moves between overview,
+inspection and editing without losing context. Compare unresolved material choices
+against the same task. Follow accepted references for their useful principles
+without importing unrelated complexity or reopening settled numbered decisions.
+
+Make the intended appearance and behavior concrete before broad production wiring.
+Reuse accepted design artifacts; otherwise annotate a visual design and walk a
+complete representative task through it. Use real representative content and
+intended art so names, silhouettes, detail and text density inform the composition.
+Specify layout/proportions, emphasis, typography, spacing, primary/secondary
+actions and material selected, empty, invalid and read-only states. Explain
+transitions, correction and supported narrow/large-text behavior. Unresolved assets
+or design choices remain explicit. The implementer should not have to invent the
+central experience from empty rectangles or a control list. Routine fixes need
+no new design exercise, and this design work does not add a user approval stage.
 
 Explain meaningful effects, constraints and current-versus-proposed differences
 where the choice is made. Names and selected states alone do not explain a choice.
