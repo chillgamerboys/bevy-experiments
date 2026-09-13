@@ -22,7 +22,10 @@ a view replaces entities; it does not own drafts, text selections or IME state.
 Keep `EditableText` entities mounted while adding/reordering unrelated rows when
 possible. Games retain draft values and decide how incoming authority changes
 resolve concurrent edits. Consume `UiTextChanged` after
-`GameUiSystems::EmitActivations`, before replacing the edited view.
+`GameUiSystems::EmitActivations`, before replacing the edited view. A notification
+is the current field value, not proof that the string differs from the draft:
+native layout/caret work can mark `EditableText` changed. Compare values before
+marking a draft dirty, clearing errors or cancelling a pending save.
 
 Bevy flex/grid layout and `Node::overflow` provide automatic rows and scrolling;
 Gamekit imposes no control-count limit. `GameUiPlugin` installs native `ScrollArea`
@@ -94,3 +97,113 @@ minimizes overlap; adopters still own surface organization. Labyrinth omits the
 log-toggle and game-menu tooltips entirely and separates non-interactive formation layout anchors
 from fitted-art input rectangles. Sprite rendering and those hit rectangles use
 the same art-fit calculation; moving the pointer over empty sky is not targeting.
+
+
+## Composite controls: action bar and character editor
+
+Labyrinth's dynamic action bar and character editor are current consumers of the
+primitives above, not shared Gamekit widgets. Use them to establish the following
+boundary before extracting a composite. One game-owned character editor should
+serve setup and later character inspection through explicit capabilities/modes;
+a second screen must not develop a competing character schema or draft lifecycle.
+Read-only inspection is a use of that same composition, not permission to expose
+undisclosed information. Future stats need no placeholder fields or shared schema.
+
+| Concern | Game supplies and owns | Reusable UI responsibility |
+| --- | --- | --- |
+| Action content | Stable action/subject IDs, disclosed labels/glyphs, provenance, formatted effects and availability reasons | Render supplied content and selected/disabled states; arrange and navigate all entries |
+| Action intent | Selection, targeting, preview calculation, confirmation and authoritative validation | Distinguish selection, explicit inspection and activation; emit identity-bearing UI intent |
+| Character content | Subject identity, field/choice descriptors, disclosed current values and editable/read-only capabilities | Compose native controls, sections, labels and field-local explanations |
+| Character lifecycle | Draft, parsing/domain validation, source revision, save/cancel/reload policy, pending acknowledgment and conflict resolution | Retain mounted control state where possible; reconcile stable identities and focus when structure changes |
+| Presentation | Skin, grouping, terminology and viewport policy | Native sizing/overflow, logical navigation, visible focus and accessible control semantics |
+
+These are ownership boundaries, not proposed Rust types. Rank mechanics, equipment
+slots, learned grants, build resolution, ownership and network authority remain in
+the game. The UI consumes a game projection; it must not calculate its own damage
+or invent a second eligibility rule. Tooltip, preview and control explanations
+should derive from the same disclosed source, including a reason when activation
+is unavailable. Shared UI may format supplied presentation data without importing
+game definitions.
+
+### Action bar consumption contract
+
+Every granted action must remain visible or reachable through an obvious native
+scroll/wrap path at supported viewport and UI scales. A numeric shortcut limit is
+not a content limit. Keep confirmation and target feedback reachable as the list
+grows. Select, inspect and commit are distinct operations: opening a tooltip must
+never spend an action, and keyboard confirmation must not bypass a disabled state.
+An unavailable but inspectable action needs an eligible inspection path and a
+textual explanation, not only a color change.
+
+Identify a rendered entry by subject and action identity, independently of label,
+position or transient entity. Bind its emitted intent to the source it represented
+and let the game reject stale intents after subject/loadout/encounter changes.
+A game-side comparison against the last presented subject/build can enforce this
+without changing Gamekit's entity-level activation message. Apply that guard to
+confirmation of an existing selection as well as new selection. Stable `UiFocusId`
+alone does not make a positional action safe. A keyboard slot
+shortcut may deliberately resolve the current visible slot; a queued activation
+from an older rendered button must not silently select a replacement slot's action.
+Changing subjects clears or revalidates selection, targeting and preview together.
+
+### Character editor consumption contract
+
+Keep one subject/draft lifecycle behind editable and read-only presentations.
+Capabilities state which fields/actions are available and why; the game still
+validates every submitted change. Retain field entities, text selection and scroll
+position through unrelated participant refresh. Stable focus identity supports
+structural replacement but does not preserve native caret/IME state by itself.
+Subject replacement, explicit reload, preset application, save, cancel and exit
+need deliberate draft/focus transitions; old field events must not overwrite the
+new draft.
+
+An authority change can retain the user's draft while making Apply unavailable
+with a conflict explanation and a reload path. A no-op save still needs an
+acknowledgment; a later edit must not be discarded by an older acknowledgment.
+Field-value equality must make repeat text notifications harmless. Keep validation
+errors near the responsible field and make errors and pending state readable
+without relying on color. Read-only mode offers inspection without enabled editing
+or a misleading Save action. This policy belongs to the game, including whether
+and when unsaved changes need confirmation.
+
+### Extraction and quality evidence
+
+Before adding a shared composite API, identify the repeated mechanical contract
+that existing native layout, controls and tooltip APIs cannot express cleanly.
+Describe opaque inputs, typed intents, ownership, scheduling and disposal; keep
+styling optional and avoid a generic RPG model. Migrate an actual consumer and
+show retained behavior. A second consumer is useful transfer evidence, not a quota.
+If the only commonality is screen appearance, keep the composition game-owned.
+
+Use this checklist for both local compositions and a proposed shared extraction:
+
+- **Data and intent:** exercise empty and long lists, duplicate labels, reordered
+  entries, unavailable actions and subject replacement. Verify IDs and source
+  checks prevent stale events from acting on another entry. Selection/inspection
+  must not submit gameplay or editor commands.
+- **Lifecycle:** test unrelated projection refresh, changed source revision,
+  value-equal text notifications, validation recovery, no-op acknowledgment,
+  edit-after-submit, reload/cancel and scope exit. Assert draft and emitted-intent
+  behavior, not just component existence.
+- **Input and layout:** use deterministic fixtures for keyboard order, focus
+  restoration, clipping/scroll visibility, disabled activation and modal isolation.
+  Exercise actual large content rather than a hard-coded eight-action example.
+- **Native interaction:** inspect real pointer targets, keyboard paths, retained
+  text caret/selection/IME, tooltip overlap and supported narrow/wide viewport and
+  scale combinations. Record the consumer, source revision and observed surfaces.
+  Screenshot review does not establish keyboard or IME behavior; deterministic
+  fixtures do not establish rendering or pointer feel.
+- **Accessibility and disclosure:** provide readable labels/reasons and visible
+  focus/selection beyond color, inspect keyboard access to disabled explanations,
+  and check that closing or changing scope removes stale disclosed content. Verify
+  assistive-technology behavior separately before claiming platform accessibility.
+- **Compatibility:** for an API change, check the promised feature combinations,
+  affected production consumers and packaged consumer separately. State migration
+  and removal/rollback conditions; compilation alone is not composite UI signoff.
+
+Current evidence anchors are the shared [contract tests](../ui/src/contracts.rs),
+[tooltip API](../ui/src/tooltip.rs), Labyrinth's
+[action controls](../../games/labyrinth/src/ui/battle/dock.rs) and
+[editor lifecycle fixtures](../../games/labyrinth/src/ui/setup_tests.rs).
+Those sources demonstrate existing mechanics and regression coverage; they do not
+establish a shared action-bar/editor API or complete the native interaction checks.
