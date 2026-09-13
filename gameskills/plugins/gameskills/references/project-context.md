@@ -17,7 +17,11 @@ When execution depends on setup, inspect readiness with:
 ```
 
 This is a read-only observation. Missing configuration, packages or prerequisites
-must remain visible; it does not install anything. Continue useful independent
+must remain visible; it does not install anything. Distinguish a valid staged pin,
+host registration, observed discovery and skills exposed in this running session.
+A valid bundle alone is not a ready workflow. When selected skills are missing,
+identify the failed boundary as an actionable setup gap rather than repeatedly
+normalizing it as an unavailable capability. Continue useful independent
 investigation, and route deliberate adoption/configuration to `gameskills:setup`.
 Use the host's supported invocation/loading mechanism; a Markdown link does not
 execute another skill. If an optional skill is unavailable, explain the missing

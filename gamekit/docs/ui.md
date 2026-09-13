@@ -177,6 +177,13 @@ If the only commonality is screen appearance, keep the composition game-owned.
 
 Use this checklist for both local compositions and a proposed shared extraction:
 
+- **Design and task:** establish the player's frequent task, decision information,
+  view hierarchy and interaction model before choosing widgets. Use representative
+  content and intended art to specify proportions, emphasis, density, transitions
+  and recovery at supported scales. Spatial interaction is useful when position
+  matters; it does not replace descriptions or comparison. Critique the rendered
+  result for context loss, repeated navigation and competing emphasis, even if
+  every control fits. A generic card grid is not evidence of a usable composition.
 - **Data and intent:** exercise empty and long lists, duplicate labels, reordered
   entries, unavailable actions and subject replacement. Verify IDs and source
   checks prevent stale events from acting on another entry. Selection/inspection

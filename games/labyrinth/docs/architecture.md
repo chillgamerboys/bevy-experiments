@@ -53,10 +53,12 @@ resolution, uses, AI, preview, UI and history consume that same definition. Lega
 `SkillId`/`AbilityLoadout` remain convenience adapters, never a second authority.
 
 `scenario::Scenario` is versioned JSON input with no files or peer identities in the
-rules crate. Each side has 1–6 actors occupying at most six spaces. Setup validates
-IDs, stats/build references, starting conditions and at least one standing hero.
-Host configuration and owned guest edits go through the same validation before
-replacing authority. The app handles bounded local save/load. Rematch reuses the
+rules crate. A deployable scenario has 1–6 actors per side occupying at most six
+spaces and at least one standing hero. `validate_preparation` retains content,
+identity, starting-condition and payload checks while allowing an empty side or
+all-down hero draft. It does not authorize combat construction or portable save.
+Host configuration and owned guest edits validate before replacing authority.
+The app handles bounded local save/load. Rematch reuses the
 explicit seed; content, rules and scenario fingerprints identify reproducible input.
 Manual/AI/External controller policy is independent from online participant identity.
 Enemies default to AI; the external policy is a pure driver hook, not a complete gym.
@@ -137,8 +139,31 @@ Host assignment pause/reassign/resume is explicit and never advances combat reso
 Setup revision guards drafts, while unchanged actor editor fields retain native
 entities/focus/caret across unrelated participant projections.
 
-Preparation separates party/enemy formation selection, scenario I/O and participant
-assignment. All actor customization uses one game-owned editor with category-local
+Preparation uses one facing six-rank board for both teams, with a separate
+`LobbyFormation` recording stable actor positions and hero-rank reservations.
+Removing or moving a character preserves other positions; empty ranks are valid
+construction state. Deployment rejects internal gaps and empty sides without
+silently compacting them. Trailing unused capacity remains legal. Combat continues
+to consume the compact Scenario and keeps its existing movement/death rules.
+
+Typed placement previews and authority share footprint, collision and ownership
+validation. Replacement keeps actor identity/controller and uses the chosen type's
+starting build, clearing the replaced actor's starting HP/status overrides. Removal
+clears references to that actor from other starting-status sources. The host owns
+moving/removing, enemy setup and rank assignment; guests may choose a type in their
+reserved hero places. A multi-rank character must have one owner across its span.
+Moving adopts the destination reservation; removing leaves the reservation intact.
+An empty reservation alone does not make a spectator gate readiness or suspension.
+
+Portable save remains playable Scenario JSON, with no participant or sparse-draft
+schema. Loading a stock or portable scenario restores compact placement and retains
+owners for matching actor identities. Editing just the seed preserves construction
+positions. Setup and assignment revisions cover these transitions; the v6 wire
+validates the draft/formation/company relationship before projecting it to a guest.
+
+The board keeps selection, type preview, placement and ownership next to their
+spatial context; scenario I/O and invitations are secondary views. All actor
+customization uses one game-owned editor with category-local
 browsing and a single actor draft, source revision and apply/discard lifecycle.
 Inspection is distinct from mutation. Effective comparisons come from the catalog
 resolver, preserving duplicate grants and learned contributions rather than
