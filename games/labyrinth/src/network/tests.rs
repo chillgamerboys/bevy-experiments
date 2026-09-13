@@ -12,6 +12,7 @@ use super::*;
 
 mod budgets;
 mod process;
+mod spatial;
 
 // This is an acceptance requirement, deliberately not derived from production
 // capacity: accidentally reverting the host to four seats must fail these tests.
@@ -29,12 +30,14 @@ fn real_udp_wagon_ownership_reconnects_without_changing_participant_capacity() {
     for guest in 1..5 {
         let code = hosted_code(app(&mut apps, 0).world(), guest - 1).expect("private invitation");
         start::join_code(app(&mut apps, guest).world_mut(), &code).expect("join starts");
-        assert!(pump_until(&mut apps, Duration::from_secs(10), |apps| app(
-            apps, guest
-        )
-        .world()
-        .resource::<Runtime>()
-        .admitted));
+        assert!(
+            pump_until(&mut apps, Duration::from_secs(10), |apps| app(apps, guest)
+                .world()
+                .resource::<Runtime>()
+                .admitted),
+            "guest {guest} admission did not complete: {}",
+            admission_diagnostics(&apps)
+        );
     }
     app(&mut apps, 0)
         .world_mut()
