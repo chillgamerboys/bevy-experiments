@@ -128,6 +128,38 @@ impl Glyph {
     }
 }
 
+/// Choose a familiar symbol from resolved behavior; authored IDs need no UI enum arm.
+pub(super) fn for_ability(definition: &labyrinth_rules::catalog::AbilityDefinition) -> Glyph {
+    if let Some(skill) = SkillId::ALL
+        .into_iter()
+        .find(|skill| labyrinth_rules::scenario::legacy_skill_id(*skill) == definition.id)
+    {
+        return for_skill(skill);
+    }
+    use labyrinth_rules::Effect;
+    for effect in &definition.effects {
+        match effect {
+            Effect::Heal(_) | Effect::Rescue(_) => return Glyph::Heal,
+            Effect::Move(amount) => {
+                return if *amount < 0 {
+                    Glyph::Hook
+                } else {
+                    Glyph::Push
+                }
+            }
+            Effect::ApplyStatus(labyrinth_rules::StatusKind::Bleed) => return Glyph::Bleed,
+            Effect::Cleanse(_) => return Glyph::Clean,
+            Effect::SwapWithSource => return Glyph::Swap,
+            _ => {}
+        }
+    }
+    if definition.target_ranks & 0b111000 != 0 {
+        Glyph::Arrow
+    } else {
+        Glyph::Blade
+    }
+}
+
 pub(super) fn for_skill(skill: SkillId) -> Glyph {
     match skill {
         SkillId::FrontStrike

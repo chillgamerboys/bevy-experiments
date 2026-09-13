@@ -137,6 +137,7 @@ enum MenuPage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Choice {
+    Ability(u8),
     Skill(SkillId),
     Reposition,
     Rescue,
@@ -195,7 +196,6 @@ enum Action {
     ToggleLan,
     ToggleTailnet,
     Ready(bool),
-    Hero(ActorId, HeroClass),
     Assign(ActorId, u8),
     AssignmentPause(bool),
     Setup(setup::SetupAction),
@@ -438,7 +438,6 @@ fn apply_action(world: &mut World, action: Action) {
                     }
                 }
                 Action::Ready(ready) => Some(LabyrinthIntent::Ready(ready)),
-                Action::Hero(actor, hero) => Some(LabyrinthIntent::SelectHero { actor, hero }),
                 Action::Assign(actor, owner) => Some(LabyrinthIntent::Assign { actor, owner }),
                 Action::AssignmentPause(paused) => Some(LabyrinthIntent::AssignmentPause(paused)),
                 Action::Start => Some(LabyrinthIntent::StartEncounter),

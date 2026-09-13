@@ -176,7 +176,7 @@ fn update(
         .iter()
         .filter(|id| !cleared(**id))
         .filter_map(|id| snapshot.actor(*id))
-        .map(|actor| actor.kind.footprint())
+        .map(|actor| actor.footprint)
         .sum();
     for (id, marker) in &strip.markers {
         let Some(actor) = snapshot.actor(*id) else {
@@ -197,7 +197,7 @@ fn update(
         let to = change
             .and_then(|change| change.position)
             .map_or(from, |position| position.to);
-        let width = actor.kind.footprint();
+        let width = actor.footprint;
         let offset = if strip.team == Team::Heroes {
             total - (to + width - 1)
         } else {

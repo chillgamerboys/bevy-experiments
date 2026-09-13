@@ -60,7 +60,7 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
             height: Val::Percent(100.0),
             min_width: Val::Px(44.0),
             min_height: Val::Px(0.0),
-            flex_grow: f32::from(actor.kind.footprint()),
+            flex_grow: f32::from(actor.footprint),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(4.0),
             ..default()
@@ -564,7 +564,7 @@ pub(super) fn present(
             && ui.selected.is_some_and(|choice| {
                 matches!(
                     choice,
-                    Choice::Skill(_) | Choice::Reposition | Choice::Rescue
+                    Choice::Ability(_) | Choice::Skill(_) | Choice::Reposition | Choice::Rescue
                 ) && inspection::display_actor(view).is_some_and(|source| {
                     inspection::action_for(choice, Some(actor.id)).is_ok_and(|action| {
                         snapshot.validate_action_target(source.id, &action).is_ok()
@@ -640,10 +640,21 @@ pub(super) fn present(
             world.entity_mut(control).insert(label);
         }
         let rank = snapshot.rank(actor.id).unwrap_or(0);
+        let source_mask = inspection::display_actor(view)
+            .and_then(|source| match ui.selected {
+                Some(Choice::Ability(index)) => source.ability(index),
+                Some(Choice::Skill(skill)) => source
+                    .skill_index(skill)
+                    .and_then(|index| source.ability(index)),
+                _ => None,
+            })
+            .map(|definition| definition.source_ranks);
         let source_rank = actor.team() == Team::Heroes
-            && matches!(ui.selected,
-            Some(Choice::Skill(skill)) if snapshot.ranks(actor.id).is_some_and(|mut ranks|
-                ranks.any(|rank| skill_definition(skill).source_ranks & (1 << (rank - 1)) != 0)));
+            && source_mask.is_some_and(|mask| {
+                snapshot
+                    .ranks(actor.id)
+                    .is_some_and(|mut ranks| ranks.any(|rank| mask & (1 << (rank - 1)) != 0))
+            });
         if let Some(cue) = world.get::<FormationCue>(entity).map(|cue| cue.0) {
             // Keep position labels literal. Range/selection use the existing
             // footprint emphasis below, not unexplained punctuation.

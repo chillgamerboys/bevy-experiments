@@ -304,7 +304,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters() {
                 keyboard_control(&mut app, &format!("Skill {index}"));
                 assert_eq!(
                     app.world().resource::<UiState>().selected,
-                    Some(Choice::Skill(skill))
+                    Some(Choice::Ability(index as u8))
                 );
                 unchanged(
                     &mut app,
@@ -387,16 +387,15 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free() {
         .and_then(|snapshot| snapshot.active_actor)
         .expect("hero");
     for skills in SkillId::ALL.chunks(MAX_EQUIPPED_ABILITIES) {
-        app.world_mut()
-            .resource_mut::<LabyrinthView>()
-            .combat
-            .as_mut()
-            .expect("combat")
-            .actors
-            .iter_mut()
-            .find(|actor| actor.id == source)
-            .expect("actor")
-            .abilities = AbilityLoadout::new(skills.iter().copied()).expect("catalog loadout");
+        set_legacy_skills(
+            app.world_mut()
+                .resource_mut::<LabyrinthView>()
+                .combat
+                .as_mut()
+                .expect("combat"),
+            source,
+            skills,
+        );
         run_frames(&mut app, 5);
         for (index, skill) in skills.iter().enumerate() {
             let control = find_named(app.world_mut(), &format!("Skill {index}")).expect("ability");

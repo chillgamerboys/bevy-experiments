@@ -283,7 +283,13 @@ pub(super) fn mount(world: &mut World, root: Entity, _stage: Entity) -> DockNode
     }
 }
 
-pub(super) fn mount_skills(world: &mut World, parent: Entity, loadout: &[SkillId]) {
+pub(super) fn mount_skills(
+    world: &mut World,
+    parent: Entity,
+    encounter: u64,
+    actor: Option<&ActorSnapshot>,
+    loadout: &[labyrinth_rules::build::ResolvedAbility],
+) {
     let children = world
         .get::<Children>(parent)
         .map(|v| v.to_vec())
@@ -291,26 +297,34 @@ pub(super) fn mount_skills(world: &mut World, parent: Entity, loadout: &[SkillId
     for child in children {
         world.despawn(child);
     }
-    for (index, skill) in loadout.iter().copied().enumerate() {
-        let definition = skill_definition(skill);
+    for (index, ability) in loadout.iter().enumerate() {
+        let definition = &ability.definition;
         let entity = glyph_control(
             world,
             parent,
             &format!("Skill {index}"),
             &format!("{}", index + 1),
-            definition.name,
-            definition.description,
-            glyphs::for_skill(skill),
+            &definition.name,
+            &definition.description,
+            glyphs::for_ability(definition),
             Action::SkillSlot(index),
         );
         world
             .entity_mut(entity)
             .insert(bevy_gamekit::ui::UiTooltipSource(
-                super::tooltips::ability_subject(skill),
+                super::tooltips::ability_subject(
+                    encounter,
+                    actor.expect("nonempty loadout has actor").id,
+                    &definition.id,
+                ),
             ))
             .insert(bevy_gamekit::ui::UiFocusId::new(
                 "labyrinth-skills",
-                format!("{skill:?}"),
+                format!(
+                    "{encounter}/{}/{}",
+                    actor.expect("nonempty loadout has actor").id.0,
+                    definition.id
+                ),
             ));
     }
 }
@@ -350,7 +364,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
         snapshot,
         world.resource::<crate::presentation::CombatDisclosure>(),
     );
-    let selected = inspection::choice_title(ui.selected);
+    let selected = inspection::choice_title(actor, ui.selected);
     let help = UiContextHelp {
         title: "Confirm combat action".to_owned(),
         body: format!("{selected}\n{reason}"),
@@ -366,9 +380,9 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
     for entity in controls {
         let selected = match world.get::<Action>(entity) {
             Some(Action::Choice(choice)) => ui.selected == Some(*choice),
-            Some(Action::SkillSlot(index)) => actor
-                .and_then(|actor| actor.skills().get(*index))
-                .is_some_and(|skill| ui.selected == Some(Choice::Skill(*skill))),
+            Some(Action::SkillSlot(index)) => u8::try_from(*index).ok().is_some_and(|index| {
+                ui.selected == Some(Choice::Ability(index)) || matches!(ui.selected, Some(Choice::Skill(skill)) if actor.and_then(|a| a.skill_index(skill)) == Some(index))
+            }),
             Some(Action::Confirm) => selected_action(view, ui).is_ok(),
             _ => false,
         };
@@ -377,8 +391,11 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
             world.entity_mut(entity).insert(wanted);
         }
         if let Some(Action::SkillSlot(index)) = world.get::<Action>(entity) {
-            if let Some(skill) = actor.and_then(|actor| actor.skills().get(*index)) {
-                let definition = skill_definition(*skill);
+            if let Some((index, definition)) = u8::try_from(*index).ok().and_then(|index| {
+                actor
+                    .and_then(|actor| actor.ability(index))
+                    .map(|definition| (index, definition))
+            }) {
                 let uses = actor
                     .filter(|actor| {
                         let policy = world
@@ -386,7 +403,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
                             .actor(actor.id);
                         policy.details && policy.statuses
                     })
-                    .and_then(|actor| actor.remaining_uses(*skill))
+                    .and_then(|actor| actor.remaining_ability_uses(index))
                     .map_or_else(String::new, |left| format!(" {left} uses remaining."));
                 let title = format!("{}. {}{uses}", index + 1, definition.name);
                 if world.get::<AccessibleLabel>(entity).map(|v| &v.0) != Some(&title) {
@@ -410,7 +427,22 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
 
 fn fixed_geometry(world: &mut World, nodes: &DockNodes) {
     let metrics = *world.resource::<ResolvedUiMetrics>();
-    let rail = (62.0 * metrics.content_scale).max(44.0 * metrics.control_scale);
+    let count = world
+        .get::<Children>(nodes.skills)
+        .map_or(0, |children| children.len());
+    let rows = if count > 8 { 2.0 } else { 1.0 };
+    if let Some(mut skills) = world.get_mut::<Node>(nodes.skills) {
+        skills.display = if count > 8 {
+            Display::Grid
+        } else {
+            Display::Flex
+        };
+        skills.grid_template_rows = vec![RepeatedGridTrack::auto(if count > 8 { 2 } else { 1 })];
+        skills.grid_auto_flow = GridAutoFlow::Column;
+        skills.row_gap = Val::Px(3.0);
+    }
+    let rail = rows * (62.0 * metrics.content_scale).max(44.0 * metrics.control_scale)
+        + (rows - 1.0) * 3.0;
     for (entity, height) in [(nodes.root, rail + 12.0), (nodes.rail, rail)] {
         if let Some(mut node) = world.get_mut::<Node>(entity) {
             if node.height != Val::Px(height) {

@@ -216,7 +216,14 @@ fn main() {
                 labyrinth::view::CompanyMember {
                     actor,
                     hero,
-                    abilities: labyrinth_rules::HeroSetup::preset(actor, hero).abilities,
+                    abilities: labyrinth_rules::catalog::ContentCatalog::builtin()
+                        .expect("catalog")
+                        .resolve_build(&labyrinth_rules::scenario::legacy_build(
+                            labyrinth_rules::HeroSetup::preset(actor, hero)
+                                .abilities
+                                .as_slice(),
+                        ))
+                        .expect("resolved build"),
                     owner: if matches!(route.as_str(), "lobby" | "paused") {
                         u8::try_from(index).expect("owner")
                     } else {

@@ -7,7 +7,7 @@ struct Entry {
     id: u64,
     title: String,
     details: Vec<String>,
-    skill: Option<SkillId>,
+    skill: Option<bevy_gamekit::ui::UiTooltipSubject>,
 }
 
 fn entries(view: &LabyrinthView) -> Vec<Entry> {
@@ -24,19 +24,33 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                 format!(
                     "{} · {}",
                     name(actor),
-                    inspection::choice_title(Some(match action {
-                        CombatAction::Skill { skill, .. } => Choice::Skill(skill),
-                        CombatAction::Reposition { .. } => Choice::Reposition,
-                        CombatAction::Rescue { .. } => Choice::Rescue,
-                        CombatAction::Defend => Choice::Defend,
-                        CombatAction::Wait => Choice::Wait,
-                    }))
+                    inspection::choice_title(
+                        view.combat
+                            .as_ref()
+                            .and_then(|snapshot| snapshot.actor(actor)),
+                        Some(match action {
+                            CombatAction::Ability { index, .. } => Choice::Ability(index),
+                            CombatAction::Skill { skill, .. } => Choice::Skill(skill),
+                            CombatAction::Reposition { .. } => Choice::Reposition,
+                            CombatAction::Rescue { .. } => Choice::Rescue,
+                            CombatAction::Defend => Choice::Defend,
+                            CombatAction::Wait => Choice::Wait,
+                        })
+                    )
                 ),
-                if let CombatAction::Skill { skill, .. } = action {
-                    Some(skill)
-                } else {
-                    None
-                },
+                view.combat
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.actor(actor))
+                    .and_then(|source| {
+                        let index = match action {
+                            CombatAction::Ability { index, .. } => Some(index),
+                            CombatAction::Skill { skill, .. } => source.skill_index(skill),
+                            _ => None,
+                        }?;
+                        source.ability(index).map(|definition| {
+                            tooltips::ability_subject(view.encounter, actor, &definition.id)
+                        })
+                    }),
             )),
             CombatEventKind::TurnStarted { actor, .. } => {
                 Some((format!("{} · turn starts", name(actor)), None))
@@ -487,12 +501,11 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             );
         }
         if expanded {
-            if let Some(skill) = entry.skill {
-                let subject = tooltips::ability_subject(skill);
+            if let Some(subject) = &entry.skill {
                 if world
                     .resource::<bevy_gamekit::ui::UiTooltipCatalog>()
                     .0
-                    .contains_key(&subject)
+                    .contains_key(subject)
                 {
                     let fonts = world.resource::<UiFonts>().clone();
                     world
@@ -503,7 +516,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
                                 "labyrinth-history",
                                 format!("ability/{}", entry.id),
                             ),
-                            UiTooltipOpen(subject),
+                            UiTooltipOpen(subject.clone()),
                             ChildOf(item),
                         ))
                         .with_child(bevy_gamekit::ui::text(
