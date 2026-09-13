@@ -65,14 +65,18 @@ fn main() {
             | "movement-blocked"
     );
     let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
-    let scenario = matches!(route.as_str(), "lobby" | "abilities" | "ability-help").then(|| {
+    let scenario = matches!(
+        route.as_str(),
+        "lobby" | "editor" | "abilities" | "ability-help"
+    )
+    .then(|| {
         let mut scenario = labyrinth_rules::scenario::Scenario::stock(
             labyrinth_rules::scenario::StockScenario::Prototype,
             42,
             &catalog,
         )
         .expect("review scenario");
-        if route != "lobby" {
+        if matches!(route.as_str(), "abilities" | "ability-help") {
             let hero = scenario.heroes.first_mut().expect("captain");
             hero.actor.name = "Captain Lantern".into();
             hero.actor.base_speed = 100;
@@ -224,7 +228,7 @@ fn main() {
     let view = LabyrinthView {
         mode: match route.as_str() {
             "menu" | "host" => ViewMode::Menu,
-            "lobby" => ViewMode::Lobby,
+            "lobby" | "editor" => ViewMode::Lobby,
             _ => ViewMode::Combat,
         },
         local: !matches!(route.as_str(), "lobby" | "paused"),
@@ -432,17 +436,26 @@ fn force_metrics(capture: Res<Capture>, mut metrics: ResMut<ResolvedUiMetrics>) 
 fn capture(
     mut commands: Commands,
     mut capture: ResMut<Capture>,
-    mut controls: Query<(&Name, &mut Interaction), With<Button>>,
+    mut controls: Query<(Entity, &Name, &mut Interaction), With<Button>>,
+    mut focus: ResMut<bevy::input_focus::InputFocus>,
 ) {
     capture.frame += 1;
+    if capture.route == "editor" && capture.frame == 2 {
+        for (entity, name, _) in &mut controls {
+            if name.as_str() == "Edit Actor 1" {
+                focus.set(entity, bevy::input_focus::FocusCause::Navigated);
+            }
+        }
+    }
     if let Some(release) = capture.release.take() {
-        for (name, mut interaction) in &mut controls {
+        for (_, name, mut interaction) in &mut controls {
             if name.as_str() == release {
                 *interaction = Interaction::None;
             }
         }
     }
     let click = match (capture.route.as_str(), capture.frame) {
+        ("editor", 4) => Some("Edit Actor 1"),
         ("host", 4) => Some("Multiplayer"),
         ("host", 7) => Some("Host Company"),
         ("game-menu", 4) => Some("Battle Settings"),
@@ -468,7 +481,7 @@ fn capture(
         _ => None,
     };
     if let Some(click) = click {
-        for (name, mut interaction) in &mut controls {
+        for (_, name, mut interaction) in &mut controls {
             if name.as_str() == click {
                 *interaction = Interaction::Pressed;
                 capture.release = Some(click);

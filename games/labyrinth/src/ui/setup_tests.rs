@@ -482,3 +482,45 @@ fn leaving_lobby_or_losing_admission_retires_editor_entities() {
         assert!(app.world().get_entity(field).is_err());
     }
 }
+
+#[test]
+fn seed_field_tracks_loaded_configuration_without_losing_an_unapplied_draft() {
+    let mut builder = TestAppBuilder::new().with_ui(1280, 900);
+    let mut view = fixture();
+    view.scenario.as_mut().expect("scenario").seed = 91;
+    builder
+        .app_mut()
+        .insert_resource(view)
+        .add_plugins(super::super::LabyrinthUiPlugin);
+    let mut app = builder.build();
+    run_frames(&mut app, 4);
+    let field = find_named(app.world_mut(), "Scenario seed").expect("seed input");
+    assert_eq!(field_text(app.world(), field), "91");
+    {
+        let mut text = app
+            .world_mut()
+            .get_mut::<EditableText>(field)
+            .expect("text");
+        text.queue_edit(TextEdit::SelectAll);
+        text.queue_edit(TextEdit::Insert("123".into()));
+    }
+    run_frames(&mut app, 2);
+    app.world_mut()
+        .resource_mut::<LabyrinthView>()
+        .players
+        .first_mut()
+        .expect("host")
+        .ready = true;
+    run_frames(&mut app, 3);
+    let field = find_named(app.world_mut(), "Scenario seed").expect("rebuilt input");
+    assert_eq!(field_text(app.world(), field), "123");
+    app.world_mut()
+        .resource_mut::<LabyrinthView>()
+        .scenario
+        .as_mut()
+        .expect("scenario")
+        .seed = 456;
+    run_frames(&mut app, 3);
+    let field = find_named(app.world_mut(), "Scenario seed").expect("loaded input");
+    assert_eq!(field_text(app.world(), field), "456");
+}

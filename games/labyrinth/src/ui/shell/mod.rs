@@ -85,6 +85,16 @@ pub(super) fn present(
     ui: &mut UiState,
     metrics: ResolvedUiMetrics,
 ) {
+    if view.mode == ViewMode::Lobby {
+        if let Some(scenario) = &view.scenario {
+            if ui.scenario_seed_source != Some(scenario.seed) {
+                ui.scenario_seed = scenario.seed.to_string();
+                ui.scenario_seed_source = Some(scenario.seed);
+            }
+        }
+    } else {
+        ui.scenario_seed_source = None;
+    }
     // Notices and background discovery updates must not recreate an active
     // admission field, lose its cursor, or reset keyboard focus.
     notices(world, view, ui);

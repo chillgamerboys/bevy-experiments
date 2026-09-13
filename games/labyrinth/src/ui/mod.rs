@@ -178,6 +178,7 @@ struct UiState {
     editor: Option<setup::ActorEditor>,
     scenario_path: String,
     scenario_seed: String,
+    scenario_seed_source: Option<u64>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -245,7 +246,7 @@ fn collect_text(
 ) {
     for change in changed.read() {
         match fields.get(change.entity) {
-            Ok(Field::Build(field)) => setup::change(&mut ui, *field, &change.value),
+            Ok(Field::Build(field)) => setup::change_from_field(&mut ui, *field, &change.value),
             Ok(Field::ScenarioPath) => ui.scenario_path.clone_from(&change.value),
             Ok(Field::ScenarioSeed) => ui.scenario_seed.clone_from(&change.value),
             Ok(Field::Name) => ui.session_name.clone_from(&change.value),

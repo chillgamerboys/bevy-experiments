@@ -363,24 +363,7 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
             && converged(apps)),
         "one host and five clients did not finish real transport admission"
     );
-    // Admission grants a spectator reservation. This fixture deliberately maps
-    // each single-rank hero to one human through the host command path.
-    for owner in 0..TEST_PLAYERS {
-        app(apps, 0)
-            .world_mut()
-            .write_message(LabyrinthIntent::Assign {
-                actor: ActorId(u16::try_from(owner + 1).expect("hero")),
-                owner: u8::try_from(owner).expect("participant"),
-            });
-    }
-    assert!(pump_until(apps, Duration::from_secs(5), |apps| {
-        host_snapshot(apps)
-            .company
-            .iter()
-            .enumerate()
-            .all(|(index, member)| usize::from(member.owner) == index)
-            && converged(apps)
-    }));
+    assign_six_controllers(apps);
     let slots: BTreeSet<_> = apps
         .iter()
         .filter_map(|app| app.world().resource::<Runtime>().player)
@@ -416,6 +399,27 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
         LAST_GUEST
     );
     codes
+}
+
+fn assign_six_controllers(apps: &mut [App]) {
+    // Admission grants a spectator reservation. This fixture deliberately maps
+    // each single-rank hero to one human through the host command path.
+    for owner in 0..TEST_PLAYERS {
+        app(apps, 0)
+            .world_mut()
+            .write_message(LabyrinthIntent::Assign {
+                actor: ActorId(u16::try_from(owner + 1).expect("hero")),
+                owner: u8::try_from(owner).expect("participant"),
+            });
+    }
+    assert!(pump_until(apps, Duration::from_secs(5), |apps| {
+        host_snapshot(apps)
+            .company
+            .iter()
+            .enumerate()
+            .all(|(index, member)| usize::from(member.owner) == index)
+            && converged(apps)
+    }));
 }
 
 fn begin_encounter(apps: &mut [App]) {
@@ -540,10 +544,32 @@ fn send_action(apps: &mut [App], actor: ActorId, action: CombatAction) {
 
 fn aggressive_action(snapshot: &CombatSnapshot, actor: ActorId) -> CombatAction {
     let actions = snapshot.legal_actions(actor);
-    actions.iter().copied().find(|action| matches!(action,
-        CombatAction::Skill { skill, .. } if labyrinth_rules::skill_definition(*skill).effects.iter()
-            .any(|effect| matches!(effect, Effect::Damage(damage) if *damage > 0))))
-        .or_else(|| actions.iter().copied().find(|action| matches!(action, CombatAction::Rescue { .. })))
+    actions
+        .iter()
+        .copied()
+        .find(|action| {
+            snapshot
+                .action_ability(actor, *action)
+                .ok()
+                .flatten()
+                .and_then(|(index, _)| {
+                    snapshot
+                        .actor(actor)
+                        .and_then(|source| source.ability(index))
+                })
+                .is_some_and(|ability| {
+                    ability
+                        .effects
+                        .iter()
+                        .any(|effect| matches!(effect, Effect::Damage(damage) if *damage > 0))
+                })
+        })
+        .or_else(|| {
+            actions
+                .iter()
+                .copied()
+                .find(|action| matches!(action, CombatAction::Rescue { .. }))
+        })
         .unwrap_or(CombatAction::Defend)
 }
 
@@ -1227,6 +1253,7 @@ fn fake_discovery_hands_five_password_joins_to_real_pinned_transport() {
             .claimed_players(),
         6
     );
+    assign_six_controllers(&mut apps);
     begin_encounter(&mut apps);
     let snapshot = wait_for_hero(&mut apps);
     let actor = snapshot.active_actor.expect("hero decision");

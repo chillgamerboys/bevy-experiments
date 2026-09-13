@@ -871,7 +871,7 @@ fn sync_unknown_status(world: &mut World, parent: Entity, actor: &ActorSnapshot,
 mod tests {
     use super::*;
     use bevy_gamekit::testing::{run_frames, HeadlessUiPlugin};
-    use labyrinth_rules::{Combat, HeroSetup, StatusKind, DEFAULT_HERO_ROSTER};
+    use labyrinth_rules::{Combat, StatusKind, DEFAULT_HERO_ROSTER};
 
     fn status(actor: ActorId, kind: StatusKind, id: u64) -> StatusInstance {
         let definition = status_definition(kind);
@@ -896,13 +896,23 @@ mod tests {
 
     #[test]
     fn character_names_ignore_rank_class_and_snapshot_array_order() {
-        let setup = std::array::from_fn(|index| {
-            HeroSetup::preset(
-                ActorId(11 + u16::try_from(index).expect("six actors") * 7),
-                HeroClass::Knifehand,
-            )
-        });
-        let mut snapshot = Combat::with_heroes(42, setup)
+        let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
+        let mut scenario = labyrinth_rules::scenario::Scenario::stock(
+            labyrinth_rules::scenario::StockScenario::WeaponComparison,
+            42,
+            &catalog,
+        )
+        .expect("scenario");
+        for (index, actor) in scenario.heroes.iter_mut().enumerate() {
+            actor.id = ActorId(11 + u16::try_from(index).expect("six actors") * 7);
+            actor.actor.appearance = ActorKind::Hero(HeroClass::Knifehand);
+            actor.actor.name = if index == 1 {
+                "Mara".to_owned()
+            } else {
+                format!("Hero {index}")
+            };
+        }
+        let mut snapshot = Combat::from_scenario(&catalog, &scenario)
             .expect("explicit IDs")
             .snapshot();
         let names = snapshot
@@ -1152,6 +1162,7 @@ mod tests {
             }
             let mut view = LabyrinthView {
                 local: true,
+                player: Some(0),
                 admitted: true,
                 combat: Some(snapshot),
                 players: vec![crate::view::PlayerView {

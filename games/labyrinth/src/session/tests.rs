@@ -660,7 +660,25 @@ fn accepted_gameplay_records_typed_monotonic_events_with_bounded_history() {
                 .find(|player| player.actor == actor)
                 .expect("hero owner")
                 .owner;
-            let action = combat.legal_actions(actor).into_iter().find(|action| matches!(action, CombatAction::Skill { skill, .. } if labyrinth_rules::skill_definition(*skill).effects.iter().any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_))))).unwrap_or(CombatAction::Wait);
+            let action = combat
+                .legal_actions(actor)
+                .into_iter()
+                .find(|action| {
+                    combat
+                        .action_ability(actor, *action)
+                        .ok()
+                        .flatten()
+                        .and_then(|(index, _)| {
+                            combat.actor(actor).and_then(|source| source.ability(index))
+                        })
+                        .is_some_and(|ability| {
+                            ability
+                                .effects
+                                .iter()
+                                .any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_)))
+                        })
+                })
+                .unwrap_or(CombatAction::Wait);
             assert_eq!(
                 request(&mut authority, slot, SessionCommand::Act { actor, action }).rejection,
                 None

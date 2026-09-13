@@ -601,12 +601,20 @@ mod tests {
             .details
             .first()
             .expect("damage")
-            .contains("Alden → Ash Brute"));
-        assert!(grouped.get(1).expect("action").title.starts_with("Alden ·"));
-        assert!(grouped.get(2).expect("turn").title.starts_with("Mara ·"));
+            .contains("Gatekeeper → Ash Brute"));
+        assert!(grouped
+            .get(1)
+            .expect("action")
+            .title
+            .starts_with("Gatekeeper ·"));
+        assert!(grouped
+            .get(2)
+            .expect("turn")
+            .title
+            .starts_with("Knifehand ·"));
         assert_eq!(
             grouped.get(2).expect("turn").details,
-            ["Alden is downed", "Ash Brute: Bleed triggers"]
+            ["Gatekeeper is downed", "Ash Brute: Bleed triggers"]
         );
         assert!(grouped.first().expect("partial").title.contains("partial"));
         assert_eq!(entries(&view), grouped, "snapshot replay is idempotent");

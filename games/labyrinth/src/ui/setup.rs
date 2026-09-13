@@ -106,6 +106,18 @@ impl ActorEditor {
     }
 }
 
+pub(super) fn change_from_field(ui: &mut UiState, field: BuildField, value: &str) {
+    // A queued event from the prior mounted draft must not overwrite Reload,
+    // preset selection, or another character before the replacement is mounted.
+    if ui
+        .editor
+        .as_ref()
+        .is_some_and(|editor| editor.mounted == Some(editor.generation))
+    {
+        change(ui, field, value);
+    }
+}
+
 pub(super) fn change(ui: &mut UiState, field: BuildField, value: &str) {
     if let Some(editor) = &mut ui.editor {
         let current = match field {
