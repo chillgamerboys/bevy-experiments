@@ -72,6 +72,8 @@ fn invalid_draft_numbers_do_not_submit_or_mutate_authoritative_scenario() {
         (BuildField::Footprint, "256"),
         (BuildField::Footprint, "0"),
         (BuildField::StartingHp, "65536"),
+        (BuildField::StartingHp, "41"),
+        (BuildField::Footprint, "2"),
         (BuildField::StartingHp, "-1"),
     ] {
         let mut ui = edit(&view);
@@ -341,9 +343,14 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
     let mut app = editor_app();
     let initial = name_field(app.world_mut());
     let view = app.world().resource::<LabyrinthView>().clone();
+    app.world_mut()
+        .get_mut::<EditableText>(initial)
+        .expect("native text")
+        .editor_mut()
+        .set_text("Accepted draft");
+    run_frames(&mut app, 2);
     let submitted = {
         let mut ui = app.world_mut().resource_mut::<UiState>();
-        change(&mut ui, BuildField::Name, "Accepted draft");
         let Some(LabyrinthIntent::CustomizeActor { actor, .. }) =
             action(&view, &mut ui, SetupAction::Save)
         else {
@@ -360,6 +367,7 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
     {
         let mut current = app.world_mut().resource_mut::<LabyrinthView>();
         current.setup_revision += 1;
+        current.revision += 1;
         current.scenario.as_mut().expect("scenario").heroes[0] = submitted;
         current.notice = None;
     }
@@ -398,4 +406,79 @@ fn pending_save_requires_matching_authoritative_ack_and_reload_or_close_retires_
     run_frames(&mut app, 2);
     assert!(app.world().get_entity(replacement).is_err());
     assert!(app.world().resource::<UiState>().editor.is_none());
+}
+
+#[test]
+fn correction_clears_local_error_and_new_edits_cancel_pending_close() {
+    let view = fixture();
+    let mut ui = edit(&view);
+    change(&mut ui, BuildField::MaxHp, "not a number");
+    assert!(action(&view, &mut ui, SetupAction::Save).is_none());
+    assert!(ui.editor.as_ref().expect("editor").error.is_some());
+    change(&mut ui, BuildField::MaxHp, "44");
+    assert!(ui.editor.as_ref().expect("editor").error.is_none());
+    assert!(action(&view, &mut ui, SetupAction::Save).is_some());
+    assert!(ui.editor.as_ref().expect("editor").pending_save);
+    change(&mut ui, BuildField::Name, "Newer local draft");
+    assert!(!ui.editor.as_ref().expect("editor").pending_save);
+    assert_eq!(
+        ui.editor.as_ref().expect("editor").name,
+        "Newer local draft"
+    );
+    action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
+    assert!(!ui.editor.as_ref().expect("editor").pending_save);
+    assert!(ui.editor.as_ref().expect("editor").error.is_none());
+}
+
+#[test]
+fn enemy_starting_down_or_oversized_formation_is_rejected_without_scenario_mutation() {
+    let view = fixture();
+    let authoritative = view.scenario.clone();
+    let enemy = view.scenario.as_ref().expect("scenario").enemies[0].id;
+    let mut ui = UiState::default();
+    action(&view, &mut ui, SetupAction::Edit(enemy));
+    change(&mut ui, BuildField::StartingHp, "0");
+    assert!(action(&view, &mut ui, SetupAction::Save).is_none());
+    assert!(ui.editor.as_ref().expect("draft retained").error.is_some());
+    assert_eq!(view.scenario, authoritative);
+}
+
+#[test]
+fn no_op_save_closes_on_new_authoritative_projection_without_setup_revision_change() {
+    let mut app = editor_app();
+    let field = name_field(app.world_mut());
+    let view = app.world().resource::<LabyrinthView>().clone();
+    {
+        let mut ui = app.world_mut().resource_mut::<UiState>();
+        assert!(action(&view, &mut ui, SetupAction::Save).is_some());
+    }
+    run_frames(&mut app, 2);
+    assert!(app.world().resource::<UiState>().editor.is_some());
+    app.world_mut().resource_mut::<LabyrinthView>().revision += 1;
+    run_frames(&mut app, 2);
+    assert_eq!(
+        app.world().resource::<LabyrinthView>().setup_revision,
+        view.setup_revision
+    );
+    assert!(app.world().resource::<UiState>().editor.is_none());
+    assert!(app.world().get_entity(field).is_err());
+}
+
+#[test]
+fn leaving_lobby_or_losing_admission_retires_editor_entities() {
+    for admitted in [true, false] {
+        let mut app = editor_app();
+        let field = name_field(app.world_mut());
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            if admitted {
+                view.mode = ViewMode::Menu;
+            } else {
+                view.admitted = false;
+            }
+        }
+        run_frames(&mut app, 2);
+        assert!(app.world().resource::<UiState>().editor.is_none());
+        assert!(app.world().get_entity(field).is_err());
+    }
 }
