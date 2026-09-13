@@ -89,6 +89,21 @@ impl StockScenario {
 impl Scenario {
     /// Validate complete rosters and initial conditions against a frozen catalog.
     pub fn validate(&self, catalog: &ContentCatalog) -> Result<(), ContentError> {
+        self.validate_contents(catalog, false)
+    }
+    /// Validate authored content while a lobby is still assembling its teams.
+    ///
+    /// Empty teams and an entirely downed hero roster are permitted here; callers
+    /// must use `validate` before deployment or saving a playable scenario. Spatial
+    /// draft positions and participant authority remain app-owned.
+    pub fn validate_preparation(&self, catalog: &ContentCatalog) -> Result<(), ContentError> {
+        self.validate_contents(catalog, true)
+    }
+    fn validate_contents(
+        &self,
+        catalog: &ContentCatalog,
+        preparing: bool,
+    ) -> Result<(), ContentError> {
         if self.schema_version != SCENARIO_SCHEMA_VERSION {
             return Err(ContentError::new(
                 "scenario.schema_version",
@@ -98,7 +113,7 @@ impl Scenario {
         text_field("scenario.name", &self.name, 128)?;
         let mut ids = BTreeSet::new();
         for (team, actors) in [(Team::Heroes, &self.heroes), (Team::Enemies, &self.enemies)] {
-            if actors.is_empty() || actors.len() > crate::PARTY_SIZE {
+            if (!preparing && actors.is_empty()) || actors.len() > crate::PARTY_SIZE {
                 return Err(ContentError::new(
                     "scenario.roster",
                     "each team needs 1..6 actors",
@@ -154,7 +169,7 @@ impl Scenario {
                 ));
             }
         }
-        if self.heroes.iter().all(|a| a.starting_hp == Some(0)) {
+        if !preparing && self.heroes.iter().all(|a| a.starting_hp == Some(0)) {
             return Err(ContentError::new(
                 "scenario.heroes",
                 "at least one hero must start standing",
@@ -375,5 +390,47 @@ pub fn legacy_build(skills: &[crate::SkillId]) -> CharacterBuild {
             })
             .collect(),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod preparation_tests {
+    use super::*;
+
+    #[test]
+    fn incomplete_preparation_never_becomes_a_deployable_battle() {
+        let catalog = ContentCatalog::builtin().expect("builtin catalog");
+        let mut scenario =
+            Scenario::stock(StockScenario::Prototype, 42, &catalog).expect("stock scenario");
+        for hero in &mut scenario.heroes {
+            hero.starting_hp = Some(0);
+        }
+        assert!(scenario.validate_preparation(&catalog).is_ok());
+        assert!(scenario.validate(&catalog).is_err());
+        assert!(crate::Combat::from_scenario(&catalog, &scenario).is_err());
+        scenario.heroes.clear();
+        scenario.enemies.clear();
+        assert!(scenario.validate_preparation(&catalog).is_ok());
+        assert!(scenario.validate(&catalog).is_err());
+        assert!(crate::Combat::from_scenario(&catalog, &scenario).is_err());
+    }
+
+    #[test]
+    fn preparation_still_rejects_invalid_actor_content_and_source_references() {
+        let catalog = ContentCatalog::builtin().expect("builtin catalog");
+        let mut scenario =
+            Scenario::stock(StockScenario::Prototype, 42, &catalog).expect("stock scenario");
+        scenario.enemies.clear();
+        let hero = scenario.heroes.first_mut().expect("first hero");
+        hero.starting_hp = Some(hero.actor.max_hp + 1);
+        assert!(scenario.validate_preparation(&catalog).is_err());
+        let hero = scenario.heroes.first_mut().expect("first hero");
+        hero.starting_hp = None;
+        hero.starting_statuses.push(StartingStatus {
+            kind: StatusKind::Haste,
+            source: Some(ActorId(u16::MAX)),
+            remaining: None,
+        });
+        assert!(scenario.validate_preparation(&catalog).is_err());
     }
 }
