@@ -12,6 +12,28 @@ override surfaces, fonts and interaction states. Scope focus identity with stabl
 keys, not displayed text. Games own selection, inspection and scene composition;
 the toolkit owns reusable accessibility mechanics.
 
+### Dynamic editors and long control lists
+
+Use `UiFocusId` keys derived from stable subject and field identities, never row
+indices or displayed labels. The remembered key belongs to the actual focused
+entity; removing a different, unkeyed control or clearing focus cannot revive a
+previous row. Duplicate eligible identities fail closed. This restores focus when
+a view replaces entities; it does not own drafts, text selections or IME state.
+Keep `EditableText` entities mounted while adding/reordering unrelated rows when
+possible. Games retain draft values and decide how incoming authority changes
+resolve concurrent edits. Consume `UiTextChanged` after
+`GameUiSystems::EmitActivations`, before replacing the edited view.
+
+Bevy flex/grid layout and `Node::overflow` provide automatic rows and scrolling;
+Gamekit imposes no control-count limit. `GameUiPlugin` installs native `ScrollArea`
+on scroll nodes and requests `ScrollIntoView` when focus changes. `UiTabOrder`
+provides logical order independently of transient entities. Long-list capability
+tests navigate and activate twelve controls and measure the focused control's
+visible bounds; field tests rebuild reordered rows and submit their retained drafts.
+These are deterministic input/layout checks, not rendered or real-pointer evidence.
+Games still choose wrapping/grouping, reachable confirmation controls, supported
+viewport/scale combinations and keyboard inspection for unavailable actions.
+
 ### Local menus and activity feeds
 
 `UiMenuStack<Route>` stores bounded, deduplicated local page history using a

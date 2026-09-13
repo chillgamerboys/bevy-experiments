@@ -532,6 +532,130 @@ mod tests {
     }
 
     #[test]
+    fn native_navigation_reaches_and_activates_every_control_in_a_long_scroll_list() {
+        let mut app = TestAppBuilder::new().with_ui(1280, 720).build();
+        app.init_resource::<KeyEvidence>().add_systems(
+            Update,
+            collect_key_evidence.after(GameUiSystems::EmitActivations),
+        );
+        let root = app.world_mut().spawn(screen_root("Long list")).id();
+        let list = app
+            .world_mut()
+            .spawn((
+                Node {
+                    width: Val::Px(250.0),
+                    height: Val::Px(120.0),
+                    flex_direction: FlexDirection::Column,
+                    overflow: Overflow::scroll_y(),
+                    ..default()
+                },
+                ChildOf(root),
+            ))
+            .id();
+        let actions = (0..12)
+            .map(|index| {
+                app.world_mut()
+                    .spawn((
+                        button(format!("Action {index}")),
+                        UiTabOrder(index),
+                        ChildOf(list),
+                    ))
+                    .insert(Node {
+                        height: Val::Px(44.0),
+                        flex_shrink: 0.0,
+                        ..default()
+                    })
+                    .id()
+            })
+            .collect::<Vec<_>>();
+        run_frames(&mut app, 3);
+        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+        assert!(visible_control_rect(
+            app.world(),
+            *actions.last().expect("twelve actions"),
+            viewport
+        )
+        .is_none());
+        assert!(focus_action(
+            app.world_mut(),
+            *actions.first().expect("twelve actions")
+        ));
+        for (index, action) in actions.iter().enumerate() {
+            if index > 0 {
+                tap_key(&mut app, KeyCode::Tab);
+            }
+            run_frames(&mut app, 2);
+            assert_eq!(app.world().resource::<InputFocus>().get(), Some(*action));
+            assert!(
+                visible_control_rect(app.world(), *action, viewport).is_some(),
+                "focused action {index} should scroll into view"
+            );
+            tap_key(&mut app, KeyCode::Enter);
+        }
+        assert_eq!(app.world().resource::<KeyEvidence>().activations, actions);
+    }
+
+    #[test]
+    fn rebuilt_fields_restore_by_stable_key_after_rows_are_reordered() {
+        use bevy_gamekit_ui::UiFocusId;
+        let mut app = TestAppBuilder::new().with_ui(1280, 720).build();
+        app.init_resource::<KeyEvidence>().add_systems(
+            Update,
+            collect_key_evidence.after(GameUiSystems::EmitActivations),
+        );
+        let root = app.world_mut().spawn(screen_root("Editor")).id();
+        let original = app
+            .world_mut()
+            .spawn((
+                text_field(&UiFonts::default(), "Original label", "Draft", 32),
+                UiFocusId::new("editor", "participant-2/name"),
+                ChildOf(root),
+            ))
+            .id();
+        run_frames(&mut app, 3);
+        assert!(focus_action(app.world_mut(), original));
+        run_frames(&mut app, 1);
+        app.world_mut().despawn(root);
+        let root = app.world_mut().spawn(screen_root("Updated editor")).id();
+        let inserted = app
+            .world_mut()
+            .spawn((
+                text_field(&UiFonts::default(), "Original label", "New row", 32),
+                UiFocusId::new("editor", "participant-3/name"),
+                ChildOf(root),
+            ))
+            .id();
+        let replacement = app
+            .world_mut()
+            .spawn((
+                // Games retain draft values; stable focus identity does not own them.
+                text_field(&UiFonts::default(), "Renamed label", "Draft", 32),
+                UiFocusId::new("editor", "participant-2/name"),
+                ChildOf(root),
+            ))
+            .id();
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(replacement)
+        );
+        assert_ne!(replacement, inserted);
+        tap_key(&mut app, KeyCode::Enter);
+        assert_eq!(
+            app.world().resource::<KeyEvidence>().submissions,
+            vec![replacement]
+        );
+        let draft = app
+            .world()
+            .get::<bevy::text::EditableText>(replacement)
+            .expect("rebuilt field")
+            .value()
+            .into_iter()
+            .collect::<String>();
+        assert_eq!(draft, "Draft");
+    }
+
+    #[test]
     fn normalized_snapshot_observes_accessible_labels_and_ancestor_eligibility() {
         let mut app = TestAppBuilder::new().with_ui(1280, 720).build();
         let root = app

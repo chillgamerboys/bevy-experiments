@@ -546,3 +546,86 @@ fn added_skin_and_changed_or_removed_overrides_repaint_without_touching_bare_act
         UiTheme::default().control
     );
 }
+
+#[test]
+fn removing_an_unkeyed_control_never_restores_a_previously_focused_identity() {
+    for observe_unkeyed_focus in [false, true] {
+        let mut app = mechanics_app(false);
+        let previous = app
+            .world_mut()
+            .spawn((button("Previous row"), UiFocusId::new("editor", "actor-1")))
+            .id();
+        let unkeyed = app.world_mut().spawn(button("Transient control")).id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(previous, FocusCause::Navigated);
+        app.update();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(unkeyed, FocusCause::Navigated);
+        // Also cover a consumer changing focus and rebuilding in one Update:
+        // the remembered identity still belongs to the previous entity.
+        if observe_unkeyed_focus {
+            app.update();
+        }
+        app.world_mut().despawn(unkeyed);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), None);
+    }
+}
+
+#[test]
+fn a_modal_opened_after_focus_was_cleared_has_no_stale_return_target() {
+    let mut app = mechanics_app(false);
+    let previous = app
+        .world_mut()
+        .spawn((button("Previous row"), UiFocusId::new("editor", "actor-1")))
+        .id();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(previous, FocusCause::Navigated);
+    app.update();
+    app.world_mut().resource_mut::<InputFocus>().clear();
+    let dialog = app.world_mut().spawn(modal("Assignment")).id();
+    let close = app
+        .world_mut()
+        .spawn((button("Close"), ChildOf(dialog)))
+        .id();
+    app.update();
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(close));
+    app.world_mut().despawn(dialog);
+    app.update();
+    assert_eq!(app.world().resource::<InputFocus>().get(), None);
+}
+
+#[test]
+fn opening_a_modal_during_a_rebuild_preserves_the_outer_return_identity() {
+    let mut app = mechanics_app(false);
+    let original = app
+        .world_mut()
+        .spawn((button("Original row"), UiFocusId::new("editor", "actor-1")))
+        .id();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(original, FocusCause::Navigated);
+    app.update();
+    app.world_mut().despawn(original);
+    let replacement = app
+        .world_mut()
+        .spawn((button("Renamed row"), UiFocusId::new("editor", "actor-1")))
+        .id();
+    let dialog = app.world_mut().spawn(modal("Assignment")).id();
+    let close = app
+        .world_mut()
+        .spawn((button("Close"), ChildOf(dialog)))
+        .id();
+    app.update();
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(close));
+    assert!(!activation_eligible(app.world_mut(), replacement));
+    app.world_mut().despawn(dialog);
+    app.update();
+    assert_eq!(
+        app.world().resource::<InputFocus>().get(),
+        Some(replacement)
+    );
+}

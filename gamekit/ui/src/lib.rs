@@ -394,6 +394,10 @@ pub struct UiTextField;
 
 /// Explicit stable identity used to restore focus after a game rebuilds a view.
 /// Labels and `Name` are not identities. Duplicate identities fail closed.
+/// Keys should identify a subject and control, independently of row order.
+/// Restoration remembers the focused entity's key; clearing focus or focusing an
+/// unkeyed entity cannot restore an unrelated earlier key. Draft values, text
+/// selections and IME state remain owned by the game and native text control.
 #[derive(Component, Debug, Clone, PartialEq, Eq)]
 pub struct UiFocusId {
     /// Game-owned scope, unique among simultaneously mounted views.
