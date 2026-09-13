@@ -24,8 +24,8 @@ cargo test --locked -p gameskills-cli --profile ci
 | Evidence | Claims | Does not establish |
 |---|---|---|
 | Pure rules tests | Catalog/build validation, scenario roundtrip, seeded order, transactional cleave/preview parity, statuses and complete fights | UI or networking |
-| Session policy tests | Independent participants/actors, owned/stale setup, spectator readiness, reassignment replay guards, exact-seed rematch | Physical socket behavior |
-| Multi-App socket tests | One host + five encrypted clients, password/direct admission, large authored build/save-load commands, command convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
+| Session policy tests | Independent participants/actors, sparse typed construction, rank reservations, compact deployment, owned/stale setup, spectator readiness, reassignment replay guards, exact-seed rematch | Physical socket behavior |
+| Multi-App socket tests | One host + five encrypted clients, password/direct admission, large authored build/save-load commands, spatial reservation/type/gap convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
 | Explicit six-process test | Abrupt sixth-seat guest kill, profile lock release, same-peer/actor/class/loadout/status recovery, subsequent completed fight | Cross-machine LAN/Tailscale reachability |
 | Fake discovery tests | Provider-neutral listing/removal/compatibility and encrypted join handoff | Real multicast or Tailscale |
 | UI behavioral/structural tests | Draft preservation/save ACK, 12+ authored moves via native keyboard/pointer messages, scoped provenance/forecast, focus/modal behavior and bounds | Visual quality or real pointer hardware |
@@ -55,6 +55,21 @@ For customization, review lobby, character editor and complete-ability overflow 
 1280×720 and 1920×1080, including 200% scaling. Automatic focus scrolling is part
 of usability; verify controls can be reached beyond the first visible rows.
 Static frames and headless native-input messages remain distinct from a desktop walk.
+
+The spatial preparation routes are `construction`, `construction-picker`,
+`construction-gap`, `construction-enemy` and `construction-owners`. Review the
+facing formation, actual multi-rank art/span, selected destination, type mechanics,
+ownership and blocked-deployment reason at 1280×720 Auto/200% and wide Auto. The
+selected type's useful moves must be visible before placement; large text uses a
+focused list/detail route rather than hiding facts beneath repeated navigation.
+Judge the complete task, including removing a character, choosing another type,
+repairing a gap, assigning control and returning from the one character editor.
+Reachable controls alone do not establish a clear or efficient composition.
+
+`session::tests::spatial` covers construction/authority/snapshot invariants;
+`network::tests::spatial` covers encrypted shared construction and local deployment
+after edits. Local Deploy skips the co-op Ready step atomically, while both modes
+retain complete/compact validation. Keep the ordinary co-op readiness regressions.
 
 The overlay regressions compare all twelve native actor anchors and actual atlas
 sprite transforms across selection, targeting, utilities and detail drawers. They
