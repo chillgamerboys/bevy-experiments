@@ -8,9 +8,11 @@ description: Design or implement native Bevy/GameKit game UI, including views, t
 Read [project context](../../references/project-context.md) and
 [UI contracts](../../references/ui-contracts.md). Preserve the task's creative
 level and accepted player experience. For new or materially changed views, apply
-the contracts' decision and information design guidance before choosing controls.
+the contracts' interaction, information and visual design guidance before choosing
+controls. Turn the accepted direction into a concrete design with representative
+content/art and a complete task walkthrough before broad production wiring.
 Establish the game-owned view, typed intents, semantic regions and control states
-before wiring presentation to authority.
+from that design before wiring presentation to authority.
 
 Inspect the exact Bevy/GameKit source, current plugin composition and style system.
 Keep views, actions and branding in the game. Use existing shared mechanics where

@@ -11,14 +11,18 @@ largest uncertainty in two or three sentences. Do not require confirmation of a
 frame the user already supplied.
 
 When a change introduces or reorganizes player-facing views, investigate the
-decisions those views serve: what must be understood before acting, what changes
-as a result, and what belongs together or on another screen. Recover where the
-same subject is viewed or edited elsewhere and who may act in each context;
-do not assume separate editors just because entry points or permissions differ.
-Inspect existing routes and requested references before interviewing. Agreement
-on mechanics is not agreement on information design. Bring concrete alternatives
-and a recommendation for material gaps, rather than asking the user to design
-every control or reopening an already accepted organization.
+goals and frequent tasks they serve using
+[interface design](../../references/interface-design.md). Inspect existing routes
+and requested references before interviewing. Challenge consequential assumptions:
+does the proposed interaction fit how players choose and compare, what deserves
+their attention, and does moving between views lose context or repeat work?
+Recover recurring views and authority rather than multiplying editors by entry
+point. Agreement on mechanics is not agreement on screen design. Use concrete
+visual alternatives and task walkthroughs to expose material gaps in organization,
+appearance or behavior; recommend a direction with its cost. Own routine craft
+decisions instead of asking the user to design every control or reopening an
+accepted answer. Hand off enough design detail to prevent the implementer from
+inventing the central experience from a list of fields.
 
 Ask only decisions whose answers change scope, architecture, player experience,
 risk or delivery. Prefer one to three questions per round, each with a concrete
