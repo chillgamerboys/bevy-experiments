@@ -1,6 +1,6 @@
 # Labyrinth customization and package-quality epic
 
-Status: implementation integrated; builder UX rejected by the user. Research and design discussion precede further UI implementation and delivery acceptance.
+Status: active UI revision; prior builder UX rejected. Accepted squad preparation and unified-editor direction is being implemented and verified before delivery acceptance.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.

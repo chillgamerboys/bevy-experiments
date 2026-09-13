@@ -494,6 +494,8 @@ fn seed_field_tracks_loaded_configuration_without_losing_an_unapplied_draft() {
         .add_plugins(super::super::LabyrinthUiPlugin);
     let mut app = builder.build();
     run_frames(&mut app, 4);
+    super::super::apply_action(app.world_mut(), Action::LobbyPage(2));
+    run_frames(&mut app, 3);
     let field = find_named(app.world_mut(), "Scenario seed").expect("seed input");
     assert_eq!(field_text(app.world(), field), "91");
     {

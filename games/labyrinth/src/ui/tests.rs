@@ -761,6 +761,8 @@ fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectator
     run_frames(&mut app, 4);
     let start = find_named(app.world_mut(), "Start Encounter").expect("start");
     assert!(app.world().get::<UiDisabled>(start).is_some());
+    apply_action(app.world_mut(), Action::LobbyPage(3));
+    run_frames(&mut app, 3);
     assert!(find_named(app.world_mut(), "Copy Invitation 4").is_some());
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();

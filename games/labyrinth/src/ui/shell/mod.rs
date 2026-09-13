@@ -105,6 +105,7 @@ pub(super) fn present(
         &view.scenario,
         &view.invite_labels,
         &view.session_name,
+        ui.lobby_page,
     ));
     let listings = (ui.form == Form::Browser).then_some(&view.listings);
     let key = format!(
@@ -155,21 +156,40 @@ pub(super) fn present(
         },
     );
     world.entity_mut(content).insert(GlobalZIndex(2));
+    if view.mode == ViewMode::Lobby {
+        if let Some(mut node) = world.get_mut::<Node>(root) {
+            node.overflow = Overflow::clip();
+            node.padding = UiRect::all(Val::Px(16.0));
+            node.row_gap = Val::Px(8.0);
+        }
+        if let Some(mut node) = world.get_mut::<Node>(content) {
+            node.flex_grow = 1.0;
+            node.flex_shrink = 1.0;
+            node.min_height = Val::Px(0.0);
+            node.row_gap = Val::Px(8.0);
+        }
+    }
     backdrop(world);
     label(
         world,
         content,
         "Brand",
         "L A B Y R I N T H",
-        UiTextRole::Display,
+        if view.mode == ViewMode::Lobby {
+            UiTextRole::Supporting
+        } else {
+            UiTextRole::Display
+        },
     );
-    label(
-        world,
-        content,
-        "Subtitle",
-        "Six lanterns. One company. Hold the line together.",
-        UiTextRole::Supporting,
-    );
+    if view.mode != ViewMode::Lobby {
+        label(
+            world,
+            content,
+            "Subtitle",
+            "Six lanterns. One company. Hold the line together.",
+            UiTextRole::Supporting,
+        );
+    }
     if view.mode == ViewMode::Lobby {
         lobby(world, content, view, ui);
     } else {

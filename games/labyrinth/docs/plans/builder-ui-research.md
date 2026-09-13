@@ -1,6 +1,6 @@
 # Builder UI research and alternatives
 
-Status: direction selected, 2026-09-13: B with one unified character editor.
+Status: active implementation of the direction selected 2026-09-13: B with one unified character editor.
 Detailed layout and usability validation remain outstanding. Reopens S6/S9 in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
 The research/grill direction decision is settled; carry it into the scoped UI

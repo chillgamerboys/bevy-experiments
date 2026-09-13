@@ -1,6 +1,6 @@
 # Weapons, character builds and configurable battles
 
-Status: implementation integrated; builder usability rejected. [Selected UI direction](builder-ui-research.md): squad preparation with one unified character editor; detailed redesign and verification remain outstanding.
+Status: active UI revision; prior builder usability rejected. [Selected UI direction](builder-ui-research.md): squad preparation with one unified character editor; detailed redesign and verification remain outstanding.
 Owner: Labyrinth. GameSkills and Gamekit have equal-priority evaluation and
 improvement outcomes in the [combined session plan](../../../../gameskills/docs/plans/skill-evaluation.md).
 Tracking: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with); see the
