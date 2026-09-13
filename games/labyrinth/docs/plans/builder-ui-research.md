@@ -1,14 +1,14 @@
 # Builder UI research and alternatives
 
-Status: active implementation of the direction selected 2026-09-13: B with one unified character editor.
-Detailed layout and usability validation remain outstanding. Reopens S6/S9 in the
+Status: active verification of the direction selected 2026-09-13: B with one unified character editor.
+The redesigned views are implemented; interactive usability acceptance remains outstanding. Reopens S6/S9 in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
 The research/grill direction decision is settled; carry it into the scoped UI
 revision. Preserve all accepted customization, authority and inventory limits.
 
 ## Problem and player tasks
 
-The integrated editor exposes data fields and selectable names but does not explain
+The rejected editor exposed data fields and selectable names but did not explain
 weapon/skill decisions. Scrolling makes controls reachable; it does not organize
 decisions. A player must be able to inspect without changing a build, understand
 what an item grants, compare the resulting moves, see rank restrictions and skill
@@ -138,3 +138,35 @@ grant; switch heroes with unapplied edits; configure an enemy and relaunch a pre
 Check accurate visible information separately from native interaction and actual
 player comprehension. Keep the rejected captures and user correction as negative
 evidence in the [GameSkills evaluation](../../../../gameskills/docs/plans/skill-evaluation.md).
+
+## Implemented revision and review findings
+
+Preparation now separates Party, Enemies, Scenario and Players. Formation cards
+show rank, ownership, weapon and current battle parameters. Both teams enter the
+same character editor; previous/next navigation changes its subject. Equipment,
+Innate, Learned, Parameters and Resulting moves are sections of one draft, with
+Apply/Discard controls outside the scrolling body. The editor opens as a full pane
+to give decisions enough space; it retains the selected actor's team/rank/owner
+context rather than squeezing a twelve-actor roster beside the inspector.
+
+Wide layouts pair a choice browser with its inspector. Narrow layouts and larger
+text use a browser/detail route with Back to choices. Browsing does not equip or
+learn. Effective damage, acting/target ranks, affected targets, prerequisites and
+actual added/removed/changed moves support an explicit draft change. Switching
+away from a dirty actor requires an explicit discard decision. Existing numerical
+fields remain prototype battle parameters, not a new character-stat system.
+
+Rendered review found two further problems and drove corrections: reusing the
+combat HUD breakpoint created one oversized squad card at 1280 pixels, and verbose
+introductory copy pushed all mechanical facts below the first fold at 200% text.
+The roster now uses its own readable-width rules. The inspector puts effective
+move facts before optional description/provenance; accessibility text is not
+shrunk to make it fit. These are observed information/layout corrections, not
+evidence that a player understood or enjoyed the new route.
+
+Production-plugin tests cover source-bound inspection, explicit choice changes,
+rank-only upgrades, duplicate grants, prerequisites, draft retention, stale
+authority, compact navigation and visible footer/mechanics. Metal frames establish
+rendered appearance. Desktop automation is unavailable in this session, so the
+pointer/keyboard usability walk and human comprehension remain pending. The
+original rejection remains negative evidence in the evaluation ledger.

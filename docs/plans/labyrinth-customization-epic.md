@@ -1,6 +1,6 @@
 # Labyrinth customization and package-quality epic
 
-Status: active UI revision; prior builder UX rejected. Accepted squad preparation and unified-editor direction is being implemented and verified before delivery acceptance.
+Status: active UI revision; prior builder UX rejected. Accepted squad preparation and unified-editor direction is implemented and undergoing delivery verification.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.
@@ -20,8 +20,10 @@ fight. Metal frames cover setup/overflow at Auto/200%; static rendering is not a
 desktop playthrough. Draft [PR #39](https://github.com/chillgamerboys/bevy-experiments/pull/39)
 exists. The final source-bound command graph and delivery observation remain pending.
 
-S6/S9 builder usability acceptance is explicitly reopened: the user rejected the
-unexplained button lists and organization despite the preceding checks. See the
+S6/S9 builder usability acceptance was reopened: the user rejected the
+unexplained button lists and organization despite the preceding checks. The
+replacement separates squad preparation from one character editor, with explicit
+inspection, effective mechanics, build comparisons and retained drafts. See the
 [research and alternatives](../../games/labyrinth/docs/plans/builder-ui-research.md).
 Reachability and unclipped screenshots did not establish understandable choices.
 Other remaining acceptance includes S9/S10: current CI/review state, interactive desktop
@@ -110,9 +112,9 @@ Epic UUID: `2d2cd063-105a-4ea0-ad4f-71e8925a2550`; project UUID: `401f99ba-c1ec-
 | S10 | [HEX-109](https://linear.app/chillgamerboys/issue/HEX-109/audit-all-epic-outcomes-and-deliver-the-implementation-prs-with) | Shared delivery | HEX-100, HEX-107, HEX-108 |
 
 All ten children, project routes and dependency edges were read back through the
-connected Linear MCP on 2026-09-13. Epic/children are Todo; implementation is not
-complete. Local plan files are not yet published to GitHub; Linear descriptions
-contain the substantive scopes independently. The design delivery record is
+connected Linear MCP on 2026-09-13 during planning. That historical observation
+does not establish their current status or completion. PR #39 publishes the plan
+and implementation; Linear descriptions retain the substantive scopes independently. The design delivery record is
 `labyrinth-customization-epic-plan`; later implementation uses PR-endpoint records.
 
 ### S1: Evaluate and improve GameSkills throughout the Labyrinth customization epic
