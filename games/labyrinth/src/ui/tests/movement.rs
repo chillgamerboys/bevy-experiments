@@ -279,8 +279,12 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it() {
             actions,
             vec![(
                 ActorId(1),
-                CombatAction::Skill {
-                    skill: SkillId::DrivingBlow,
+                CombatAction::Ability {
+                    index: snapshot
+                        .actor(ActorId(1))
+                        .expect("hero")
+                        .skill_index(SkillId::DrivingBlow)
+                        .expect("Driving Blow"),
                     target: ActorId(104)
                 }
             )]

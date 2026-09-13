@@ -64,12 +64,52 @@ fn main() {
             | "movement"
             | "movement-blocked"
     );
-    let heroes = if large {
+    let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
+    let scenario = matches!(route.as_str(), "lobby" | "abilities" | "ability-help").then(|| {
+        let mut scenario = labyrinth_rules::scenario::Scenario::stock(
+            labyrinth_rules::scenario::StockScenario::Prototype,
+            42,
+            &catalog,
+        )
+        .expect("review scenario");
+        if route != "lobby" {
+            let hero = scenario.heroes.first_mut().expect("captain");
+            hero.actor.name = "Captain Lantern".into();
+            hero.actor.base_speed = 100;
+            hero.actor.build = labyrinth_rules::build::CharacterBuild {
+                innate: catalog
+                    .definition()
+                    .abilities
+                    .iter()
+                    .take(12)
+                    .map(|ability| labyrinth_rules::build::InnateGrant {
+                        ability: ability.id.clone(),
+                        provenance: labyrinth_rules::catalog::ContentId::new("captain_training")
+                            .expect("provenance"),
+                    })
+                    .collect(),
+                ..default()
+            };
+        }
+        scenario
+    });
+    let heroes = if let Some(scenario) = &scenario {
+        scenario
+            .heroes
+            .iter()
+            .map(|hero| match hero.actor.appearance {
+                labyrinth_rules::ActorKind::Hero(class) => class,
+                _ => unreachable!("stock heroes"),
+            })
+            .collect()
+    } else if large {
         labyrinth_rules::PROTOTYPE_HERO_ROSTER.to_vec()
     } else {
         DEFAULT_HERO_ROSTER.to_vec()
     };
-    let mut combat = if large {
+    let mut combat = if let Some(scenario) = &scenario {
+        Combat::from_scenario(&catalog, scenario).expect("review scenario combat")
+    } else if large {
         Combat::with_party(
             42,
             heroes
@@ -78,10 +118,10 @@ fn main() {
                 .map(|(i, hero)| labyrinth_rules::HeroSetup::preset(ActorId(i as u16 + 1), *hero))
                 .collect(),
         )
+        .expect("review party")
     } else {
-        Combat::new(42, DEFAULT_HERO_ROSTER)
-    }
-    .expect("review fixture");
+        Combat::new(42, DEFAULT_HERO_ROSTER).expect("review fixture")
+    };
     let mut events = Vec::new();
     for _ in 0..PARTY_SIZE * 2 {
         if route.starts_with("movement") {
@@ -180,6 +220,7 @@ fn main() {
             }
         }
     }
+    let company_snapshot = snapshot.clone();
     let view = LabyrinthView {
         mode: match route.as_str() {
             "menu" | "host" => ViewMode::Menu,
@@ -207,6 +248,9 @@ fn main() {
             })
             .collect(),
         assignment_revision: 1,
+        setup_revision: 1,
+        scenario,
+        catalog: Some(catalog),
         company: heroes
             .iter()
             .copied()
@@ -216,14 +260,11 @@ fn main() {
                 labyrinth::view::CompanyMember {
                     actor,
                     hero,
-                    abilities: labyrinth_rules::catalog::ContentCatalog::builtin()
-                        .expect("catalog")
-                        .resolve_build(&labyrinth_rules::scenario::legacy_build(
-                            labyrinth_rules::HeroSetup::preset(actor, hero)
-                                .abilities
-                                .as_slice(),
-                        ))
-                        .expect("resolved build"),
+                    abilities: company_snapshot
+                        .actor(actor)
+                        .expect("company actor")
+                        .abilities
+                        .clone(),
                     owner: if matches!(route.as_str(), "lobby" | "paused") {
                         u8::try_from(index).expect("owner")
                     } else {
@@ -336,7 +377,7 @@ fn help_fixture(
     mut settings: ResMut<bevy_gamekit::ui::UiTooltipSettings>,
 ) {
     let source = match capture.route.as_str() {
-        "help" | "help-locked" => "Skill 0",
+        "help" | "help-locked" | "ability-help" => "Skill 0",
         "history-actor" => "Actor 105",
         "corpse-forecast" => "Actor 103",
         _ => return,

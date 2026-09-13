@@ -225,6 +225,29 @@ fn twelve_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable
             // Restore the previous command focus so the next ability is reached by Tab.
             assert!(focus_action(app.world_mut(), control));
         }
+        for name in [
+            "Reposition",
+            "Rescue",
+            "Defend",
+            "Wait",
+            "Confirm Combat Action",
+        ] {
+            let control = find_named(app.world_mut(), name).expect("utility control");
+            let visible = visible_control_rect(
+                app.world(),
+                control,
+                Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+            )
+            .expect("visible utility");
+            let node = app
+                .world()
+                .get::<ComputedNode>(control)
+                .expect("measured utility");
+            assert!(
+                visible.width() + 0.5 >= node.size().x * node.inverse_scale_factor,
+                "{name} clipped at {scale:?}"
+            );
+        }
         // The final scrolled move also uses the normal native pointer path.
         let last = *controls.last().expect("twelfth move");
         let target = find_named(app.world_mut(), "Actor 101").expect("target");
