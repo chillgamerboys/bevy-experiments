@@ -888,6 +888,11 @@ fn repeated_class_actors_cannot_be_swapped_between_owners_in_later_snapshots() {
     let first = twins.next().expect("first Knifehand");
     let second = twins.next().expect("second Knifehand");
     std::mem::swap(&mut first.actor, &mut second.actor);
+    for member in &after.company {
+        after
+            .formation
+            .assign_actor(&after.scenario, member.actor, member.owner);
+    }
     assert_eq!(
         after.validate(),
         Ok(()),
