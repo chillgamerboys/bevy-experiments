@@ -33,6 +33,32 @@ observer alignment remains separate from the connected MCP tracker. These are
 pending/unavailable observations, not passed requirements. No merge or release is
 authorized, and the deferred inventory/passive/gym scope remains unchanged.
 
+## Acceptance evidence at the UI revision
+
+The combined preflight at `0291105` passed configured Labyrinth, rules, Gamekit UI,
+Clippy, formatting, docs and skill checks. Final publication-source results belong
+in PR #39 and the durable delivery observation; this preflight is not relabeled
+when the final copy or Git source changes.
+
+| Slice | Implemented evidence | Remaining acceptance |
+|---|---|---|
+| S1 GameSkills | Numbered grill, explicit UI planning/verification, tested evidence-ref correction; independent baseline/candidate planning pair | Native routing, installed candidate and comparative cost unobserved; pair showed no demonstrated improvement |
+| S2 Catalog | Data-authored definitions, deterministic provenance-aware resolution and validation tests | No inventory or passive execution claimed |
+| S3 Scenarios | Both-team validated scenarios, stock variants, seeds, JSON round trips and controller seam | Full gym/training deferred |
+| S4 Weapons | Six weapon definitions, additive/upgrading learned techniques, rank/target and transactional cleave tests | Balance remains experimental |
+| S5 Co-op | Ownership, spectator, reassignment, replay and encrypted session/process regressions | Cross-machine LAN/Tailscale unobserved |
+| S6 Editor | One editor, both teams, inspect-before-change, comparison, drafts, revision/authority guards; production input tests and Metal frames | Desktop usability and actual player comprehension pending |
+| S7 Hotbar | Complete granted list, overflow/input, provenance/forecast and stale displayed-build regression | Desktop feel and resizing walk pending |
+| S8 Gamekit | Shared focus fix and UI tests; composite source/disclosure/input/lifecycle contracts; demonstrated consumer hotbar fix | No newly extracted composite widget or package-release claim |
+| S9 Integration | Combined automated suites and rendered review; historical six-process kill/reconnect/fight evidence | Final-source process observation and unavailable manual routes must remain distinct |
+| S10 Delivery | Existing PR #39 and exact HEX-99/project bindings; current docs preserve unfinished scope | Final source/CI observation; standalone tracker observer unavailable; merge unauthorized |
+
+The source/static review found no further concrete hotbar or squad-shell defect
+after correction. Rendered review separately caught the roster breakpoint,
+200% first-fold information and misleading Parameters instructions. Correcting
+those findings supports visible information and layout claims; it does not supply
+the missing player observations. Plans remain active for that outstanding work.
+
 ## Agreed contract
 
 See the [game implementation contract](../../games/labyrinth/docs/plans/weapons-and-battle-setup.md)
