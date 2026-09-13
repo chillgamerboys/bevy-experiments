@@ -1,6 +1,6 @@
 # Labyrinth customization and package-quality epic
 
-Status: active UI revision; prior builder UX rejected. Accepted squad preparation and unified-editor direction is implemented and undergoing delivery verification.
+Status: active UI design revision; hands-on feedback rejected the card-based preparation/player menus. Spatial construction and integrated ownership are selected; retain one unified character editor.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
 Current endpoint: observed reviewable PR delivery for HEX-99. Merge/release require separate authorization.

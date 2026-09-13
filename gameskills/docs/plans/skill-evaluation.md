@@ -1,6 +1,6 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active; builder usability rejected by the user, corrective design selected and implementation/evaluation in progress. Independent native behavioral trials remain unobserved.
+Status: active; hands-on feedback rejected the revised preparation/player menus too. Spatial-constructor and broader planning/review refinements are being specified. Independent native behavioral trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
@@ -701,3 +701,46 @@ This correction supplies packaging evidence, not native activation or proof of
 better planning behavior. No additional skill rule is inferred from this one
 missed step; apply the existing delivery/package instructions and retain the
 finding when assessing end-to-end execution.
+
+## Second hands-on rejection and planning refinement
+
+After trying the published UI, the user again found preparation and player
+management clunky. Addition offered no up-front character-type selection, and
+box-shaped roster cards failed to exploit the six-rank battle presentation.
+Earlier rendered reviews found information/overflow defects but did not challenge
+the underlying interaction strongly enough. Preserve the prior narrow passes and
+this new negative result together; added descriptions and passing tests did not
+establish a good UI.
+
+The next plan/grill refinement must treat visual/spatial interaction as one of
+several core planning considerations, retaining information hierarchy. It must
+investigate user goals and task frequency; the appropriate visual/spatial model;
+information priority and comparison; view/context reuse; action/state/feedback
+and recovery; authority; and supported input/accessibility/responsive behavior.
+Do not prescribe spatial manipulation for every UI or replace explanations with
+icons. Investigate consequential ambiguities with concrete alternatives and
+recommendations; carry settled answers forward and own routine craft decisions.
+
+Require concrete design specifications proportional to the change: representative
+content and art, layout/proportions, emphasis/typography/density, primary/secondary
+actions, selected/empty/invalid/read-only states, transitions and narrow/large-text
+behavior. An annotated visual design plus task walkthrough should make the planned
+result reviewable before broad production wiring. This is design work, not a new
+mandatory user approval or repetitive questionnaire. The criterion is whether an
+implementer can understand the intended screen and behavior without inventing its
+central decisions from a list of controls.
+
+Strengthen visual-walk judgment as well as coverage: actively challenge composition,
+clarity, consistency, visual quality, discoverability, unnecessary steps, repeated
+editing, attention competition, context loss and correction costs. Walk complete
+creation/replacement/positioning/assignment/customization/deployment tasks through
+actual states. Cite the problematic state, consequence and proposed correction;
+retain material unresolved design findings instead of accepting mere absence of
+clipping. Separate agent judgment, observed user feedback and mechanical test
+evidence. Evaluate produced designs and interfaces, not just articulate plans.
+
+These are requirements for the next canonical plan/grill/UI review revision, not
+a claim that the current installed or packaged skills already implement them.
+Keep Gamekit composite quality tied to the same task and visual standards. The
+[Labyrinth design](../../../games/labyrinth/docs/plans/builder-ui-research.md) records
+answers 9–10 and the required next artifact; future grill numbering starts at 11.

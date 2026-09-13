@@ -1,7 +1,7 @@
 # Builder UI research and alternatives
 
-Status: active verification of the direction selected 2026-09-13: B with one unified character editor.
-The redesigned views are implemented; interactive usability acceptance remains outstanding. Reopens S6/S9 in the
+Status: active design revision after hands-on rejection of the card-based preparation and player menus.
+Answers 9–10 select spatial construction and integrated player ownership; implementation of this refinement is outstanding. Reopens S6/S9 in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
 The research/grill direction decision is settled; carry it into the scoped UI
 revision. Preserve all accepted customization, authority and inventory limits.
@@ -129,8 +129,9 @@ organization, not an accepted detailed layout, final artwork or working interfac
    implemented. The user explicitly rejected separating character editing into
    different editors and expects this screen to become a detailed in-game view.
    Multiple redesigns are acceptable; multiple character editor screens are not.
-Questions 1–6 remain settled. Future material questions continue at 9. No further
-interview is needed for these decisions; detailed layout is an implementation task.
+Questions 1–8 remain settled; answers 9–10 below refine preparation without
+forking the character editor. Future material questions continue at 11. Specify
+the visual design and full interaction journeys before the next implementation.
 
 Prototype the real tasks before another production UI pass: compare
 dagger/greatsword from rank 1 and rank 4; inspect a learned upgrade; remove a redundant
@@ -170,3 +171,63 @@ authority, compact navigation and visible footer/mechanics. Metal frames establi
 rendered appearance. Desktop automation is unavailable in this session, so the
 pointer/keyboard usability walk and human comprehension remain pending. The
 original rejection remains negative evidence in the evaluation ledger.
+
+## Hands-on feedback and accepted construction model
+
+The user tried the running game and rejected the preparation/player menus as
+clunky. Removing and adding an actor did not offer a type choice before creation.
+The card grid represented the formation through text instead of using the game's
+six-rank spatial presentation. This is a second negative usability observation,
+not a successful usability result inferred from previous test/render passes.
+
+9. **Settled:** constructor positions may contain gaps while assembling a lineup.
+   Deployment must reject a lineup with internal gaps; combat remains compact.
+   This does not introduce empty ranks into combat rules. Retain smaller test
+   rosters: their occupied footprint is contiguous from the front, with unused
+   capacity behind it. Show which gaps block deployment. Do not silently compact
+   the draft or change the player's selected positions on deployment. A separate,
+   explicit compact action can be considered in the detailed design.
+10. **Settled:** ownership is managed directly on the formation, with a compact
+    player strip for connection/readiness/assignments. Invitations and connection
+    details belong in an expandable lobby panel. Preserve the earlier host-owned
+    assignment of places and player-owned selection/customization of characters,
+    including zero/multiple characters and spectators.
+
+The constructor therefore needs a spatial draft distinct from the compact
+authoritative battle specification. It must retain position/subject identity
+through empty slots, actor replacement and multi-rank occupancy, then validate
+before constructing a deployable scenario. Do not misrepresent gaps as dummy
+actors or change targeting/death-compaction rules merely to support this UI.
+
+## Next design artifact and review
+
+Produce an annotated visual design using actual available character art, authored
+types and representative long names. Specify the facing formations, rank anchors,
+selected/hovered/owned/empty states, character-picker placement, player strip,
+primary actions, detail surfaces and secondary test controls. Describe proportions,
+spacing, type hierarchy, contrast/emphasis, information density and responsive
+changes; a list of panels and controls is insufficient. Preserve the unified
+editor, explanations, comparisons and the settled authority rules.
+
+Walk these tasks in the design and later in the rendered production route:
+
+- Select a rank, inspect a character type and its footprint/build, preview placement
+  and choose it before mutating the lineup. Repeat for an enemy.
+- Replace and move an existing character; show displacement/collision consequences
+  before committing, including a two-rank creature.
+- Leave an internal gap during construction, recognize why deployment is blocked,
+  and repair it without losing the selected types/builds/owners.
+- Assign places/characters to a player from the board, let that player customize
+  within authority, and recognize multiple-character ownership or spectating.
+- Open the same character editor, compare a weapon/technique, return with retained
+  context, and launch a valid small or full test encounter.
+
+Critique composition and task friction as well as factual information and input
+correctness: what draws attention first, what is hard to recognize, which action
+is ambiguous, where context is lost, how much navigation/repetition is required,
+and whether extra panels/text conceal the game. Preserve hierarchy and accessible
+explanations while making the interaction more visual. Findings need a concrete
+state/task, observed consequence and correction; unclipped controls alone cannot
+accept the design. Human feedback, agent visual judgment and automated checks
+remain distinct. This discussion records design work; it does not claim the new
+constructor has been implemented or its usability accepted.
