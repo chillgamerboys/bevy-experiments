@@ -24,6 +24,13 @@ Source is only one input: configuration, Git refs, environment, executable and m
 files can also change. Preserve the old record and rerun affected checks when required;
 do not weaken fingerprints or copy a pass to a new source identity.
 
+If another worker's unrelated branch is the only changed input, commands with
+known Git dependencies can opt into an exact `git_refs` list in project config.
+Keep the review base and any other consumed refs; default/`"all"` dependencies keep
+the whole graph conservative. Use the current development runtime and create new
+evidence after the configuration change. See [declared Git inputs](../cli/README.md#declared-git-inputs-for-command-evidence);
+this does not make an old invalid record valid.
+
 ## A docs pointer resolves incorrectly
 
 Run `gameskills docs resolve --path PATH` from the adopter root, or provide `--root`.

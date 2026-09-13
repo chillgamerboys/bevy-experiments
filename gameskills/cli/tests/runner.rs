@@ -523,7 +523,7 @@ mod unix {
     #[test]
     fn changed_worktree_untracked_index_head_config_lock_and_environment_invalidate() -> Test {
         let mut f = Fixture::new()?;
-        f.command("a", &["echo", "ok"], json!({}))?;
+        f.command("a", &["echo", "ok"], json!({"git_refs":[]}))?;
         let result = f.run(&["a"])?;
         assert!(ok(&result), "{result}");
         let id = f.id(&result)?;
@@ -574,7 +574,11 @@ mod unix {
     #[test]
     fn input_change_during_successful_command_marks_run_stale() -> Test {
         let mut f = Fixture::new()?;
-        f.command("mutate", &["mutate", "source.txt", "changed"], json!({}))?;
+        f.command(
+            "mutate",
+            &["mutate", "source.txt", "changed"],
+            json!({"git_refs":[]}),
+        )?;
         let result = f.run(&["mutate"])?;
         assert_eq!(status(&result, "mutate"), Some("passed"));
         assert_eq!(result.get("status"), Some(&json!("stale")));
@@ -614,6 +618,140 @@ mod unix {
         );
         assert!(!ok(&f.run(&["check"])?));
         assert_eq!(fs::read(f.record(f.id(&result)?))?, prior);
+        Ok(())
+    }
+    #[test]
+    fn selected_refs_allow_other_worktree_commits_but_bind_the_review_base() -> Test {
+        let mut f = Fixture::new()?;
+        let head = f.git(&["rev-parse", "HEAD"])?;
+        f.git(&["branch", "review-base", &head])?;
+        f.command(
+            "a",
+            &["echo", "ok"],
+            json!({"git_refs":["refs/heads/review-base"]}),
+        )?;
+        let result = f.run(&["a"])?;
+        assert!(ok(&result));
+        let before = fs::read(f.record(f.id(&result)?))?;
+        let other = f.scratch.path().join("other-worktree");
+        f.git(&[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "other-worker",
+            other.to_str().ok_or("path")?,
+        ])?;
+        f.git(&[
+            "-C",
+            other.to_str().ok_or("path")?,
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "--quiet",
+            "-m",
+            "other work",
+        ])?;
+        assert_eq!(f.git(&["rev-parse", "HEAD"])?, head);
+        assert!(ok(&f.evidence(f.id(&result)?, "validate")?));
+        let advanced = f.git(&["rev-parse", "other-worker"])?;
+        f.git(&["update-ref", "refs/heads/review-base", &advanced])?;
+        let invalid = f.evidence(f.id(&result)?, "validate")?;
+        assert!(!ok(&invalid));
+        assert!(invalid.to_string().contains("repository/refs_digest"));
+        assert_eq!(f.invoke("run", &["a", "--resume", f.id(&result)?])?.0, 2);
+        assert_eq!(fs::read(f.record(f.id(&result)?))?, before);
+        Ok(())
+    }
+    #[test]
+    fn selected_refs_union_prerequisites_and_all_refs_remain_conservative() -> Test {
+        let mut f = Fixture::new()?;
+        f.git(&["branch", "review-base", "HEAD"])?;
+        f.command(
+            "base",
+            &["echo", "base"],
+            json!({"git_refs":["refs/heads/review-base"]}),
+        )?;
+        f.command(
+            "app",
+            &["echo", "app"],
+            json!({"git_refs":[],"requires":["base"]}),
+        )?;
+        let scoped = f.run(&["app"])?;
+        f.git(&["tag", "unrelated-tag", "HEAD"])?;
+        assert!(ok(&f.evidence(f.id(&scoped)?, "validate")?));
+        f.git(&["branch", "-D", "review-base"])?;
+        assert!(!ok(&f.evidence(f.id(&scoped)?, "validate")?));
+        let (code, missing) = f.invoke("run", &["app"])?;
+        assert_eq!(code, 2);
+        assert!(missing.to_string().contains("selected Git ref is missing"));
+        f.git(&["branch", "review-base", "HEAD"])?;
+        f.command("base", &["echo", "base"], json!({"git_refs":"all"}))?;
+        let conservative = f.run(&["app"])?;
+        f.git(&["branch", "unrelated", "HEAD"])?;
+        assert!(!ok(&f.evidence(f.id(&conservative)?, "validate")?));
+        Ok(())
+    }
+    #[test]
+    fn selected_refs_keep_symbolic_targets_and_head_identity() -> Test {
+        let mut f = Fixture::new()?;
+        f.git(&["branch", "base-a", "HEAD"])?;
+        f.git(&["branch", "base-b", "HEAD"])?;
+        f.git(&[
+            "symbolic-ref",
+            "refs/heads/review-base",
+            "refs/heads/base-a",
+        ])?;
+        f.command(
+            "a",
+            &["echo", "ok"],
+            json!({"git_refs":["refs/heads/review-base"]}),
+        )?;
+        let original = f.run(&["a"])?;
+        f.git(&[
+            "symbolic-ref",
+            "refs/heads/review-base",
+            "refs/heads/base-b",
+        ])?;
+        assert!(!ok(&f.evidence(f.id(&original)?, "validate")?));
+        let retargeted = f.run(&["a"])?;
+        f.git(&["pack-refs", "--all", "--prune"])?;
+        assert!(ok(&f.evidence(f.id(&retargeted)?, "validate")?));
+        f.git(&["checkout", "--quiet", "base-a"])?;
+        assert!(!ok(&f.evidence(f.id(&retargeted)?, "validate")?));
+        Ok(())
+    }
+    #[test]
+    fn selected_refs_distinguish_relevant_mutation_during_execution() -> Test {
+        let mut f = Fixture::new()?;
+        f.command_raw(
+            "unrelated",
+            json!({"argv":["git","update-ref","refs/heads/new-ref","HEAD"],"git_refs":[]}),
+        )?;
+        let unrelated = f.run(&["unrelated"])?;
+        assert!(ok(&unrelated));
+        assert!(ok(&f.evidence(f.id(&unrelated)?, "validate")?));
+        f.git(&["branch", "review-base", "HEAD"])?;
+        let advanced = f.git(&[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit-tree",
+            "HEAD^{tree}",
+            "-p",
+            "HEAD",
+            "-m",
+            "advanced",
+        ])?;
+        f.command_raw("relevant", json!({"argv":["git","update-ref","refs/heads/review-base",advanced],"git_refs":["refs/heads/review-base"]}))?;
+        let relevant = f.run(&["relevant"])?;
+        assert_eq!(status(&relevant, "relevant"), Some("passed"));
+        assert_eq!(relevant.get("status"), Some(&json!("stale")));
+        assert!(!ok(&f.evidence(f.id(&relevant)?, "validate")?));
         Ok(())
     }
     #[test]
@@ -781,7 +919,10 @@ mod unix {
         let mut f = Fixture::new()?;
         let executable = f.scratch.path().join("external command");
         fs::copy(&f.probe, &executable)?;
-        f.command_raw("external", json!({"argv":[executable,"echo","original"]}))?;
+        f.command_raw(
+            "external",
+            json!({"argv":[executable,"echo","original"],"git_refs":[]}),
+        )?;
         let result = f.run(&["external"])?;
         assert!(ok(&result), "{result}");
         use std::io::Write;

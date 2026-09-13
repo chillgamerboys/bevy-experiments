@@ -41,3 +41,38 @@ fn configuration_contract_fixtures() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
+
+#[test]
+fn git_ref_selection_validates_without_git_or_setup() {
+    for refs in [
+        r#""all""#,
+        "[]",
+        r#"["refs/heads/main", "refs/remotes/origin/main", "refs/tags/v1"]"#,
+    ] {
+        let source =
+            format!("schema_version = 1\n[commands.check]\nargv = [\"true\"]\ngit_refs = {refs}\n");
+        assert!(gameskills_cli::config::parse(&source).is_ok(), "{refs}");
+    }
+    for refs in [
+        r#""head""#,
+        "1",
+        "{}",
+        "[1]",
+        r#"["HEAD"]"#,
+        r#"["main"]"#,
+        r#"["refs/"]"#,
+        r#"["refs/heads/main", "refs/heads/main"]"#,
+        r#"["refs/heads/*.rs"]"#,
+        r#"["refs/heads/a..b"]"#,
+        r#"["refs/heads/a@{b"]"#,
+        r#"["refs/heads/.hidden"]"#,
+        r#"["refs/heads/locked.lock"]"#,
+        r#"["refs/heads/a."]"#,
+        r#"["refs//main"]"#,
+    ] {
+        let source =
+            format!("schema_version = 1\n[commands.check]\nargv = [\"true\"]\ngit_refs = {refs}\n");
+        let error = gameskills_cli::config::parse(&source).expect_err(refs);
+        assert!(error.contains("git_refs"), "{refs}: {error}");
+    }
+}
