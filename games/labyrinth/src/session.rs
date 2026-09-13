@@ -865,12 +865,10 @@ impl PartyAuthority {
                 if slot != 0 || !self.in_lobby() {
                     return Err("Only the host can start from the lobby.".into());
                 }
-                if self
-                    .players
-                    .iter()
-                    .any(|p| p.occupied && (!p.connected || !p.ready))
-                {
-                    return Err("Every reserved participant must be connected and ready.".into());
+                if self.players.iter().any(|p| {
+                    self.company.iter().any(|m| m.owner == p.slot) && (!p.connected || !p.ready)
+                }) {
+                    return Err("Every character controller must be connected and ready.".into());
                 }
                 self.combat = Some(
                     Combat::from_scenario(&self.catalog, &self.scenario)

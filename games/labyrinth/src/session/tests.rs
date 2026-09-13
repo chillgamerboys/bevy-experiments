@@ -1477,3 +1477,51 @@ fn invalid_scenario_is_rejected_before_ready_without_partial_setup_mutation() {
     assert_eq!(authority.setup_revision, before.setup_revision);
     assert!(authority.combat.is_none());
 }
+
+#[test]
+fn spectators_do_not_gate_ready_or_start_even_if_the_host_spectates() {
+    let mut authority = PartyAuthority::new(42, false);
+    let owner = peer(1);
+    authority.reserve(owner).expect("owner");
+    authority.connected(owner, true);
+    let spectator = peer(2);
+    authority.reserve(spectator).expect("spectator");
+    authority.connected(spectator, true);
+    let ids = authority
+        .company
+        .iter()
+        .map(|m| m.actor)
+        .collect::<Vec<_>>();
+    for actor in ids {
+        assert!(request(
+            &mut authority,
+            0,
+            SessionCommand::Assign { actor, owner: 1 }
+        )
+        .rejection
+        .is_none());
+    }
+    assert!(request(&mut authority, 1, SessionCommand::Ready(true))
+        .rejection
+        .is_none());
+    assert!(authority
+        .players
+        .iter()
+        .filter(|p| p.slot != 1)
+        .all(|p| !p.ready));
+    authority.connected(spectator, false);
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let snapshot = authority.snapshot(0);
+    snapshot
+        .validate()
+        .expect("host and guest spectators do not pause");
+    assert!(!snapshot.paused);
+    assert!(snapshot
+        .player_views()
+        .first()
+        .expect("host")
+        .actors
+        .is_empty());
+}

@@ -196,21 +196,32 @@ pub(super) fn lobby(world: &mut World, parent: Entity, view: &LabyrinthView, ui:
         .iter()
         .find(|player| Some(player.slot) == view.player)
         .is_some_and(|player| player.ready);
+    let spectator = view
+        .players
+        .iter()
+        .find(|p| Some(p.slot) == view.player)
+        .is_none_or(|p| p.actors.is_empty());
     let actions = row(world, lobby, "Lobby Actions");
     control(
         world,
         actions,
         "Toggle Ready",
-        if ready { "Not ready" } else { "Ready" },
+        if spectator {
+            "Spectating"
+        } else if ready {
+            "Not ready"
+        } else {
+            "Ready"
+        },
         Action::Ready(!ready),
-        !view.admitted,
+        !view.admitted || spectator,
     );
     if view.host {
         let can_start = !view.players.is_empty()
             && view
                 .players
                 .iter()
-                .filter(|player| player.occupied)
+                .filter(|player| player.occupied && !player.actors.is_empty())
                 .all(|player| player.connected && player.ready);
         control(
             world,
