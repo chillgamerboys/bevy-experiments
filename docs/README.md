@@ -17,6 +17,6 @@ Owned guidance:
 - [Internal tools and CI](../devtools/README.md)
 
 Active work: [documentation and skills](plans/docs-and-skills.md).
-Current workflow work: [efficient feature delivery](../gameskills/docs/plans/efficient-workflow.md).
+Current workflow: [model routing and efficient feature delivery](../gameskills/docs/agent-workflow.md).
 Scoped epic: [Labyrinth customization and package quality](plans/labyrinth-customization-epic.md).
 Deferred work: [distribution and repository split](plans/distribution.md).

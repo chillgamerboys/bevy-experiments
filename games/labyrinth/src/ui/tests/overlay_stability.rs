@@ -556,7 +556,8 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
     app.update();
     let preview = find_named(app.world_mut(), "Tooltip Card 0").expect("preview");
     let before = visible_control_rect(app.world(), preview, viewport).expect("preview geometry");
-    for frame in 0..12 {
+    // Headless UI advances 100 ms per frame; include the two-second pin boundary.
+    for frame in 0..22 {
         app.update();
         let card = find_named(app.world_mut(), "Tooltip Card 0").expect("continuous card");
         assert!(app
@@ -842,7 +843,7 @@ fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
     let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
     let source = find_named(app.world_mut(), "Skill 0").expect("skill");
     hover_control(&mut app, source, viewport);
-    run_frames(&mut app, 8);
+    run_frames(&mut app, 18);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
     let card = find_named(app.world_mut(), "Tooltip Card 0").expect("card");
     let rect = visible_control_rect(app.world(), card, viewport).expect("visible card");

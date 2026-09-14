@@ -124,19 +124,20 @@ local overlays. Update this recipe whenever the committed pin changes.
 
 ## Current rollout state
 
-PR #40 merged the rigor implementation; PRs #41–45 merged the launch and game UI
-updates. `dev` now exists from accepted main `e58c73a`. Feature delivery in this
-candidate targets `dev` at Development rigor; `main` remains the milestone branch.
-The remote default changes only after real Development CI and framework integration
-are observed. The [efficient workflow plan](../gameskills/docs/plans/efficient-workflow.md)
-records rollout progress and the separate tooltip-delay pilot.
+PR #46 completed the framework rollout into `dev` at
+`d24edcc154a403272fa62114aee6f28bf025ea76`. `dev` is now the GitHub default and
+feature-delivery branch, using Development rigor. `main` remains the explicitly
+approved milestone branch at Testing rigor. Required PR CI passed on macOS; the
+synced merged checkout also passed focused workflow verification and delivery
+observation. The [agent workflow guide](../gameskills/docs/agent-workflow.md) owns
+model routing, usage accounting and prompt feature integration.
 
-The source CLI and candidate instructions are `0.1.0-dev.5`. Installation is an
-explicit immutable-bundle update; rebuilding the CLI does not repin or reload the
-current host session. The committed lock now selects dev.5 with the content identity above;
-`gameskills status` reports the hydrated installation. Preserve existing overlays and historical evidence.
+The source CLI and committed instruction pin are `0.1.0-dev.5`. Supported setup
+preserved adopter configuration and local overlays, and an ordinary Codex process
+discovered all selected packages. This does not reload an existing Conductor
+conversation: start a fresh host session to load the revised instructions. Claude
+behavior and broader comparative cost trials remain separate evaluation work.
 
-The [rigor plan](../gameskills/docs/plans/development-rigor.md) retains remaining
-branch/default and installation acceptance. Update the lock, registration and
-current rollout observations together; do not infer native activation from source
-or package validation alone.
+The [evaluation plan](../gameskills/docs/plans/skill-evaluation.md) retains those
+trials and the measured tooltip-delay pilot. Release publication, additional
+platform/display commitments and linked-adopter migration remain separately scoped.

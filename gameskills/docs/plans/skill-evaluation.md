@@ -11,8 +11,9 @@ Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/str
 
 ### Current iteration: useful guidance and total usage
 
-PRs #41–45 are merged. The current [efficient workflow plan](efficient-workflow.md)
-owns the next implementation and tooltip-delay pilot. Capture per-task coordinator
+PRs #41–46 are merged. The [agent workflow](../agent-workflow.md) is implemented
+and adopted as dev.5; dev is the default feature branch. The measured tooltip-delay
+pilot is [HEX-117](https://linear.app/chillgamerboys/issue/HEX-117/increase-tooltip-hover-to-pin-delay-to-two-seconds). Capture per-task coordinator
 and worker start/end counters, actual model/effort where exposed, elapsed time,
 retries, review rounds and quality/rework observations. Include cached input within
 input and reasoning within output; never sum cumulative counters across checkpoints.
