@@ -25,6 +25,32 @@ coordinator/worker usage, cache counts, retries and outcomes without double-coun
 cumulative counters. Candidate promotion and cross-client efficacy claims still
 require their own evidence; this iteration does not establish those automatically.
 
+### Observed costs during the current implementation
+
+The pure rules owner verified Skills/Abilities/Moveset and Resilient with83rules
+regressions and1Rustdoc, without unrelated UI or platform sweeps. Batch1's normal
+UI suite reached60passing tests after correcting old Escape-only fixtures and real
+close-focus/menu-recovery defects. These are actual engineering outcomes, not a
+controlled token-savings comparison.
+
+- Routine queue JSON repeats the entire plan. The coordinator now extracts status,
+  revision and errors; a supported concise output mode is a candidate improvement.
+- Queue injection help omits required `reason` and `verified_source`, causing a
+  failed attempt and source lookup. Provide a compact valid example in help.
+- `docs-check` omitted `git_refs = []`, so unrelated branch/ref changes made a graph
+  stale even though its source and all commands were unchanged/passed. Its project
+  command now declares worktree inputs and the runner still binds the receiving
+  base. Preserve the stale record; never relabel it as accepted evidence.
+- `verification_context::resolve` treats every gameplay PR to a Testing branch as
+  a milestone. This does not represent the user's milestone-promotion-only intent
+  while ordinary development still targets main. Add an explicit promotion trigger
+  rather than inferring a milestone from the branch alone; no fabricated manual
+  sanity observation or scope downgrade is acceptable.
+- Native per-thread deltas are recorded in `.context/gameskills-usage/`. Cached
+  input is part of input; reasoning output is part of output. Root coordination
+  and backend work overlap in time, so allocate by thread/batch rather than adding
+  cumulative session totals or claiming all parallel work belongs to Batch1.
+
 ### MCP delivery contradiction and verification handoff
 
 The user challenged the extra standalone Linear check despite working connected
