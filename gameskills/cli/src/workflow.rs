@@ -425,15 +425,30 @@ fn historical_verification(recorded: &Value) -> Result<(), String> {
         .get("gameplay")
         .and_then(Value::as_bool)
         .ok_or("invalid historical gameplay classification")?;
-    let manual_required = gameplay
-        && string(policy, "manual_sanity") == "milestone"
-        && string(policy, "branch_required_level") == "testing";
+    let promotion = match recorded.get("promotion") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_bool()
+                .ok_or("invalid historical promotion classification")?,
+        ),
+    };
+    let manual_required = if let Some(promotion) = promotion {
+        promotion && gameplay && string(policy, "manual_sanity") == "milestone"
+    } else {
+        gameplay
+            && string(policy, "manual_sanity") == "milestone"
+            && string(policy, "branch_required_level") == "testing"
+    };
     if recorded.get("manual_sanity_required") != Some(&json!(manual_required)) {
         return Err("invalid historical manual sanity requirement".into());
     }
-    let expected = digest(
-        &json!({"policy_digest":policy_digest,"base":policy["receiving_branch"],"level":policy["level"],"scope":scope,"gameplay":gameplay}),
-    )?;
+    let digest_input = if let Some(promotion) = promotion {
+        json!({"policy_digest":policy_digest,"base":policy["receiving_branch"],"level":policy["level"],"scope":scope,"gameplay":gameplay,"promotion":promotion})
+    } else {
+        json!({"policy_digest":policy_digest,"base":policy["receiving_branch"],"level":policy["level"],"scope":scope,"gameplay":gameplay})
+    };
+    let expected = digest(&digest_input)?;
     if recorded.get("selection_digest") != Some(&json!(expected)) {
         return Err("historical verification selection digest mismatch".into());
     }

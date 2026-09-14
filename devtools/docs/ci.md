@@ -115,3 +115,10 @@ walk. Compatibility sizes/scales are retained for relevant defects or explicit
 Release commitments. Keep captures under `target/review/` through review, then retain
 a concise revision/command/result record. Stop after applicable checks pass unless
 new changes, failures or unresolved concerns justify more verification.
+
+## Superseded branch runs
+
+Pull-request concurrency is per PR. Push concurrency is per receiving branch, so
+newer dev/main pushes cancel superseded push runs while the latest combined source
+is checked. Explicit workflow dispatches keep independent run identities. A cancelled
+run is never counted as passing evidence for the revision it did not finish.

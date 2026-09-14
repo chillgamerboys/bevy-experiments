@@ -1,9 +1,7 @@
 # Builder UI research and alternatives
 
-Status: active follow-up acceptance context; prior direction implemented in PR #39. The current
-[battle UI and character customization plan](ui-and-character-builds.md) carries
-the subsequent user feedback and supersedes this document's editor terminology
-and layout details. Answers 9–10 remain the spatial-construction and ownership
+Status: active follow-up acceptance context; prior direction implemented in PR #39. The current [game architecture](../architecture.md) records the later PRs #42–45
+implementation and supersedes this document's editor terminology and layout details. Answers 9–10 remain the spatial-construction and ownership
 foundation. Preserve separate S6/S9 package/evaluation acceptance in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
 

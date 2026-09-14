@@ -1,8 +1,7 @@
 # Weapons, character builds and configurable battles
 
-Status: active follow-up acceptance; foundation delivered in PR #39. The current [battle UI and character
-customization plan](ui-and-character-builds.md) supersedes this document's editor
-terminology, passive deferral and UI acceptance direction. Preserve the spatial
+Status: active follow-up acceptance; foundation delivered in PR #39. The current [game architecture](../architecture.md) records PRs #42–45 and
+supersedes this document's editor terminology and passive deferral. Preserve the spatial
 construction and ownership contracts and separate package-evaluation work below.
 The earlier [selected UI direction](builder-ui-research.md) explains the foundation.
 Owner: Labyrinth. GameSkills and Gamekit have equal-priority evaluation and
@@ -10,9 +9,8 @@ improvement outcomes in the [combined session plan](../../../../gameskills/docs/
 Tracking: [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with); see the
 [detailed epic and child issues](../../../../docs/plans/labyrinth-customization-epic.md).
 The earlier endpoint was verification and merge of PR #39, which is now merged.
-That authorization does not extend to subsequent PRs. The current UI follow-up is
-at implementation planning; release and separate package evaluation remain outside
-that plan's delivery scope.
+That authorization does not extend to subsequent PRs. The UI follow-up is merged; release and separate package evaluation remain
+outside that completed implementation scope.
 
 ## Accepted scope
 

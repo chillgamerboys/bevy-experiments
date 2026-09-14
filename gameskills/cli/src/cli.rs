@@ -12,7 +12,9 @@ const PLAN_HELP: &str = "gameskills plan validate --file PLAN.json";
 const QUEUE_HELP: &str = "gameskills queue create --file PLAN.json\ngameskills queue status QUEUE_ID\ngameskills queue inject QUEUE_ID --file ORDER.json --expected-revision N\ngameskills queue start|resume QUEUE_ID ORDER_ID --worktree PATH --expected-revision N\ngameskills queue block|report|integrated QUEUE_ID ORDER_ID --file OBSERVATION.json --expected-revision N";
 const RUN_HELP: &str = "gameskills run COMMAND ... [--base BRANCH] [--level LEVEL] [--scope LABEL] [--max-workers N] [--resource-wait-seconds SECONDS] [--resume RUN_ID]\nCommands come from gameskills.toml; resume reruns the graph into a new record.";
 const EVIDENCE_HELP: &str = "gameskills evidence list\ngameskills evidence show|validate RUN_ID";
-const DELIVERY_HELP: &str = "gameskills delivery start ID --goal TEXT [--endpoint pr] [--repo OWNER/REPO] [--base BRANCH] [--level LEVEL] [--scope LABEL] [--gameplay] [--check COMMAND]\ngameskills delivery bind ID [--pr URL] [--issue UUID] [--project UUID]\ngameskills delivery show ID\ngameskills delivery note ID [--remaining TEXT] [--authorization TEXT]\ngameskills delivery scope ID [--level LEVEL] [--scope LABEL] [--gameplay]\ngameskills delivery check ID [--evidence RUN_ID] [--manual-observation FILE]";
+const AGENTS_HELP: &str = "gameskills agents resolve --client CLIENT --host CAPABILITIES.json [--kind bounded|standard|complex] [--attempt N] [--reason TEXT]\nResolve configured model/effort against actual host capabilities; does not launch agents.";
+const USAGE_HELP: &str = "gameskills usage checkpoint TASK --log SESSION.jsonl --phase start|end --role coordinator|worker [--attempt ID]\ngameskills usage import --file RECEIPT.json\ngameskills usage report TASK [--rates RATES.json] [--details]\nReport observed task/thread deltas; missing telemetry/prices remain unavailable.";
+const DELIVERY_HELP: &str = "gameskills delivery start ID --goal TEXT [--endpoint pr] [--repo OWNER/REPO] [--base BRANCH] [--level LEVEL] [--scope LABEL] [--gameplay] [--promotion] [--check COMMAND]\ngameskills delivery bind ID [--pr URL] [--issue UUID] [--project UUID]\ngameskills delivery show ID\ngameskills delivery note ID [--remaining TEXT] [--authorization TEXT]\ngameskills delivery scope ID [--level LEVEL] [--scope LABEL] [--gameplay] [--promotion]\ngameskills delivery check ID [--evidence RUN_ID] [--manual-observation FILE] [--tracker-observation FILE]";
 const DOCS_HELP: &str = "gameskills docs resolve [--path PATH]...\nResolve adopter docs without installation; paths are repository-relative.";
 const VERIFICATION_HELP: &str = "gameskills verification resolve [--base BRANCH] [--level development|testing|release]\nRead-only project policy resolution, independent of installation. The base defaults to project.delivery_base, then main. An explicit level cannot weaken the receiving branch requirement.";
 const LEGACY_HELP: &str = "gameskills legacy import [--apply]\nInspect the old installation first; --apply preserves old client files and overlays.";
@@ -32,6 +34,18 @@ struct Arguments {
 
 #[derive(Subcommand)]
 enum Operation {
+    /// Resolve an opted-in project model mapping against host capabilities.
+    #[command(after_help = AGENTS_HELP)]
+    Agents {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
+    /// Capture and summarize source-backed task usage.
+    #[command(after_help = USAGE_HELP)]
+    Usage {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
     #[command(name = "__runner-supervisor", hide = true)]
     Supervisor {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -183,6 +197,8 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 Operation::Run { args } => ("run", args),
                 Operation::Evidence { args } => ("evidence", args),
                 Operation::Delivery { args } => ("delivery", args),
+                Operation::Agents { args } => ("agents", args),
+                Operation::Usage { args } => ("usage", args),
                 Operation::Supervisor { args } => ("__runner-supervisor", args),
                 Operation::Config { command: Some(_) } => {
                     return failure("invalid_arguments", "unexpected config operation");
@@ -207,6 +223,8 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                     "evidence" => Some(EVIDENCE_HELP),
                     "legacy" => Some(LEGACY_HELP),
                     "delivery" => Some(DELIVERY_HELP),
+                    "agents" => Some(AGENTS_HELP),
+                    "usage" => Some(USAGE_HELP),
                     _ => None,
                 };
                 if let Some(help) = help {
@@ -227,6 +245,14 @@ pub fn execute(args: impl IntoIterator<Item = OsString>) -> Response {
                 }
             };
             let result = match family {
+                "usage" => crate::usage::execute(&root, &arguments),
+                "agents" => crate::platform::read_ordinary_file(&root.join("gameskills.toml"))
+                    .map_err(|error| error.to_string())
+                    .and_then(|source| crate::config::parse(&source))
+                    .and_then(|config| {
+                        serde_json::to_value(config).map_err(|error| error.to_string())
+                    })
+                    .and_then(|config| crate::agents::execute(&root, &config, &arguments)),
                 "docs" => crate::docs::execute(&root, &arguments),
                 "verification" => crate::verification::execute(&root, &arguments),
                 "__runner-supervisor" => crate::runner::supervisor(&arguments),

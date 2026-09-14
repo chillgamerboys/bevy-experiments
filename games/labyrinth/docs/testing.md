@@ -16,7 +16,7 @@ the selected scope is not unfinished acceptance. Stop once relevant checks pass
 unless a new change, failure or unresolved concern justifies more.
 
 Run from the repository root. Cargo's CI profile speeds compilation independently
-of verification rigor; ordinary play uses the default development profile. These
+of verification rigor; the quickstart uses ci, while Cargo defaults to dev when no profile is supplied. These
 commands include broad suites for explicit use; the
 [CI selector](../../../devtools/docs/ci.md) owns focused suite execution.
 

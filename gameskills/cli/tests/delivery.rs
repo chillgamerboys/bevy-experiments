@@ -57,6 +57,102 @@ fn remote(root: &Path) -> Result<Value, Box<dyn Error>> {
         json!({"url":"https://github.com/test/game/pull/1","headRefOid":git(root,&["rev-parse","HEAD"])? ,"baseRefOid":"base-sha","baseRefName":"main","state":"OPEN","reviewDecision":"","statusCheckRollup":[{"name":"ci","conclusion":"SUCCESS"}]}),
     )
 }
+
+#[test]
+fn merged_delivery_accepts_synced_source_but_rejects_old_divergent_and_dirty_checkouts(
+) -> Result<(), Box<dyn Error>> {
+    for squash in [false, true] {
+        let d = fixture()?;
+        let root = d.path();
+        let base = git(root, &["rev-parse", "HEAD"])?;
+        git(root, &["commit", "--allow-empty", "-m", "feature"])?;
+        let source = git(root, &["rev-parse", "HEAD"])?;
+        cli(
+            root,
+            &[
+                "delivery",
+                "start",
+                "merged",
+                "--goal",
+                "Ship",
+                "--endpoint",
+                "merge",
+                "--repo",
+                "test/game",
+            ],
+        )?;
+        cli(
+            root,
+            &[
+                "delivery",
+                "bind",
+                "merged",
+                "--pr",
+                "https://github.com/test/game/pull/1",
+            ],
+        )?;
+        if squash {
+            git(root, &["checkout", "--detach", &base])?;
+        }
+        git(root, &["commit", "--allow-empty", "-m", "observed merge"])?;
+        let merged = git(root, &["rev-parse", "HEAD"])?;
+        git(root, &["branch", "remote-target", &merged])?;
+        std::fs::write(
+            root.join("bin/gh"),
+            r#"#!/bin/sh
+case "$1" in
+repo) echo '{"nameWithOwner":"test/game"}' ;;
+api) case "$2" in
+ *compare*) echo '{"status":"identical"}' ;;
+ *) printf '{"object":{"sha":"%s"}}\n' "$(git rev-parse remote-target)" ;;
+esac ;;
+*) cat "$GH_FIXTURE" ;;
+esac
+"#,
+        )?;
+        let mut pr = remote(root)?;
+        set(&mut pr, "/headRefOid", json!(source));
+        set(&mut pr, "/state", json!("MERGED"));
+        set(&mut pr, "/mergeCommit", json!({"oid":merged}));
+        std::fs::write(root.join("pr.json"), pr.to_string())?;
+        let synced = cli(root, &["delivery", "check", "merged"])?;
+        assert_eq!(
+            at(&synced, "/ok"),
+            true,
+            "synced (squash={squash}): {synced}"
+        );
+        std::fs::write(root.join("uncommitted.txt"), "local edit")?;
+        assert_eq!(
+            at(&cli(root, &["delivery", "check", "merged"])?, "/ok"),
+            false
+        );
+        std::fs::remove_file(root.join("uncommitted.txt"))?;
+        git(root, &["checkout", "--detach", &base])?;
+        let old = cli(root, &["delivery", "check", "merged"])?;
+        assert_eq!(at(&old, "/ok"), false, "pre-merge checkout: {old}");
+        git(
+            root,
+            &[
+                "commit",
+                "--allow-empty",
+                "-m",
+                "unpublished divergent change",
+            ],
+        )?;
+        assert_eq!(
+            at(&cli(root, &["delivery", "check", "merged"])?, "/ok"),
+            false
+        );
+        git(root, &["checkout", "--detach", &source])?;
+        let exact = cli(root, &["delivery", "check", "merged"])?;
+        assert_eq!(
+            at(&exact, "/ok"),
+            true,
+            "exact source (squash={squash}): {exact}"
+        );
+    }
+    Ok(())
+}
 #[test]
 fn resumed_pr_task_cannot_finish_at_local_commits() -> Result<(), Box<dyn Error>> {
     let d = fixture()?;
@@ -633,6 +729,57 @@ fn development_scope_defaults_and_runner_evidence_remain_bound() -> Result<(), B
 }
 
 #[test]
+fn promotion_is_explicit_for_gameplay_milestones() -> Result<(), Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    rigor_fixture(root)?;
+    let ordinary = cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "ordinary",
+            "--goal",
+            "Ship",
+            "--base",
+            "main",
+            "--scope",
+            "session",
+            "--gameplay",
+        ],
+    )?;
+    assert_eq!(ordinary.pointer("/record/promotion"), Some(&json!(false)));
+    assert_eq!(
+        ordinary.pointer("/record/verification/manual_sanity_required"),
+        Some(&json!(false))
+    );
+    let promoted = cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "promoted",
+            "--goal",
+            "Ship",
+            "--base",
+            "dev",
+            "--level",
+            "release",
+            "--scope",
+            "session",
+            "--gameplay",
+            "--promotion",
+        ],
+    )?;
+    assert_eq!(promoted.pointer("/record/promotion"), Some(&json!(true)));
+    assert_eq!(
+        promoted.pointer("/record/verification/manual_sanity_required"),
+        Some(&json!(true))
+    );
+    Ok(())
+}
+
+#[test]
 fn milestone_requires_actual_candidate_bound_manual_reference() -> Result<(), Box<dyn Error>> {
     let d = fixture()?;
     let root = d.path();
@@ -650,6 +797,7 @@ fn milestone_requires_actual_candidate_bound_manual_reference() -> Result<(), Bo
             "--base",
             "main",
             "--gameplay",
+            "--promotion",
             "--scope",
             "rules",
         ],

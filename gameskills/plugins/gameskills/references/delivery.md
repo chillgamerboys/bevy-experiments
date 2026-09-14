@@ -6,6 +6,17 @@ requirements. Finish useful preparation before seeking any missing final approva
 Creating a PR does not accept it; a successful audit does not authorize merging;
 merging does not prove a release was published.
 
+Honor explicit standing authorization for ordinary feature merges when its branch,
+required checks and applicable review conditions are satisfied. Do not ask again
+for each such PR. The project's promotion branch remains a distinct endpoint;
+never infer promotion or release authority from feature-merge permission.
+
+Keep one cohesive deliverable in one PR, including dependent worker commits.
+Independent changes can be separate; use stacks only when their review value
+justifies restacking and repeated integration checks. Observe each merge before
+advancing the next. Use ancestry-preserving merges for recurring branch promotions;
+squash feature PRs only when no unmerged descendants depend on those commit IDs.
+
 ## PR and audit identity
 
 Identify the actual repository/provider, PR URL/number, source branch and HEAD,
@@ -76,6 +87,10 @@ integration. Release acceptance remains with the release skill. Commands and
 external observations do not replace source review or gameplay acceptance.
 
 ## Milestone sanity
+
+Select an actual promotion explicitly (`delivery start/scope --promotion`), not
+merely from a branch name or Testing rigor. Ordinary gameplay PRs are not implicit
+milestones. Receiving-branch verification still applies independently.
 
 Resolve the receiving branch's verification policy and review the combined batch's
 affected journeys. When its manual-sanity policy requires a milestone game check,

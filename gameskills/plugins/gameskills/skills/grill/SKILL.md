@@ -32,6 +32,10 @@ so the user can answer by number. Continue numbering across rounds; map replies
 back to their original decisions and carry settled answers into the plan.
 Use the host's available question tool; continue independent read-only research
 while waiting. Delegate routine implementation choices to your own judgment.
+Keep one unanswered round active. End the turn with the actual numbered decisions,
+short options and recommendations in the final message: question cards can disappear
+under later messages. Yield for an explicit answer before dependent planning or work;
+a preselected option is not an answer. Record accepted choices once and reuse them.
 
 Track settled, delegated and deferred decisions. State contradictions explicitly
 before reopening an accepted answer. Stop when the remaining choices can safely

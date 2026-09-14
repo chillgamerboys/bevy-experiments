@@ -11,12 +11,14 @@ Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/str
 
 ### Current iteration: useful guidance and total usage
 
-The user reconfirmed ongoing evaluation and token efficiency on 2026-09-14. Use
-the current [UI implementation plan's evaluation section](../../../games/labyrinth/docs/plans/ui-and-character-builds.md#evaluate-gameskills-during-implementation)
-for the four batches, token checkpoints, quality observations and optimization
-recommendations. Read that compact current scope before retrieving historical
-sections below. This round has native per-thread token telemetry available; older
-unavailable-telemetry statements remain accurate for their original trials.
+PRs #41–45 are merged. The current [efficient workflow plan](efficient-workflow.md)
+owns the next implementation and tooltip-delay pilot. Capture per-task coordinator
+and worker start/end counters, actual model/effort where exposed, elapsed time,
+retries, review rounds and quality/rework observations. Include cached input within
+input and reasoning within output; never sum cumulative counters across checkpoints.
+Preserve source/pin/client identities and raw metadata references. Missing telemetry
+or prices remain unavailable. Compare equivalent accepted outcomes before claiming
+cost savings. Earlier observations below retain their original scope.
 
 Evaluate actual implementation without replaying every task or imposing a broader
 benchmark suite. Keep normal-1080 affected UI verification, focused logic/E2E checks,

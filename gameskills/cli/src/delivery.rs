@@ -47,6 +47,8 @@ mod posix {
             scope: Vec<String>,
             #[arg(long)]
             gameplay: bool,
+            #[arg(long)]
+            promotion: bool,
             #[arg(long = "check")]
             checks: Vec<String>,
         },
@@ -58,6 +60,8 @@ mod posix {
             scope: Vec<String>,
             #[arg(long)]
             gameplay: bool,
+            #[arg(long)]
+            promotion: bool,
             #[arg(long = "check")]
             checks: Vec<String>,
         },
@@ -160,6 +164,7 @@ mod posix {
             level,
             scope,
             gameplay,
+            promotion,
             checks,
             ..
         } = &args.command
@@ -184,12 +189,13 @@ mod posix {
                 .clone()
                 .map(Ok)
                 .unwrap_or_else(|| crate::verification::delivery_base(config))?;
-            let verification = crate::verification_context::resolve(
+            let verification = crate::verification_context::resolve_with_promotion(
                 config,
                 Some(&base),
                 level.as_deref(),
                 scope,
                 *gameplay,
+                *promotion,
             )?;
             if goal.trim().is_empty() || base.starts_with('-') || base.is_empty() {
                 return Err("goal and base must be nonempty".into());
@@ -199,7 +205,7 @@ mod posix {
                     return Err(format!("unknown configured check: {check}"));
                 }
             }
-            let record = json!({"schema_version":1,"id":id,"goal":goal,"endpoint":endpoint,"repo":repo,"base":base,"checks":checks,"initial_source":before,"instruction_lock":crate::platform::read_ordinary_file(&root.join("gameskills.lock.json")).map_err(|e|e.to_string())?,"cli_version":env!("CARGO_PKG_VERSION"),"binding":{},"remaining_work":[],"authorization":"session authorization must be consulted; this record grants none","last_observation":null,"verification":verification});
+            let record = json!({"schema_version":1,"id":id,"goal":goal,"endpoint":endpoint,"repo":repo,"base":base,"checks":checks,"initial_source":before,"instruction_lock":crate::platform::read_ordinary_file(&root.join("gameskills.lock.json")).map_err(|e|e.to_string())?,"cli_version":env!("CARGO_PKG_VERSION"),"binding":{},"remaining_work":[],"authorization":"session authorization must be consulted; this record grants none","last_observation":null,"promotion":promotion,"verification":verification});
             directory.write_json(&file, &envelope(&record))?;
             return Ok(
                 json!({"ok":true,"record":record,"claim":"task intent; no delivery observed"}),
@@ -217,10 +223,11 @@ mod posix {
                 level,
                 scope,
                 gameplay,
+                promotion,
                 checks,
                 ..
             } => {
-                let selected = crate::verification_context::resolve(
+                let selected = crate::verification_context::resolve_with_promotion(
                     config,
                     Some(text(&record, "base")?),
                     level.as_deref().or_else(|| {
@@ -230,6 +237,7 @@ mod posix {
                     }),
                     &scope,
                     gameplay,
+                    promotion,
                 )?;
                 for check in &checks {
                     if config.get("commands").and_then(|c| c.get(check)).is_none() {
@@ -256,6 +264,7 @@ mod posix {
                     fields.insert("checks".into(), json!(checks));
                 }
                 fields.insert("verification".into(), selected);
+                fields.insert("promotion".into(), json!(promotion));
                 fields.insert("last_observation".into(), Value::Null);
                 directory.write_json(&file, &envelope(&record))?;
                 Ok(
@@ -500,7 +509,16 @@ mod posix {
                 "url,body,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,mergeCommit",
             ],
         )?;
-        if v.get("headRefOid") != source.pointer("/repository/head") {
+        let state = v.get("state").and_then(Value::as_str);
+        let local_head = source
+            .pointer("/repository/head")
+            .and_then(Value::as_str)
+            .ok_or("missing source head")?;
+        let pr_head = v
+            .get("headRefOid")
+            .and_then(Value::as_str)
+            .ok_or("remote PR source unavailable")?;
+        if state != Some("MERGED") && pr_head != local_head {
             return Err(
                 "remote PR source differs from current HEAD; push the current commits".into(),
             );
@@ -519,7 +537,7 @@ mod posix {
         {
             return Err("PR base observation differs from current remote target".into());
         }
-        if v.get("state").and_then(Value::as_str) == Some("MERGED") {
+        if state == Some("MERGED") {
             let merge = v
                 .pointer("/mergeCommit/oid")
                 .and_then(Value::as_str)
@@ -541,6 +559,14 @@ mod posix {
             ) {
                 return Err("merge is not contained in the current remote target".into());
             }
+            if pr_head != local_head
+                && (!git_ancestor(root, merge, local_head)
+                    || !git_ancestor(root, local_head, target_sha))
+            {
+                return Err(
+                    "local HEAD is not an integrated revision of the current remote target".into(),
+                );
+            }
             v.as_object_mut()
                 .ok_or("invalid delivery object")?
                 .insert("integration".into(), integrated);
@@ -553,6 +579,14 @@ mod posix {
             .insert("remote_target".into(), target);
         Ok(v)
     }
+    fn git_ancestor(root: &Path, ancestor: &str, descendant: &str) -> bool {
+        Command::new("git")
+            .current_dir(root)
+            .args(["merge-base", "--is-ancestor", ancestor, descendant])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
     fn pr_reasons(record: &Value, source: &Value, pr: &Value) -> Vec<String> {
         let mut r = Vec::new();
         if pr.get("baseRefName") != record.get("base") {
@@ -561,7 +595,9 @@ mod posix {
         if pr.get("url") != record.pointer("/binding/pr") {
             r.push("provider returned a different PR".into());
         }
-        if pr.get("headRefOid") != source.pointer("/repository/head") {
+        if pr.get("state").and_then(Value::as_str) != Some("MERGED")
+            && pr.get("headRefOid") != source.pointer("/repository/head")
+        {
             r.push("remote source mismatch".into());
         }
         let state = pr.get("state").and_then(Value::as_str);
