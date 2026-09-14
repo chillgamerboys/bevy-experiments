@@ -511,6 +511,6 @@ effort = "high"
 
 [commands.workflow-efficiency-test]
 git_refs = []
-argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--test", "agents", "--test", "usage", "--test", "delivery", "--test", "verification_context", "--test", "configuration", "--test", "help"]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--test", "agents", "--test", "usage", "--test", "delivery", "--test", "verification_context", "--test", "workflow", "--test", "configuration", "--test", "help"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]

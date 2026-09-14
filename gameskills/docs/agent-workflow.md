@@ -96,3 +96,15 @@ A rates file has `schema_version: 1`, `as_of`, `source`, `currency` and a `rates
 array. Each entry has `client`, `model`, `uncached_input_per_million`,
 `cached_input_per_million` and `output_per_million`. These are caller-supplied
 nonnegative rates; the ledger neither authenticates them nor claims billed cost.
+
+## Repository dispatch lessons
+
+Complete active queues under their recorded receiving policy before changing the
+project delivery base or instruction pin. Configuration transitions can stale
+reports even when worker commits are unchanged; preserve those observations and
+use the supported lifecycle to refresh them.
+
+A compact worker brief includes repository lint conventions and affected callers.
+Here Rust tests use `expect` and checked access; changes to verification-context
+serialization include workflow queue compatibility tests as well as resolver tests.
+These small checks caught integration gaps without a game or display sweep.
