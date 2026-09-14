@@ -38,27 +38,32 @@ history, and make character customization reflect one coherent backend model.
 
 Observed on 2026-09-14:
 
-- Batch1 extends [PR #42](https://github.com/chillgamerboys/bevy-experiments/pull/42),
-  branch `codex/fixed-formation-tooltips`, base `main`. Local changes restore ×,
-  retain valid pins through menus, separate Party management and preserve visible
-  interruption recovery. The obsolete flex-row actor fixture is repaired; its
-  focused geometry regression passes. The old remote Escape-only implementation
-  and its failed CI remain superseded inputs until the updated branch is published.
-- Shared tooltip suspension and focus/close regression tests pass. Combined
-  normal1080 UI verification, affected renders and current PR checks are pending;
-  historical screenshots or old successful commands do not certify new inputs.
-- Batch2's pure rules model is complete in isolated work; 83 rules tests plus one
-  Rustdoc and strict rules lint pass. Application/schema consumers are being
-  migrated before publication. Editor redesign and compact full-history delivery
-  remain required in Batches3/4.
+- Batch1 is published as [PR #42](https://github.com/chillgamerboys/bevy-experiments/pull/42)
+  at `4db8f6d`; required GitHub checks pass. Its fixed rank geometry, visible tooltip
+  close, menu suspension and separate Party management have focused model/input
+  checks and actual normal-1080 frames. No hardware walkthrough is claimed.
+- Batch2 is published as [PR #43](https://github.com/chillgamerboys/bevy-experiments/pull/43).
+  Canonical rules/app migration and Resilient are complete; 84 rules tests, one
+  Rustdoc and focused editor/session/network/presentation checks pass. Its initial
+  CI selector missed changed protocol/reconnect tests; `4c3971c` repairs the exact
+  suite membership without adding a discovery sweep. Updated CI is running.
+- Batch3 implements Parameters-first customization, actual sprite/draft summary,
+  personal versus equipment rows, current passive contributions, explicit Unequip
+  and the fixed save/discard footer. Review caught stale cached equipment/Moveset
+  inspection after item changes; validation and regression coverage are added.
+  Three actual 1920×1080 Auto frames show Parameters, Equipment and Abilities.
+  Focused final verification and PR publication are pending.
+- Batch4's bounded encounter archive/protocol-v8 backend is committed in isolated
+  work. Focused rules/session/network checks pass; its single compact virtualized
+  history presentation is in progress. Integration and PR delivery remain required.
 - [PR #41](https://github.com/chillgamerboys/bevy-experiments/pull/41), the separate
   setup/launch audit, remains open. Its normal-window defaults and `--window-size`
   option are absent from this branch. Do not document that option here as available.
 - The installed GameSkills bundle is `0.1.0-dev.3`; the local executable is
   `./target/ci/gameskills` version `0.1.0-dev.4`. Installed-pin status passed.
   Project base is still `main`; the proposed `dev` default rollout is separate work.
-- Delivery tasks `formation-tooltip` and `character-build-model` bind the actual
-  issues/PRs as available. Queue `ui-builds-20260914` tracks isolated workers.
+- Delivery tasks `formation-tooltip`, `character-build-model`, `character-editor`
+  and `encounter-history` bind the actual issues/PRs as available. Queue `ui-builds-20260914` tracks isolated workers.
   `.context/gameskills-usage/` retains per-thread implementation counters and
   observed workflow costs. No merge is authorized.
 

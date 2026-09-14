@@ -420,6 +420,7 @@ fn native_browse_inspect_equip_and_footer_work_at_supported_sizes(
             .expect("editor")
             .draft
             .clone();
+        activate(&mut app, "Category Equipment", pointer);
         activate(&mut app, "Weapon greatsword", pointer);
         assert_eq!(
             app.world()
@@ -500,7 +501,8 @@ fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_f
         .expect("catalog")
         .definition()
         .skills
-        .last()
+        .iter()
+        .rfind(|skill| skill.personal_selectable)
         .expect("skill")
         .id
         .clone();
@@ -552,4 +554,166 @@ fn first_detail_fold_shows_effects_and_ranks_and_native_paging_reaches_sources_c
     tap_key(&mut app, KeyCode::Home);
     run_frames(&mut app, 3);
     assert_eq!(app.world().get::<ScrollPosition>(area).expect("top").y, 0.);
+}
+
+#[test]
+fn owned_ability_inspection_retains_effects_and_explicit_unequip_is_reversible() {
+    let view = fixture();
+    let catalog = view.catalog.as_ref().expect("catalog");
+    let mut ui = edit(&view);
+    action(
+        &view,
+        &mut ui,
+        SetupAction::Ability(id("duelist_dagger_power")),
+    );
+    inspect(
+        &view,
+        &mut ui,
+        Category::Abilities,
+        Selection::Ability(id("duelist_dagger_power")),
+    );
+    let info = details::inspection(ui.editor.as_ref().expect("editor"), catalog);
+    assert!(info.facts.iter().any(|s| s == "Ability active."));
+    assert!(info.moves.iter().any(|s| s
+        .definition
+        .effects
+        .contains(&labyrinth_rules::Effect::Damage(7))));
+    inspect(
+        &view,
+        &mut ui,
+        Category::Equipment,
+        Selection::Weapon(Some(id("dagger"))),
+    );
+    assert_eq!(
+        details::inspection(ui.editor.as_ref().expect("editor"), catalog).apply,
+        Some(("Unequip".into(), false))
+    );
+    apply(&view, &mut ui);
+    assert!(ui
+        .editor
+        .as_ref()
+        .expect("editor")
+        .draft
+        .actor
+        .build
+        .weapon
+        .is_none());
+    assert!(build(ui.editor.as_ref().expect("editor"), catalog)
+        .abilities
+        .iter()
+        .any(|a| !a.active()));
+    apply(&view, &mut ui);
+    assert_eq!(
+        ui.editor.as_ref().expect("editor").draft.actor.build.weapon,
+        Some(id("dagger"))
+    );
+    assert!(build(ui.editor.as_ref().expect("editor"), catalog)
+        .abilities
+        .iter()
+        .all(|a| a.active()));
+}
+
+#[test]
+fn parameters_preview_and_equipment_grants_are_separate_normal_1080() {
+    let mut app = app(1920, 1080, UiScaleMode::Auto);
+    assert_eq!(
+        app.world()
+            .resource::<UiState>()
+            .editor
+            .as_ref()
+            .expect("editor")
+            .category,
+        Category::Parameters
+    );
+    assert!(find_named(app.world_mut(), "Selection Inspector").is_none());
+    assert!(find_named(app.world_mut(), "Build Presets").is_none());
+    let sprite = find_named(app.world_mut(), "Character Sprite").expect("persistent sprite slot");
+    assert!(app.world().get::<ImageNode>(sprite).is_some());
+    let preview_name = find_named(app.world_mut(), "Character Preview Name").expect("name");
+    let field = app
+        .world_mut()
+        .query::<(Entity, &Field)>()
+        .iter(app.world())
+        .find_map(|(e, f)| matches!(f, Field::Build(BuildField::Name)).then_some(e))
+        .expect("name field");
+    assert!(focus_action(app.world_mut(), field));
+    {
+        use bevy::text::{EditableText, TextEdit};
+        let mut text = app
+            .world_mut()
+            .get_mut::<EditableText>(field)
+            .expect("editable");
+        text.queue_edit(TextEdit::TextEnd(false));
+        text.queue_edit(TextEdit::Insert(" Aster".into()));
+    }
+    run_frames(&mut app, 3);
+    assert!(app
+        .world()
+        .get::<Text>(preview_name)
+        .expect("same live preview")
+        .0
+        .ends_with(" Aster"));
+    activate(&mut app, "Category Skills", true);
+    assert!(find_named(app.world_mut(), "Skill dagger_stab").is_none());
+    assert!(find_named(app.world_mut(), "Equipment Grants Heading").is_some());
+    activate(&mut app, "Equipment Skill dagger_stab", true);
+    assert!(find_named(app.world_mut(), "Apply Inspected Choice").is_none());
+    let draft = app
+        .world()
+        .resource::<UiState>()
+        .editor
+        .as_ref()
+        .expect("editor")
+        .draft
+        .clone();
+    activate(&mut app, "Category Moveset", false);
+    activate(&mut app, "Moveset Skill dagger_stab", false);
+    assert!(find_named(app.world_mut(), "Apply Inspected Choice").is_none());
+    assert_eq!(
+        app.world()
+            .resource::<UiState>()
+            .editor
+            .as_ref()
+            .expect("editor")
+            .draft,
+        draft
+    );
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1920., 1080.));
+    for key in ["Character Preview", "Build Footer", "Character Categories"] {
+        let entity = find_named(app.world_mut(), key).expect(key);
+        let rect =
+            visible_control_rect(app.world(), entity, viewport).expect("fixed region visible");
+        assert!(rect.width() > 0. && rect.height() > 0., "{key}");
+    }
+}
+
+#[test]
+fn changing_equipment_retires_cached_grants_and_moveset_inspection() {
+    let view = fixture();
+    let catalog = view.catalog.as_ref().expect("catalog");
+    let mut ui = edit(&view);
+    inspect(
+        &view,
+        &mut ui,
+        Category::Skills,
+        Selection::EquipmentSkill(id("dagger_stab")),
+    );
+    inspect(
+        &view,
+        &mut ui,
+        Category::Moveset,
+        Selection::Move(id("dagger_stab")),
+    );
+    action(&view, &mut ui, SetupAction::Weapon(Some(id("bow"))));
+    action(&view, &mut ui, SetupAction::Category(Category::Skills));
+    assert_ne!(
+        ui.editor.as_ref().expect("editor").selection(),
+        Some(&Selection::EquipmentSkill(id("dagger_stab")))
+    );
+    action(&view, &mut ui, SetupAction::Category(Category::Moveset));
+    let info = details::inspection(ui.editor.as_ref().expect("editor"), catalog);
+    assert!(info
+        .moves
+        .iter()
+        .all(|skill| skill.definition.id != id("dagger_stab")));
 }

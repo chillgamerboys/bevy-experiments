@@ -27,9 +27,9 @@ require their own evidence; this iteration does not establish those automaticall
 
 ### Observed costs during the current implementation
 
-The pure rules owner verified Skills/Abilities/Moveset and Resilient with83rules
-regressions and1Rustdoc, without unrelated UI or platform sweeps. Batch1's normal
-UI suite reached60passing tests after correcting old Escape-only fixtures and real
+The pure rules owner verified Skills/Abilities/Moveset and Resilient with 84 rules
+regressions and one Rustdoc, without unrelated UI or platform sweeps. Batch1's normal
+UI suite reached 60 passing tests after correcting old Escape-only fixtures and real
 close-focus/menu-recovery defects. These are actual engineering outcomes, not a
 controlled token-savings comparison.
 
@@ -50,6 +50,21 @@ controlled token-savings comparison.
   input is part of input; reasoning output is part of output. Root coordination
   and backend work overlap in time, so allocate by thread/batch rather than adding
   cumulative session totals or claiming all parallel work belongs to Batch1.
+
+- Batch2 CI initially stopped because four changed protocol/reconnect tests were
+  missing from the selected suites. They now belong to the existing exact gameplay
+  group, including the protocol-listing rejection; a full discovery sweep is not
+  needed. Run changed-test classification before publishing migrated tests.
+- Shared Cargo targets can reuse incompatible local rules metadata across worktrees.
+  Serialize compilation and clean only `labyrinth-rules` when switching incompatible
+  APIs; retain expensive Bevy dependency artifacts.
+- A broad `history::` filter accidentally selected eight existing UI tests, including
+  compatibility cases. Record that extra cost honestly; do not rerun passing tests
+  just to improve the label. Configured history filters should name owner modules.
+- Bounded independent review found stale editor source labels after equipment changes.
+  It caught a real correctness issue while normal-1080 tests and three affected
+  rendered pages supplied distinct behavior/layout evidence. Fresh review tasks can
+  receive a small file/acceptance brief instead of inheriting the full transcript.
 
 ### MCP delivery contradiction and verification handoff
 

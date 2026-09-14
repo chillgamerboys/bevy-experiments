@@ -87,15 +87,20 @@ option explains its test purpose. **Lobby** contains co-op connection/invitation
 details. Select a character on either side and choose **Customize** for the same
 unified editor.
 
-The same character editor handles either team. Equipment, Skills, Abilities,
-Parameters and Moveset organize one draft. Selecting a catalog entry only
-inspects it: read its effects, acting/target ranks, uses, prerequisites and proposed
-move changes before explicitly equipping an item or adding a selection. Moveset retains
-all grant and upgrade sources. Apply build submits the complete draft; Discard
-draft reloads the authoritative character. Leaving a changed draft requires an
-explicit discard decision. Sections and character navigation do not create another
-editor. Existing name/HP/speed/footprint/preset/starting-condition controls live in
-Parameters; a broader character stat system remains future work.
+The same character editor handles either team. **Parameters** opens first, followed
+by **Equipment**, **Skills**, **Abilities** and **Moveset**. The character's actual
+sprite, draft name, stats and equipment remain visible beside the scrolling content.
+Parameters contains name, maximum HP, speed and rank size, with starting HP/statuses
+in a separate Starting conditions group. Presets are chosen when creating a character.
+
+Selecting a catalog entry only inspects it. Read its effects, ranks, uses,
+prerequisites and proposed changes before choosing Equip/Unequip or Add/Remove.
+Skills and Abilities separate personal selections from read-only **From equipment**
+grants. Missing prerequisites leave personal selections inactive; restoring suitable
+equipment reactivates them. Moveset shows eligible Skills with effective values,
+source grants and passive upgrades. **Save & close** submits the complete draft and
+waits for the host's acknowledgment. **Discard changes** reloads the saved character
+in place; closing or switching a changed draft asks before discarding it.
 
 Guests edit owned builds and select types in reserved places; the host controls
 formation movement/removal, assignment and enemies. Starting HP can be blank for

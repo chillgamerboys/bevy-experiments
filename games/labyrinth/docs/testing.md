@@ -265,6 +265,11 @@ input/layout checks. Compare a dagger and greatsword at different acting ranks,
 inspect an Ability that upgrades a Skill’s ranks/damage, remove one of several grants, and explain
 the actual added/removed/changed moves before applying. Exercise category changes,
 dirty character switching, discard/reload, server conflicts and source replacement.
+The normal-1080 editor checks cover Parameters-first layout, a live draft summary,
+read-only equipment grants, Moveset inspection, explicit reversible Unequip, current
+passive effects, dirty navigation, permissions, text focus and host acknowledgment.
+Actual render routes `editor-parameters`, `editor-compare` and `editor-abilities`
+show the normal layout and existing sprite assets; they do not prove hardware input.
 Both teams use the same editor. Do not infer understandable choices from unclipped
 buttons alone; record what is visible separately from observed player comprehension.
 

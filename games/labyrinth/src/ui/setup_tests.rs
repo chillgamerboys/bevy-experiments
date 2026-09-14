@@ -161,13 +161,17 @@ fn ownership_changes_refresh_inspected_choices_without_enabling_unavailable_choi
         app.world_mut(),
         Action::Setup(SetupAction::Category(Category::Equipment)),
     );
-    for (weapon, unavailable) in [("dagger", false), ("greatsword", true)] {
+    for (selection, unavailable) in [
+        (Selection::Weapon(Some(id("dagger"))), false),
+        (Selection::Weapon(Some(id("greatsword"))), false),
+        (Selection::Weapon(None), true),
+    ] {
+        if unavailable {
+            super::super::apply_action(app.world_mut(), Action::Setup(SetupAction::Weapon(None)));
+        }
         super::super::apply_action(
             app.world_mut(),
-            Action::Setup(SetupAction::Inspect(
-                actor,
-                Selection::Weapon(Some(id(weapon))),
-            )),
+            Action::Setup(SetupAction::Inspect(actor, selection)),
         );
         run_frames(&mut app, 3);
         let choice = find_named(app.world_mut(), "Apply Inspected Choice").expect("choice");

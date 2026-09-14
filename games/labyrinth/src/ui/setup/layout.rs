@@ -17,8 +17,6 @@ struct EditorEdit {
 #[derive(Component)]
 struct EditorDirty;
 #[derive(Component)]
-struct EditorName;
-#[derive(Component)]
 struct DetailScroll;
 #[derive(Component)]
 struct BrowserScroll(Category);
@@ -167,12 +165,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
     {
         text.0.clone_from(&dirty);
     }
-    for mut text in world
-        .query_filtered::<&mut Text, With<EditorName>>()
-        .iter_mut(world)
-    {
-        text.0.clone_from(&editor.name);
-    }
+    preview::update(world, editor, view);
     let controls = world
         .query_filtered::<Entity, With<EditorSave>>()
         .iter(world)
@@ -240,51 +233,14 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             ..box_node()
         },
     );
-    let name_label = paragraph(
-        world,
-        identity,
-        "Build Title",
-        &editor.name,
-        UiTextRole::Title,
-    );
-    world
-        .entity_mut(name_label)
-        .insert((EditorName, TextLayout::no_wrap()));
-    let (team, start, end) = details::rank_span(view, editor);
-    let weapon = editor
-        .draft
-        .actor
-        .build
-        .weapon
-        .as_ref()
-        .and_then(|id| catalog.weapon(id))
-        .map_or("Unarmed", |w| w.name.as_str());
-    let owner = if team == labyrinth_rules::Team::Enemies {
-        "Host-controlled enemy".into()
-    } else {
-        view.company
-            .iter()
-            .find(|m| m.actor == editor.id)
-            .and_then(|member| view.players.iter().find(|p| p.slot == member.owner))
-            .map_or_else(
-                || "Unassigned".into(),
-                |p| format!("Controlled by {}", p.name),
-            )
-    };
     paragraph(
         world,
         identity,
-        "Character Context",
-        format!(
-            "{} · ranks {start}–{end} · {weapon} · {owner}",
-            if team == labyrinth_rules::Team::Heroes {
-                "Party"
-            } else {
-                "Enemy"
-            }
-        ),
-        UiTextRole::Supporting,
+        "Build Title",
+        "Customize character",
+        UiTextRole::Title,
     );
+    let (_, start, end) = details::rank_span(view, editor);
     let roster = view
         .scenario
         .as_ref()
@@ -318,6 +274,10 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             );
         }
     }
+    let close = button(world, header, "Close Build", "×", SetupAction::Close, false);
+    world
+        .entity_mut(close)
+        .insert(AccessibleLabel::new("Close character editor"));
     let nav = row(world, panel, "Character Categories");
     if let Some(mut node) = world.get_mut::<Node>(nav) {
         node.overflow = Overflow::scroll_x();
@@ -348,10 +308,24 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             ..box_node()
         },
     );
+    preview::mount(world, workspace, editor, view, compact);
+    let content_workspace = column(
+        world,
+        workspace,
+        "Character Content",
+        Node {
+            flex_grow: 1.,
+            flex_basis: Val::Px(0.),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(16.),
+            overflow: Overflow::clip(),
+            ..box_node()
+        },
+    );
     if editor.pending_exit.is_some() {
         let confirmation = column(
             world,
-            workspace,
+            content_workspace,
             "Discard Confirmation",
             Node {
                 width: Val::Percent(100.),
@@ -394,13 +368,13 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             false,
         );
     } else {
-        if !compact || !editor.detail_only {
+        if editor.category == Category::Parameters || !compact || !editor.detail_only {
             let browser = column(
                 world,
-                workspace,
+                content_workspace,
                 "Character Browser",
                 Node {
-                    width: if compact {
+                    width: if compact || editor.category == Category::Parameters {
                         Val::Percent(100.)
                     } else {
                         Val::Percent(37.)
@@ -419,10 +393,10 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             ));
             mount_browser(world, browser, editor, catalog, view, can_edit);
         }
-        if !compact || editor.detail_only {
+        if editor.category != Category::Parameters && (!compact || editor.detail_only) {
             let inspector = column(
                 world,
-                workspace,
+                content_workspace,
                 "Selection Inspector",
                 Node {
                     flex_grow: 1.,
@@ -470,7 +444,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         world,
         actions,
         "Apply Build",
-        "Apply build",
+        "Save & close",
         SetupAction::Save,
         !can_edit || conflict || editor.pending_save || editor.pending_exit.is_some(),
     );
@@ -481,16 +455,8 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         world,
         actions,
         "Reload Build",
-        "Discard draft",
+        "Discard changes",
         SetupAction::Reload,
-        false,
-    );
-    button(
-        world,
-        actions,
-        "Close Build",
-        "Close editor",
-        SetupAction::Close,
         false,
     );
 }
@@ -564,7 +530,7 @@ fn mount_browser(
             world,
             parent,
             "Browse Instruction",
-            "Select to inspect. Changes stay in your draft until Apply build.",
+            "Select to inspect. Changes stay in your draft until Save & close.",
             UiTextRole::Supporting,
         );
     }
@@ -576,7 +542,7 @@ fn mount_browser(
                 editor,
                 "Weapon None".into(),
                 "Unarmed".into(),
-                "Keep skills and learned moves without weapon grants.".into(),
+                "Personal selections remain; equipment prerequisites still apply.".into(),
                 Selection::Weapon(None),
             );
             for weapon in &catalog.definition().weapons {
@@ -603,45 +569,167 @@ fn mount_browser(
                 );
             }
         }
-        Category::Skills => {
-            for skill in &catalog.definition().skills {
-                let granted = editor
-                    .draft
-                    .actor
-                    .build
+        Category::Skills | Category::Abilities => {
+            let skills = editor.category == Category::Skills;
+            let resolved = catalog.resolve_build(&editor.draft.actor.build).ok();
+            paragraph(
+                world,
+                parent,
+                "Personal Selections",
+                "Personal selections",
+                UiTextRole::Body,
+            );
+            if skills {
+                for skill in catalog
+                    .definition()
                     .skills
                     .iter()
-                    .any(|g| g.skill == skill.id);
-                browser_row(
+                    .filter(|s| s.personal_selectable)
+                {
+                    let granted = editor
+                        .draft
+                        .actor
+                        .build
+                        .skills
+                        .iter()
+                        .any(|g| g.skill == skill.id);
+                    let inactive =
+                        catalog.unmet_requirements(&editor.draft.actor.build, &skill.requirements);
+                    browser_row(
+                        world,
+                        parent,
+                        editor,
+                        format!("Skill {}", skill.id),
+                        format!(
+                            "{}{}",
+                            skill.name,
+                            if granted {
+                                if inactive.is_some() {
+                                    " · inactive"
+                                } else {
+                                    " · in draft"
+                                }
+                            } else {
+                                ""
+                            }
+                        ),
+                        inactive.unwrap_or_else(|| details::move_summary(skill)),
+                        Selection::Skill(skill.id.clone()),
+                    );
+                }
+            } else {
+                for ability in catalog
+                    .definition()
+                    .abilities
+                    .iter()
+                    .filter(|a| a.personal_selectable)
+                {
+                    let granted = editor.draft.actor.build.abilities.contains(&ability.id);
+                    let state = resolved
+                        .as_ref()
+                        .and_then(|b| b.abilities.iter().find(|a| a.definition.id == ability.id));
+                    browser_row(
+                        world,
+                        parent,
+                        editor,
+                        format!("Ability {}", ability.id),
+                        format!(
+                            "{}{}",
+                            ability.name,
+                            if granted {
+                                if state.is_some_and(|a| a.inactive_reason.is_some()) {
+                                    " · inactive"
+                                } else {
+                                    " · active"
+                                }
+                            } else {
+                                ""
+                            }
+                        ),
+                        state
+                            .and_then(|a| a.inactive_reason.clone())
+                            .unwrap_or_else(|| ability.description.clone()),
+                        Selection::Ability(ability.id.clone()),
+                    );
+                }
+            }
+            paragraph(
+                world,
+                parent,
+                "Equipment Grants Heading",
+                "From equipment",
+                UiTextRole::Body,
+            );
+            let weapon = editor
+                .draft
+                .actor
+                .build
+                .weapon
+                .as_ref()
+                .and_then(|id| catalog.weapon(id));
+            let ids = weapon.map(|w| if skills { &w.skills } else { &w.abilities });
+            if ids.is_none_or(|ids| ids.is_empty()) {
+                paragraph(
                     world,
                     parent,
-                    editor,
-                    format!("Skill {}", skill.id),
-                    format!("{}{}", skill.name, if granted { " · in draft" } else { "" }),
-                    details::move_summary(skill),
-                    Selection::Skill(skill.id.clone()),
+                    "Equipment Grants Empty",
+                    "No grants from your current equipment.",
+                    UiTextRole::Supporting,
                 );
             }
-        }
-        Category::Abilities => {
-            for ability in &catalog.definition().abilities {
-                browser_row(
-                    world,
-                    parent,
-                    editor,
-                    format!("Ability {}", ability.id),
-                    format!(
-                        "{}{}",
-                        ability.name,
-                        if editor.draft.actor.build.abilities.contains(&ability.id) {
-                            " · in draft"
-                        } else {
-                            ""
-                        }
-                    ),
-                    ability.description.clone(),
-                    Selection::Ability(ability.id.clone()),
-                );
+            if let Some(weapon) = weapon {
+                for id in if skills {
+                    &weapon.skills
+                } else {
+                    &weapon.abilities
+                } {
+                    let (title, description, selection) = if skills {
+                        let Some(skill) = catalog.skill(id) else {
+                            continue;
+                        };
+                        (
+                            skill.name.clone(),
+                            catalog
+                                .unmet_requirements(&editor.draft.actor.build, &skill.requirements)
+                                .unwrap_or_else(|| details::move_summary(skill)),
+                            Selection::EquipmentSkill(id.clone()),
+                        )
+                    } else {
+                        let Some(ability) = catalog.ability(id) else {
+                            continue;
+                        };
+                        let state = resolved
+                            .as_ref()
+                            .and_then(|b| b.abilities.iter().find(|a| a.definition.id == *id));
+                        (
+                            format!(
+                                "{} · {}",
+                                ability.name,
+                                if state.is_some_and(|a| a.inactive_reason.is_some()) {
+                                    "inactive"
+                                } else {
+                                    "active"
+                                }
+                            ),
+                            state
+                                .and_then(|a| a.inactive_reason.clone())
+                                .unwrap_or_else(|| ability.description.clone()),
+                            Selection::EquipmentAbility(id.clone()),
+                        )
+                    };
+                    browser_row(
+                        world,
+                        parent,
+                        editor,
+                        format!(
+                            "Equipment {} {id}",
+                            if skills { "Skill" } else { "Ability" }
+                        ),
+                        title,
+                        format!("From {} · read only\n{description}", weapon.name),
+                        selection,
+                    );
+                }
             }
         }
         Category::Moveset => match catalog.resolve_build(&editor.draft.actor.build) {
@@ -651,7 +739,7 @@ fn mount_browser(
                         world,
                         parent,
                         editor,
-                        format!("Result Move {}", skill.definition.id),
+                        format!("Moveset Skill {}", skill.definition.id),
                         skill.definition.name.clone(),
                         details::move_summary(&skill.definition),
                         Selection::Move(skill.definition.id.clone()),
@@ -678,12 +766,6 @@ fn mount_browser(
                     BuildField::Footprint,
                     &editor.footprint,
                     1,
-                ),
-                (
-                    "Starting HP (blank = full)",
-                    BuildField::StartingHp,
-                    &editor.starting_hp,
-                    5,
                 ),
             ] {
                 paragraph(
@@ -719,6 +801,32 @@ fn mount_browser(
                 "Starting conditions",
                 UiTextRole::Body,
             );
+            paragraph(
+                world,
+                parent,
+                "Build StartingHp Label",
+                "Starting HP (blank = full)",
+                UiTextRole::Body,
+            );
+            let bundle = bevy_gamekit::ui::text_field(
+                world.resource::<UiFonts>(),
+                "Starting HP (blank = full)",
+                &editor.starting_hp,
+                5,
+            );
+            let initial_hp = world
+                .spawn((
+                    bundle,
+                    UiSkin::Field,
+                    Field::Build(BuildField::StartingHp),
+                    EditorEdit::default(),
+                    UiFocusId::new("labyrinth-build", format!("{}:StartingHp", editor.id.0)),
+                    ChildOf(parent),
+                ))
+                .id();
+            if !can_edit {
+                world.entity_mut(initial_hp).insert(UiDisabled);
+            }
             for kind in [
                 labyrinth_rules::StatusKind::Bleed,
                 labyrinth_rules::StatusKind::Brace,
@@ -749,27 +857,6 @@ fn mount_browser(
                     "Condition Explanation",
                     labyrinth_rules::status_definition(kind).description,
                     UiTextRole::Supporting,
-                );
-            }
-            paragraph(
-                world,
-                parent,
-                "Preset Heading",
-                "Start from a character preset",
-                UiTextRole::Body,
-            );
-            for preset in &catalog.definition().actor_presets {
-                browser_row(
-                    world,
-                    parent,
-                    editor,
-                    format!("Build Preset {}", preset.id),
-                    preset.name.clone(),
-                    format!(
-                        "{} HP · speed {} · {} formation spaces",
-                        preset.max_hp, preset.base_speed, preset.footprint
-                    ),
-                    Selection::Preset(preset.id.clone()),
                 );
             }
         }

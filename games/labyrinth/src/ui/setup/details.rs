@@ -83,6 +83,7 @@ pub(in crate::ui) fn move_facts(
             |uses| format!("{uses} uses per encounter."),
         ),
     ];
+    facts.extend(requirements(&def.requirements, catalog));
     for effect in &def.effects {
         if let labyrinth_rules::Effect::ApplyStatus(kind) = effect {
             let explanation = labyrinth_rules::status_definition(*kind)
@@ -143,14 +144,41 @@ fn operation(value: &labyrinth_rules::catalog::UpgradeOperation) -> String {
         ExtendTargetRanks(mask) => format!("adds target ranks {}", ranks(*mask)),
     }
 }
+pub(super) fn requirements(
+    values: &[labyrinth_rules::catalog::EquipmentRequirement],
+    catalog: &ContentCatalog,
+) -> Vec<String> {
+    use labyrinth_rules::catalog::EquipmentRequirement;
+    if values.is_empty() {
+        return vec!["No equipment prerequisite.".into()];
+    }
+    values
+        .iter()
+        .map(|requirement| match requirement {
+            EquipmentRequirement::Kind(kind) => format!("Requires {kind} equipment."),
+            EquipmentRequirement::Item(item) => format!(
+                "Requires {}.",
+                catalog
+                    .weapon(item)
+                    .map_or(item.as_str(), |item| item.name.as_str())
+            ),
+        })
+        .collect()
+}
 pub(super) fn proposed(
     editor: &ActorEditor,
     selection: &Selection,
-    catalog: &ContentCatalog,
+    _catalog: &ContentCatalog,
 ) -> CharacterBuild {
     let mut build = editor.draft.actor.build.clone();
     match selection {
-        Selection::Weapon(id) => build.weapon.clone_from(id),
+        Selection::Weapon(id) => {
+            build.weapon = if id.is_some() && build.weapon == *id {
+                None
+            } else {
+                id.clone()
+            };
+        }
         Selection::Skill(id) => {
             if build.skills.iter().any(|g| &g.skill == id) {
                 build.skills.retain(|g| &g.skill != id);
@@ -168,12 +196,7 @@ pub(super) fn proposed(
                 build.abilities.push(id.clone());
             }
         }
-        Selection::Preset(id) => {
-            if let Some(preset) = catalog.actor_preset(id) {
-                build = preset.build.clone();
-            }
-        }
-        Selection::Move(_) => {}
+        Selection::Move(_) | Selection::EquipmentSkill(_) | Selection::EquipmentAbility(_) => {}
     }
     build
 }
@@ -313,9 +336,30 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
     let Some(selected) = editor.selection() else {
         return result;
     };
+    let from_equipment = matches!(
+        selected,
+        Selection::EquipmentSkill(_) | Selection::EquipmentAbility(_)
+    );
     let current = catalog.resolve_build(&editor.draft.actor.build);
     let candidate = proposed(editor, selected, catalog);
     let next = catalog.resolve_build(&candidate);
+    let already_owned = match selected {
+        Selection::Weapon(id) => editor.draft.actor.build.weapon == *id,
+        Selection::Skill(id) => editor
+            .draft
+            .actor
+            .build
+            .skills
+            .iter()
+            .any(|g| &g.skill == id),
+        Selection::Ability(id) => editor.draft.actor.build.abilities.contains(id),
+        _ => true,
+    };
+    let inspected_build = if already_owned {
+        current.as_ref().ok()
+    } else {
+        next.as_ref().ok()
+    };
     let mut move_ids = Vec::new();
     match selected {
         Selection::Weapon(id) => {
@@ -323,6 +367,20 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 result.title = weapon.name.clone();
                 result.description = weapon.description.clone();
                 move_ids = weapon.skills.clone();
+                result
+                    .facts
+                    .push(format!("Equipment kind: {}", weapon.kind));
+                for id in &weapon.abilities {
+                    if let Some(ability) = catalog.ability(id) {
+                        result.facts.push(format!(
+                            "Grants Ability · {}: {}",
+                            ability.name, ability.description
+                        ));
+                        result
+                            .facts
+                            .extend(requirements(&ability.requirements, catalog));
+                    }
+                }
                 result.facts.push(
                     match weapon.handedness {
                         labyrinth_rules::catalog::Handedness::One => {
@@ -349,15 +407,19 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 .into(),
             );
             result.apply = Some((
-                if equipped {
-                    "Equipped".into()
+                if id.is_none() || equipped {
+                    if id.is_none() && equipped {
+                        "Unarmed".into()
+                    } else {
+                        "Unequip".into()
+                    }
                 } else {
                     format!("Equip {}", result.title)
                 },
-                equipped,
+                id.is_none() && equipped,
             ));
         }
-        Selection::Skill(id) => {
+        Selection::Skill(id) | Selection::EquipmentSkill(id) => {
             if let Some(skill) = catalog.skill(id) {
                 result.title = skill.name.clone();
                 result.description = skill.description.clone();
@@ -369,9 +431,17 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                     .skills
                     .iter()
                     .any(|g| g.skill == *id);
+                result.facts.push(
+                    if from_equipment {
+                        "Equipment Skill."
+                    } else {
+                        "Personal Skill selection."
+                    }
+                    .into(),
+                );
                 result
                     .facts
-                    .push("Personal Skill selection. Equipment requirements still apply.".into());
+                    .extend(requirements(&skill.requirements, catalog));
                 if let Some(reason) =
                     catalog.unmet_requirements(&editor.draft.actor.build, &skill.requirements)
                 {
@@ -388,7 +458,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 ));
             }
         }
-        Selection::Ability(id) => {
+        Selection::Ability(id) | Selection::EquipmentAbility(id) => {
             if let Some(ability) = catalog.ability(id) {
                 result.title = ability.name.clone();
                 result.description = ability.description.clone();
@@ -415,9 +485,10 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 if ability.upgrades.is_empty() {
                     result.facts.push("No prerequisite Skill required.".into());
                 }
-                if let Some(resolved) = next
-                    .as_ref()
-                    .ok()
+                result
+                    .facts
+                    .extend(requirements(&ability.requirements, catalog));
+                if let Some(resolved) = inspected_build
                     .and_then(|build| build.abilities.iter().find(|a| a.definition.id == *id))
                 {
                     result
@@ -448,25 +519,6 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 ));
             }
         }
-        Selection::Preset(id) => {
-            if let Some(preset) = catalog.actor_preset(id) {
-                result.title = preset.name.clone();
-                result.description="Use this preset's appearance, equipment, Skills, Abilities and starting values in your draft.".into();
-                result.facts.push(format!("Maximum HP {} → {} · speed {} → {} · formation spaces {} → {}. Starting HP resets to full.",editor.max_hp,preset.max_hp,editor.speed,preset.base_speed,editor.footprint,preset.footprint));
-                move_ids = catalog.resolve_build(&preset.build).map_or_else(
-                    |_| vec![],
-                    |build| {
-                        build
-                            .moveset
-                            .skills
-                            .iter()
-                            .map(|a| a.definition.id.clone())
-                            .collect()
-                    },
-                );
-                result.apply = Some(("Use preset in draft".into(), false));
-            }
-        }
         Selection::Move(id) => {
             move_ids.push(id.clone());
             if let Some(skill) = catalog.skill(id) {
@@ -475,7 +527,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
             }
         }
     }
-    let resolved = next.as_ref().ok().or_else(|| current.as_ref().ok());
+    let resolved = inspected_build.or_else(|| current.as_ref().ok());
     if let Some(build) = resolved {
         for id in move_ids {
             if let Some(skill) = build.moveset.skills.iter().find(|a| a.definition.id == id) {
@@ -491,7 +543,21 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
             }
         }
     }
-    if !matches!(selected, Selection::Move(_)) {
+    if from_equipment {
+        result.apply = None;
+        let source = editor
+            .draft
+            .actor
+            .build
+            .weapon
+            .as_ref()
+            .and_then(|id| catalog.weapon(id))
+            .map_or("equipment", |item| item.name.as_str());
+        result.facts.push(format!(
+            "From {source}. Change its item on the Equipment page."
+        ));
+    }
+    if !matches!(selected, Selection::Move(_)) && !from_equipment {
         match (&current, &next) {
             (Ok(before), Ok(after)) => result.changes = changes(before, after),
             (_, Err(error)) => {
