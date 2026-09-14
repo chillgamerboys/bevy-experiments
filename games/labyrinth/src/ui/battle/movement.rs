@@ -50,6 +50,10 @@ pub(super) fn mount(world: &mut World, parent: Entity, team: Team, snapshot: &Co
         strip,
         "Projected Rank Positions",
         Node {
+            display: Display::Grid,
+            grid_template_columns: RepeatedGridTrack::flex(PARTY_SIZE as u16, 1.0),
+            grid_template_rows: vec![GridTrack::flex(1.0)],
+            column_gap: Val::Px(4.0),
             width: Val::Percent(100.0),
             height: Val::Px(48.0),
             ..default()
@@ -67,7 +71,8 @@ pub(super) fn mount(world: &mut World, parent: Entity, team: Team, snapshot: &Co
         );
         world.entity_mut(marker).insert((
             Node {
-                position_type: PositionType::Absolute,
+                grid_row: GridPlacement::start(1),
+                min_width: Val::Px(0.0),
                 height: Val::Percent(100.0),
                 border: UiRect::bottom(Val::Px(2.0)),
                 ..default()
@@ -166,18 +171,6 @@ fn update(
         world.entity_mut(strip.heading).insert(heading_style);
     }
     world.get_mut::<Node>(strip.row).expect("rank row").height = Val::Px(48.0);
-    let cleared = |id| {
-        forecast.actors.iter().any(|change| {
-            change.actor == id && change.outcome == Knowledge::Known(ForecastOutcome::CorpseCleared)
-        })
-    };
-    let total: u8 = snapshot
-        .formation(strip.team)
-        .iter()
-        .filter(|id| !cleared(**id))
-        .filter_map(|id| snapshot.actor(*id))
-        .map(|actor| actor.footprint)
-        .sum();
     for (id, marker) in &strip.markers {
         let Some(actor) = snapshot.actor(*id) else {
             continue;
@@ -198,11 +191,6 @@ fn update(
             .and_then(|change| change.position)
             .map_or(from, |position| position.to);
         let width = actor.footprint;
-        let offset = if strip.team == Team::Heroes {
-            total - (to + width - 1)
-        } else {
-            to - 1
-        };
         let moved = from != to;
         let identity = actors::display_name(snapshot, actor);
         let ranks = if moved {
@@ -246,8 +234,7 @@ fn update(
         );
         let mut node = world.get_mut::<Node>(*marker).expect("marker");
         node.display = Display::Flex;
-        node.left = Val::Percent(f32::from(offset) / f32::from(total) * 100.0);
-        node.width = Val::Percent(f32::from(width) / f32::from(total) * 100.0);
+        node.grid_column = actors::rank_column(strip.team, to, width);
         node.height = Val::Percent(100.0);
     }
 }

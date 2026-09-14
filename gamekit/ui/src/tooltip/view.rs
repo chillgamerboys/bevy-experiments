@@ -6,7 +6,6 @@ use bevy::input_focus::{tab_navigation::TabGroup, FocusCause};
 
 #[derive(Component, Clone)]
 pub(super) enum TooltipAction {
-    Close(usize),
     Link(usize, UiTooltipSubject),
 }
 
@@ -43,11 +42,6 @@ fn label(world: &mut World, parent: Entity, name: &str, value: String, role: UiT
 }
 
 fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction) -> Entity {
-    let role = if matches!(action, TooltipAction::Close(_)) {
-        UiTextRole::Title
-    } else {
-        UiTextRole::Body
-    };
     let entity = world
         .spawn((
             crate::button(format!("Tooltip {title}")),
@@ -62,7 +56,7 @@ fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction)
         entity,
         "Tooltip Control Label",
         title.to_owned(),
-        role,
+        UiTextRole::Body,
     );
     entity
 }
@@ -133,6 +127,7 @@ pub(super) fn render(world: &mut World) {
                     let card = world
                         .spawn((
                             Name::new(format!("Tooltip Card {depth}")),
+                            AccessibleLabel::new(content.title.clone()),
                             Node {
                                 position_type: PositionType::Absolute,
                                 left: Val::Px(0.0),
@@ -169,7 +164,6 @@ pub(super) fn render(world: &mut World) {
                         .spawn((
                             Node {
                                 min_height: Val::Px(44.0),
-                                padding: UiRect::right(Val::Px(44.0)),
                                 flex_shrink: 0.0,
                                 align_items: AlignItems::Center,
                                 ..default()
@@ -186,38 +180,10 @@ pub(super) fn render(world: &mut World) {
                         content.title.clone(),
                         UiTextRole::Title,
                     );
-                    if pinned {
-                        // ASCII remains visible with the default Bevy font as well as game fonts.
-                        let close = action(world, heading, "x", TooltipAction::Close(depth));
-                        world.entity_mut(close).insert((
-                            Name::new("Tooltip Close"),
-                            AccessibleLabel::new("Close tooltip"),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                right: Val::Px(0.0),
-                                top: Val::Px(0.0),
-                                width: Val::Px(44.0),
-                                height: Val::Px(44.0),
-                                min_width: Val::Px(44.0),
-                                min_height: Val::Px(44.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                            crate::UiSkinOverrides {
-                                background: Some(Color::NONE),
-                                border: Some(Color::NONE),
-                                ..default()
-                            },
-                        ));
-                        if let Some(children) = world.get::<Children>(close) {
-                            let labels = children.to_vec();
-                            for child in labels {
-                                world.entity_mut(child).insert(Node::default());
-                            }
-                        }
-                        view.focus = Some(close);
-                    }
+                    // Keyboard inspection stays inside the deepest card even
+                    // when it has no links. Cards have no activation behavior.
+                    view.focus = Some(card);
+                    let mut first_link = None;
                     for fact in &content.facts {
                         label(world, card, "Tooltip Fact", fact.clone(), UiTextRole::Body);
                     }
@@ -239,12 +205,13 @@ pub(super) fn render(world: &mut World) {
                             .contains_key(&link.subject)
                         {
                             if pinned {
-                                action(
+                                let link = action(
                                     world,
                                     card,
                                     &format!("{} ›", link.label),
                                     TooltipAction::Link(depth, link.subject.clone()),
                                 );
+                                first_link.get_or_insert(link);
                             } else {
                                 let row = world
                                     .spawn((
@@ -263,6 +230,9 @@ pub(super) fn render(world: &mut World) {
                                 );
                             }
                         }
+                    }
+                    if let Some(link) = first_link {
+                        view.focus = Some(link);
                     }
                     view.cards.push(card);
                 }

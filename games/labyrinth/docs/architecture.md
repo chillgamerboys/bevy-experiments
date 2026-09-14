@@ -222,9 +222,16 @@ system, with encounter/actor-scoped subjects and disclosure-filtered content.
 Portrait activation pins a card without changing the selected target; there is no
 separate inspection/initiative drawer. The primary battlefield never scrolls;
 overflowing ability loadouts scroll horizontally and focus brings controls into view.
+The battlefield and movement previews share a fixed six-column grid per side.
+Actor footprints span whole rank columns, with both front ranks facing the center.
+Sparse rosters and corpse removal leave non-interactive empty back ranks; occupancy
+never changes rank width or enlarges the fitted sprites. Preparation retains its
+separate editable-gap contract.
 Contextual cards reserve the character summaries, HP and command rail. They may
-cover artwork so sparse formations with tall fitted sprites still have room for
-effects, ranks and scrollable explanations; sprite size never limits help height.
+cover artwork to leave room for effects, ranks and scrollable explanations;
+sprite size never limits help height. A pinned card ignores unrelated hover and
+inspection actions until Escape dismisses it deepest-first. Screen/modal scope
+changes and disclosure revocation still invalidate unavailable content.
 The log retains its height above artwork through a separate game-owned boundary.
 
 Local game/settings/leave pages compose Gamekit's `UiMenuStack` and menu templates.

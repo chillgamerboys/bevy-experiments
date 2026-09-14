@@ -126,6 +126,30 @@ argv = ["cargo", "test", "-p", "bevy-gamekit-ui", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
+[commands.ui-tooltip-test]
+git_refs = []
+argv = ["cargo", "test", "--locked", "-p", "bevy-gamekit-ui", "--profile", "ci", "tooltip::", "--", "--test-threads=1"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.ui-lint]
+git_refs = []
+argv = ["cargo", "clippy", "--locked", "-p", "bevy-gamekit-ui", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+
+[commands.labyrinth-render-sparse]
+git_refs = []
+argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-sparse-1920.png", "1920", "1080", "auto", "sparse"]
+timeout_seconds = 600
+resources = ["project:cargo-target", "gpu", "window"]
+
+[commands.labyrinth-render-tooltip]
+git_refs = []
+argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-tooltip-1920.png", "1920", "1080", "auto", "help-locked"]
+timeout_seconds = 600
+resources = ["project:cargo-target", "gpu", "window"]
+
 [commands.rules-test]
 # These commands consume source; the runner binds the resolved receiving base.
 git_refs = []

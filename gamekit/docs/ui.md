@@ -85,10 +85,16 @@ late `Node` offsets or wait for a later frame to reveal valid geometry. The host
 is a full-target screen root; cards retain native layout and scroll behavior.
 Previews appear immediately and are pointer-transparent. Leaving before the
 configurable `UiTooltipSettings::lock_delay` (1 second by default) dismisses them
-immediately. Continuous hover locks a card until explicit dismissal, source
-replacement or a scope/disclosure change. An accent border and corner × indicate
-the locked state; there is no Pin/footer row. Retained click focus is not hover;
-keyboard inspection is explicit via T. This lifecycle is separate from placement
+immediately. Continuous hover locks a card until Escape dismisses it, deepest
+linked card first and then the root. Pinned chains ignore other hover sources,
+explicit-open actions and ordinary gameplay/outside clicks; linked navigation
+within the chain remains available. An accent border indicates the locked state;
+there is no close button or Pin/footer row. Source-entity rebuilds preserve stable
+subjects, while screen/modal scope changes and disclosure revocation still clear
+invalid content. Adopters can explicitly clear state through lifecycle requests.
+Retained click focus is not hover; keyboard inspection is explicit via T, with
+focus on the deepest card's first link or the card itself when it has no links.
+This lifecycle is separate from placement
 and never delays display to mask invalid geometry. `UiTooltipDismissOnActivate`
 can suppress a transient hint on activation until its source is left.
 `UiTooltipAvoid` marks same-host surfaces, such as a visible activity log, whose

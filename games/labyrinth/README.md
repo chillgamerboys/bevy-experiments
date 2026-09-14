@@ -208,7 +208,10 @@ Player and monster corpses preserve all occupied ranks, have separate HP equal t
 one quarter of living maximum HP (rounded up), and retain Bleed without refreshing
 it. Corpse effects tick at round end. Remains can be attacked by either team and
 expire after three full rounds, excluding creation: a round-2 corpse clears at
-round-5 end. Destruction/expiry compacts the formation. Healing/rescue cannot revive
+round-5 end. Destruction/expiry compacts the formation toward the center. Both sides
+always retain six fixed rank spaces: smaller rosters and cleared corpses leave
+empty back ranks without enlarging the characters, menus or controls. Two-rank
+actors retain their full footprint. Healing/rescue cannot revive
 corpses. All heroes down loses; all living enemies dead wins even with corpses left.
 The host can return to the lobby for a new test encounter; this is not campaign revival.
 See [formation and death contracts](docs/rules.md).
@@ -261,10 +264,11 @@ current selection. Exact source/target ranks are listed in ability tooltips;
 HP forecast segments remain attached to the affected actor.
 
 Hover an ability or status to see its card immediately. Leaving before 1 second
-hides it immediately; continuous hover locks it with an accent border and a small
-top-right **×**. Locked cards remain open over empty space, support related terms,
-and close via ×, an outside click, or **Escape** (deepest card first). Hovering a
-different source replaces the card and restarts the lock timer. **T** explicitly
+hides it immediately; continuous hover locks it with an accent border. Locked
+cards support related terms and stay open while hovering or clicking other
+characters and abilities. **Escape** is their only dismissal control (deepest
+card first); there is no close button or outside-click dismissal. Close the
+current card before inspecting another source. **T** explicitly
 opens keyboard inspection of the focused source; merely retaining clicked-button
 focus never reopens a preview. Game-menu and combat-log toggles have no tooltips.
 **K** toggles the equipped skillbook,

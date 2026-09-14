@@ -24,6 +24,7 @@ pub struct UiTooltipSource(pub UiTooltipSubject);
 
 /// Attach to an existing action to open inspection on activation, without a
 /// game-specific action translator. Do not attach to gameplay ability buttons.
+/// An existing pinned chain ignores this action until it is dismissed.
 #[derive(Component, Debug, Clone)]
 pub struct UiTooltipOpen(pub UiTooltipSubject);
 
@@ -106,13 +107,16 @@ impl Default for UiTooltipSettings {
 /// Local inspection commands; these never represent gameplay activation.
 #[derive(Message, Debug, Clone)]
 pub enum UiTooltipRequest {
-    /// Open a known subject immediately (for example, from a skillbook).
+    /// Open a known subject immediately (for example, from a skillbook), unless
+    /// another inspection chain is already pinned.
     Open(UiTooltipSubject),
     /// Keep the current chain open independently of pointer position.
     Pin,
-    /// Close the deepest card first.
+    /// Programmatically close the deepest card first. The native player control
+    /// is the configured dismiss key (Escape by default).
     Back,
-    /// Close the complete chain.
+    /// Programmatically close the complete chain, for example during a game
+    /// lifecycle transition. Ordinary pointer activation does not dismiss pins.
     Dismiss,
 }
 
@@ -172,7 +176,6 @@ impl UiTooltipState {
     fn hover(
         &mut self,
         candidate: Option<UiTooltipSubject>,
-        over_card: bool,
         delta: Duration,
         settings: &UiTooltipSettings,
     ) {
@@ -182,18 +185,12 @@ impl UiTooltipState {
             self.dwell = Duration::ZERO;
             self.suppressed = None;
         }
-        if self.keyboard || (self.pinned && over_card) {
+        if self.keyboard || self.pinned {
             return;
         }
         if let Some(subject) = candidate {
             if self.suppressed.as_ref() == Some(&subject) {
                 return;
-            }
-            if self.pinned {
-                if !changed || self.chain.first() == Some(&subject) {
-                    return;
-                }
-                self.pinned = false;
             }
             if self.chain.first() != Some(&subject) {
                 self.chain = vec![subject];
@@ -440,13 +437,10 @@ fn resolve(
     };
     world.resource_scope(|world, mut state: Mut<UiTooltipState>| {
         let was_keyboard = state.keyboard;
-        let explicit_dismissal = outside_click
+        let explicit_dismissal = (outside_click && !state.pinned)
             || commands
                 .iter()
                 .any(|command| matches!(command, UiTooltipRequest::Dismiss))
-            || clicked
-                .iter()
-                .any(|action| matches!(action, view::TooltipAction::Close(0)))
             || (escape && !editing && state.chain.len() == 1);
         let host_changed = state.host.is_some() && state.host != host;
         state.host = host;
@@ -472,14 +466,14 @@ fn resolve(
             .and_then(|(subject, _, _)| key.as_ref().filter(|key| *key == subject))
             .cloned();
         if !(inspect && state.pinned) {
-            state.hover(pointer_key, over_card, delta, &settings);
+            state.hover(pointer_key, delta, &settings);
         }
         if let Some((key, _, anchor)) = &candidate {
             if state.chain.first() == Some(key) && !state.keyboard {
                 state.anchor = Some(*anchor);
             }
         }
-        if outside_click {
+        if outside_click && !state.pinned {
             state.dismiss();
         }
         // Adopters identify controls whose hint has served its purpose on use.
@@ -499,7 +493,7 @@ fn resolve(
             }
         }
         for (entity, subject) in opened {
-            if content(world, &state, &subject).is_some() {
+            if !state.pinned && content(world, &state, &subject).is_some() {
                 state.chain = vec![subject];
                 state.anchor = Some(entity);
                 state.pinned = true;
@@ -507,7 +501,9 @@ fn resolve(
         }
         for command in commands {
             match command {
-                UiTooltipRequest::Open(subject) if content(world, &state, &subject).is_some() => {
+                UiTooltipRequest::Open(subject)
+                    if !state.pinned && content(world, &state, &subject).is_some() =>
+                {
                     state.chain = vec![subject];
                     state.pinned = true;
                 }
@@ -520,16 +516,9 @@ fn resolve(
             }
         }
         for action in clicked {
-            match action {
-                view::TooltipAction::Close(depth) => {
-                    state.chain.truncate(depth);
-                    state.suppressed = state.candidate.clone();
-                }
-                view::TooltipAction::Link(depth, subject) => {
-                    if state.pinned && content(world, &state, &subject).is_some() {
-                        state.follow(depth, subject, settings.max_depth);
-                    }
-                }
+            let view::TooltipAction::Link(depth, subject) = action;
+            if state.pinned && content(world, &state, &subject).is_some() {
+                state.follow(depth, subject, settings.max_depth);
             }
         }
         if inspect && !editing {
@@ -595,7 +584,7 @@ fn resolve(
             state.pinned = false;
             state.keyboard = false;
             // Closing a floating card can expose a different source beneath
-            // its ×. Geometry changes are not fresh hover intent. Wait for an
+            // it. Geometry changes are not fresh hover intent. Wait for an
             // actual pointer move; explicit keyboard inspection remains usable.
             if explicit_dismissal && !cursors.is_empty() {
                 state.dismissed_pointer = Some(cursors.clone());

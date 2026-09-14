@@ -707,6 +707,11 @@ fn facing_front_ranks_are_presentation_only_and_selection_is_distinct_normal_108
         .get::<Children>(heroes)
         .expect("tiles")
         .iter()
+        .filter(|entity| {
+            app.world()
+                .get::<Name>(*entity)
+                .is_some_and(|name| name.as_str().starts_with("Actor "))
+        })
         .map(|entity| {
             app.world()
                 .get::<Name>(entity)

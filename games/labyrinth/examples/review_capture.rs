@@ -58,6 +58,7 @@ fn main() {
     let large = matches!(
         route.as_str(),
         "footprints"
+            | "sparse"
             | "corpses"
             | "corpse-forecast"
             | "corpse-help"
@@ -133,7 +134,7 @@ fn main() {
     };
     let mut events = Vec::new();
     for _ in 0..PARTY_SIZE * 2 {
-        if route.starts_with("movement") {
+        if route.starts_with("movement") || route == "sparse" {
             break;
         }
         let Some(action) = combat.ai_action() else {
@@ -143,11 +144,11 @@ fn main() {
             events.extend(combat.apply(actor, action).expect("legal fixture AI"));
         }
     }
-    if route == "corpse-forecast" || route.starts_with("movement") {
+    if route == "corpse-forecast" || route.starts_with("movement") || route == "sparse" {
         for _ in 0..24 {
             let actor = combat.snapshot().active_actor.expect("review decision");
             if actor
-                == if route.starts_with("movement") {
+                == if route.starts_with("movement") || route == "sparse" {
                     ActorId(1)
                 } else {
                     ActorId(3)
@@ -186,6 +187,20 @@ fn main() {
             eligible_boundary: snapshot.boundary_sequence + 1,
         }];
         snapshot.validate().expect("corpse review state");
+    }
+    if route == "sparse" {
+        // Authored cleared-rank fixture; transition behavior has separate UI tests.
+        let retained = [ActorId(1), ActorId(5), ActorId(101)];
+        for actor in &mut snapshot.actors {
+            if !retained.contains(&actor.id) {
+                actor.hp = 0;
+                actor.life = labyrinth_rules::LifeState::Removed;
+                actor.statuses.clear();
+            }
+        }
+        snapshot.hero_formation.retain(|id| retained.contains(id));
+        snapshot.enemy_formation.retain(|id| retained.contains(id));
+        snapshot.validate().expect("sparse review state");
     }
     if route == "corpses" {
         // Authored visual fixture, not evidence of a death-save or damage transition.

@@ -92,6 +92,14 @@ uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
 
+The `sparse` route retains a hero, wagon and Hauler with empty back ranks. Compare
+it with `footprints` at 1920×1080 Auto when changing rank sizing. The normal-1080
+footprint regression checks initial sparse rosters, death versus corpse removal,
+stable controls and projected movement alignment; authored frames do not establish
+those transitions. `gameskills run ui-tooltip-test` covers the shared tooltip
+lifecycle. Labyrinth's normal UI tests cover pointer hover, pinned persistence
+through other ability clicks, Escape and nested inspection without a close button.
+
 When customization presentation or interaction changes, review the affected lobby,
 character editor or ability-overflow path at 1920×1080 Auto. Automatic focus scrolling is part
 of usability; verify controls can be reached beyond the first visible rows.
@@ -241,12 +249,12 @@ resizing when affected. Record missing required interaction/network evidence;
 unselected routes are not pending gates.
 
 Tooltip lifecycle regressions include immediate first-frame preview and departure,
-one-second continuous hover to lock, persistence over empty space, source switching,
-explicit keyboard inspection, modal cleanup, and ×/Escape/outside dismissal.
+one-second continuous hover to lock, persistence over empty space and other sources,
+explicit keyboard inspection, modal cleanup, and deepest-first Escape dismissal.
 The native-layout test compares the card rectangle on every frame across locking:
 the preview must use the same shorter geometry as the locked card, not reserve an
-extra footer. Native pointer tests close the × over an underlying character and
-verify that stationary-pointer dismissal does not reveal a new tooltip. Render
+extra footer. Native pointer tests hover and activate another ability while pinned,
+then verify that Escape with a stationary pointer does not reveal a new tooltip. Render
 `labyrinth_review ... 1920 1080 auto help` and `help-locked` for separate authored
 presentation states; those captures freeze timing and do not prove hover duration.
 
