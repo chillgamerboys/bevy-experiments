@@ -200,6 +200,15 @@ impl Combat {
         catalog: &crate::catalog::ContentCatalog,
         scenario: &crate::scenario::Scenario,
     ) -> Result<Self, crate::catalog::ContentError> {
+        Self::from_scenario_with_events(catalog, scenario).map(|(combat, _)| combat)
+    }
+
+    /// Begin an encounter and return every committed initial round/turn outcome.
+    /// Session owners retain these alongside subsequent [`Self::apply`] outcomes.
+    pub fn from_scenario_with_events(
+        catalog: &crate::catalog::ContentCatalog,
+        scenario: &crate::scenario::Scenario,
+    ) -> Result<(Self, Vec<CombatEvent>), crate::catalog::ContentError> {
         scenario.validate(catalog)?;
         let scenario_fingerprint = scenario.fingerprint(catalog)?;
         let mut next_status = 1_u64;
@@ -284,7 +293,7 @@ impl Combat {
             .seek_decision(&mut events, &mut work)
             .map_err(setup_error)?;
         combat.state.validate().map_err(setup_error)?;
-        Ok(combat)
+        Ok((combat, events))
     }
 
     /// Public full snapshot containing committed phases, rolls and status lifetimes.

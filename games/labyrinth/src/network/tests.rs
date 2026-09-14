@@ -12,6 +12,7 @@ use super::*;
 
 mod budgets;
 mod delivery_order;
+mod history;
 mod process;
 mod spatial;
 

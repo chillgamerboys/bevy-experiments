@@ -195,7 +195,7 @@ failed loads preserve the current scenario, formation and setup revision.
 Portable save remains playable Scenario JSON, with no participant or sparse-draft
 schema. Loading a stock or portable scenario restores compact placement and retains
 owners for matching actor identities. Editing just the seed preserves construction
-positions. Setup and assignment revisions cover these transitions; the v7 wire
+positions. Setup and assignment revisions cover these transitions; the v8 wire
 validates the draft/formation/company relationship before projecting it to a guest.
 
 The board keeps selection, type preview, placement and ownership next to their
@@ -231,6 +231,29 @@ snapshots; only request sequence is recipient-specific. Host RNG, admission secr
 and password verifier are never sent in them. Recent typed outcomes have monotonic
 session IDs, letting UI effects deduplicate while a reconnect establishes a fresh
 baseline. A cosmetic effect is never gameplay evidence or a scheduling dependency.
+
+The host/local session retains every typed outcome for the displayed encounter,
+including construction's initial round, turn and status outcomes. It discards that
+archive only when the encounter is replaced or the session closes. Session snapshots
+retain at most 80 recent events and advertise the complete half-open event-ID range.
+Protocol v8 adds game-owned history requests over the existing acknowledged,
+encrypted transport; only an admitted connection can read its current encounter.
+Each page contains at most 64 events and 32 KiB of encoded data. Per-connection
+queues hold at most eight requests and serve one page per connection per tick,
+independently of gameplay sequences, decisions, revisions and turn advancement.
+
+`EncounterHistory` is a separate incremental presentation cache. Ordered IDs
+identify overlaps; equal records deduplicate and conflicting records fail validation.
+Snapshots announce new ranges, and the client fills missing ranges one bounded page
+at a time, including after a missed recent window or reconnect. Responses must match
+the active connection attempt, requested range and encounter. Same-session disconnect
+keeps cached records while cancelling pending reads; a different session or encounter
+clears them. Local/host reads use the same archive page method. UI range queries copy
+at most 64 records and do not clone the full cache; `LabyrinthView.events` remains the
+recent animation input. The current cooperative wire state is public: older pages
+have the same disclosure policy as live records, and the presentation's existing
+unknown-information guard still applies. No past-encounter export or host-restart
+archive is promised.
 
 ## Stage and overlay presentation
 
@@ -278,15 +301,20 @@ checks its compatibility `paused` flag against the authoritative reason. One pla
 returning does not resume combat while another is missing, and reconnection does
 not clear a rules fault.
 
-Log mode is a local Hidden/Compact/History enum, initially Hidden. Hidden removes
-the entire input surface but retains authoritative events. Compact shows two
-outcome summaries without history navigation; History provides the non-modal
-scrollable overlay. It groups typed authoritative events by
-action and turn boundaries, handles a partially retained first action explicitly,
-and reuses unchanged rows by event identity. New encounters reset local expansion
-and reading state. Gamekit only supplies follow-latest scrolling; game-local code
-owns summaries, detail links, bounded retention and disclosure. As elsewhere,
-concealing a history panel does not remove facts already sent over the network.
+The combat log is one compact, translucent, non-modal overlay, initially hidden.
+Its close control removes pointer/focus eligibility while retaining local reading
+state and the complete current-encounter cache. Plain typed event rows use fixed
+slots keyed by event ID, with at most 32 mounted rows and spacers for the remaining
+archive. Missing visible records request bounded pages; replacing placeholders or
+receiving events preserves the reading anchor. Latest restores following and
+clears unread state. New encounters reset reading state. Full text remains available
+through row inspection, including long names, with the shared one-second pin,
+close and menu suspension policy. Only mounted rows and the bounded inspection
+chain need tooltip content. The exact `CombatDisclosure::has_unknown()` guard
+conceals rows and revokes their inspection keys, including while the panel is
+hidden. Game-owned code retains history and enforces disclosure; GameKit supplies
+scrolling and inspection lifecycle. Concealing the panel does not remove facts
+already sent over the network.
 
 Statuses use one stable effects control per actor, with priority derived from the
 effect definition. A compact name/potency/clock and overflow count are backed by
