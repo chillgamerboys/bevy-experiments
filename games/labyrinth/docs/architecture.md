@@ -308,7 +308,7 @@ slots keyed by event ID, with at most 32 mounted rows and spacers for the remain
 archive. Missing visible records request bounded pages; replacing placeholders or
 receiving events preserves the reading anchor. Latest restores following and
 clears unread state. New encounters reset reading state. Full text remains available
-through row inspection, including long names, with the shared one-second pin,
+through row inspection, including long names, with the shared two-second pin,
 close and menu suspension policy. Only mounted rows and the bounded inspection
 chain need tooltip content. The exact `CombatDisclosure::has_unknown()` guard
 conceals rows and revokes their inspection keys, including while the panel is

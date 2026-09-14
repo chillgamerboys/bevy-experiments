@@ -97,7 +97,7 @@ pub struct UiTooltipSettings {
 impl Default for UiTooltipSettings {
     fn default() -> Self {
         Self {
-            lock_delay: Duration::from_secs(1),
+            lock_delay: Duration::from_secs(2),
             max_depth: 4,
             inspect_key: Some(KeyCode::KeyT),
             dismiss_key: Some(KeyCode::Escape),
