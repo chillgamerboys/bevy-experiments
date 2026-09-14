@@ -1,8 +1,9 @@
 # Tests and evidence
 
 Resolve `gameskills verification resolve --base BRANCH` before selecting checks.
-Development feature PRs to `dev` and Testing milestone batches to `main` run on
-macOS. Windows/Linux are Release checks. Creative involvement and Cargo's `ci`
+The current receiving branch is `main` (Testing). After the pending branch rollout,
+feature PRs to `dev` use Development and milestone batches to `main` use Testing.
+Both levels run on macOS. Windows/Linux are Release checks. Creative involvement and Cargo's `ci`
 build profile are independent of this policy.
 
 Choose the affected owner suites and relevant build/lint checks. Logic-only changes
@@ -39,7 +40,9 @@ cargo run --locked -p repo-devtools --profile ci -- skills validate
 cargo test --locked -p gameskills-cli --profile ci
 ```
 
-Use `cargo test -p <package> --profile ci` for focused iteration. The list above is
+Use named suites or an explicit test target/filter for focused iteration; an
+unfiltered game package includes every non-ignored test, including retained display
+and network cases. The list above is
 the broad validation set, not a requirement to rebuild all games for narrative
 documentation. `cargo deny` is a separately installed dependency-policy tool.
 

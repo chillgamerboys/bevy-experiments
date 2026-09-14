@@ -1,12 +1,14 @@
 # Development rigor and milestone promotion
 
 Status: active
-Phase: implementation in progress
+Phase: implementation merged; branch and installation rollout pending
 Owner: GameSkills, with repository CI and game test-suite owners.
-Current endpoint: reviewable implementation PR, authorized after planning.
+Implementation: PR #40 merged into `main` as `ebc77b73584f3e1f2a6cefcd036fcffb985ddd1a`.
+Remaining endpoint: branch/default and installation rollout described below.
 Tracking: [HEX-110](https://linear.app/chillgamerboys/issue/HEX-110/add-scoped-development-testing-and-release-rigor-to-gameskills).
 Branch/default changes follow accepted integration and observed Development routing.
-The earlier PR #39 merge is complete and grants no new merge authority.
+Development and Testing probes passed on the accepted implementation; a real
+`dev` receiving branch and current-session candidate activation remain unobserved.
 
 ## Outcome and accepted decisions
 

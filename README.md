@@ -5,26 +5,26 @@ through independently composed games. Bevy 0.19; one Cargo workspace.
 
 | Game | Purpose | Run from the repository root |
 |---|---|---|
-| [Labyrinth](games/labyrinth/README.md) | Primary game: six-player cooperative positional combat | `cargo run` |
-| [Carterfight](games/carterfight/README.md) | Pixel-art dialogue battle; contrasting UI adopter | `cargo run -p carterfight` |
-| [Deckbuilder](games/deckbuilder/README.md) | Runnable UI and multiplayer regression example | `cargo run -p deckbuilder` |
+| [Labyrinth](games/labyrinth/README.md) | Primary game: six-player cooperative positional combat | `cargo run --locked -p labyrinth --profile ci` |
+| [Carterfight](games/carterfight/README.md) | Pixel-art dialogue battle; contrasting UI adopter | `cargo run --locked -p carterfight --profile ci` |
+| [Deckbuilder](games/deckbuilder/README.md) | Runnable UI and multiplayer regression example | `cargo run --locked -p deckbuilder --profile ci` |
 
-For a local Labyrinth battle controlling the whole company: `cargo run -- --local`.
-Ordinary play does not require `--all-features`. The multiplayer menu opens no host
-until requested. See each game's README for controls and supported behavior.
+For the offline Labyrinth setup lobby, add `-- --local`. The main menu opens
+no host until requested. Ordinary play does not require `--all-features`.
+
+Start with [setup and launch](docs/setup-and-launch.md): prerequisites, exact game
+commands, window sizing, build profiles and optional GameSkills setup. Labyrinth
+requests a 1920×1080 logical window with Auto UI scale; desktop limits may apply.
 
 ## Development
 
-```sh
-cargo test --workspace --all-features --profile ci
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --profile ci -- -D warnings
-cargo run --locked -p repo-devtools --profile ci -- check
-```
+Select checks for the changed behavior using [testing scope](docs/testing.md).
+Logic fixes need relevant owner tests; UI checks and end-to-end journeys follow the
+affected surface. The broad workspace suite is not the development default.
 
-The CI profile optimizes compile time; normal `cargo run` uses the dev profile.
-Switching profiles/features can compile additional artifacts. Generated builds and
-review captures live under `target/`; do not commit them or admission credentials.
+The quickstart uses Cargo's `ci` profile for faster local builds. For smoother play
+when performance matters, use `--profile dev`; changing profiles/features builds
+separate artifacts. Generated builds and captures live under `target/`.
 
 - [Gamekit](gamekit/README.md): opt-in Rust capabilities and their documentation.
 - [GameSkills](gameskills/README.md): CLI, canonical plugins and legacy compatibility.

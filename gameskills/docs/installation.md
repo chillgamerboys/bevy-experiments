@@ -4,7 +4,7 @@ Use this guide to adopt a candidate or change an explicit instruction pin.
 
 ## Install a candidate
 
-The current candidate is unpublished `0.1.0-dev.3`. Source installation requires the
+The current source candidate is unpublished `0.1.0-dev.4`. Source installation requires the
 pinned Rust 1.97.1 toolchain. A verified prebuilt executable requires neither Cargo
 nor Python at runtime. Git is needed for repository operations; native activation
 also needs the selected Codex or Claude CLI.
@@ -33,8 +33,8 @@ read-only until `--apply`. Applying stages immutable files in `.gameskills/bundl
 records their content and runtime compatibility in `gameskills.lock.json`, and
 registers selected Codex plugins in project `.codex/config.toml`, preserving
 unrelated settings and comments. Commit the
-configuration and lock; keep `.gameskills/` out of Git. Hydrating a fresh checkout
-is an explicit setup operation.
+configuration and lock; keep `.gameskills/` out of Git. Recreating the ignored bundle and registration in a fresh checkout is explicit;
+it is not the same as selecting a newer pin. See the checkout procedure below.
 
 Codex local marketplaces require an absolute source path, so generated registration
 entries in `.codex/config.toml` are machine/worktree-local: exclude a generated-only
@@ -45,7 +45,9 @@ outdated. Ownership lives in `.gameskills/native-registration.json`.
 
 Use `setup --bundle PATH --apply` to select a verified compatible bundle for an
 update or rollback. Export one with `gameskills bundle --out NEW_DIRECTORY`; pinned
-source export uses `--source CHECKOUT --revision FULL_COMMIT`. Canonical preparation
+source export uses `--source CHECKOUT --revision FULL_COMMIT`; that checkout must
+be at the selected revision with a matching prepared bundle and clean canonical inputs.
+Canonical preparation
 is the repository tool's responsibility, not an implicit runtime download.
 Old immutable bundles remain available. Modified installed content is an error;
 edit canonical source or project-owned guidance instead of installed caches.
@@ -53,6 +55,37 @@ edit canonical source or project-owned guidance instead of installed caches.
 and refuses to overwrite subsequent user edits. Changed or disabled owned native
 values are conflicts; setup will not silently re-enable them. Updates remove obsolete
 owned registration values only while they still match the previous write.
+
+## This checkout and existing pins
+
+For repository development, build a local executable without a global install:
+
+```sh
+cargo build --locked -p gameskills-cli --profile ci
+./target/ci/gameskills --version
+./target/ci/gameskills status
+./target/ci/gameskills setup
+```
+
+These last commands inspect state and propose changes. `setup --apply` without
+`--bundle` selects the executable's embedded baseline, even when a different pin
+already exists. It is an update operation in that case, not merely hydration.
+Compare the proposal's `lock_change` and content identity with `gameskills.lock.json`.
+
+To preserve an existing pin in a fresh worktree, obtain its verified immutable bundle
+from a retained installation or pinned source export, then run
+`setup --bundle /absolute/path/to/bundle` and inspect the proposal before applying
+that same command with `--apply`. Recheck `status` and project registration.
+If the current executable's embedded content matches the recorded pin, ordinary
+`setup --apply` can restore it. A checked-in lock alone does not provide the ignored
+bundle files, and copying `.codex/config.toml` does not relocate absolute paths.
+
+The repository's [setup guide](../../docs/setup-and-launch.md#current-rollout-state)
+records its rollout state. CLI version, embedded candidate and installed instructions
+are distinct identities: rebuilding or installing the CLI does not update the pin or
+reload a running Codex/Conductor session. Read `status.version`, `cli_version`,
+`source_commit` and `content_sha256` together. Native agent launch below starts Codex
+or Claude; it does not start Labyrinth or another game.
 
 ## Native clients
 

@@ -2,6 +2,8 @@
 
 Current shared guidance:
 
+- [Setup and launch](setup-and-launch.md)
+
 - [Architecture and Decisions](architecture.md)
 - [Development and documentation conventions](development.md)
 - [Testing and evidence](testing.md)

@@ -7,11 +7,12 @@ primarily to Labyrinth. Energy, card effects, private hands and victory stay loc
 From the repository root or this directory:
 
 ```sh
-cargo run -p deckbuilder
-cargo test -p deckbuilder --profile ci
+cargo run --locked -p deckbuilder --profile ci
 ```
 
-No `--all-features` is needed for ordinary play. Use pointer or Tab/Shift+Tab and
+The initial window request is 1440×900 logical pixels. See [setup and launch](../../docs/setup-and-launch.md)
+for build profiles and the separate 1080p verification target. No test suite or
+`--all-features` is needed for ordinary play. Use pointer or Tab/Shift+Tab and
 Enter/Space. Start a local match, select a card, play it, end the turn, or open the
 local Game menu. Escape opens it or returns to the previous page. Back to game
 closes it; returning to the main menu requires confirmation. The match and
