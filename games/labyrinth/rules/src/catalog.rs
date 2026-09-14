@@ -7,15 +7,17 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fmt};
 
 /// Supported authored catalog schema (effect semantics also require rules identity).
-pub const CATALOG_SCHEMA_VERSION: u32 = 1;
+pub const CATALOG_SCHEMA_VERSION: u32 = 2;
 /// Maximum encoded catalog accepted before parsing.
 pub const MAX_CATALOG_BYTES: usize = 1_048_576;
 /// Maximum definitions per category; unrelated to the number of UI shortcuts.
 pub const MAX_CATALOG_ENTRIES: usize = 256;
-/// Maximum distinct active abilities on one resolved actor.
-pub const MAX_RESOLVED_ABILITIES: usize = 64;
-/// Maximum ordered effects on one resolved ability.
-pub const MAX_ABILITY_EFFECTS: usize = 16;
+/// Maximum distinct active skills on one resolved actor.
+pub const MAX_MOVESET_SKILLS: usize = 64;
+/// Maximum distinct passive Abilities selected or granted on one actor.
+pub const MAX_BUILD_ABILITIES: usize = 64;
+/// Maximum ordered effects on one resolved skill.
+pub const MAX_SKILL_EFFECTS: usize = 16;
 /// Maximum configured maximum HP and authored direct damage/healing.
 pub const MAX_CONTENT_POWER: u16 = 10_000;
 
@@ -86,12 +88,16 @@ impl fmt::Display for ContentError {
 }
 impl std::error::Error for ContentError {}
 
-/// Behavior category is independent of where an ability was granted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum AbilityBehavior {
-    /// Explicitly selected combat action. Passive/reaction execution is deferred.
-    #[default]
-    Active,
+/// An authored equipment prerequisite; every listed requirement must match.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EquipmentRequirement {
+    /// Any item with this equipment kind.
+    Kind(ContentId),
+    /// This exact item identity.
+    Item(ContentId),
+}
+fn personally_selectable() -> bool {
+    true
 }
 /// Target collection shape; resolved targets must be captured before effects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -102,19 +108,22 @@ pub enum TargetPattern {
     /// Distinct eligible occupants of ranks 1–2; a two-rank actor is hit once.
     FrontPair,
 }
-/// Fully owned ability definition; adding known effects needs no ability enum arm.
+/// Fully owned skill definition; adding known effects needs no skill enum arm.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AbilityDefinition {
+pub struct SkillDefinition {
     /// Stable key.
     pub id: ContentId,
     /// Display label.
     pub name: String,
     /// Authored explanation; consumers should also describe resolved effects.
     pub description: String,
-    /// Active versus future passive behavior, never inferred from provenance.
+    /// Whether this may be selected personally, independently of equipment grants.
+    #[serde(default = "personally_selectable")]
+    pub personal_selectable: bool,
+    /// Equipment requirements, distinct from the source that grants this Skill.
     #[serde(default)]
-    pub behavior: AbilityBehavior,
+    pub requirements: Vec<EquipmentRequirement>,
     /// Allowed source ranks, bit zero is rank one.
     pub source_ranks: u8,
     /// Allowed target ranks, using the same six-bit mask.
@@ -129,7 +138,7 @@ pub struct AbilityDefinition {
     /// Explicit execution order, using tested Rust primitives.
     pub effects: Vec<Effect>,
 }
-impl AbilityDefinition {
+impl SkillDefinition {
     /// Whether one-based source rank is in this move's mask.
     #[must_use]
     pub fn allows_source_rank(&self, rank: u8) -> bool {
@@ -161,8 +170,14 @@ pub struct WeaponDefinition {
     pub description: String,
     /// Metadata without imposing inventory policy.
     pub handedness: Handedness,
-    /// Ordered ability grants.
-    pub grants: Vec<ContentId>,
+    /// Equipment category used by kind prerequisites.
+    pub kind: ContentId,
+    /// Ordered active Skill grants.
+    #[serde(default)]
+    pub skills: Vec<ContentId>,
+    /// Passive Ability grants.
+    #[serde(default)]
+    pub abilities: Vec<ContentId>,
 }
 /// Explicit additive upgrade operations. No replacements or recursive skill links.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,33 +196,48 @@ pub enum UpgradeOperation {
     /// Union this six-rank mask into allowed target ranks.
     ExtendTargetRanks(u8),
 }
-/// A learned contribution to a separately granted ability.
+/// A passive contribution to a separately granted active Skill.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AbilityUpgrade {
-    /// The ability must already be granted in the completed build.
-    pub ability: ContentId,
-    /// Ordered contributions applied once per selected learned skill.
+pub struct SkillUpgrade {
+    /// The skill must already be granted in the completed build.
+    pub skill: ContentId,
+    /// Ordered contributions applied once per effective passive Ability.
     pub operations: Vec<UpgradeOperation>,
 }
-/// A learned skill can add moves, upgrade moves, or do both.
+/// A bounded passive effect, never an action or arbitrary event callback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PassiveEffect {
+    /// Shorten finite Debuff durations on application/refresh, minimum one tick.
+    ReduceNegativeStatusDuration {
+        /// Number of matching duration ticks removed.
+        amount: u8,
+    },
+}
+/// A passive Ability can modify active Skills or a narrowly defined runtime rule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LearnedSkillDefinition {
+pub struct AbilityDefinition {
     /// Stable key.
     pub id: ContentId,
     /// Display label.
     pub name: String,
-    /// Explanation of the learned skill.
+    /// Player-facing explanation.
     pub description: String,
-    /// Descriptive source identity, e.g. assassin; not a class restriction/tree.
+    /// Descriptive origin, not a class restriction.
     pub provenance: ContentId,
-    /// Ordered active grants.
+    /// Whether this may be selected personally.
+    #[serde(default = "personally_selectable")]
+    pub personal_selectable: bool,
+    /// Equipment conditions independent of grant source.
     #[serde(default)]
-    pub grants: Vec<ContentId>,
-    /// Explicit upgrades to moves granted elsewhere or by this skill.
+    pub requirements: Vec<EquipmentRequirement>,
+    /// Contributions to separately granted, eligible Skills.
     #[serde(default)]
-    pub upgrades: Vec<AbilityUpgrade>,
+    pub upgrades: Vec<SkillUpgrade>,
+    /// Narrow runtime passive effects.
+    #[serde(default)]
+    pub effects: Vec<PassiveEffect>,
 }
 /// Actor preset supplies editable defaults, never authority over resolved stats.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -225,7 +255,7 @@ pub struct ActorPreset {
     pub base_speed: u16,
     /// Default occupied ranks, 1–6.
     pub footprint: u8,
-    /// Default grants, learned skills and optional weapon.
+    /// Default personal Skills/Abilities and optional weapon.
     pub build: CharacterBuild,
 }
 /// Untrusted authored input. Validate with [`ContentCatalog::new`] before use.
@@ -236,15 +266,15 @@ pub struct CatalogDefinition {
     pub schema_version: u32,
     /// Author-controlled descriptive content revision; hash verifies actual data.
     pub revision: String,
-    /// Active ability definitions.
+    /// Active skill definitions.
     #[serde(default)]
-    pub abilities: Vec<AbilityDefinition>,
+    pub skills: Vec<SkillDefinition>,
     /// One-weapon choices.
     #[serde(default)]
     pub weapons: Vec<WeaponDefinition>,
-    /// Learned grant/upgrade definitions.
+    /// Passive Ability definitions.
     #[serde(default)]
-    pub learned_skills: Vec<LearnedSkillDefinition>,
+    pub abilities: Vec<AbilityDefinition>,
     /// Defaults for either team.
     #[serde(default)]
     pub actor_presets: Vec<ActorPreset>,
@@ -285,26 +315,22 @@ impl ContentCatalog {
         if definition.schema_version != CATALOG_SCHEMA_VERSION {
             return Err(ContentError::new(
                 "schema_version",
-                "unsupported catalog schema",
+                "unsupported catalog schema; recreate this catalog using schema 2 Skills/Abilities",
             ));
         }
         text_field("revision", &definition.revision, 128)?;
         for (name, ids) in [
             (
-                "abilities",
-                definition
-                    .abilities
-                    .iter()
-                    .map(|x| &x.id)
-                    .collect::<Vec<_>>(),
+                "skills",
+                definition.skills.iter().map(|x| &x.id).collect::<Vec<_>>(),
             ),
             (
                 "weapons",
                 definition.weapons.iter().map(|x| &x.id).collect(),
             ),
             (
-                "learned_skills",
-                definition.learned_skills.iter().map(|x| &x.id).collect(),
+                "abilities",
+                definition.abilities.iter().map(|x| &x.id).collect(),
             ),
             (
                 "actor_presets",
@@ -313,12 +339,12 @@ impl ContentCatalog {
         ] {
             unique_ids(name, &ids, MAX_CATALOG_ENTRIES)?;
         }
-        definition.abilities.sort_by(|a, b| a.id.cmp(&b.id));
+        definition.skills.sort_by(|a, b| a.id.cmp(&b.id));
         definition.weapons.sort_by(|a, b| a.id.cmp(&b.id));
-        definition.learned_skills.sort_by(|a, b| a.id.cmp(&b.id));
+        definition.abilities.sort_by(|a, b| a.id.cmp(&b.id));
         definition.actor_presets.sort_by(|a, b| a.id.cmp(&b.id));
         let bytes = serde_json::to_vec(&(
-            "labyrinth-build-v1",
+            "labyrinth-build-v2-skills-abilities-moveset",
             crate::rules_fingerprint(),
             &definition,
         ))
@@ -328,32 +354,62 @@ impl ContentCatalog {
             definition,
             fingerprint,
         };
-        for ability in &catalog.definition.abilities {
-            validate_ability(ability)?;
+        for skill in &catalog.definition.skills {
+            validate_skill(skill)?;
+            catalog.validate_requirements(&format!("skills.{}", skill.id), &skill.requirements)?;
         }
         for weapon in &catalog.definition.weapons {
             let path = format!("weapons.{}", weapon.id);
             text_field(&format!("{path}.name"), &weapon.name, 128)?;
             text_field(&format!("{path}.description"), &weapon.description, 2048)?;
-            catalog.validate_grants(&path, &weapon.grants)?;
+            catalog.validate_grants(&path, &weapon.skills)?;
+            unique_ids(
+                &format!("{path}.abilities"),
+                &weapon.abilities.iter().collect::<Vec<_>>(),
+                MAX_BUILD_ABILITIES,
+            )?;
+            for id in &weapon.abilities {
+                if catalog.ability(id).is_none() {
+                    return Err(ContentError::new(&path, format!("missing ability {id}")));
+                }
+            }
         }
-        for skill in &catalog.definition.learned_skills {
-            let path = format!("learned_skills.{}", skill.id);
-            text_field(&format!("{path}.name"), &skill.name, 128)?;
-            text_field(&format!("{path}.description"), &skill.description, 2048)?;
-            catalog.validate_grants(&path, &skill.grants)?;
+        for ability in &catalog.definition.abilities {
+            let path = format!("abilities.{}", ability.id);
+            text_field(&format!("{path}.name"), &ability.name, 128)?;
+            text_field(&format!("{path}.description"), &ability.description, 2048)?;
+            catalog.validate_requirements(&path, &ability.requirements)?;
+            if ability.upgrades.is_empty() && ability.effects.is_empty() {
+                return Err(ContentError::new(
+                    &path,
+                    "a passive Ability needs an upgrade or effect",
+                ));
+            }
+            if ability.effects.len() > MAX_SKILL_EFFECTS
+                || ability.effects.iter().any(|effect| {
+                    matches!(
+                        effect,
+                        PassiveEffect::ReduceNegativeStatusDuration { amount: 0 }
+                    )
+                })
+            {
+                return Err(ContentError::new(
+                    &path,
+                    "invalid passive effects (maximum 16, positive magnitudes)",
+                ));
+            }
             unique_ids(
                 &format!("{path}.upgrades"),
-                &skill
+                &ability
                     .upgrades
                     .iter()
-                    .map(|u| &u.ability)
+                    .map(|u| &u.skill)
                     .collect::<Vec<_>>(),
-                MAX_RESOLVED_ABILITIES,
+                MAX_MOVESET_SKILLS,
             )?;
-            for upgrade in &skill.upgrades {
-                let base = catalog.ability(&upgrade.ability).ok_or_else(|| {
-                    ContentError::new(&path, format!("missing ability {}", upgrade.ability))
+            for upgrade in &ability.upgrades {
+                let base = catalog.skill(&upgrade.skill).ok_or_else(|| {
+                    ContentError::new(&path, format!("missing Skill {}", upgrade.skill))
                 })?;
                 let mut effective = base.clone();
                 apply_upgrade(base, &mut effective, upgrade, &path)?;
@@ -387,20 +443,20 @@ impl ContentCatalog {
     pub fn definition(&self) -> &CatalogDefinition {
         &self.definition
     }
-    /// Find an ability by stable key.
+    /// Find an active Skill by stable key.
     #[must_use]
-    pub fn ability(&self, id: &ContentId) -> Option<&AbilityDefinition> {
-        self.definition.abilities.iter().find(|a| &a.id == id)
+    pub fn skill(&self, id: &ContentId) -> Option<&SkillDefinition> {
+        self.definition.skills.iter().find(|a| &a.id == id)
     }
     /// Find a weapon by stable key.
     #[must_use]
     pub fn weapon(&self, id: &ContentId) -> Option<&WeaponDefinition> {
         self.definition.weapons.iter().find(|a| &a.id == id)
     }
-    /// Find a learned skill by stable key.
+    /// Find a passive Ability by stable key.
     #[must_use]
-    pub fn learned_skill(&self, id: &ContentId) -> Option<&LearnedSkillDefinition> {
-        self.definition.learned_skills.iter().find(|a| &a.id == id)
+    pub fn ability(&self, id: &ContentId) -> Option<&AbilityDefinition> {
+        self.definition.abilities.iter().find(|a| &a.id == id)
     }
     /// Find editable actor defaults by stable key.
     #[must_use]
@@ -434,17 +490,91 @@ impl ContentCatalog {
         }
         Ok(())
     }
+    fn validate_requirements(
+        &self,
+        path: &str,
+        requirements: &[EquipmentRequirement],
+    ) -> Result<(), ContentError> {
+        if requirements.len() > 2 {
+            return Err(ContentError::new(
+                path,
+                "one weapon supports at most a kind and an exact-item requirement",
+            ));
+        }
+        let mut kind = None;
+        let mut item = None;
+        for requirement in requirements {
+            match requirement {
+                EquipmentRequirement::Kind(id) => {
+                    if kind.replace(id).is_some()
+                        || !self.definition.weapons.iter().any(|w| &w.kind == id)
+                    {
+                        return Err(ContentError::new(
+                            path,
+                            "duplicate or unknown equipment kind requirement",
+                        ));
+                    }
+                }
+                EquipmentRequirement::Item(id) => {
+                    if item.replace(id).is_some() || self.weapon(id).is_none() {
+                        return Err(ContentError::new(
+                            path,
+                            "duplicate or unknown equipment item requirement",
+                        ));
+                    }
+                }
+            }
+        }
+        if let (Some(kind), Some(item)) = (kind, item) {
+            if self.weapon(item).is_some_and(|w| &w.kind != kind) {
+                return Err(ContentError::new(
+                    path,
+                    "conflicting kind and item requirements",
+                ));
+            }
+        }
+        Ok(())
+    }
+    /// Explain missing equipment without invalidating an otherwise legal personal selection.
+    #[must_use]
+    pub fn unmet_requirements(
+        &self,
+        build: &CharacterBuild,
+        requirements: &[EquipmentRequirement],
+    ) -> Option<String> {
+        let equipped = build.weapon.as_ref().and_then(|id| self.weapon(id));
+        let missing = requirements
+            .iter()
+            .filter_map(|requirement| match requirement {
+                EquipmentRequirement::Kind(kind) if !equipped.is_some_and(|w| &w.kind == kind) => {
+                    Some(format!("Requires {kind} equipment"))
+                }
+                EquipmentRequirement::Item(item) if !equipped.is_some_and(|w| &w.id == item) => {
+                    Some(format!(
+                        "Requires {}",
+                        self.weapon(item).map_or(item.as_str(), |w| w.name.as_str())
+                    ))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if missing.is_empty() {
+            None
+        } else {
+            Some(missing.join("; "))
+        }
+    }
     fn validate_grants(&self, path: &str, grants: &[ContentId]) -> Result<(), ContentError> {
         unique_ids(
             &format!("{path}.grants"),
             &grants.iter().collect::<Vec<_>>(),
-            MAX_RESOLVED_ABILITIES,
+            MAX_MOVESET_SKILLS,
         )?;
         for grant in grants {
-            if self.ability(grant).is_none() {
+            if self.skill(grant).is_none() {
                 return Err(ContentError::new(
                     format!("{path}.grants"),
-                    format!("missing ability {grant}"),
+                    format!("missing skill {grant}"),
                 ));
             }
         }
@@ -522,33 +652,33 @@ fn validate_effect(path: &str, effect: &Effect) -> Result<(), ContentError> {
     if !valid {
         return Err(ContentError::new(
             path,
-            "invalid value or effect unsupported for active abilities",
+            "invalid value or effect unsupported for active skills",
         ));
     }
     Ok(())
 }
-pub(crate) fn validate_ability(ability: &AbilityDefinition) -> Result<(), ContentError> {
-    let path = format!("abilities.{}", ability.id);
-    text_field(&format!("{path}.name"), &ability.name, 128)?;
-    text_field(&format!("{path}.description"), &ability.description, 2048)?;
-    rank_mask(&format!("{path}.source_ranks"), ability.source_ranks)?;
-    rank_mask(&format!("{path}.target_ranks"), ability.target_ranks)?;
-    if ability.max_uses == Some(0) {
+pub(crate) fn validate_skill(skill: &SkillDefinition) -> Result<(), ContentError> {
+    let path = format!("skills.{}", skill.id);
+    text_field(&format!("{path}.name"), &skill.name, 128)?;
+    text_field(&format!("{path}.description"), &skill.description, 2048)?;
+    rank_mask(&format!("{path}.source_ranks"), skill.source_ranks)?;
+    rank_mask(&format!("{path}.target_ranks"), skill.target_ranks)?;
+    if skill.max_uses == Some(0) {
         return Err(ContentError::new(
             format!("{path}.max_uses"),
             "must be positive or absent for unlimited",
         ));
     }
-    if ability.effects.is_empty() || ability.effects.len() > MAX_ABILITY_EFFECTS {
+    if skill.effects.is_empty() || skill.effects.len() > MAX_SKILL_EFFECTS {
         return Err(ContentError::new(
             format!("{path}.effects"),
             "expected 1..16 ordered effects",
         ));
     }
-    if ability.target_pattern == TargetPattern::FrontPair
-        && (ability.target_rule != TargetRule::EnemyStanding
-            || ability.target_ranks != 3
-            || ability
+    if skill.target_pattern == TargetPattern::FrontPair
+        && (skill.target_rule != TargetRule::EnemyStanding
+            || skill.target_ranks != 3
+            || skill
                 .effects
                 .iter()
                 .any(|e| matches!(e, Effect::SwapWithSource | Effect::Rescue(_))))
@@ -558,11 +688,11 @@ pub(crate) fn validate_ability(ability: &AbilityDefinition) -> Result<(), Conten
             "FrontPair requires enemy ranks 1–2 and compatible effects",
         ));
     }
-    for (index, effect) in ability.effects.iter().enumerate() {
+    for (index, effect) in skill.effects.iter().enumerate() {
         validate_effect(&format!("{path}.effects[{index}]"), effect)?;
-        if matches!(effect, Effect::Rescue(_)) && ability.target_rule != TargetRule::AllyDowned
+        if matches!(effect, Effect::Rescue(_)) && skill.target_rule != TargetRule::AllyDowned
             || matches!(effect, Effect::SwapWithSource)
-                && ability.target_rule != TargetRule::OtherAlly
+                && skill.target_rule != TargetRule::OtherAlly
         {
             return Err(ContentError::new(
                 format!("{path}.effects[{index}]"),
@@ -573,12 +703,12 @@ pub(crate) fn validate_ability(ability: &AbilityDefinition) -> Result<(), Conten
     Ok(())
 }
 pub(crate) fn apply_upgrade(
-    base: &AbilityDefinition,
-    effective: &mut AbilityDefinition,
-    upgrade: &AbilityUpgrade,
+    base: &SkillDefinition,
+    effective: &mut SkillDefinition,
+    upgrade: &SkillUpgrade,
     path: &str,
 ) -> Result<(), ContentError> {
-    if upgrade.operations.is_empty() || upgrade.operations.len() > MAX_ABILITY_EFFECTS {
+    if upgrade.operations.is_empty() || upgrade.operations.len() > MAX_SKILL_EFFECTS {
         return Err(ContentError::new(path, "upgrade requires 1..16 operations"));
     }
     for operation in &upgrade.operations {
@@ -619,6 +749,6 @@ pub(crate) fn apply_upgrade(
             }
         }
     }
-    validate_ability(effective)
+    validate_skill(effective)
         .map_err(|e| ContentError::new(format!("{path}.{}", e.path), e.message))
 }

@@ -129,12 +129,12 @@ impl Glyph {
 }
 
 /// Choose a familiar symbol from resolved behavior; authored IDs need no UI enum arm.
-pub(super) fn for_ability(definition: &labyrinth_rules::catalog::AbilityDefinition) -> Glyph {
+pub(super) fn for_skill(definition: &labyrinth_rules::catalog::SkillDefinition) -> Glyph {
     if let Some(skill) = SkillId::ALL
         .into_iter()
         .find(|skill| labyrinth_rules::scenario::legacy_skill_id(*skill) == definition.id)
     {
-        return for_skill(skill);
+        return for_legacy_skill(skill);
     }
     use labyrinth_rules::Effect;
     for effect in &definition.effects {
@@ -160,7 +160,7 @@ pub(super) fn for_ability(definition: &labyrinth_rules::catalog::AbilityDefiniti
     }
 }
 
-pub(super) fn for_skill(skill: SkillId) -> Glyph {
+pub(super) fn for_legacy_skill(skill: SkillId) -> Glyph {
     match skill {
         SkillId::FrontStrike
         | SkillId::DeepStrike

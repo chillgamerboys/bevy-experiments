@@ -54,15 +54,15 @@ impl EffectResolver<'_> {
             work,
         )?;
         match action {
-            CombatAction::Skill { .. } | CombatAction::Ability { .. } => {
+            CombatAction::LegacySkill { .. } | CombatAction::Skill { .. } => {
                 let (index, anchor) = self
                     .state
-                    .action_ability(source, action)?
+                    .action_skill(source, action)?
                     .ok_or(RuleError::UnknownSkill)?;
                 let definition = self
                     .state
                     .actor(source)
-                    .and_then(|a| a.ability(index))
+                    .and_then(|a| a.skill(index))
                     .ok_or(RuleError::UnknownSkill)?
                     .clone();
                 let targets = self.state.ability_targets(source, index, anchor)?;
@@ -416,6 +416,12 @@ impl EffectResolver<'_> {
         {
             return Err(RuleError::NotStanding);
         }
+        let duration = self
+            .state
+            .actor(bearer)
+            .ok_or(RuleError::UnknownActor)?
+            .resolved_build
+            .status_duration(kind, definition.duration.ticks);
         if let Some(instance) = self
             .actor_mut(bearer)?
             .statuses
@@ -425,7 +431,7 @@ impl EffectResolver<'_> {
             match definition.reapplication {
                 Reapplication::Refresh => {
                     instance.source = source;
-                    instance.remaining = definition.duration.ticks;
+                    instance.remaining = duration;
                     instance.eligible_boundary = eligible_boundary;
                 }
             }
@@ -443,7 +449,7 @@ impl EffectResolver<'_> {
             bearer,
             source,
             potency: definition.potency,
-            remaining: definition.duration.ticks,
+            remaining: duration,
             eligible_boundary,
         };
         self.actor_mut(bearer)?.statuses.push(instance.clone());

@@ -2,7 +2,7 @@
 
 use super::*;
 use bevy_gamekit::ui::{UiContextHelpState, UiSkinOverrides};
-use labyrinth_rules::skill_definition;
+use labyrinth_rules::legacy_skill_definition;
 
 #[derive(Resource, Default)]
 struct CombatCommands(Vec<(ActorId, CombatAction)>);
@@ -70,7 +70,7 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiS
         activate(&mut app, old_skill, keyboard);
         assert_eq!(
             app.world().resource::<UiState>().selected,
-            Some(Choice::Ability(0))
+            Some(Choice::Skill(0))
         );
         let target = find_named(app.world_mut(), "Actor 105").expect("rear enemy");
         activate(&mut app, target, keyboard);
@@ -112,7 +112,7 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiS
             commands,
             vec![(
                 ActorId(4),
-                CombatAction::Ability {
+                CombatAction::Skill {
                     index: 0,
                     target: ActorId(105),
                 },
@@ -137,8 +137,8 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiS
 
         for (name, choice, heading) in [
             ("Reposition", Choice::Reposition, "Reposition"),
-            ("Skill 0", Choice::Ability(0), "Mend"),
-            ("Skill 1", Choice::Ability(1), "Staunch"),
+            ("Skill 0", Choice::Skill(0), "Mend"),
+            ("Skill 1", Choice::Skill(1), "Staunch"),
         ] {
             let button = find_named(app.world_mut(), name).expect("medic control");
             activate(&mut app, button, keyboard);
@@ -169,7 +169,9 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiS
                 app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
                 app.world().resource::<UiContextHelpState>());
             let title = title.expect("current tooltip");
-            assert!(!text(&app, title).contains(skill_definition(SkillId::BackRankShot).name));
+            assert!(
+                !text(&app, title).contains(legacy_skill_definition(SkillId::BackRankShot).name)
+            );
             assert_eq!(
                 app.world().resource::<LabyrinthView>().combat.as_ref(),
                 Some(&next)

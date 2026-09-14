@@ -66,7 +66,7 @@ fn main() {
             | "movement-blocked"
     );
     let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
-    let scenario = (matches!(route.as_str(), "lobby" | "abilities" | "ability-help")
+    let scenario = (matches!(route.as_str(), "lobby" | "skills" | "skill-help")
         || route.starts_with("editor")
         || route.starts_with("construction"))
     .then(|| {
@@ -76,22 +76,24 @@ fn main() {
             &catalog,
         )
         .expect("review scenario");
-        if matches!(route.as_str(), "abilities" | "ability-help") {
+        if matches!(route.as_str(), "skills" | "skill-help") {
             let hero = scenario.heroes.first_mut().expect("captain");
             hero.actor.name = "Captain Lantern".into();
             hero.actor.base_speed = 100;
             hero.actor.build = labyrinth_rules::build::CharacterBuild {
-                innate: catalog
+                skills: catalog
                     .definition()
-                    .abilities
+                    .skills
                     .iter()
+                    .filter(|skill| skill.personal_selectable)
                     .take(12)
-                    .map(|ability| labyrinth_rules::build::InnateGrant {
-                        ability: ability.id.clone(),
+                    .map(|skill| labyrinth_rules::build::SkillGrant {
+                        skill: skill.id.clone(),
                         provenance: labyrinth_rules::catalog::ContentId::new("captain_training")
                             .expect("provenance"),
                     })
                     .collect(),
+                weapon: Some(labyrinth_rules::catalog::ContentId::new("dagger").expect("item")),
                 ..default()
             };
         }
@@ -295,10 +297,10 @@ fn main() {
                 labyrinth::view::CompanyMember {
                     actor,
                     hero,
-                    abilities: company_snapshot
+                    resolved_build: company_snapshot
                         .actor(actor)
                         .expect("company actor")
-                        .abilities
+                        .resolved_build
                         .clone(),
                     owner: if matches!(route.as_str(), "lobby" | "paused") {
                         u8::try_from(index).expect("owner")
@@ -461,7 +463,7 @@ fn help_fixture(
     mut settings: ResMut<bevy_gamekit::ui::UiTooltipSettings>,
 ) {
     let source = match capture.route.as_str() {
-        "help" | "help-locked" | "ability-help" => "Skill 0",
+        "help" | "help-locked" | "skill-help" => "Skill 0",
         "history-actor" => "Actor 105",
         "corpse-forecast" => "Actor 103",
         _ => return,
@@ -568,8 +570,8 @@ fn capture(
         (route, 4) if route.starts_with("editor") => Some("Edit Actor 1"),
         ("editor-compare", 7) => Some("Weapon greatsword"),
         ("editor-detail", 7) => Some("Weapon dagger"),
-        ("editor-learned", 7) => Some("Category Learned"),
-        ("editor-learned", 10) => Some("Learned duelist_dagger_power"),
+        ("editor-learned", 7) => Some("Category Abilities"),
+        ("editor-learned", 10) => Some("Ability duelist_dagger_power"),
         ("editor-parameters", 7) => Some("Category Parameters"),
         ("construction", 4) => Some("Select Heroes Rank 1"),
         ("construction-picker" | "construction-gap" | "construction-owners", 4) => {

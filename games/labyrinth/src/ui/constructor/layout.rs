@@ -574,8 +574,8 @@ pub(super) fn context(
             "Move Detail Scroll Hint",
             format!(
                 "{} {} · scroll / PgDn",
-                build.abilities.len(),
-                if build.abilities.len() == 1 {
+                build.moveset.skills.len(),
+                if build.moveset.skills.len() == 1 {
                     "move"
                 } else {
                     "moves"
@@ -718,7 +718,8 @@ pub(super) fn context(
                             format!(
                                 "Moves · {}",
                                 build
-                                    .abilities
+                                    .moveset
+                                    .skills
                                     .iter()
                                     .map(|a| a.definition.name.as_str())
                                     .collect::<Vec<_>>()
@@ -933,14 +934,14 @@ fn picker(
                 ..default()
             },
         );
-        for ability in &build.abilities {
+        for skill in &build.moveset.skills {
             let facts = setup::details::move_facts(
-                ability,
+                skill,
                 (rank, rank.saturating_add(preset.footprint - 1)),
                 catalog,
             );
             let can_act = (rank..rank.saturating_add(preset.footprint))
-                .any(|r| ability.definition.allows_source_rank(r));
+                .any(|r| skill.definition.allows_source_rank(r));
             let mut compact_facts = facts.clone();
             if let Some(effect) = compact_facts.first_mut() {
                 *effect = format!(
@@ -959,8 +960,8 @@ fn picker(
             label(
                 world,
                 moves,
-                &format!("Type Move {} Facts", ability.definition.id),
-                format!("{} · {}", ability.definition.name, compact_facts.join("\n")),
+                &format!("Type Move {} Facts", skill.definition.id),
+                format!("{} · {}", skill.definition.name, compact_facts.join("\n")),
                 UiTextRole::Supporting,
             );
         }

@@ -41,16 +41,27 @@ for precise clocks, movement, targeting and provisional death-save semantics.
 stable `ContentId`. Built-in definitions live in `rules/content/catalog.toml`.
 Known effects are data authoring; new semantics require a typed effect and tests.
 `build::ActorBuild` separates name/appearance/stats/footprint from `CharacterBuild`
-(innate grants with provenance, learned-skill IDs and one optional weapon ID).
+(personal Skills with provenance, passive Ability IDs and one optional weapon ID).
+A Skill is active; an Ability is passive. Both may be granted by equipment or selected
+personally when permitted, and either may require a kind of equipment or an exact item.
 
-Resolution creates one immutable `ResolvedBuild` per actor. Duplicate move grants
-merge provenance, learned grants precede upgrades, and stable ordering/conflict
-validation prevent file-order behavior. Definitions carry effective effects, reach,
-use limits and grant/upgrade sources. The maximum is 64 resolved moves per actor,
-a validation/wire resource bound; the eight-key shortcut range does not cap moves.
-`CombatAction::Ability { index, target }` names an actor-local frozen move. Legality,
-resolution, uses, AI, preview, UI and history consume that same definition. Legacy
-`SkillId`/`AbilityLoadout` remain convenience adapters, never a second authority.
+One immutable `ResolvedBuild` per actor includes the canonical `Moveset` of eligible
+`ResolvedSkill` values, passive Ability state and inactive Skill explanations.
+Duplicate grants retain provenance without multiplying the same passive. Missing
+equipment leaves personal selections inactive; it does not invalidate the build.
+Malformed content and conflicting effective upgrades remain errors. Current rank,
+targets and remaining uses determine this turn's legality, not Moveset membership.
+The limits are 64 distinct Skills and 64 distinct Abilities; eight numeric shortcuts
+do not cap the Moveset. See [content](content.md) for exact starter equipment mapping.
+
+`CombatAction::Skill { index, target }` identifies an actor-local frozen active Skill.
+Legality, resolution, uses, AI, preview, UI and history consume that same definition.
+`CombatAction::LegacySkill`, `LegacySkillLoadout` and `legacy_skill_definition` are
+explicit fixed-enum compatibility adapters. Trusted fixtures author exact legacy
+equipment through `legacy_catalog`; parsed scenarios never manufacture those grants.
+`ActorSnapshot.resolved_build` and the session company's matching field carry the
+entire frozen projection. Presentation exposes effective active `skills`; passives
+never enter the action rail.
 
 `scenario::Scenario` is versioned JSON input with no files or peer identities in the
 rules crate. A deployable scenario has 1–6 actors per side occupying at most six
@@ -77,9 +88,11 @@ lethal turn-start bleed resolves before any command can act. Enemy resolution is
 automatic in the app but not gated on animation completion. An unexpected AI error
 halts the encounter with a diagnostic instead of retrying a bad transition forever.
 
-The canonical content fingerprint hashes hero/enemy stats, abilities, status
+The canonical content fingerprint hashes hero/enemy stats, Skills, status
 definitions and an explicit algorithm/interpretation revision. Network compatibility
-adds the application wire schema. Change `RULES_VERSION` whenever semantics change;
+adds the application wire schema. Protocol 7 rejects peers using the old active-Ability
+fields and command variants; catalog/scenario schema 2 rejects incompatible saves. Change `RULES_VERSION` whenever
+semantics change;
 authored catalog changes automatically change the digest. The fingerprint is a
 compatibility check, not proof that a remote executable is trustworthy.
 
@@ -96,6 +109,12 @@ defence; Haste/Weakened definitions exercise future speed/power modifiers in pur
 tests. Effects with new semantics require a new tested enum variant; this is not
 an unbounded callback or scripting system. Shields, retaliation, auras, arbitrary
 stacking and position-bound hazards are not claimed as implemented.
+
+Resilient uses a bounded typed passive effect when a finite Debuff is applied or
+refreshed: subtract one duration tick, minimum one. It respects each condition's own
+clock and does not shorten buffs. Explicit starting remaining durations and restored
+live snapshots bypass application-time reduction. Presentation reads actual
+instance/preview remaining ticks rather than deriving them from default status text.
 
 At each boundary, eligible status identities are captured in deterministic order.
 New effects cannot recursively trigger at their own application boundary, removed
@@ -176,7 +195,7 @@ failed loads preserve the current scenario, formation and setup revision.
 Portable save remains playable Scenario JSON, with no participant or sparse-draft
 schema. Loading a stock or portable scenario restores compact placement and retains
 owners for matching actor identities. Editing just the seed preserves construction
-positions. Setup and assignment revisions cover these transitions; the v6 wire
+positions. Setup and assignment revisions cover these transitions; the v7 wire
 validates the draft/formation/company relationship before projecting it to a guest.
 
 The board keeps selection, type preview, placement and ownership next to their
@@ -184,20 +203,20 @@ spatial context; scenario I/O and invitations are secondary views. All actor
 customization uses one game-owned editor with category-local
 browsing and a single actor draft, source revision and apply/discard lifecycle.
 Inspection is distinct from mutation. Effective comparisons come from the catalog
-resolver, preserving duplicate grants and learned contributions rather than
-recalculating combat behavior in widgets. Prerequisite rejection text names the
-required catalog move and omits authoring paths; the resolver still determines
-eligibility. Character presentation and draft policy
+resolver, preserving duplicate sources and passive contributions. Widgets do not
+recalculate combat behavior. Equipment-only definitions are inspectable but cannot
+be added as personal grants. Missing-equipment selections remain editable, with
+inactive reasons and reactivation driven by the same resolver. Character presentation and draft policy
 stay local; the same screen is intended to support later in-game inspection without
 authorizing combat-time editing. Existing prototype battle parameters do not define
 a future attribute/progression system.
 
-The battle action rail retains the subject and effective disclosed loadout actually
+The battle action rail retains the subject and effective disclosed Moveset actually
 mounted. Selection and confirmation reject an input batch if the current projection
 differs before Present can rebuild those controls. This complements turn/encounter
 and server-side authorization: an old actor-local position must never select a new
 build's move merely because the index remains legal. Mutable HP/uses do not change
-the frozen loadout identity; current action legality is still validated separately.
+the frozen Moveset identity; current action legality is still validated separately.
 
 All cooperative battle state is public, so peers receive full authoritative
 snapshots; only request sequence is recipient-specific. Host RNG, admission secrets
@@ -216,12 +235,12 @@ UI post-layout precedes scene synchronization, which precedes visibility/bounds.
 The camera conversion accounts for viewport offsets, device scale, pan and zoom.
 
 Organization remains game-owned: one facing formation, compact rolled-order strip,
-equipped-ability rail, target/legality line and explicit confirmation. Actor,
+active Skill rail, target/legality line and explicit confirmation. Actor,
 condition and current-round initiative details use the shared contextual-card
 system, with encounter/actor-scoped subjects and disclosure-filtered content.
 Portrait activation pins a card without changing the selected target; there is no
 separate inspection/initiative drawer. The primary battlefield never scrolls;
-overflowing ability loadouts scroll horizontally and focus brings controls into view.
+overflowing Movesets scroll horizontally and focus brings controls into view.
 The battlefield and movement previews share a fixed six-column grid per side.
 Actor footprints span whole rank columns, with both front ranks facing the center.
 Sparse rosters and corpse removal leave non-interactive empty back ranks; occupancy

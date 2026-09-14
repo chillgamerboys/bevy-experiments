@@ -614,7 +614,7 @@ pub(super) fn present(
             && ui.selected.is_some_and(|choice| {
                 matches!(
                     choice,
-                    Choice::Ability(_) | Choice::Skill(_) | Choice::Reposition | Choice::Rescue
+                    Choice::Skill(_) | Choice::LegacySkill(_) | Choice::Reposition | Choice::Rescue
                 ) && inspection::display_actor(view).is_some_and(|source| {
                     inspection::action_for(choice, Some(actor.id)).is_ok_and(|action| {
                         snapshot.validate_action_target(source.id, &action).is_ok()
@@ -692,10 +692,10 @@ pub(super) fn present(
         let rank = snapshot.rank(actor.id).unwrap_or(0);
         let source_mask = inspection::display_actor(view)
             .and_then(|source| match ui.selected {
-                Some(Choice::Ability(index)) => source.ability(index),
-                Some(Choice::Skill(skill)) => source
-                    .skill_index(skill)
-                    .and_then(|index| source.ability(index)),
+                Some(Choice::Skill(index)) => source.skill(index),
+                Some(Choice::LegacySkill(skill)) => source
+                    .legacy_skill_index(skill)
+                    .and_then(|index| source.skill(index)),
                 _ => None,
             })
             .map(|definition| definition.source_ranks);
@@ -1248,7 +1248,7 @@ mod tests {
             let mut ui = UiState::default();
             present_overlay_fixture(&mut app, &view, &ui);
             let before = art_geometry(&mut app);
-            ui.selected = Some(Choice::Skill(SkillId::FrontStrike));
+            ui.selected = Some(Choice::LegacySkill(SkillId::FrontStrike));
             ui.target = Some(ActorId(101));
             present_overlay_fixture(&mut app, &view, &ui);
             assert_eq!(art_geometry(&mut app), before, "forecast moved art");

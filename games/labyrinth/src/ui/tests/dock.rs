@@ -3,7 +3,7 @@
 use super::*;
 use crate::presentation::{ActorDisclosure, CombatDisclosure};
 use bevy_gamekit::ui::UiContextHelp;
-use labyrinth_rules::{skill_definition, Team};
+use labyrinth_rules::{legacy_skill_definition, Team};
 
 fn text_named(app: &mut App, name: &str) -> String {
     let entity = find_named(app.world_mut(), name).expect("named text");
@@ -54,8 +54,8 @@ fn rank_numbers_stay_plain_when_showing_ability_range_and_selection(
     let source = snapshot
         .actor(snapshot.active_actor.expect("active"))
         .expect("actor");
-    let skill = *source.skills().first().expect("ability");
-    apply_action(app.world_mut(), Action::Choice(Choice::Skill(skill)));
+    let skill = *source.legacy_skills().first().expect("skill");
+    apply_action(app.world_mut(), Action::Choice(Choice::LegacySkill(skill)));
     apply_action(app.world_mut(), Action::Actor(ActorId(101)));
     run_frames(&mut app, 3);
     for actor in &snapshot.actors {
@@ -234,7 +234,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit_normal_1080() {
         .find_map(|player| {
             let actor = snapshot.actor(player.actor)?;
             actor
-                .skills()
+                .legacy_skills()
                 .iter()
                 .enumerate()
                 .find_map(|(index, skill)| {
@@ -243,7 +243,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit_normal_1080() {
                         .iter()
                         .filter(|target| target.team() == Team::Enemies)
                         .find_map(|target| {
-                            let action = CombatAction::Skill {
+                            let action = CombatAction::LegacySkill {
                                 skill: *skill,
                                 target: target.id,
                             };
@@ -271,10 +271,10 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit_normal_1080() {
     run_frames(&mut app, 3);
     assert_eq!(
         app.world().resource::<UiState>().selected,
-        Some(Choice::Ability(index as u8))
+        Some(Choice::Skill(index as u8))
     );
     let preview = snapshot
-        .preview_action(source, &CombatAction::Skill { skill, target })
+        .preview_action(source, &CombatAction::LegacySkill { skill, target })
         .expect("preview");
     let expected_hp = preview.actor(target).expect("target outcome").after.hp;
     let facts = crate::presentation::ForecastDisplay::build(
@@ -282,7 +282,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit_normal_1080() {
         app.world()
             .resource::<crate::presentation::CombatDisclosure>(),
         source,
-        &CombatAction::Skill { skill, target },
+        &CombatAction::LegacySkill { skill, target },
     )
     .expect("disclosed preview");
     assert_eq!(
@@ -355,7 +355,7 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(
         network_ownership(&mut view);
         view.player = Some(5);
     }
-    for count in 0..=MAX_EQUIPPED_ABILITIES {
+    for count in 0..=MAX_LEGACY_SKILLS {
         {
             let mut view = app.world_mut().resource_mut::<LabyrinthView>();
             set_legacy_skills(
@@ -382,7 +382,7 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(
             assert_eq!(
                 app.world().resource::<InputFocus>().get(),
                 Some(entity),
-                "{count} abilities, slot {index}, {scale:?}"
+                "{count} skills, slot {index}, {scale:?}"
             );
             let visible = visible_control_rect(
                 app.world(),
@@ -392,25 +392,25 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(
             .expect("focused skill is visible");
             assert!(
                 visible.width() >= 43.5 && visible.height() >= 43.5,
-                "{count} abilities, slot {index}, {scale:?}: {visible:?}"
+                "{count} skills, slot {index}, {scale:?}: {visible:?}"
             );
             tap_key(&mut app, KeyCode::Enter);
             assert_eq!(
                 app.world().resource::<UiState>().selected,
-                Some(Choice::Ability(index as u8))
+                Some(Choice::Skill(index as u8))
             );
             assert!(app
                 .world()
                 .get::<AccessibleLabel>(entity)
-                .expect("accessible ability")
+                .expect("accessible skill")
                 .0
-                .contains(skill_definition(skill).name));
+                .contains(legacy_skill_definition(skill).name));
         }
         for (index, key) in shortcuts.iter().copied().enumerate().take(count) {
             tap_key(&mut app, key);
             assert_eq!(
                 app.world().resource::<UiState>().selected,
-                Some(Choice::Ability(index as u8))
+                Some(Choice::Skill(index as u8))
             );
         }
         let wait =

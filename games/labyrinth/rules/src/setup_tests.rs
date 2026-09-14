@@ -1,7 +1,7 @@
 //! Six-rank and loadout contracts, independent of lobby, networking, or Bevy.
 
 use super::*;
-use crate::{EnemyKind, SkillId, DEFAULT_HERO_ROSTER, MAX_EQUIPPED_ABILITIES};
+use crate::{EnemyKind, SkillId, DEFAULT_HERO_ROSTER, MAX_LEGACY_SKILLS};
 
 fn setup() -> [HeroSetup; PARTY_SIZE] {
     let mut ids = [90, 12, 42, 7, 900, 300].into_iter();
@@ -74,7 +74,7 @@ fn invalid_and_colliding_setup_ids_fail_before_combat_starts() {
     assert!(HeroSetup::new(
         ActorId(0),
         HeroClass::Scout,
-        AbilityLoadout::new([]).expect("empty")
+        LegacySkillLoadout::new([]).expect("empty")
     )
     .is_err());
 }
@@ -82,20 +82,24 @@ fn invalid_and_colliding_setup_ids_fail_before_combat_starts() {
 #[test]
 fn equipped_cross_class_skill_is_authorized_and_unequipped_starter_is_not() {
     let mut heroes = setup();
-    heroes.first_mut().expect("gatekeeper").abilities =
-        AbilityLoadout::new([SkillId::SnapShot]).expect("scout ability");
+    heroes.first_mut().expect("gatekeeper").skills =
+        LegacySkillLoadout::new([SkillId::SnapShot]).expect("scout skill");
     let mut combat = Combat::with_heroes(15, heroes).expect("cross-class loadout");
     let actor = ActorId(90);
     wait_for(&mut combat, actor);
     assert_eq!(
-        combat.state.actor(actor).expect("gatekeeper").skills(),
+        combat
+            .state
+            .actor(actor)
+            .expect("gatekeeper")
+            .legacy_skills(),
         &[SkillId::SnapShot]
     );
     let before = combat.clone();
     assert_eq!(
         combat.apply(
             actor,
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: SkillId::FrontStrike,
                 target: ActorId(101)
             }
@@ -110,7 +114,7 @@ fn equipped_cross_class_skill_is_authorized_and_unequipped_starter_is_not() {
     combat
         .apply(
             actor,
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: SkillId::SnapShot,
                 target: ActorId(106),
             },
@@ -136,7 +140,7 @@ fn repeated_class_actors_keep_independent_uses_hp_and_statuses() {
     combat
         .apply(
             left,
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: SkillId::Mend,
                 target: left,
             },
@@ -170,39 +174,40 @@ fn repeated_class_actors_keep_independent_uses_hp_and_statuses() {
 #[test]
 fn loadouts_are_bounded_unique_serde_validated_and_may_be_empty() {
     assert_eq!(
-        AbilityLoadout::new([SkillId::Mend, SkillId::Mend]),
+        LegacySkillLoadout::new([SkillId::Mend, SkillId::Mend]),
         Err(RuleError::InvalidLoadout)
     );
     assert_eq!(
-        AbilityLoadout::new(SkillId::ALL.into_iter().take(MAX_EQUIPPED_ABILITIES + 1)),
+        LegacySkillLoadout::new(SkillId::ALL.into_iter().take(MAX_LEGACY_SKILLS + 1)),
         Err(RuleError::InvalidLoadout)
     );
-    let maximum = AbilityLoadout::new(SkillId::ALL.into_iter().take(MAX_EQUIPPED_ABILITIES))
-        .expect("maximum");
-    assert_eq!(maximum.as_slice().len(), MAX_EQUIPPED_ABILITIES);
+    let maximum =
+        LegacySkillLoadout::new(SkillId::ALL.into_iter().take(MAX_LEGACY_SKILLS)).expect("maximum");
+    assert_eq!(maximum.as_slice().len(), MAX_LEGACY_SKILLS);
     let wire = serde_json::to_vec(&maximum).expect("serialize");
     assert_eq!(
-        serde_json::from_slice::<AbilityLoadout>(&wire).expect("validate"),
+        serde_json::from_slice::<LegacySkillLoadout>(&wire).expect("validate"),
         maximum
     );
-    assert!(serde_json::from_str::<AbilityLoadout>(r#"["Mend","Mend"]"#).is_err());
-    assert!(serde_json::from_str::<AbilityLoadout>(r#"["InventedSkill"]"#).is_err());
+    assert!(serde_json::from_str::<LegacySkillLoadout>(r#"["Mend","Mend"]"#).is_err());
+    assert!(serde_json::from_str::<LegacySkillLoadout>(r#"["InventedSkill"]"#).is_err());
     let too_many = serde_json::to_vec(
         &SkillId::ALL
             .into_iter()
-            .take(MAX_EQUIPPED_ABILITIES + 1)
+            .take(MAX_LEGACY_SKILLS + 1)
             .collect::<Vec<_>>(),
     )
     .expect("fixture");
-    assert!(serde_json::from_slice::<AbilityLoadout>(&too_many).is_err());
+    assert!(serde_json::from_slice::<LegacySkillLoadout>(&too_many).is_err());
     let mut heroes = setup();
-    heroes.first_mut().expect("first").abilities = AbilityLoadout::new([]).expect("empty");
+    heroes.first_mut().expect("first").skills = LegacySkillLoadout::new([]).expect("empty");
     let mut combat = Combat::with_heroes(15, heroes).expect("unarmed party member");
     wait_for(&mut combat, ActorId(90));
     let actions = combat.legal_actions(ActorId(90));
-    assert!(!actions
-        .iter()
-        .any(|action| matches!(action, CombatAction::Skill { .. })));
+    assert!(!actions.iter().any(|action| matches!(
+        action,
+        CombatAction::Skill { .. } | CombatAction::LegacySkill { .. }
+    )));
     assert!(actions.contains(&CombatAction::Defend));
     assert!(actions.contains(&CombatAction::Wait));
     assert!(actions.contains(&CombatAction::Reposition { ally: ActorId(12) }));
@@ -214,12 +219,15 @@ fn loadout_and_use_tampering_is_rejected_on_snapshot_ingress() {
     let valid = serde_json::to_value(combat.snapshot()).expect("snapshot");
     for (path, replacement) in [
         (
-            "/actors/0/abilities",
+            "/actors/0/resolved_build",
             serde_json::json!(["FrontStrike", "FrontStrike"]),
         ),
-        ("/actors/0/abilities", serde_json::json!(["InventedSkill"])),
         (
-            "/actors/0/abilities",
+            "/actors/0/resolved_build",
+            serde_json::json!(["InventedSkill"]),
+        ),
+        (
+            "/actors/0/resolved_build",
             serde_json::json!(SkillId::ALL.into_iter().take(9).collect::<Vec<_>>()),
         ),
         ("/actors/0/skill_uses", serde_json::json!({"63":1})),
@@ -264,7 +272,7 @@ fn loadout_and_use_tampering_is_rejected_on_snapshot_ingress() {
         .expect("actor")
         .as_object_mut()
         .expect("object")
-        .remove("abilities");
+        .remove("resolved_build");
     assert!(serde_json::from_value::<CombatSnapshot>(missing).is_err());
 }
 
@@ -277,7 +285,12 @@ fn every_default_hero_has_rank_appropriate_attacks_and_utilities_in_six_ranks() 
         let actions = combat.legal_actions(actor);
         assert!(
             actions.iter().any(|action| match action {
-                CombatAction::Skill { skill, .. } => skill_definition(*skill)
+                CombatAction::Skill { index, .. } => combat
+                    .state
+                    .actor(actor)
+                    .expect("actor")
+                    .skill(*index)
+                    .expect("skill")
                     .effects
                     .iter()
                     .any(|effect| matches!(effect, Effect::Damage(_))),
@@ -287,13 +300,18 @@ fn every_default_hero_has_rank_appropriate_attacks_and_utilities_in_six_ranks() 
         );
         if id >= 5 {
             assert!(actions.contains(&CombatAction::Skill {
-                skill: SkillId::Mend,
+                index: combat
+                    .state
+                    .actor(actor)
+                    .expect("actor")
+                    .legacy_skill_index(SkillId::Mend)
+                    .expect("Mend"),
                 target: actor
             }));
         }
     }
     for skill in SkillId::ALL {
-        let definition = skill_definition(skill);
+        let definition = legacy_skill_definition(skill);
         assert!(definition.source_ranks != 0 && definition.source_ranks & !0b11_1111 == 0);
         assert!(definition.target_ranks != 0 && definition.target_ranks & !0b11_1111 == 0);
         for invalid in [0, 7, 8, u8::MAX] {
@@ -315,7 +333,7 @@ fn front_middle_rear_masks_enforce_linear_source_and_target_edges() {
             ] {
                 let mut heroes = setup();
                 for hero in &mut heroes {
-                    hero.abilities = AbilityLoadout::new([skill]).expect("one ability");
+                    hero.skills = LegacySkillLoadout::new([skill]).expect("one skill");
                 }
                 let mut combat = Combat::with_heroes(15, heroes).expect("party");
                 let actor = *combat
@@ -344,7 +362,7 @@ fn front_middle_rear_masks_enforce_linear_source_and_target_edges() {
                     Ok(())
                 };
                 assert_eq!(
-                    combat.validate_action(actor, &CombatAction::Skill { skill, target }),
+                    combat.validate_action(actor, &CombatAction::LegacySkill { skill, target }),
                     expected,
                     "{skill:?}: source {source_rank}, target {target_rank}"
                 );

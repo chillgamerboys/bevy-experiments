@@ -23,7 +23,7 @@ fn fixture() -> LabyrinthView {
                 labyrinth_rules::ActorKind::Hero(hero) => hero,
                 _ => panic!("hero stock appearance"),
             },
-            abilities: actor.actor.resolve(&catalog).expect("resolved build"),
+            resolved_build: actor.actor.resolve(&catalog).expect("resolved build"),
             owner: 0,
         })
         .collect();
@@ -246,9 +246,9 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
     }
     for selected in [
         SetupAction::Weapon(Some(id("dagger"))),
-        SetupAction::Innate(id("rally")),
-        SetupAction::Learned(id("assassin_feint_training")),
-        SetupAction::Learned(id("duelist_dagger_power")),
+        SetupAction::Skill(id("rally")),
+        SetupAction::Ability(id("resilient")),
+        SetupAction::Ability(id("duelist_dagger_power")),
         SetupAction::Status(labyrinth_rules::StatusKind::Haste),
     ] {
         assert!(action(&view, &mut ui, selected).is_none());
@@ -275,15 +275,15 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
     );
     assert_eq!(actor.starting_hp, Some(31));
     assert_eq!(actor.actor.build.weapon, Some(id("dagger")));
-    let mut expected_innate = original.actor.build.innate.clone();
-    expected_innate.push(InnateGrant {
-        ability: id("rally"),
-        provenance: id("innate"),
+    let mut expected_skills = original.actor.build.skills.clone();
+    expected_skills.push(SkillGrant {
+        skill: id("rally"),
+        provenance: id("skills"),
     });
-    assert_eq!(actor.actor.build.innate, expected_innate);
+    assert_eq!(actor.actor.build.skills, expected_skills);
     assert_eq!(
-        actor.actor.build.learned_skills,
-        vec![id("assassin_feint_training"), id("duelist_dagger_power")]
+        actor.actor.build.abilities,
+        vec![id("resilient"), id("duelist_dagger_power")]
     );
     assert_eq!(
         actor.starting_statuses,
@@ -318,19 +318,11 @@ fn empty_starting_hp_is_full_and_toggle_removal_preserves_other_grant_sources() 
     let view = fixture();
     let mut ui = edit(&view);
     change(&mut ui, BuildField::StartingHp, "   ");
-    let original = first_actor(&view).actor.build.innate.clone();
-    action(&view, &mut ui, SetupAction::Innate(id("rally")));
-    action(&view, &mut ui, SetupAction::Innate(id("rally")));
-    action(
-        &view,
-        &mut ui,
-        SetupAction::Learned(id("assassin_feint_training")),
-    );
-    action(
-        &view,
-        &mut ui,
-        SetupAction::Learned(id("assassin_feint_training")),
-    );
+    let original = first_actor(&view).actor.build.skills.clone();
+    action(&view, &mut ui, SetupAction::Skill(id("rally")));
+    action(&view, &mut ui, SetupAction::Skill(id("rally")));
+    action(&view, &mut ui, SetupAction::Ability(id("resilient")));
+    action(&view, &mut ui, SetupAction::Ability(id("resilient")));
     action(&view, &mut ui, SetupAction::Weapon(None));
     let Some(LabyrinthIntent::CustomizeActor { actor, .. }) =
         action(&view, &mut ui, SetupAction::Save)
@@ -339,8 +331,8 @@ fn empty_starting_hp_is_full_and_toggle_removal_preserves_other_grant_sources() 
     };
     assert_eq!(actor.starting_hp, None);
     assert_eq!(actor.actor.build.weapon, None);
-    assert_eq!(actor.actor.build.innate, original);
-    assert!(actor.actor.build.learned_skills.is_empty());
+    assert_eq!(actor.actor.build.skills, original);
+    assert!(actor.actor.build.abilities.is_empty());
 }
 
 #[test]

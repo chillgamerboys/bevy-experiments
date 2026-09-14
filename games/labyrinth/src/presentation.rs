@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::Resource;
 use labyrinth_rules::{
-    skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction,
-    CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, StatusInstance, StatusKind,
-    StatusTag,
+    legacy_skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary,
+    CombatAction, CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, StatusInstance,
+    StatusKind, StatusTag,
 };
 
 /// Use the frozen character name, including names authored in battle setup.
@@ -56,7 +56,7 @@ pub struct ActorDisclosure {
     pub health: bool,
     /// Conditions, including modifiers that affect forecasts.
     pub statuses: bool,
-    /// Speed, equipped abilities and spent uses.
+    /// Speed, equipped skills and spent uses.
     pub details: bool,
 }
 
@@ -109,8 +109,8 @@ pub struct Health {
 pub struct ActorDetails {
     /// Effective speed, not a predicted initiative roll.
     pub speed: u16,
-    /// Equipped catalog abilities.
-    pub abilities: Vec<labyrinth_rules::build::ResolvedAbility>,
+    /// Equipped catalog skills.
+    pub skills: Vec<labyrinth_rules::build::ResolvedSkill>,
     /// Uses already spent, not uses remaining.
     pub uses: BTreeMap<u8, u16>,
 }
@@ -173,7 +173,7 @@ impl BattlePresentation {
                         details: if policy.details && policy.statuses {
                             Knowledge::Known(ActorDetails {
                                 speed: actor.speed(),
-                                abilities: actor.resolved_abilities().to_vec(),
+                                skills: actor.resolved_skills().to_vec(),
                                 uses: actor
                                     .skill_uses
                                     .iter()
@@ -261,7 +261,7 @@ impl ForecastDisplay {
         action: &CombatAction,
     ) -> Result<Self, RuleError> {
         let target = match *action {
-            CombatAction::Skill { target, .. } | CombatAction::Ability { target, .. } => target,
+            CombatAction::LegacySkill { target, .. } | CombatAction::Skill { target, .. } => target,
             CombatAction::Reposition { ally } | CombatAction::Rescue { ally } => ally,
             CombatAction::Defend | CombatAction::Wait => actor,
         };
@@ -275,8 +275,8 @@ impl ForecastDisplay {
         // Be deliberately conservative: validation and follow-up effects can reveal
         // hidden health, equipment or modifiers too. Do not resolve first and hide later.
         let index = match *action {
-            CombatAction::Ability { index, .. } => Some(index),
-            CombatAction::Skill { skill, .. } => source.skill_index(skill),
+            CombatAction::Skill { index, .. } => Some(index),
+            CombatAction::LegacySkill { skill, .. } => source.legacy_skill_index(skill),
             _ => None,
         };
         let targets = index.map_or_else(
@@ -564,11 +564,11 @@ pub fn status_description(status: &StatusInstance, life: LifeState) -> String {
 #[must_use]
 pub fn effective_description(actor: &ActorSnapshot, action: &CombatAction) -> String {
     let index = match *action {
-        CombatAction::Ability { index, .. } => Some(index),
-        CombatAction::Skill { skill, .. } => actor.skill_index(skill),
+        CombatAction::Skill { index, .. } => Some(index),
+        CombatAction::LegacySkill { skill, .. } => actor.legacy_skill_index(skill),
         _ => None,
     };
-    if let Some(definition) = index.and_then(|index| actor.ability(index)) {
+    if let Some(definition) = index.and_then(|index| actor.skill(index)) {
         return effects_description(&definition.effects);
     }
     base_description(action)
@@ -608,8 +608,10 @@ pub fn effects_description(effects: &[Effect]) -> String {
 #[must_use]
 pub fn base_description(action: &CombatAction) -> String {
     match action {
-        CombatAction::Ability { .. } => "Select a character to inspect its move".to_owned(),
-        CombatAction::Skill { skill, .. } => effects_description(skill_definition(*skill).effects),
+        CombatAction::Skill { .. } => "Select a character to inspect its move".to_owned(),
+        CombatAction::LegacySkill { skill, .. } => {
+            effects_description(legacy_skill_definition(*skill).effects)
+        }
         CombatAction::Reposition { .. } => "Swap with an adjacent ally".to_owned(),
         CombatAction::Rescue { .. } => "Rescue to 25% HP".to_owned(),
         CombatAction::Defend => status_definition(StatusKind::Brace).description.to_owned(),
@@ -644,7 +646,7 @@ mod tests {
             };
             snapshot.validate().expect("valid corpse");
             let before = snapshot.clone();
-            let action = CombatAction::Skill {
+            let action = CombatAction::LegacySkill {
                 skill: SkillId::SnapShot,
                 target: ActorId(101),
             };
@@ -734,7 +736,7 @@ mod tests {
             &snapshot,
             &CombatDisclosure::default(),
             ActorId(101),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::BrutalStrike,
                 target,
             },
@@ -832,7 +834,7 @@ mod tests {
         assert_eq!(enemy.health, Knowledge::Unknown);
         assert_eq!(enemy.statuses, Knowledge::Unknown);
         assert_eq!(enemy.details, Knowledge::Unknown);
-        let action = CombatAction::Skill {
+        let action = CombatAction::LegacySkill {
             skill: SkillId::FrontStrike,
             target,
         };
@@ -869,7 +871,7 @@ mod tests {
             &snapshot,
             &CombatDisclosure::default(),
             ActorId(1),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::FrontStrike,
                 target: ActorId(101),
             },
@@ -896,7 +898,7 @@ mod tests {
             &snapshot,
             &CombatDisclosure::default(),
             ActorId(1),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::FrontStrike,
                 target: ActorId(101),
             },
@@ -926,7 +928,7 @@ mod tests {
             &snapshot,
             &CombatDisclosure::default(),
             ActorId(2),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::BleedingCut,
                 target: ActorId(101),
             },

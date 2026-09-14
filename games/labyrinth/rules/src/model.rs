@@ -8,7 +8,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    skill_definition, skills_for, status_definition, RemovalReason, Stat, StatusInstance,
+    legacy_skill_definition, skills_for, status_definition, RemovalReason, Stat, StatusInstance,
     StatusKind, TargetRule, MAX_ACTORS, MAX_STATUSES, PARTY_SIZE,
 };
 
@@ -176,7 +176,8 @@ impl ActorKind {
     }
 }
 
-/// Typed skill catalog IDs; their order is also deterministic AI tie-breaking.
+/// Fixed legacy Skill IDs retained for trusted fixtures and explicit action aliases.
+/// Current authored Skills use ContentId and frozen Moveset order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SkillId {
     /// Gatekeeper's strong front attack.
@@ -226,7 +227,7 @@ pub enum SkillId {
 }
 
 impl SkillId {
-    /// Complete typed catalog, independent of which abilities presets equip.
+    /// Complete typed catalog, independent of which skills presets equip.
     pub const ALL: [Self; 22] = [
         Self::FrontStrike,
         Self::LongReach,
@@ -256,15 +257,15 @@ impl SkillId {
 /// A single action. Expected turn/player identity belongs in the app envelope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CombatAction {
-    /// Use a frozen actor-local ability slot; the encounter identity binds the index.
-    Ability {
-        /// Zero-based index into this actor's resolved abilities (0..64).
+    /// Use a frozen actor-local skill slot; the encounter identity binds the index.
+    Skill {
+        /// Zero-based index into this actor's resolved skills (0..64).
         index: u8,
         /// Selected anchor; FrontPair captures all eligible front-two occupants.
         target: ActorId,
     },
-    /// Use an owned skill on a stable character ID.
-    Skill {
+    /// Explicit compatibility alias for the old fixed SkillId enum.
+    LegacySkill {
         /// Authored skill.
         skill: SkillId,
         /// Chosen target.
@@ -355,8 +356,8 @@ pub struct ActorSnapshot {
     pub max_hp: u16,
     /// Immutable base speed.
     pub base_speed: u16,
-    /// Explicit equipped abilities, independent of the class starter preset.
-    pub abilities: crate::build::ResolvedBuild,
+    /// Frozen active Moveset and passive Ability resolution.
+    pub resolved_build: crate::build::ResolvedBuild,
     /// Build selections whose resolved view is validated against the frozen catalog.
     pub build: crate::build::CharacterBuild,
     /// Custom display name independent of appearance.
@@ -412,11 +413,12 @@ impl ActorSnapshot {
             _ => (self.hp, self.max_hp),
         }
     }
-    /// This actor's actual equipped abilities, not its class starter preset.
+    /// Legacy-recognized members of the actual Moveset; excludes new authored IDs.
     #[must_use]
-    pub fn skills(&self) -> Vec<SkillId> {
-        self.abilities
-            .abilities
+    pub fn legacy_skills(&self) -> Vec<SkillId> {
+        self.resolved_build
+            .moveset
+            .skills
             .iter()
             .filter_map(|a| {
                 SkillId::ALL
@@ -425,37 +427,44 @@ impl ActorSnapshot {
             })
             .collect()
     }
-    /// All frozen effective abilities, including authored IDs with no legacy enum.
+    /// Canonical active collection, frozen for the current encounter.
     #[must_use]
-    pub fn resolved_abilities(&self) -> &[crate::build::ResolvedAbility] {
-        &self.abilities.abilities
+    pub fn moveset(&self) -> &crate::build::Moveset {
+        &self.resolved_build.moveset
+    }
+    /// All frozen effective skills, including authored IDs with no legacy enum.
+    #[must_use]
+    pub fn resolved_skills(&self) -> &[crate::build::ResolvedSkill] {
+        &self.resolved_build.moveset.skills
     }
     /// Borrow the one effective definition used by legality, preview, AI and apply.
     #[must_use]
-    pub fn ability(&self, index: u8) -> Option<&crate::catalog::AbilityDefinition> {
-        self.abilities
-            .abilities
+    pub fn skill(&self, index: u8) -> Option<&crate::catalog::SkillDefinition> {
+        self.resolved_build
+            .moveset
+            .skills
             .get(usize::from(index))
             .map(|a| &a.definition)
     }
     /// Find a stable actor-local index by authored content identity.
     #[must_use]
-    pub fn ability_index(&self, id: &crate::catalog::ContentId) -> Option<u8> {
-        self.abilities
-            .abilities
+    pub fn skill_index(&self, id: &crate::catalog::ContentId) -> Option<u8> {
+        self.resolved_build
+            .moveset
+            .skills
             .iter()
             .position(|a| &a.definition.id == id)
             .and_then(|i| u8::try_from(i).ok())
     }
     /// Translate an old action ID into this actor's effective definition index.
     #[must_use]
-    pub fn skill_index(&self, skill: SkillId) -> Option<u8> {
-        self.ability_index(&crate::scenario::legacy_skill_id(skill))
+    pub fn legacy_skill_index(&self, skill: SkillId) -> Option<u8> {
+        self.skill_index(&crate::scenario::legacy_skill_id(skill))
     }
-    /// Remaining uses; absent means unlimited or an unknown index (check ability first).
+    /// Remaining uses; absent means unlimited or an unknown index (check skill first).
     #[must_use]
-    pub fn remaining_ability_uses(&self, index: u8) -> Option<u8> {
-        self.ability(index)?
+    pub fn remaining_skill_uses(&self, index: u8) -> Option<u8> {
+        self.skill(index)?
             .max_uses
             .map(|limit| limit.saturating_sub(self.skill_uses.get(&index).copied().unwrap_or(0)))
     }
@@ -486,7 +495,7 @@ impl ActorSnapshot {
     /// Remaining uses of a limited skill; `None` means unlimited.
     #[must_use]
     pub fn remaining_uses(&self, skill: SkillId) -> Option<u8> {
-        self.remaining_ability_uses(self.skill_index(skill)?)
+        self.remaining_skill_uses(self.legacy_skill_index(skill)?)
     }
 }
 
@@ -611,7 +620,7 @@ impl CombatSnapshot {
                 || crate::catalog::text_field("actor.name", &actor.display_name, 128).is_err()
                 || self
                     .catalog
-                    .validate_resolved(&actor.build, &actor.abilities)
+                    .validate_resolved(&actor.build, &actor.resolved_build)
                     .is_err()
                 || actor.hp > actor.max_hp
                 || actor.statuses.len() > MAX_STATUSES
@@ -645,7 +654,7 @@ impl CombatSnapshot {
                 return Err(RuleError::InvalidState);
             }
             if actor.skill_uses.iter().any(|(index, used)| {
-                actor.ability(*index).is_none_or(|definition| {
+                actor.skill(*index).is_none_or(|definition| {
                     definition
                         .max_uses
                         .is_none_or(|limit| *used == 0 || *used > limit)
@@ -825,22 +834,24 @@ impl CombatSnapshot {
                 }
                 Ok(())
             }
-            CombatAction::Skill { skill, target } => {
-                let index = source.skill_index(skill).ok_or(RuleError::UnknownSkill)?;
-                self.validate_action_target(actor, &CombatAction::Ability { index, target })
+            CombatAction::LegacySkill { skill, target } => {
+                let index = source
+                    .legacy_skill_index(skill)
+                    .ok_or(RuleError::UnknownSkill)?;
+                self.validate_action_target(actor, &CombatAction::Skill { index, target })
             }
-            CombatAction::Ability { index, target } => {
-                let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
+            CombatAction::Skill { index, target } => {
+                let definition = source.skill(index).ok_or(RuleError::UnknownSkill)?;
                 if self
                     .ranks(actor)
                     .is_none_or(|mut ranks| !ranks.any(|rank| definition.allows_source_rank(rank)))
                 {
                     return Err(RuleError::WrongRank);
                 }
-                if source.remaining_ability_uses(index) == Some(0) {
+                if source.remaining_skill_uses(index) == Some(0) {
                     return Err(RuleError::NoUses);
                 }
-                self.validate_ability_target(actor, index, target)?;
+                self.validate_skill_target(actor, index, target)?;
                 if definition.target_pattern == crate::catalog::TargetPattern::FrontPair {
                     // A selected anchor is an eligible captured occupant, not an arbitrary actor.
                     if !self
@@ -854,33 +865,35 @@ impl CombatSnapshot {
             }
         }
     }
-    /// Translate either command spelling into the frozen actor-local ability index.
-    pub fn action_ability(
+    /// Translate either command spelling into the frozen actor-local skill index.
+    pub fn action_skill(
         &self,
         actor: ActorId,
         action: CombatAction,
     ) -> Result<Option<(u8, ActorId)>, RuleError> {
         let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
         match action {
-            CombatAction::Ability { index, target } => {
-                source.ability(index).ok_or(RuleError::UnknownSkill)?;
+            CombatAction::Skill { index, target } => {
+                source.skill(index).ok_or(RuleError::UnknownSkill)?;
                 Ok(Some((index, target)))
             }
-            CombatAction::Skill { skill, target } => Ok(Some((
-                source.skill_index(skill).ok_or(RuleError::UnknownSkill)?,
+            CombatAction::LegacySkill { skill, target } => Ok(Some((
+                source
+                    .legacy_skill_index(skill)
+                    .ok_or(RuleError::UnknownSkill)?,
                 target,
             ))),
             _ => Ok(None),
         }
     }
-    fn validate_ability_target(
+    fn validate_skill_target(
         &self,
         actor: ActorId,
         index: u8,
         target: ActorId,
     ) -> Result<(), RuleError> {
         let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
-        let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
+        let definition = source.skill(index).ok_or(RuleError::UnknownSkill)?;
         let recipient = self.actor(target).ok_or(RuleError::UnknownActor)?;
         if self
             .ranks(target)
@@ -922,8 +935,8 @@ impl CombatSnapshot {
         anchor: ActorId,
     ) -> Result<Vec<ActorId>, RuleError> {
         let source = self.actor(actor).ok_or(RuleError::UnknownActor)?;
-        let definition = source.ability(index).ok_or(RuleError::UnknownSkill)?;
-        self.validate_ability_target(actor, index, anchor)?;
+        let definition = source.skill(index).ok_or(RuleError::UnknownSkill)?;
+        self.validate_skill_target(actor, index, anchor)?;
         match definition.target_pattern {
             crate::catalog::TargetPattern::Single => Ok(vec![anchor]),
             crate::catalog::TargetPattern::FrontPair => {
@@ -936,7 +949,7 @@ impl CombatSnapshot {
                 for rank in 1..=2 {
                     if let Some(id) = self.occupant(team, rank) {
                         if !result.contains(&id)
-                            && self.validate_ability_target(actor, index, id).is_ok()
+                            && self.validate_skill_target(actor, index, id).is_ok()
                         {
                             result.push(id);
                         }
@@ -957,25 +970,14 @@ impl CombatSnapshot {
             return Vec::new();
         };
         let mut candidates = Vec::new();
-        for (position, ability) in source.resolved_abilities().iter().enumerate() {
+        for position in 0..source.resolved_skills().len() {
             let Ok(index) = u8::try_from(position) else {
                 continue;
             };
             for target in &self.actors {
-                // Preserve the old action spelling for legacy IDs; both spellings
-                // normalize to the same frozen definition and use counter.
-                let skill = SkillId::ALL
-                    .into_iter()
-                    .find(|s| crate::scenario::legacy_skill_id(*s) == ability.definition.id);
-                candidates.push(match skill {
-                    Some(skill) => CombatAction::Skill {
-                        skill,
-                        target: target.id,
-                    },
-                    None => CombatAction::Ability {
-                        index,
-                        target: target.id,
-                    },
+                candidates.push(CombatAction::Skill {
+                    index,
+                    target: target.id,
                 });
             }
         }
@@ -998,7 +1000,7 @@ pub enum RuleError {
     InvalidActorId,
     /// Two heroes supplied the same stable character identity.
     DuplicateActor,
-    /// Equipped abilities contained duplicates or exceeded the fixed wire bound.
+    /// Equipped skills contained duplicates or exceeded the fixed wire bound.
     InvalidLoadout,
     /// Data violates a trusted domain invariant.
     InvalidState,
@@ -1035,9 +1037,7 @@ impl fmt::Display for RuleError {
         f.write_str(match self {
             Self::InvalidActorId => "Character identity is invalid or reserved",
             Self::DuplicateActor => "Each character needs a unique identity",
-            Self::InvalidLoadout => {
-                "Equipped abilities must be unique and within the loadout limit"
-            }
+            Self::InvalidLoadout => "Equipped skills must be unique and within the loadout limit",
             Self::InvalidState => "Invalid combat state",
             Self::UnknownActor => "Unknown character",
             Self::WrongActor => "It is not this character's turn",
@@ -1237,8 +1237,8 @@ impl fmt::Display for CombatEvent {
                 "Character {}: {}",
                 actor.0,
                 match action {
-                    CombatAction::Skill { skill, .. } => skill_definition(*skill).name,
-                    CombatAction::Ability { .. } => "Ability",
+                    CombatAction::LegacySkill { skill, .. } => legacy_skill_definition(*skill).name,
+                    CombatAction::Skill { .. } => "Skill",
                     CombatAction::Reposition { .. } => "Reposition",
                     CombatAction::Rescue { .. } => "Rescue",
                     CombatAction::Defend => "Defend",

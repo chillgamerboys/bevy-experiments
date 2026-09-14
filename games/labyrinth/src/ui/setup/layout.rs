@@ -147,7 +147,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
         .resolve_build(&editor.draft.actor.build)
         .map_or_else(
             |_| "build needs correction".to_owned(),
-            |resolved| format!("{} active moves in draft", resolved.abilities.len()),
+            |resolved| format!("{} active moves in draft", resolved.moveset.skills.len()),
         );
     let dirty = if editor.pending_save {
         "Applying draft · waiting for host acknowledgment".to_owned()
@@ -576,15 +576,15 @@ fn mount_browser(
                 editor,
                 "Weapon None".into(),
                 "Unarmed".into(),
-                "Keep innate and learned moves without weapon grants.".into(),
+                "Keep skills and learned moves without weapon grants.".into(),
                 Selection::Weapon(None),
             );
             for weapon in &catalog.definition().weapons {
                 let equipped = editor.draft.actor.build.weapon.as_ref() == Some(&weapon.id);
                 let description = weapon
-                    .grants
+                    .skills
                     .iter()
-                    .filter_map(|id| catalog.ability(id))
+                    .filter_map(|id| catalog.skill(id))
                     .map(|a| format!("{}: {}", a.name, details::move_summary(a)))
                     .collect::<Vec<_>>()
                     .join("\n");
@@ -603,62 +603,58 @@ fn mount_browser(
                 );
             }
         }
-        Category::Innate => {
-            for ability in &catalog.definition().abilities {
+        Category::Skills => {
+            for skill in &catalog.definition().skills {
                 let granted = editor
                     .draft
                     .actor
                     .build
-                    .innate
+                    .skills
                     .iter()
-                    .any(|g| g.ability == ability.id);
+                    .any(|g| g.skill == skill.id);
                 browser_row(
                     world,
                     parent,
                     editor,
-                    format!("Innate {}", ability.id),
-                    format!(
-                        "{}{}",
-                        ability.name,
-                        if granted { " · in draft" } else { "" }
-                    ),
-                    details::move_summary(ability),
-                    Selection::Innate(ability.id.clone()),
+                    format!("Skill {}", skill.id),
+                    format!("{}{}", skill.name, if granted { " · in draft" } else { "" }),
+                    details::move_summary(skill),
+                    Selection::Skill(skill.id.clone()),
                 );
             }
         }
-        Category::Learned => {
-            for skill in &catalog.definition().learned_skills {
+        Category::Abilities => {
+            for ability in &catalog.definition().abilities {
                 browser_row(
                     world,
                     parent,
                     editor,
-                    format!("Learned {}", skill.id),
+                    format!("Ability {}", ability.id),
                     format!(
                         "{}{}",
-                        skill.name,
-                        if editor.draft.actor.build.learned_skills.contains(&skill.id) {
-                            " · learned"
+                        ability.name,
+                        if editor.draft.actor.build.abilities.contains(&ability.id) {
+                            " · in draft"
                         } else {
                             ""
                         }
                     ),
-                    skill.description.clone(),
-                    Selection::Learned(skill.id.clone()),
+                    ability.description.clone(),
+                    Selection::Ability(ability.id.clone()),
                 );
             }
         }
-        Category::Moves => match catalog.resolve_build(&editor.draft.actor.build) {
+        Category::Moveset => match catalog.resolve_build(&editor.draft.actor.build) {
             Ok(build) => {
-                for ability in &build.abilities {
+                for skill in &build.moveset.skills {
                     browser_row(
                         world,
                         parent,
                         editor,
-                        format!("Result Move {}", ability.definition.id),
-                        ability.definition.name.clone(),
-                        details::move_summary(&ability.definition),
-                        Selection::Move(ability.definition.id.clone()),
+                        format!("Result Move {}", skill.definition.id),
+                        skill.definition.name.clone(),
+                        details::move_summary(&skill.definition),
+                        Selection::Move(skill.definition.id.clone()),
                     );
                 }
             }
@@ -854,8 +850,8 @@ fn mount_inspector(
     {
         paragraph(world, content, "Build Change", change, UiTextRole::Body);
     }
-    for ability in &info.moves {
-        let definition = &ability.definition;
+    for skill in &info.moves {
+        let definition = &skill.definition;
         paragraph(
             world,
             content,
@@ -936,15 +932,15 @@ fn mount_inspector(
     for fact in info.facts {
         paragraph(world, content, "Choice Fact", fact, UiTextRole::Supporting);
     }
-    for ability in info.moves {
+    for skill in info.moves {
         paragraph(
             world,
             content,
             "Effective Move Name",
-            format!("{} · usage and sources", ability.definition.name),
+            format!("{} · usage and sources", skill.definition.name),
             UiTextRole::Body,
         );
-        for fact in details::move_facts(&ability, span, catalog)
+        for fact in details::move_facts(&skill, span, catalog)
             .into_iter()
             .skip(3)
         {

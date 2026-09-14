@@ -4,7 +4,7 @@
     reason = "test fixtures assert validated catalog contents"
 )]
 
-use crate::{build::*, catalog::*, skill_definition, ActorKind, Effect, HeroClass, SkillId};
+use crate::{build::*, catalog::*, legacy_skill_definition, ActorKind, Effect, HeroClass, SkillId};
 
 fn id(value: &str) -> ContentId {
     ContentId::new(value).unwrap()
@@ -33,9 +33,9 @@ fn snake(value: &str) -> String {
 fn embedded_data_preserves_all_legacy_abilities_and_actor_defaults() {
     let catalog = catalog();
     for skill in SkillId::ALL {
-        let legacy = skill_definition(skill);
+        let legacy = legacy_skill_definition(skill);
         let key = snake(serde_json::to_value(skill).unwrap().as_str().unwrap());
-        let authored = catalog.ability(&id(&key)).unwrap();
+        let authored = catalog.skill(&id(&key)).unwrap();
         assert_eq!(authored.name, legacy.name);
         assert_eq!(authored.description, legacy.description);
         assert_eq!(authored.source_ranks, legacy.source_ranks);
@@ -58,24 +58,27 @@ fn embedded_data_preserves_all_legacy_abilities_and_actor_defaults() {
         assert_eq!((preset.max_hp, preset.base_speed), kind.stats());
         assert_eq!(preset.footprint, kind.footprint());
         let resolved = catalog.resolve_build(&preset.build).unwrap();
-        assert_eq!(resolved.abilities.len(), crate::skills_for(kind).len());
+        assert_eq!(resolved.moveset.skills.len(), crate::skills_for(kind).len());
     }
 }
 #[test]
 fn data_only_new_weapon_and_ability_have_no_enum_or_consumer_mapping() {
     let mut raw = catalog().definition().clone();
-    let mut ability = raw.abilities[0].clone();
-    ability.id = id("test_lance_pierce");
-    ability.effects = vec![Effect::Damage(19)];
-    ability.source_ranks = 63;
-    ability.target_ranks = 15;
-    raw.abilities.push(ability);
+    let mut skill = raw.skills[0].clone();
+    skill.id = id("test_lance_pierce");
+    skill.requirements.clear();
+    skill.effects = vec![Effect::Damage(19)];
+    skill.source_ranks = 63;
+    skill.target_ranks = 15;
+    raw.skills.push(skill);
     raw.weapons.push(WeaponDefinition {
         id: id("test_lance"),
         name: "Test Lance".into(),
         description: "New data-only weapon.".into(),
         handedness: Handedness::Two,
-        grants: vec![id("test_lance_pierce")],
+        kind: id("spear"),
+        abilities: vec![],
+        skills: vec![id("test_lance_pierce")],
     });
     let encoded = serde_json::to_string(&raw).unwrap();
     let catalog: ContentCatalog = serde_json::from_str(&encoded).unwrap();
@@ -86,15 +89,15 @@ fn data_only_new_weapon_and_ability_have_no_enum_or_consumer_mapping() {
         })
         .unwrap();
     assert_eq!(
-        resolved.abilities[0].definition.effects,
+        resolved.moveset.skills[0].definition.effects,
         vec![Effect::Damage(19)]
     );
-    assert_eq!(resolved.abilities[0].definition.target_ranks, 15);
+    assert_eq!(resolved.moveset.skills[0].definition.target_ranks, 15);
 }
 #[test]
 fn all_six_weapons_resolve_and_throw_is_unlimited() {
     let catalog = catalog();
-    assert_eq!(catalog.definition().weapons.len(), 6);
+    assert_eq!(catalog.definition().weapons.len(), 11);
     for weapon in &catalog.definition().weapons {
         let resolved = catalog
             .resolve_build(&CharacterBuild {
@@ -102,39 +105,48 @@ fn all_six_weapons_resolve_and_throw_is_unlimited() {
                 ..Default::default()
             })
             .unwrap();
-        assert!(!resolved.abilities.is_empty());
+        assert!(!resolved.moveset.skills.is_empty());
         assert!(resolved
-            .abilities
+            .moveset
+            .skills
             .iter()
-            .all(|a| a.grants[0].kind == GrantKind::Weapon));
+            .all(|a| a.grants[0].kind == GrantKind::Equipment));
     }
-    assert_eq!(catalog.ability(&id("dagger_throw")).unwrap().max_uses, None);
+    assert_eq!(catalog.skill(&id("dagger_throw")).unwrap().max_uses, None);
     assert_eq!(
         catalog
-            .ability(&id("greatsword_cleave"))
+            .skill(&id("greatsword_cleave"))
             .unwrap()
             .target_pattern,
         TargetPattern::FrontPair
     );
 }
 #[test]
-fn grants_deduplicate_without_losing_sources_and_upgrades_are_explicit() {
-    let catalog = catalog();
+fn grants_deduplicate_without_losing_sources_and_passives_apply_once() {
+    let mut raw = catalog().definition().clone();
+    let weapon = raw
+        .weapons
+        .iter_mut()
+        .find(|w| w.id == id("dagger"))
+        .unwrap();
+    weapon.skills.push(id("mend"));
+    weapon.abilities.push(id("duelist_dagger_power"));
+    let catalog = ContentCatalog::new(raw).unwrap();
     let mut build = dagger();
-    build.innate.push(InnateGrant {
-        ability: id("dagger_stab"),
-        provenance: id("innate"),
+    build.skills.push(SkillGrant {
+        skill: id("mend"),
+        provenance: id("medic"),
     });
-    build.learned_skills = vec![
-        id("duelist_dagger_power"),
-        id("assassin_feint_training"),
-        id("assassin_bleeding_dagger"),
-    ];
+    build.abilities = vec![id("duelist_dagger_power"), id("assassin_bleeding_dagger")];
     let resolved = catalog.resolve_build(&build).unwrap();
-    assert_eq!(resolved.abilities.len(), 3);
-    let stab = &resolved.abilities[0];
-    assert_eq!(stab.grants.len(), 2);
-    assert_eq!(stab.upgrades.len(), 2);
+    assert_eq!(resolved.moveset.skills.len(), 3);
+    assert_eq!(resolved.moveset.skills[0].grants.len(), 2);
+    let stab = resolved
+        .moveset
+        .skills
+        .iter()
+        .find(|s| s.definition.id == id("dagger_stab"))
+        .unwrap();
     assert_eq!(
         stab.definition.effects,
         vec![
@@ -142,52 +154,43 @@ fn grants_deduplicate_without_losing_sources_and_upgrades_are_explicit() {
             Effect::ApplyStatus(crate::StatusKind::Bleed)
         ]
     );
-    assert_eq!(stab.upgrades[0].source.provenance, id("assassin"));
-    assert_eq!(stab.upgrades[1].source.provenance, id("duelist"));
-    build.learned_skills.reverse();
+    assert_eq!(stab.upgrades.len(), 2);
+    assert_eq!(
+        resolved
+            .abilities
+            .iter()
+            .find(|a| a.definition.id == id("duelist_dagger_power"))
+            .unwrap()
+            .grants
+            .len(),
+        2
+    );
+    build.abilities.reverse();
     assert_eq!(catalog.resolve_build(&build).unwrap(), resolved);
     build.weapon = None;
-    let without_weapon = catalog.resolve_build(&build).unwrap();
-    assert_eq!(without_weapon.abilities.len(), 2);
-    assert_eq!(without_weapon.abilities[0].grants.len(), 1);
-    build
-        .learned_skills
-        .retain(|s| s != &id("assassin_bleeding_dagger"));
-    assert_eq!(
-        catalog.resolve_build(&build).unwrap().abilities[0]
-            .definition
-            .effects,
-        vec![Effect::Damage(7)]
-    );
-    build.innate.clear();
-    let error = catalog.resolve_build(&build).unwrap_err();
-    assert!(error
-        .message
-        .contains("requires granted ability dagger_stab"));
+    let removed = catalog.resolve_build(&build).unwrap();
+    assert_eq!(removed.moveset.skills.len(), 1);
+    assert_eq!(removed.moveset.skills[0].definition.id, id("mend"));
+    assert_eq!(removed.moveset.skills[0].grants.len(), 1);
+    assert!(removed.abilities.iter().all(|a| !a.active()));
+    build.weapon = Some(id("dagger"));
+    assert_eq!(catalog.resolve_build(&build).unwrap(), resolved);
 }
 #[test]
-fn full_grant_collection_precedes_upgrades_and_rejects_repeated_skills() {
-    let mut raw = catalog().definition().clone();
-    raw.learned_skills.push(LearnedSkillDefinition {
-        id: id("z_grant_stab"),
-        name: "Stab Training".into(),
-        description: "Learn dagger stab without a dagger.".into(),
-        provenance: id("duelist"),
-        grants: vec![id("dagger_stab")],
-        upgrades: vec![],
-    });
-    let catalog = ContentCatalog::new(raw).unwrap();
+fn missing_targets_deactivate_passives_and_repeated_selections_are_rejected() {
+    let catalog = catalog();
     let mut build = CharacterBuild {
-        learned_skills: vec![id("assassin_bleeding_dagger"), id("z_grant_stab")],
+        weapon: Some(id("knifehand_daggers")),
+        abilities: vec![id("assassin_bleeding_dagger")],
         ..Default::default()
     };
-    assert_eq!(
-        catalog.resolve_build(&build).unwrap().abilities[0]
-            .upgrades
-            .len(),
-        1
-    );
-    build.learned_skills.push(id("assassin_bleeding_dagger"));
+    let resolved = catalog.resolve_build(&build).unwrap();
+    assert!(resolved.abilities[0]
+        .inactive_reason
+        .as_ref()
+        .unwrap()
+        .contains("dagger_stab"));
+    build.abilities.push(id("assassin_bleeding_dagger"));
     assert!(catalog
         .resolve_build(&build)
         .unwrap_err()
@@ -196,26 +199,31 @@ fn full_grant_collection_precedes_upgrades_and_rejects_repeated_skills() {
 }
 #[test]
 fn resolved_builds_serialize_beyond_eight_and_reject_tampered_views() {
-    let catalog = catalog();
+    let mut raw = catalog().definition().clone();
+    for skill in &mut raw.skills {
+        skill.personal_selectable = true;
+        skill.requirements.clear();
+    }
+    let catalog = ContentCatalog::new(raw).unwrap();
     let build = CharacterBuild {
-        innate: catalog
+        skills: catalog
             .definition()
-            .abilities
+            .skills
             .iter()
             .take(12)
-            .map(|a| InnateGrant {
-                ability: a.id.clone(),
-                provenance: id("innate"),
+            .map(|a| SkillGrant {
+                skill: a.id.clone(),
+                provenance: id("skills"),
             })
             .collect(),
         ..Default::default()
     };
     let resolved = catalog.resolve_build(&build).unwrap();
-    assert_eq!(resolved.abilities.len(), 12);
+    assert_eq!(resolved.moveset.skills.len(), 12);
     let mut copy: ResolvedBuild =
         serde_json::from_str(&serde_json::to_string(&resolved).unwrap()).unwrap();
     catalog.validate_resolved(&build, &copy).unwrap();
-    copy.abilities[0].definition.effects = vec![Effect::Damage(999)];
+    copy.moveset.skills[0].definition.effects = vec![Effect::Damage(999)];
     assert!(catalog.validate_resolved(&build, &copy).is_err());
     assert_eq!(catalog.resolve_build(&build).unwrap(), resolved);
 }
@@ -228,14 +236,14 @@ fn builds_own_their_resolved_definitions_and_presets_do_not_constrain_stats() {
     first.footprint = 3;
     first.build = dagger();
     let mut resolved = first.resolve(&catalog).unwrap();
-    resolved.abilities[0].definition.effects.clear();
+    resolved.moveset.skills[0].definition.effects.clear();
     let second = ActorBuild::from_preset(&catalog, &id("gatekeeper")).unwrap();
     assert_eq!(
         (second.max_hp, second.base_speed, second.footprint),
         (32, 2, 1)
     );
     assert_eq!(
-        first.resolve(&catalog).unwrap().abilities[0]
+        first.resolve(&catalog).unwrap().moveset.skills[0]
             .definition
             .effects,
         vec![Effect::Damage(5)]
@@ -243,7 +251,8 @@ fn builds_own_their_resolved_definitions_and_presets_do_not_constrain_stats() {
     assert!(catalog
         .resolve_build(&CharacterBuild::default())
         .unwrap()
-        .abilities
+        .moveset
+        .skills
         .is_empty());
     first.footprint = 7;
     assert_eq!(first.resolve(&catalog).unwrap_err().path, "actor.footprint");
@@ -252,15 +261,15 @@ fn builds_own_their_resolved_definitions_and_presets_do_not_constrain_stats() {
 fn canonical_fingerprint_ignores_definition_order_but_tracks_values() {
     let catalog = catalog();
     let mut raw = catalog.definition().clone();
-    raw.abilities.reverse();
+    raw.skills.reverse();
     raw.weapons.reverse();
-    raw.learned_skills.reverse();
+    raw.abilities.reverse();
     raw.actor_presets.reverse();
     assert_eq!(
         ContentCatalog::new(raw.clone()).unwrap().fingerprint(),
         catalog.fingerprint()
     );
-    raw.abilities[0].name.push('!');
+    raw.skills[0].name.push('!');
     assert_ne!(
         ContentCatalog::new(raw).unwrap().fingerprint(),
         catalog.fingerprint()
@@ -270,20 +279,20 @@ fn canonical_fingerprint_ignores_definition_order_but_tracks_values() {
 fn invalid_catalogs_report_reference_value_and_upgrade_context() {
     let base = catalog().definition().clone();
     let mut raw = base.clone();
-    raw.abilities.push(raw.abilities[0].clone());
+    raw.skills.push(raw.skills[0].clone());
     assert!(ContentCatalog::new(raw)
         .unwrap_err()
         .message
         .contains("duplicate id"));
     let mut raw = base.clone();
-    raw.weapons[0].grants.push(id("missing_move"));
+    raw.weapons[0].skills.push(id("missing_move"));
     assert!(ContentCatalog::new(raw)
         .unwrap_err()
         .path
         .contains("weapons."));
     for mask in [0, 64, 255] {
         let mut raw = base.clone();
-        raw.abilities[0].source_ranks = mask;
+        raw.skills[0].source_ranks = mask;
         assert!(ContentCatalog::new(raw)
             .unwrap_err()
             .path
@@ -299,14 +308,14 @@ fn invalid_catalogs_report_reference_value_and_upgrade_context() {
         Effect::StatusDamage(crate::DamageKind::Bleed),
     ] {
         let mut raw = base.clone();
-        raw.abilities[0].effects = vec![effect];
+        raw.skills[0].effects = vec![effect];
         assert!(ContentCatalog::new(raw)
             .unwrap_err()
             .path
             .contains("effects"));
     }
     let mut raw = base.clone();
-    raw.abilities[0].max_uses = Some(0);
+    raw.skills[0].max_uses = Some(0);
     assert!(ContentCatalog::new(raw)
         .unwrap_err()
         .path
@@ -315,8 +324,8 @@ fn invalid_catalogs_report_reference_value_and_upgrade_context() {
     raw.schema_version = 999;
     assert_eq!(ContentCatalog::new(raw).unwrap_err().path, "schema_version");
     let mut raw = base.clone();
-    raw.learned_skills[0].upgrades = vec![AbilityUpgrade {
-        ability: id("mend"),
+    raw.abilities[0].upgrades = vec![SkillUpgrade {
+        skill: id("mend"),
         operations: vec![UpgradeOperation::AddDamage {
             effect_index: 0,
             amount: 2,
@@ -327,8 +336,8 @@ fn invalid_catalogs_report_reference_value_and_upgrade_context() {
         .message
         .contains("base Damage"));
     let mut raw = base;
-    raw.learned_skills[0].upgrades = vec![AbilityUpgrade {
-        ability: id("greatsword_cleave"),
+    raw.abilities[0].upgrades = vec![SkillUpgrade {
+        skill: id("greatsword_cleave"),
         operations: vec![UpgradeOperation::ExtendTargetRanks(63)],
     }];
     assert!(ContentCatalog::new(raw)
@@ -361,14 +370,16 @@ fn parser_rejects_unknown_effects_fields_passives_and_bad_ids() {
 fn combined_upgrades_and_move_count_are_bounded_without_silent_truncation() {
     let mut raw = catalog().definition().clone();
     for (key, amount) in [("a_power", 6000), ("b_power", 6000)] {
-        raw.learned_skills.push(LearnedSkillDefinition {
+        raw.abilities.push(AbilityDefinition {
             id: id(key),
             name: key.into(),
             description: "Large valid individual bonus.".into(),
             provenance: id("test"),
-            grants: vec![],
-            upgrades: vec![AbilityUpgrade {
-                ability: id("dagger_stab"),
+            personal_selectable: true,
+            requirements: vec![],
+            effects: vec![],
+            upgrades: vec![SkillUpgrade {
+                skill: id("dagger_stab"),
                 operations: vec![UpgradeOperation::AddDamage {
                     effect_index: 0,
                     amount,
@@ -378,30 +389,35 @@ fn combined_upgrades_and_move_count_are_bounded_without_silent_truncation() {
     }
     let catalog = ContentCatalog::new(raw).unwrap();
     let mut build = dagger();
-    build.learned_skills = vec![id("a_power"), id("b_power")];
+    build.abilities = vec![id("a_power"), id("b_power")];
     assert!(catalog
         .resolve_build(&build)
         .unwrap_err()
         .message
         .contains("combined damage"));
     let mut raw = catalog.definition().clone();
-    let template = raw.abilities[0].clone();
+    let mut template = raw.skills[0].clone();
+    template.personal_selectable = true;
+    template.requirements.clear();
     for i in 0..65 {
         let mut a = template.clone();
         a.id = id(&format!("overflow_{i}"));
-        raw.abilities.push(a);
+        raw.skills.push(a);
     }
     let catalog = ContentCatalog::new(raw).unwrap();
     let mut build = CharacterBuild {
-        innate: (0..64)
-            .map(|i| InnateGrant {
-                ability: id(&format!("overflow_{i}")),
-                provenance: id("innate"),
+        skills: (0..64)
+            .map(|i| SkillGrant {
+                skill: id(&format!("overflow_{i}")),
+                provenance: id("skills"),
             })
             .collect(),
         ..Default::default()
     };
-    assert_eq!(catalog.resolve_build(&build).unwrap().abilities.len(), 64);
+    assert_eq!(
+        catalog.resolve_build(&build).unwrap().moveset.skills.len(),
+        64
+    );
     build.weapon = Some(id("dagger"));
     assert!(catalog
         .resolve_build(&build)

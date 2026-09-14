@@ -147,8 +147,8 @@ enum MenuPage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Choice {
-    Ability(u8),
-    Skill(SkillId),
+    Skill(u8),
+    LegacySkill(SkillId),
     Reposition,
     Rescue,
     Defend,
