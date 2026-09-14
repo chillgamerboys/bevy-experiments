@@ -89,6 +89,10 @@ combat/sequences while reading. Queue overflow and unadmitted requests also exer
 the production host history handler. This is same-machine multi-App evidence, not
 OS-process death, discovery or cross-machine coverage. Select these filters for
 history work; rendered scrolling and disclosure guard acceptance remain UI checks.
+`gameskills run labyrinth-history` selects the session/network history tests only.
+For a changed log interface, `labyrinth-history-ui-normal` separately selects its
+formatter and eight normal-1080 interaction cases, skipping compatibility wrappers.
+This keeps logic-only history fixes independent of rendered UI verification.
 
 ## Static frame review
 
@@ -100,8 +104,9 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 For Development/Testing UI changes, inspect only the affected route at 1920×1080
 Auto. Other sizes/scales are compatibility cases selected for a relevant defect
 or explicit Release support, not routine acceptance. Retain their automated tests.
-Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
-`paused`, `abilities`, `ability-help`, `editor` and `editor-actions`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
+Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `history-long`, `history-older`, `combat`, `help`, `effects`, `inspect`, `order` and
+`paused`, `skills`, `skill-help`, `editor-parameters`, `editor-compare`,
+`editor-abilities` and `editor-actions`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
@@ -112,7 +117,7 @@ footprint regression checks initial sparse rosters, death versus corpse removal,
 stable controls and projected movement alignment; authored frames do not establish
 those transitions. `gameskills run ui-tooltip-test` covers the shared tooltip
 lifecycle. Labyrinth's normal UI tests cover pointer hover, pinned persistence
-through other ability clicks, Escape and nested inspection without a close button.
+through other Skill clicks, × branch dismissal, Escape menu routing and nested inspection.
 
 When customization presentation or interaction changes, review the affected lobby,
 character editor or ability-overflow path at 1920×1080 Auto. Automatic focus scrolling is part
@@ -266,11 +271,13 @@ unselected routes are not pending gates.
 
 Tooltip lifecycle regressions include immediate first-frame preview and departure,
 one-second continuous hover to lock, persistence over empty space and other sources,
-explicit keyboard inspection, modal cleanup, and deepest-first Escape dismissal.
+explicit keyboard inspection, visible × branch dismissal, and temporary modal suspension.
+Escape belongs to the Game menu; it does not dismiss Labyrinth's pinned cards.
 The native-layout test compares the card rectangle on every frame across locking:
 the preview must use the same shorter geometry as the locked card, not reserve an
-extra footer. Native pointer tests hover and activate another ability while pinned,
-then verify that Escape with a stationary pointer does not reveal a new tooltip. Render
+extra footer. Native pointer tests hover and activate another Skill while pinned, then verify
+that × dismissal does not immediately repin under a stationary pointer. Escape
+hides pins through the Game menu and restores valid subjects after returning. Render
 `labyrinth_review ... 1920 1080 auto help` and `help-locked` for separate authored
 presentation states; those captures freeze timing and do not prove hover duration.
 

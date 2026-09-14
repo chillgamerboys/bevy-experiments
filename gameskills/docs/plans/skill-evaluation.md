@@ -66,6 +66,23 @@ controlled token-savings comparison.
   rendered pages supplied distinct behavior/layout evidence. Fresh review tasks can
   receive a small file/acceptance brief instead of inheriting the full transcript.
 
+- History review found that fixed virtual rows clipped valid long names without a
+  reveal route. Adding a full-text tooltip exposed a second issue: word-only wrapping
+  still clipped an unbroken name. One normal-1080 regression now measures horizontal
+  fit and keyboard access to the final line, plus pin/virtualization/menu/disclosure
+  lifecycle. This supports testing relevant content extremes at the normal target,
+  rather than replaying a resolution matrix.
+- Broader CI caught an old lobby→editor header assertion missed by the editor suite.
+  The correction preserves actual occupied ranks in the new preview and tests that
+  exact moved-wagon route at normal1080. Search consumers of renamed semantic UI
+  identifiers before selecting verification; UI owner directories are not the whole
+  interaction dependency graph.
+- PR43's CI selector change triggered workspace-wide macOS Testing fallback; its
+  Rust job took 14m7s. Local checks stayed scoped. Investigate focused controller
+  validation and reuse of accepted prerequisite evidence between dependent PRs,
+  preserving changed-test coverage checks. Do not describe the CI run as narrow or
+  claim that cached token counts establish causal performance savings.
+
 ### MCP delivery contradiction and verification handoff
 
 The user challenged the extra standalone Linear check despite working connected
