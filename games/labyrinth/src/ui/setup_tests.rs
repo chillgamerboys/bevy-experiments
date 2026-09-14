@@ -247,7 +247,7 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
     for selected in [
         SetupAction::Weapon(Some(id("dagger"))),
         SetupAction::Skill(id("rally")),
-        SetupAction::Ability(id("assassin_feint_training")),
+        SetupAction::Ability(id("resilient")),
         SetupAction::Ability(id("duelist_dagger_power")),
         SetupAction::Status(labyrinth_rules::StatusKind::Haste),
     ] {
@@ -283,7 +283,7 @@ fn composed_submission_and_saved_scenario_preserve_exact_build_and_starting_fiel
     assert_eq!(actor.actor.build.skills, expected_skills);
     assert_eq!(
         actor.actor.build.abilities,
-        vec![id("assassin_feint_training"), id("duelist_dagger_power")]
+        vec![id("resilient"), id("duelist_dagger_power")]
     );
     assert_eq!(
         actor.starting_statuses,
@@ -321,16 +321,8 @@ fn empty_starting_hp_is_full_and_toggle_removal_preserves_other_grant_sources() 
     let original = first_actor(&view).actor.build.skills.clone();
     action(&view, &mut ui, SetupAction::Skill(id("rally")));
     action(&view, &mut ui, SetupAction::Skill(id("rally")));
-    action(
-        &view,
-        &mut ui,
-        SetupAction::Ability(id("assassin_feint_training")),
-    );
-    action(
-        &view,
-        &mut ui,
-        SetupAction::Ability(id("assassin_feint_training")),
-    );
+    action(&view, &mut ui, SetupAction::Ability(id("resilient")));
+    action(&view, &mut ui, SetupAction::Ability(id("resilient")));
     action(&view, &mut ui, SetupAction::Weapon(None));
     let Some(LabyrinthIntent::CustomizeActor { actor, .. }) =
         action(&view, &mut ui, SetupAction::Save)

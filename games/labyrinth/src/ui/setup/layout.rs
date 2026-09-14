@@ -582,7 +582,7 @@ fn mount_browser(
             for weapon in &catalog.definition().weapons {
                 let equipped = editor.draft.actor.build.weapon.as_ref() == Some(&weapon.id);
                 let description = weapon
-                    .grants
+                    .skills
                     .iter()
                     .filter_map(|id| catalog.skill(id))
                     .map(|a| format!("{}: {}", a.name, details::move_summary(a)))
@@ -624,23 +624,23 @@ fn mount_browser(
             }
         }
         Category::Abilities => {
-            for skill in &catalog.definition().abilities {
+            for ability in &catalog.definition().abilities {
                 browser_row(
                     world,
                     parent,
                     editor,
-                    format!("Ability {}", skill.id),
+                    format!("Ability {}", ability.id),
                     format!(
                         "{}{}",
-                        skill.name,
-                        if editor.draft.actor.build.abilities.contains(&skill.id) {
-                            " · learned"
+                        ability.name,
+                        if editor.draft.actor.build.abilities.contains(&ability.id) {
+                            " · in draft"
                         } else {
                             ""
                         }
                     ),
-                    skill.description.clone(),
-                    Selection::Ability(skill.id.clone()),
+                    ability.description.clone(),
+                    Selection::Ability(ability.id.clone()),
                 );
             }
         }

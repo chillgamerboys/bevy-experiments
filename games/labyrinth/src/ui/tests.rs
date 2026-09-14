@@ -849,7 +849,7 @@ fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank_
 }
 
 #[test]
-fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_loadouts_normal_1080() {
+fn skill_controls_follow_movesets_with_eight_shortcuts_and_empty_movesets_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let mut next_id = 0;
     let heroes = DEFAULT_HERO_ROSTER.map(|class| {
@@ -956,8 +956,8 @@ fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectator
 }
 
 #[test]
-fn ability_and_target_selection_never_commit_without_explicit_confirmation_normal_1080() {
-    ability_and_target_selection_never_commit_without_explicit_confirmation(
+fn skill_and_target_selection_never_commit_without_explicit_confirmation_normal_1080() {
+    skill_and_target_selection_never_commit_without_explicit_confirmation(
         1920,
         1080,
         UiScaleMode::Auto,
@@ -965,15 +965,15 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation_norma
 }
 
 #[test]
-fn ability_and_target_selection_never_commit_without_explicit_confirmation_compatibility() {
-    ability_and_target_selection_never_commit_without_explicit_confirmation(
+fn skill_and_target_selection_never_commit_without_explicit_confirmation_compatibility() {
+    skill_and_target_selection_never_commit_without_explicit_confirmation(
         1280,
         720,
         UiScaleMode::Auto,
     );
 }
 
-fn ability_and_target_selection_never_commit_without_explicit_confirmation(
+fn skill_and_target_selection_never_commit_without_explicit_confirmation(
     width: u32,
     height: u32,
     scale: UiScaleMode,

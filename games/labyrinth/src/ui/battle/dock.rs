@@ -290,7 +290,7 @@ pub(super) fn mount_skills(
     parent: Entity,
     encounter: u64,
     actor: Option<&ActorSnapshot>,
-    loadout: &[labyrinth_rules::build::ResolvedSkill],
+    moveset: &[labyrinth_rules::build::ResolvedSkill],
 ) {
     let children = world
         .get::<Children>(parent)
@@ -299,7 +299,7 @@ pub(super) fn mount_skills(
     for child in children {
         world.despawn(child);
     }
-    for (index, skill) in loadout.iter().enumerate() {
+    for (index, skill) in moveset.iter().enumerate() {
         let definition = &skill.definition;
         let entity = glyph_control(
             world,
@@ -314,9 +314,9 @@ pub(super) fn mount_skills(
         world
             .entity_mut(entity)
             .insert(bevy_gamekit::ui::UiTooltipSource(
-                super::tooltips::ability_subject(
+                super::tooltips::skill_subject(
                     encounter,
-                    actor.expect("nonempty loadout has actor").id,
+                    actor.expect("nonempty moveset has actor").id,
                     &definition.id,
                 ),
             ))
@@ -324,7 +324,7 @@ pub(super) fn mount_skills(
                 "labyrinth-skills",
                 format!(
                     "{encounter}/{}/{}",
-                    actor.expect("nonempty loadout has actor").id.0,
+                    actor.expect("nonempty moveset has actor").id.0,
                     definition.id
                 ),
             ));

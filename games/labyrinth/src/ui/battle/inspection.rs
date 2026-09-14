@@ -109,7 +109,7 @@ pub(super) fn choice_title(actor: Option<&ActorSnapshot>, choice: Option<Choice>
         Some(Choice::Rescue) => "Rescue · revive a downed ally",
         Some(Choice::Defend) => "Guard · reduce direct damage by 2",
         Some(Choice::Wait) => "Wait · spend this turn",
-        None => "Choose an skill · select a target · confirm",
+        None => "Choose a skill · select a target · confirm",
     }
 }
 
@@ -188,7 +188,7 @@ pub(super) fn slot_value(
                     {
                         "Waiting for your turn".to_owned()
                     } else if ui.selected.is_none() {
-                        "Choose an skill".to_owned()
+                        "Choose a skill".to_owned()
                     } else {
                         reason
                     }

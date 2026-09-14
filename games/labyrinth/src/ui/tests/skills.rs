@@ -109,8 +109,8 @@ fn capture(mut intents: MessageReader<LabyrinthIntent>, mut commands: ResMut<Com
 }
 
 #[test]
-fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable_normal_1080() {
-    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+fn fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable_normal_1080() {
+    fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable(
         1920,
         1080,
         UiScaleMode::Auto,
@@ -118,20 +118,20 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
 }
 
 #[test]
-fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable_compatibility() {
-    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+fn fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable_compatibility() {
+    fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable(
         1280,
         720,
         UiScaleMode::Auto,
     );
-    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+    fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable(
         1280,
         720,
         UiScaleMode::Percent200,
     );
 }
 
-fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+fn fourteen_authored_skills_are_tabbable_inspectable_targetable_and_confirmable(
     width: u32,
     height: u32,
     scale: UiScaleMode,
@@ -393,8 +393,8 @@ fn effective_multi_target_forecast_names_every_target_and_conceals_secondary_unk
 }
 
 #[test]
-fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_normal_1080() {
-    ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+fn skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_normal_1080() {
+    skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
         1920,
         1080,
         UiScaleMode::Auto,
@@ -402,15 +402,15 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
 }
 
 #[test]
-fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_compatibility() {
-    ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+fn skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_compatibility() {
+    skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
         1280,
         720,
         UiScaleMode::Auto,
     );
 }
 
-fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+fn skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
     width: u32,
     height: u32,
     scale: UiScaleMode,

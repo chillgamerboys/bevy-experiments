@@ -511,11 +511,11 @@ pub(super) fn action(
                 return None;
             }
             let editor = ui.editor.as_mut()?;
-            let learned = &mut editor.draft.actor.build.abilities;
-            if learned.contains(&id) {
-                learned.retain(|skill| *skill != id);
+            let abilities = &mut editor.draft.actor.build.abilities;
+            if abilities.contains(&id) {
+                abilities.retain(|ability| *ability != id);
             } else {
-                learned.push(id);
+                abilities.push(id);
             }
             editor.generation += 1;
             editor.error = None;

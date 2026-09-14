@@ -282,7 +282,7 @@ pub(super) fn changes(before: &ResolvedBuild, after: &ResolvedBuild) -> Vec<Stri
         }
     }
     if lines.is_empty() {
-        lines.push("No change to active moves.".into());
+        lines.push("No change to Moveset or Abilities.".into());
     }
     lines
 }
@@ -394,7 +394,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 result.description = ability.description.clone();
 
                 result.facts.push(format!(
-                    "Discipline: {}. Available to any character with the required move.",
+                    "Passive source: {}. Equipment and Skill prerequisites determine whether it is active.",
                     ability.provenance
                 ));
                 for upgrade in &ability.upgrades {
@@ -413,7 +413,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                     ));
                 }
                 if ability.upgrades.is_empty() {
-                    result.facts.push("No prerequisite move required.".into());
+                    result.facts.push("No prerequisite Skill required.".into());
                 }
                 if let Some(resolved) = next
                     .as_ref()
@@ -423,7 +423,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                     result
                         .facts
                         .push(resolved.inactive_reason.clone().map_or_else(
-                            || "Active passive Ability.".into(),
+                            || "Ability active.".into(),
                             |reason| format!("Inactive: {reason}"),
                         ));
                 }
@@ -451,7 +451,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
         Selection::Preset(id) => {
             if let Some(preset) = catalog.actor_preset(id) {
                 result.title = preset.name.clone();
-                result.description="Use this preset's appearance, equipment, skills moves and starting values in your draft.".into();
+                result.description="Use this preset's appearance, equipment, Skills, Abilities and starting values in your draft.".into();
                 result.facts.push(format!("Maximum HP {} → {} · speed {} → {} · formation spaces {} → {}. Starting HP resets to full.",editor.max_hp,preset.max_hp,editor.speed,preset.base_speed,editor.footprint,preset.footprint));
                 move_ids = catalog.resolve_build(&preset.build).map_or_else(
                     |_| vec![],

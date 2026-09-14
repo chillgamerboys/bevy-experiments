@@ -8,7 +8,6 @@ use bevy_gamekit::testing::{
     find_named, focus_action, run_frames, tap_key, visible_control_rect, TestAppBuilder,
 };
 use labyrinth_rules::{
-    build::CharacterBuild,
     catalog::{AbilityDefinition, SkillUpgrade, UpgradeOperation},
     scenario::StockScenario,
 };
@@ -104,7 +103,7 @@ fn inspection_does_not_edit_and_explicit_equip_preserves_parameter_drafts() {
         &view,
         &mut ui,
         Category::Abilities,
-        Selection::Ability(id("assassin_feint_training")),
+        Selection::Ability(id("resilient")),
     );
     let editor = ui.editor.as_ref().expect("editor");
     assert_eq!(
@@ -128,7 +127,9 @@ fn rank_restrictions_are_explained_without_removing_granted_moves() {
     let mut ui = edit(&view);
     action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
     let resolved = build(ui.editor.as_ref().expect("editor"), catalog);
-    let throw = resolved.moveset.skills
+    let throw = resolved
+        .moveset
+        .skills
         .iter()
         .find(|a| a.definition.id == id("dagger_throw"))
         .expect("throw remains granted");
@@ -167,26 +168,72 @@ fn passive_prerequisites_remain_selected_and_equipment_only_skills_stay_readonly
     let catalog = view.catalog.as_ref().expect("catalog");
     let mut ui = edit(&view);
     action(&view, &mut ui, SetupAction::Weapon(Some(id("greatsword"))));
-    inspect(&view, &mut ui, Category::Abilities, Selection::Ability(id("duelist_dagger_power")));
+    inspect(
+        &view,
+        &mut ui,
+        Category::Abilities,
+        Selection::Ability(id("duelist_dagger_power")),
+    );
     let info = details::inspection(ui.editor.as_ref().expect("editor"), catalog);
     assert!(info.facts.iter().any(|s| s.contains("Inactive:")));
     assert!(!info.apply.expect("select inactive ability").1);
     apply(&view, &mut ui);
     let inactive = build(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(!inactive.abilities[0].active());
+    assert!(!inactive
+        .abilities
+        .first()
+        .expect("selected passive")
+        .active());
     action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
     let improved = build(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(improved.moveset.skills.iter().find(|s| s.definition.id == id("dagger_stab")).expect("stab").definition.effects.contains(&labyrinth_rules::Effect::Damage(7)));
+    assert!(improved
+        .moveset
+        .skills
+        .iter()
+        .find(|s| s.definition.id == id("dagger_stab"))
+        .expect("stab")
+        .definition
+        .effects
+        .contains(&labyrinth_rules::Effect::Damage(7)));
     action(&view, &mut ui, SetupAction::Skill(id("dagger_stab")));
-    assert!(!ui.editor.as_ref().expect("editor").draft.actor.build.skills.iter().any(|grant| grant.skill == id("dagger_stab")));
-    inspect(&view, &mut ui, Category::Skills, Selection::Skill(id("dagger_stab")));
-    assert!(details::inspection(ui.editor.as_ref().expect("editor"), catalog).apply.expect("readonly equipment source").1);
+    assert!(!ui
+        .editor
+        .as_ref()
+        .expect("editor")
+        .draft
+        .actor
+        .build
+        .skills
+        .iter()
+        .any(|grant| grant.skill == id("dagger_stab")));
+    inspect(
+        &view,
+        &mut ui,
+        Category::Skills,
+        Selection::Skill(id("dagger_stab")),
+    );
+    assert!(
+        details::inspection(ui.editor.as_ref().expect("editor"), catalog)
+            .apply
+            .expect("readonly equipment source")
+            .1
+    );
     action(&view, &mut ui, SetupAction::Weapon(None));
     let inactive = build(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(inactive.abilities.iter().any(|a| a.definition.id == id("duelist_dagger_power") && !a.active()));
-    assert!(!inactive.moveset.skills.iter().any(|s| s.definition.id == id("dagger_stab")));
+    assert!(inactive
+        .abilities
+        .iter()
+        .any(|a| a.definition.id == id("duelist_dagger_power") && !a.active()));
+    assert!(!inactive
+        .moveset
+        .skills
+        .iter()
+        .any(|s| s.definition.id == id("dagger_stab")));
     action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
-    assert_eq!(build(ui.editor.as_ref().expect("editor"), catalog), improved);
+    assert_eq!(
+        build(ui.editor.as_ref().expect("editor"), catalog),
+        improved
+    );
 }
 #[test]
 fn rank_only_upgrade_comparison_names_the_actual_changed_fields() {

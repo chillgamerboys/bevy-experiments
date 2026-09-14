@@ -91,7 +91,8 @@ halts the encounter with a diagnostic instead of retrying a bad transition forev
 The canonical content fingerprint hashes hero/enemy stats, Skills, status
 definitions and an explicit algorithm/interpretation revision. Network compatibility
 adds the application wire schema. Protocol 7 rejects peers using the old active-Ability
-fields and command variants; catalog/scenario schema 2 rejects incompatible saves. Change `RULES_VERSION` whenever semantics change;
+fields and command variants; catalog/scenario schema 2 rejects incompatible saves. Change `RULES_VERSION` whenever
+semantics change;
 authored catalog changes automatically change the digest. The fingerprint is a
 compatibility check, not proof that a remote executable is trustworthy.
 
@@ -210,12 +211,12 @@ stay local; the same screen is intended to support later in-game inspection with
 authorizing combat-time editing. Existing prototype battle parameters do not define
 a future attribute/progression system.
 
-The battle action rail retains the subject and effective disclosed loadout actually
+The battle action rail retains the subject and effective disclosed Moveset actually
 mounted. Selection and confirmation reject an input batch if the current projection
 differs before Present can rebuild those controls. This complements turn/encounter
 and server-side authorization: an old actor-local position must never select a new
 build's move merely because the index remains legal. Mutable HP/uses do not change
-the frozen loadout identity; current action legality is still validated separately.
+the frozen Moveset identity; current action legality is still validated separately.
 
 All cooperative battle state is public, so peers receive full authoritative
 snapshots; only request sequence is recipient-specific. Host RNG, admission secrets

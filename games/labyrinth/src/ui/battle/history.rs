@@ -54,7 +54,7 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                             _ => None,
                         }?;
                         source.skill(index).map(|definition| {
-                            tooltips::ability_subject(view.encounter, actor, &definition.id)
+                            tooltips::skill_subject(view.encounter, actor, &definition.id)
                         })
                     }),
             )),

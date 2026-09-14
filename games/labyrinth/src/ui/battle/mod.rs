@@ -59,8 +59,8 @@ struct BattleNodes {
     heroes: Entity,
     enemies: Entity,
     skills: Entity,
-    loadout: Vec<labyrinth_rules::build::ResolvedSkill>,
-    ability_actor: Option<(u64, ActorId)>,
+    moveset: Vec<labyrinth_rules::build::ResolvedSkill>,
+    moveset_actor: Option<(u64, ActorId)>,
     confirm: Entity,
     rematch: Entity,
     dock: dock::DockNodes,
@@ -70,7 +70,7 @@ struct BattleNodes {
     feedback: BTreeMap<ActorId, (String, f64)>,
 }
 
-fn displayed_loadout(
+fn displayed_moveset(
     view: &LabyrinthView,
     presentation: &crate::presentation::BattlePresentation,
 ) -> (
@@ -97,8 +97,8 @@ pub(super) fn input_matches_presented_build(world: &World, view: &LabyrinthView)
         snapshot,
         world.resource::<crate::presentation::CombatDisclosure>(),
     );
-    let (subject, skills) = displayed_loadout(view, &presentation);
-    nodes.ability_actor == subject && nodes.loadout == skills
+    let (subject, skills) = displayed_moveset(view, &presentation);
+    nodes.moveset_actor == subject && nodes.moveset == skills
 }
 
 pub(super) fn clear(world: &mut World) {
@@ -154,11 +154,11 @@ pub(super) fn present(
             world.resource::<crate::presentation::CombatDisclosure>(),
         );
         let displayed = inspection::display_actor(view);
-        let (ability_actor, loadout) = displayed_loadout(view, &presentation);
-        if nodes.loadout != loadout || nodes.ability_actor != ability_actor {
-            dock::mount_skills(world, nodes.skills, view.encounter, displayed, &loadout);
-            nodes.loadout = loadout;
-            nodes.ability_actor = ability_actor;
+        let (moveset_actor, moveset) = displayed_moveset(view, &presentation);
+        if nodes.moveset != moveset || nodes.moveset_actor != moveset_actor {
+            dock::mount_skills(world, nodes.skills, view.encounter, displayed, &moveset);
+            nodes.moveset = moveset;
+            nodes.moveset_actor = moveset_actor;
             // An actor/index is meaningful only within this frozen build.
             ui.selected = None;
             ui.target = None;

@@ -777,8 +777,11 @@ fn sixth_player_reconnect_preserves_nondefault_actor_loadout_and_live_state() {
     let mut scenario = authority.scenario.clone();
     let sixth = scenario.heroes.last_mut().expect("sixth character");
     sixth.id = ActorId(909);
-    sixth.actor.build =
-        labyrinth_rules::scenario::legacy_build(&[labyrinth_rules::SkillId::DeepStrike]);
+    sixth.actor.build = labyrinth_rules::build::CharacterBuild {
+        weapon: Some(labyrinth_rules::catalog::ContentId::new("knifehand_daggers").expect("item")),
+        abilities: vec![labyrinth_rules::catalog::ContentId::new("resilient").expect("passive")],
+        ..Default::default()
+    };
     let revision = authority.setup_revision;
     assert!(request(
         &mut authority,

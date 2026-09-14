@@ -938,7 +938,10 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
             .legal_actions(actor)
             .into_iter()
             .find(|action| match action {
-                CombatAction::Skill { index, .. } => before.actor(actor).and_then(|source| source.skill(*index)).is_some_and(|skill| skill.id.as_str() == "bleeding_cut"),
+                CombatAction::Skill { index, .. } => before
+                    .actor(actor)
+                    .and_then(|source| source.skill(*index))
+                    .is_some_and(|skill| skill.id.as_str() == "bleeding_cut"),
                 _ => false,
             })
             .unwrap_or(CombatAction::Wait);
@@ -1530,7 +1533,7 @@ fn incompatible_and_opaque_service_listings_do_not_open_direct_transport() {
     };
     let incompatible = SessionMetadata::new(
         GAME_ID,
-        "different",
+        "6", // Previous active-Ability wire schema must not enter the new session.
         fingerprint_text(),
         "Other rules",
         1,
@@ -1834,12 +1837,17 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
         .skills
         .iter()
         .filter(|skill| skill.personal_selectable)
-        .map(|a| SkillGrant {
-            skill: a.id.clone(),
-            provenance: ContentId::new("skills").expect("ID"),
+        .map(|skill| SkillGrant {
+            skill: skill.id.clone(),
+            provenance: ContentId::new(format!("custom_scenario_personal_skill_{}", skill.id))
+                .expect("bounded provenance ID"),
         })
         .collect();
     custom.actor.build.weapon = Some(ContentId::new("dagger").expect("ID"));
+    custom.actor.build.abilities = vec![
+        ContentId::new("duelist_dagger_power").expect("passive ID"),
+        ContentId::new("resilient").expect("passive ID"),
+    ];
     let payload = GameRequest {
         sequence: 100,
         encounter: before.encounter,

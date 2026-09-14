@@ -16,7 +16,7 @@ fn subject(value: impl Into<String>) -> UiTooltipSubject {
     UiTooltipSubject(format!("labyrinth/{}", value.into()))
 }
 
-pub(super) fn ability_subject(
+pub(super) fn skill_subject(
     encounter: u64,
     actor: ActorId,
     skill: &labyrinth_rules::catalog::ContentId,
@@ -72,10 +72,7 @@ fn skill_content(skill: &labyrinth_rules::build::ResolvedSkill) -> UiTooltipCont
         ));
     }
     for upgrade in &skill.upgrades {
-        facts.push(format!(
-            "Ability upgrade · {} · {}",
-            upgrade.source.provenance, upgrade.source.definition
-        ));
+        facts.push(format!("Passive Ability · {}", upgrade.ability));
         for operation in &upgrade.upgrade.operations {
             use labyrinth_rules::catalog::UpgradeOperation;
             facts.push(match operation {
@@ -289,7 +286,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         }
     }
     entries.insert(subject("ranks"), UiTooltipContent {
-        title: "Formation ranks".to_owned(), body: "Rank 1 is nearest the breach. Each side has six linear positions. Lit numbers show where an skill can be used and which target ranks it can reach. Character names and monster types identify combatants; the numbers at their feet show their current ranks.".to_owned(), ..default()
+        title: "Formation ranks".to_owned(), body: "Rank 1 is nearest the breach. Each side has six linear positions. Lit numbers show where a skill can be used and which target ranks it can reach. Character names and monster types identify combatants; the numbers at their feet show their current ranks.".to_owned(), ..default()
     });
     entries.insert(subject("boundaries"), UiTooltipContent {
         title: "Condition timing".to_owned(), body: "Conditions tick or expire on their declared boundary, not when you inspect them. Turn-start damage happens at the bearer's initiative slot, including while dying. Corpses never take turns: retained conditions trigger and count down at round end, before corpse expiry. Initiative is rolled again each round.".to_owned(), ..default()
@@ -319,7 +316,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
             .iter()
             .map(|skill| {
                 (
-                    ability_subject(view.encounter, actor.id, &skill.definition.id),
+                    skill_subject(view.encounter, actor.id, &skill.definition.id),
                     skill_content(skill),
                 )
             })
@@ -334,7 +331,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         {
             for skill in &details.skills {
                 entries.insert(
-                    ability_subject(view.encounter, actor.id, &skill.definition.id),
+                    skill_subject(view.encounter, actor.id, &skill.definition.id),
                     skill_content(skill),
                 );
             }
