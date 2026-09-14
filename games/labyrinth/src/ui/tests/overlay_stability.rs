@@ -409,7 +409,8 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
             let ui = app.world().resource::<UiState>();
             assert_eq!(ui.log_mode, LogMode::History);
             unchanged(&mut app, &expected, &snapshot, toggle);
-            tap_key(&mut app, KeyCode::Escape);
+            let hide = find_named(app.world_mut(), "History Hide").expect("hide log");
+            assert!(click_action(&mut app, hide));
             unchanged(
                 &mut app,
                 &expected,
@@ -565,19 +566,27 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
         );
     }
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
-    let close = find_named(app.world_mut(), "Tooltip Close").expect("locked close");
-    let close_rect = visible_control_rect(app.world(), close, viewport).expect("close fits");
-    assert!(before.contains(close_rect.center()));
+    assert!(find_named(app.world_mut(), "Tooltip Close").is_some());
+    let pinned = app.world().resource::<UiTooltipState>().subjects().to_vec();
     move_pointer(&mut app, Vec2::new(5.0, 5.0));
     run_frames(&mut app, 15);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
-    hover_at(&mut app, close_rect.center());
-    assert_eq!(
-        app.world().get::<Interaction>(close),
-        Some(&Interaction::Hovered),
-        "close is reachable"
+    native_pointer_click(&mut app, Vec2::new(5.0, 5.0));
+    let other = find_named(app.world_mut(), "Skill 1").expect("other ability");
+    let other_point = visible_control_rect(app.world(), other, viewport)
+        .expect("other ability bounds")
+        .center();
+    hover_at(&mut app, other_point);
+    run_frames(&mut app, 15);
+    assert_eq!(app.world().resource::<UiTooltipState>().subjects(), pinned);
+    native_pointer_click(&mut app, other_point);
+    assert!(
+        app.world().resource::<UiState>().selected.is_some(),
+        "gameplay input still works"
     );
-    native_pointer_click(&mut app, close_rect.center());
+    assert_eq!(app.world().resource::<UiTooltipState>().subjects(), pinned);
+    let close = find_named(app.world_mut(), "Tooltip Close").expect("pinned close control");
+    assert!(click_action(&mut app, close));
     assert!(
         find_named(app.world_mut(), "Tooltip Card 0").is_none(),
         "after closing: {:?}",
@@ -586,7 +595,7 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
     run_frames(&mut app, 15);
     assert!(
         find_named(app.world_mut(), "Tooltip Card 0").is_none(),
-        "uncovered actor cannot reopen under a stationary cursor"
+        "closing cannot reopen a different source under a stationary cursor"
     );
     move_pointer(&mut app, point);
     app.update();

@@ -2,6 +2,10 @@
 use super::*;
 
 pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
+    // A confirmed host recovery also retires this combat-only page on guests.
+    if view.mode != ViewMode::Combat && ui.menus.current() == Some(&MenuPage::Party) {
+        ui.menus.close();
+    }
     let key = format!(
         "{:?}:{}:{}:{:?}:{:?}:{:?}:{:?}",
         ui.menus,
@@ -32,20 +36,6 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
     let panel = world
         .spawn((bevy_gamekit::ui::menu_panel("Overlay Panel"), ChildOf(root)))
         .id();
-    if view.host
-        && view.mode == ViewMode::Combat
-        && !view.paused
-        && ui.menus.current() == Some(&MenuPage::Game)
-    {
-        control(
-            world,
-            panel,
-            "Manage Assignments",
-            "Pause and assign characters",
-            Action::AssignmentPause(true),
-            false,
-        );
-    }
     if ui.menus.current() == Some(&MenuPage::Leave) {
         label(
             world,
@@ -54,6 +44,7 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Leave the company?",
             UiTextRole::Title,
         );
+        interruption_notice(world, panel, view);
         label(
             world,
             panel,
@@ -85,7 +76,9 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             Action::ConfirmLeave,
             false,
         );
-    } else if view.paused {
+    } else if ui.menus.current() == Some(&MenuPage::Party) && !view.local {
+        party(world, panel, view);
+    } else if view.paused && !ui.menus.is_open() {
         let (title, detail) = match view.interruption {
             crate::view::CombatInterruption::Assignments => (
                 "CHARACTER ASSIGNMENTS",
@@ -124,27 +117,15 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
                 false,
             );
         }
-        if view.host && view.interruption != crate::view::CombatInterruption::Halted {
-            if view.interruption == crate::view::CombatInterruption::Assignments {
-                lobby::assignments(world, panel, view);
-                control(
-                    world,
-                    panel,
-                    "Resume After Assignment",
-                    "Resume combat",
-                    Action::AssignmentPause(false),
-                    false,
-                );
-            } else {
-                control(
-                    world,
-                    panel,
-                    "Manage Assignments",
-                    "Pause and assign characters",
-                    Action::AssignmentPause(true),
-                    false,
-                );
-            }
+        if !view.local && view.admitted {
+            control(
+                world,
+                panel,
+                "Manage Assignments",
+                "Party management",
+                Action::PartyManagement,
+                false,
+            );
         }
         if view.host {
             control(
@@ -172,11 +153,18 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Settings",
             UiTextRole::Title,
         );
+        interruption_notice(world, panel, view);
         label(
             world,
             panel,
             "Settings Advice",
-            "Local preferences only. The shared encounter continues.",
+            if view.paused {
+                "Local preferences only. Combat is paused."
+            } else if view.local {
+                "Local preferences only."
+            } else {
+                "Local preferences only. The shared encounter continues."
+            },
             UiTextRole::Supporting,
         );
         control(
@@ -219,13 +207,16 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Game menu",
             UiTextRole::Title,
         );
-        label(
-            world,
-            panel,
-            "Game Menu Advice",
-            "This menu is local. The company keeps playing.",
-            UiTextRole::Supporting,
-        );
+        interruption_notice(world, panel, view);
+        if !view.local && !view.paused {
+            label(
+                world,
+                panel,
+                "Game Menu Advice",
+                "Combat continues while this menu is open.",
+                UiTextRole::Supporting,
+            );
+        }
         control(
             world,
             panel,
@@ -242,12 +233,147 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             Action::Settings,
             false,
         );
-        control(
+        if !view.local && view.mode == ViewMode::Combat {
+            control(
+                world,
+                panel,
+                "Manage Assignments",
+                "Party management",
+                Action::PartyManagement,
+                false,
+            );
+        }
+        let leave = control(
             world,
             panel,
             "Menu Leave",
-            "Leave company…",
+            if view.local {
+                "Return to main menu…"
+            } else {
+                "Leave company…"
+            },
             Action::Leave,
+            false,
+        );
+        world
+            .get_mut::<Node>(leave)
+            .expect("menu control")
+            .margin
+            .top = Val::Px(20.0);
+    }
+}
+
+fn party(world: &mut World, panel: Entity, view: &LabyrinthView) {
+    use crate::view::CombatInterruption;
+    label(
+        world,
+        panel,
+        "Party Management Title",
+        "Party management",
+        UiTextRole::Title,
+    );
+    interruption_notice(world, panel, view);
+    let editing =
+        view.host && view.admitted && view.interruption == CombatInterruption::Assignments;
+    if editing {
+        label(
+            world,
+            panel,
+            "Party Management Detail",
+            "Combat is paused. Assign characters, then resume when ready.",
+            UiTextRole::Supporting,
+        );
+        lobby::assignments(world, panel, view);
+        control(
+            world,
+            panel,
+            "Resume After Assignment",
+            "Resume combat",
+            Action::AssignmentPause(false),
+            false,
+        );
+    } else {
+        for member in &view.company {
+            let character = view
+                .scenario
+                .as_ref()
+                .and_then(|s| s.heroes.iter().find(|a| a.id == member.actor))
+                .map_or(member.hero.name(), |a| a.actor.name.as_str());
+            let owner = view
+                .players
+                .iter()
+                .find(|p| p.slot == member.owner)
+                .map_or("Unassigned", |p| p.name.as_str());
+            label(
+                world,
+                panel,
+                &format!("Party Character {}", member.actor.0),
+                format!("{character} · {owner}"),
+                UiTextRole::Body,
+            );
+        }
+        if view.mode == ViewMode::Combat
+            && view.host
+            && view.admitted
+            && view.interruption != CombatInterruption::Halted
+        {
+            control(
+                world,
+                panel,
+                "Pause For Assignments",
+                "Pause and edit assignments",
+                Action::AssignmentPause(true),
+                false,
+            );
+        } else {
+            label(
+                world,
+                panel,
+                "Party Management Detail",
+                "The host manages character assignments.",
+                UiTextRole::Supporting,
+            );
+        }
+    }
+    control(world, panel, "Party Back", "Back", Action::Cancel, false);
+}
+
+/// Local navigation must never hide an authoritative interruption or its recovery.
+fn interruption_notice(world: &mut World, panel: Entity, view: &LabyrinthView) {
+    use crate::view::CombatInterruption;
+    if !view.paused {
+        return;
+    }
+    let detail = match view.interruption {
+        CombatInterruption::Assignments => "Combat is paused for character assignments.",
+        CombatInterruption::Halted => "A rules error halted the encounter. The host can return the party to the lobby.",
+        CombatInterruption::Reconnecting => "Your connection is not admitted. Reconnect to recover the current encounter.",
+        _ => "The company is waiting for disconnected players. Reconnect or ask the host to reassign their characters.",
+    };
+    label(
+        world,
+        panel,
+        "Menu Interruption Notice",
+        detail,
+        UiTextRole::Body,
+    );
+    if !view.admitted {
+        control(
+            world,
+            panel,
+            "Overlay Reconnect",
+            "Reconnect reserved hero",
+            Action::Reconnect,
+            false,
+        );
+    }
+    if view.host && view.interruption == CombatInterruption::Halted {
+        control(
+            world,
+            panel,
+            "Abort To Lobby",
+            "Return party to lobby",
+            Action::Rematch,
             false,
         );
     }

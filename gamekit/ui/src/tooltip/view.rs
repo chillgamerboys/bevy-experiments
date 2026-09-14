@@ -81,7 +81,35 @@ fn action_node() -> Node {
     }
 }
 
+fn focus_inside(world: &World, root: Entity) -> bool {
+    world
+        .resource::<InputFocus>()
+        .get()
+        .is_some_and(|mut entity| loop {
+            if entity == root {
+                return true;
+            }
+            let Some(parent) = world.get::<ChildOf>(entity) else {
+                return false;
+            };
+            entity = parent.parent();
+        })
+}
+
+pub(super) fn has_focus(world: &World) -> bool {
+    world
+        .resource::<TooltipView>()
+        .root
+        .is_some_and(|root| focus_inside(world, root))
+}
+
 pub(super) fn render(world: &mut World) {
+    // A game may open its modal after Resolve. Hide it in the same frame and
+    // release ownership without waiting for the next input/lifecycle pass.
+    let suspended = world.resource::<UiTooltipSuspension>().0;
+    world
+        .resource_mut::<UiTooltipState>()
+        .set_suspended(suspended);
     let host = world
         .query_filtered::<Entity, With<UiTooltipHost>>()
         .iter(world)
@@ -92,9 +120,11 @@ pub(super) fn render(world: &mut World) {
     let wanted = state
         .chain
         .iter()
+        .take_while(|_| !suspended)
         .map_while(|key| content(world, state, key).map(|value| (key.clone(), value)))
         .collect::<Vec<_>>();
     world.resource_scope(|world, mut view: Mut<TooltipView>| {
+        let had_focus = view.root.is_some_and(|root| focus_inside(world, root));
         if view.host != host
             || view.rendered != wanted
             || view.pinned != pinned
@@ -103,6 +133,9 @@ pub(super) fn render(world: &mut World) {
                 .is_some_and(|entity| world.get_entity(entity).is_err())
         {
             if let Some(root) = view.root.take() {
+                if suspended && focus_inside(world, root) {
+                    world.resource_mut::<InputFocus>().clear();
+                }
                 let _ = world.despawn(root);
             }
             view.cards.clear();
@@ -133,6 +166,7 @@ pub(super) fn render(world: &mut World) {
                     let card = world
                         .spawn((
                             Name::new(format!("Tooltip Card {depth}")),
+                            AccessibleLabel::new(content.title.clone()),
                             Node {
                                 position_type: PositionType::Absolute,
                                 left: Val::Px(0.0),
@@ -186,12 +220,14 @@ pub(super) fn render(world: &mut World) {
                         content.title.clone(),
                         UiTextRole::Title,
                     );
+                    view.focus = Some(card);
                     if pinned {
-                        // ASCII remains visible with the default Bevy font as well as game fonts.
+                        // ASCII also works with Bevy's fallback font. The
+                        // accessible name describes the close action in full.
                         let close = action(world, heading, "x", TooltipAction::Close(depth));
                         world.entity_mut(close).insert((
                             Name::new("Tooltip Close"),
-                            AccessibleLabel::new("Close tooltip"),
+                            AccessibleLabel::new(format!("Close {} tooltip", content.title)),
                             Node {
                                 position_type: PositionType::Absolute,
                                 right: Val::Px(0.0),
@@ -216,8 +252,11 @@ pub(super) fn render(world: &mut World) {
                                 world.entity_mut(child).insert(Node::default());
                             }
                         }
+                        // A leaf without related terms still has a keyboard
+                        // dismissal target inside its reading scope.
                         view.focus = Some(close);
                     }
+                    let mut first_link = None;
                     for fact in &content.facts {
                         label(world, card, "Tooltip Fact", fact.clone(), UiTextRole::Body);
                     }
@@ -239,12 +278,13 @@ pub(super) fn render(world: &mut World) {
                             .contains_key(&link.subject)
                         {
                             if pinned {
-                                action(
+                                let link = action(
                                     world,
                                     card,
                                     &format!("{} ›", link.label),
                                     TooltipAction::Link(depth, link.subject.clone()),
                                 );
+                                first_link.get_or_insert(link);
                             } else {
                                 let row = world
                                     .spawn((
@@ -264,6 +304,9 @@ pub(super) fn render(world: &mut World) {
                             }
                         }
                     }
+                    if let Some(link) = first_link {
+                        view.focus = Some(link);
+                    }
                     view.cards.push(card);
                 }
             }
@@ -277,20 +320,10 @@ pub(super) fn render(world: &mut World) {
             } else {
                 world.entity_mut(root).remove::<TabGroup>();
             }
-            let focus_inside =
-                world
-                    .resource::<InputFocus>()
-                    .get()
-                    .is_some_and(|mut entity| loop {
-                        if entity == root {
-                            return true;
-                        }
-                        let Some(parent) = world.get::<ChildOf>(entity) else {
-                            return false;
-                        };
-                        entity = parent.parent();
-                    });
-            if keyboard && (!view.keyboard || !focus_inside) {
+            let focus_inside = focus_inside(world, root);
+            // A pointer-opened chain can still own a focused close/link. When
+            // branch changes rebuild those controls, keep focus on its new leaf.
+            if (keyboard && (!view.keyboard || !focus_inside)) || (had_focus && !focus_inside) {
                 if let Some(entity) = view.focus {
                     world
                         .resource_mut::<InputFocus>()

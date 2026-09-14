@@ -1,10 +1,55 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active; spatial preparation and broader planning/review refinements are implemented after two hands-on UI rejections. Original-pin ordinary Codex discovery is now observed after registration repair; final integrated delivery and human UI acceptance remain pending. Independent native behavioral trials remain unobserved.
+Status: active; current evaluation follows the September battle UI and character
+customization iteration. PR #39 is merged; earlier endpoints and observations below
+retain their original scope and do not authorize merging later PRs. Broader
+independent native behavioral and comparative cost trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
 ## Scope and priority
+
+### Current iteration: useful guidance and total usage
+
+The user reconfirmed ongoing evaluation and token efficiency on 2026-09-14. Use
+the current [UI implementation plan's evaluation section](../../../games/labyrinth/docs/plans/ui-and-character-builds.md#evaluate-gameskills-during-implementation)
+for the four batches, token checkpoints, quality observations and optimization
+recommendations. Read that compact current scope before retrieving historical
+sections below. This round has native per-thread token telemetry available; older
+unavailable-telemetry statements remain accurate for their original trials.
+
+Evaluate actual implementation without replaying every task or imposing a broader
+benchmark suite. Keep normal-1080 affected UI verification, focused logic/E2E checks,
+macOS Development/Testing and milestone-only developer sanity. Record combined
+coordinator/worker usage, cache counts, retries and outcomes without double-counting
+cumulative counters. Candidate promotion and cross-client efficacy claims still
+require their own evidence; this iteration does not establish those automatically.
+
+### Observed costs during the current implementation
+
+The pure rules owner verified Skills/Abilities/Moveset and Resilient with83rules
+regressions and1Rustdoc, without unrelated UI or platform sweeps. Batch1's normal
+UI suite reached60passing tests after correcting old Escape-only fixtures and real
+close-focus/menu-recovery defects. These are actual engineering outcomes, not a
+controlled token-savings comparison.
+
+- Routine queue JSON repeats the entire plan. The coordinator now extracts status,
+  revision and errors; a supported concise output mode is a candidate improvement.
+- Queue injection help omits required `reason` and `verified_source`, causing a
+  failed attempt and source lookup. Provide a compact valid example in help.
+- `docs-check` omitted `git_refs = []`, so unrelated branch/ref changes made a graph
+  stale even though its source and all commands were unchanged/passed. Its project
+  command now declares worktree inputs and the runner still binds the receiving
+  base. Preserve the stale record; never relabel it as accepted evidence.
+- `verification_context::resolve` treats every gameplay PR to a Testing branch as
+  a milestone. This does not represent the user's milestone-promotion-only intent
+  while ordinary development still targets main. Add an explicit promotion trigger
+  rather than inferring a milestone from the branch alone; no fabricated manual
+  sanity observation or scope downgrade is acceptable.
+- Native per-thread deltas are recorded in `.context/gameskills-usage/`. Cached
+  input is part of input; reasoning output is part of output. Root coordination
+  and backend work overlap in time, so allocate by thread/batch rather than adding
+  cumulative session totals or claiming all parallel work belongs to Batch1.
 
 ### MCP delivery contradiction and verification handoff
 

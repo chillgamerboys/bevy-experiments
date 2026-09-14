@@ -14,13 +14,23 @@ struct FormationCue(Entity);
 #[derive(Component)]
 struct TargetState(Entity);
 
-pub(super) fn formation(
-    world: &mut World,
-    parent: Entity,
-    name: &str,
-    _title: &str,
-    _stacked: bool,
-) -> Entity {
+#[derive(Component)]
+struct EmptyRank {
+    team: Team,
+    rank: u8,
+}
+
+/// One stable board coordinate system for living actors, remains and forecasts.
+pub(super) fn rank_column(team: Team, rank: u8, footprint: u8) -> GridPlacement {
+    let start = if team == Team::Heroes {
+        PARTY_SIZE as i16 + 2 - i16::from(rank) - i16::from(footprint)
+    } else {
+        i16::from(rank)
+    };
+    GridPlacement::start_span(start, u16::from(footprint))
+}
+
+pub(super) fn formation(world: &mut World, parent: Entity, name: &str, side: Team) -> Entity {
     let team = column(
         world,
         parent,
@@ -34,7 +44,7 @@ pub(super) fn formation(
             ..default()
         },
     );
-    column(
+    let ranks = column(
         world,
         team,
         &format!("{name} Ranks"),
@@ -42,12 +52,41 @@ pub(super) fn formation(
             width: Val::Percent(100.0),
             height: Val::Percent(100.0),
             min_height: Val::Px(0.0),
-            flex_direction: FlexDirection::Row,
+            display: Display::Grid,
+            grid_template_columns: RepeatedGridTrack::flex(PARTY_SIZE as u16, 1.0),
+            grid_template_rows: vec![GridTrack::flex(1.0)],
             column_gap: Val::Px(4.0),
             align_items: AlignItems::Stretch,
             ..default()
         },
-    )
+    );
+    let appearance = world.resource::<LabyrinthAppearance>().clone();
+    for rank in 1..=PARTY_SIZE as u8 {
+        let empty = label(
+            world,
+            ranks,
+            &format!("{side:?} Empty Rank {rank}"),
+            format!("{rank}\nEmpty"),
+            UiTextRole::Supporting,
+        );
+        world.entity_mut(empty).insert((
+            EmptyRank { team: side, rank },
+            Node {
+                grid_column: rank_column(side, rank, 1),
+                grid_row: GridPlacement::start(1),
+                min_width: Val::Px(0.0),
+                align_self: AlignSelf::End,
+                padding: UiRect::bottom(Val::Px(8.0)),
+                border: UiRect::bottom(Val::Px(1.0)),
+                ..default()
+            },
+            TextLayout::justify(Justify::Center),
+            TextColor(appearance.muted),
+            BorderColor::all(appearance.line),
+            Pickable::IGNORE,
+        ));
+    }
+    ranks
 }
 
 pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapshot) {
@@ -56,11 +95,10 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
         parent,
         &format!("Actor {} Tile", actor.id.0),
         Node {
-            flex_basis: Val::Px(0.0),
+            grid_row: GridPlacement::start(1),
             height: Val::Percent(100.0),
-            min_width: Val::Px(44.0),
+            min_width: Val::Px(0.0),
             min_height: Val::Px(0.0),
-            flex_grow: f32::from(actor.footprint),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(4.0),
             ..default()
@@ -498,6 +536,18 @@ pub(super) fn present(
     let projected = BattlePresentation::new(snapshot, &disclosure);
     let forecast = inspection::forecast_display(world, view, ui);
     let appearance = world.resource::<LabyrinthAppearance>().clone();
+    let empty_ranks = world
+        .query::<(Entity, &EmptyRank)>()
+        .iter(world)
+        .map(|(entity, rank)| (entity, snapshot.occupant(rank.team, rank.rank).is_none()))
+        .collect::<Vec<_>>();
+    for (entity, empty) in empty_ranks {
+        let display = if empty { Display::Flex } else { Display::None };
+        let mut node = world.get_mut::<Node>(entity).expect("empty rank");
+        if node.display != display {
+            node.display = display;
+        }
+    }
     for actor in &snapshot.actors {
         let Some(facts) = projected.actor(actor.id) else {
             continue;
@@ -770,6 +820,12 @@ pub(super) fn present(
                 .insert(BackgroundColor(appearance.dock));
         }
         if let Some(mut node) = world.get_mut::<Node>(entity) {
+            if let Some(rank) = snapshot.rank(actor.id) {
+                let column = rank_column(actor.team(), rank, actor.footprint);
+                if node.grid_column != column {
+                    node.grid_column = column;
+                }
+            }
             let display = if snapshot.rank(actor.id).is_none() {
                 Display::None
             } else {
@@ -1123,11 +1179,23 @@ mod tests {
 
     #[test]
     fn overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes() {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
+        assert_overlay_footprint(&[(1920, 1080, UiScaleMode::Auto)]);
+    }
+
+    #[test]
+    fn overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes_compatibility() {
+        assert_overlay_footprint(&[
+            (1280, 720, UiScaleMode::Auto),
+            (1280, 720, UiScaleMode::Percent200),
+        ]);
+    }
+
+    fn assert_overlay_footprint(cases: &[(u32, u32, UiScaleMode)]) {
+        for &(width, height, scale) in cases {
             // Isolate actor-owned geometry from the command dock so this test
             // identifies accidental text-driven motion in the numeric footer.
             let mut app = App::new();
-            app.add_plugins(HeadlessUiPlugin::new(1280, 720))
+            app.add_plugins(HeadlessUiPlugin::new(width, height))
                 .insert_resource(UiScalePreference(scale))
                 .init_resource::<LabyrinthAppearance>()
                 .init_resource::<CombatDisclosure>()
@@ -1151,14 +1219,15 @@ mod tests {
             let root = app
                 .world_mut()
                 .spawn(Node {
-                    width: Val::Px(180.0),
+                    width: Val::Px(width as f32),
                     height: Val::Px(440.0),
                     flex_direction: FlexDirection::Row,
                     ..default()
                 })
                 .id();
-            for id in [ActorId(1), ActorId(101)] {
-                mount_actor(app.world_mut(), root, snapshot.actor(id).expect("actor"));
+            for (id, side) in [(ActorId(1), Team::Heroes), (ActorId(101), Team::Enemies)] {
+                let ranks = formation(app.world_mut(), root, &format!("{side:?}"), side);
+                mount_actor(app.world_mut(), ranks, snapshot.actor(id).expect("actor"));
             }
             let mut view = LabyrinthView {
                 local: true,

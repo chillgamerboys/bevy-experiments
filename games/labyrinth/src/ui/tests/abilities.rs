@@ -260,7 +260,9 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
         let description_rect = visible_control_rect(app.world(), description, viewport)
             .expect("help paging reaches its explanation");
         assert!(description_rect.height() >= 20.0);
-        tap_key(&mut app, KeyCode::Escape);
+        let close = find_named(app.world_mut(), "Tooltip Close").expect("close inspection");
+        assert!(focus_action(app.world_mut(), close));
+        tap_key(&mut app, KeyCode::Enter);
         let target = find_named(app.world_mut(), "Actor 101").expect("target");
         assert!(focus_action(app.world_mut(), target));
         tap_key(&mut app, KeyCode::Enter);

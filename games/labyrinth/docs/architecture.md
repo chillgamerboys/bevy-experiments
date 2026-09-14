@@ -222,15 +222,31 @@ system, with encounter/actor-scoped subjects and disclosure-filtered content.
 Portrait activation pins a card without changing the selected target; there is no
 separate inspection/initiative drawer. The primary battlefield never scrolls;
 overflowing ability loadouts scroll horizontally and focus brings controls into view.
+The battlefield and movement previews share a fixed six-column grid per side.
+Actor footprints span whole rank columns, with both front ranks facing the center.
+Sparse rosters and corpse removal leave non-interactive empty back ranks; occupancy
+never changes rank width or enlarges the fitted sprites. Preparation retains its
+separate editable-gap contract.
 Contextual cards reserve the character summaries, HP and command rail. They may
-cover artwork so sparse formations with tall fitted sprites still have room for
-effects, ranks and scrollable explanations; sprite size never limits help height.
+cover artwork to leave room for effects, ranks and scrollable explanations;
+sprite size never limits help height. Pinned cards ignore unrelated hover,
+inspection and gameplay clicks; a visible × closes that branch and its descendants.
+Labyrinth owns Escape for Game-menu navigation. Its `UiTooltipSuspension` resource
+hides all cards and releases their input/focus while menus, the editor or combat
+interruptions block play. The resource is set before tooltip Resolve and again
+after game presentation to hide newly opened menus' tooltips in the same frame.
+Valid pins survive temporary menus; disclosure revocation, host replacement and
+expired transient sources still invalidate content. Resuming never steals focus.
 The log retains its height above artwork through a separate game-owned boundary.
 
-Local game/settings/leave pages compose Gamekit's `UiMenuStack` and menu templates.
+Local Game/Settings/Party management/Leave pages compose Gamekit's `UiMenuStack`
+and menu templates. Game begins with its title and primary navigation; assignment
+controls live on Party management, with explicit multiplayer host pause/resume.
 They never gate network schedules, pause Bevy time, or change host authority.
 `CombatInterruption` distinguishes missing controllers, host assignment pause, local reconnect admission and
-halted rules. The validated host snapshot excludes local reconnect/menu state and
+halted rules. Open pages retain interruption notices and applicable reconnect or
+host recovery actions; local Settings never claims a paused encounter continues.
+The validated host snapshot excludes local reconnect/menu state and
 checks its compatibility `paused` flag against the authoritative reason. One player
 returning does not resume combat while another is missing, and reconnection does
 not clear a rules fault.

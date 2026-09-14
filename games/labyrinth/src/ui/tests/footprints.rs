@@ -4,6 +4,168 @@ use super::*;
 use labyrinth_rules::{LifeState, Team};
 
 #[test]
+fn sparse_formations_keep_six_rank_scale_and_advance_after_removal_normal_1080() {
+    fn rect(app: &mut App, name: &str) -> Rect {
+        let entity = find_named(app.world_mut(), name).expect(name);
+        let node = app.world().get::<ComputedNode>(entity).expect("layout");
+        let transform = app
+            .world()
+            .get::<UiGlobalTransform>(entity)
+            .expect("position");
+        Rect::from_center_size(
+            transform.translation * node.inverse_scale_factor,
+            node.size() * node.inverse_scale_factor,
+        )
+    }
+    fn same_size(a: Rect, b: Rect) {
+        assert!(
+            (a.size() - b.size()).abs().max_element() <= 1.0,
+            "{a:?} -> {b:?}"
+        );
+    }
+    fn mount(view: LabyrinthView) -> App {
+        let mut app = App::new();
+        app.add_plugins(HeadlessUiPlugin::new(1920, 1080))
+            .insert_resource(UiScalePreference(UiScaleMode::Auto))
+            .insert_resource(view)
+            .add_plugins(LabyrinthUiPlugin);
+        app.finish();
+        app.cleanup();
+        run_frames(&mut app, 5);
+        app
+    }
+    let mut combat = Combat::with_party(
+        42,
+        labyrinth_rules::PROTOTYPE_HERO_ROSTER
+            .into_iter()
+            .enumerate()
+            .map(|(i, hero)| HeroSetup::preset(ActorId(i as u16 + 1), hero))
+            .collect(),
+    )
+    .expect("full six-rank party");
+    for _ in 0..24 {
+        let active = combat.snapshot().active_actor.expect("active");
+        if active == ActorId(1) {
+            break;
+        }
+        combat.apply(active, CombatAction::Wait).expect("wait");
+    }
+    let mut view = fixture();
+    view.combat = Some(combat.snapshot());
+    let mut app = mount(view);
+    let tracked = [
+        "Actor 5 Tile",
+        "Actor 101 Tile",
+        "Actor 5",
+        "Actor 101",
+        "Confirm Combat Action",
+        "Battle Settings",
+    ];
+    let before = tracked.map(|name| rect(&mut app, name));
+    let removed = [ActorId(2), ActorId(3), ActorId(103), ActorId(104)];
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        let snapshot = view.combat.as_mut().expect("combat");
+        for actor in &mut snapshot.actors {
+            if removed.contains(&actor.id) {
+                actor.hp = 0;
+                actor.life = LifeState::Corpse {
+                    hp: 1,
+                    max_hp: actor.max_hp.div_ceil(4),
+                    created_round: snapshot.round,
+                };
+                actor.statuses.clear();
+            }
+        }
+        snapshot.revision += 1;
+        snapshot.validate().expect("corpse fixture");
+    }
+    run_frames(&mut app, 3);
+    for (name, before) in tracked.iter().zip(before) {
+        assert_eq!(
+            rect(&mut app, name),
+            before,
+            "death alone retains all ranks"
+        );
+    }
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        let snapshot = view.combat.as_mut().expect("combat");
+        for actor in &mut snapshot.actors {
+            if removed.contains(&actor.id) {
+                actor.life = LifeState::Removed;
+            }
+        }
+        snapshot.hero_formation.retain(|id| !removed.contains(id));
+        snapshot.enemy_formation.retain(|id| !removed.contains(id));
+        snapshot.revision += 1;
+        snapshot.validate().expect("compacted fixture");
+    }
+    run_frames(&mut app, 3);
+    let after = tracked.map(|name| rect(&mut app, name));
+    for (a, b) in before.into_iter().zip(after) {
+        same_size(a, b);
+    }
+    assert!(
+        after[0].center().x > before[0].center().x,
+        "heroes advance right"
+    );
+    assert!(
+        after[1].center().x < before[1].center().x,
+        "enemies advance left"
+    );
+    assert_eq!(&before[4..], &after[4..], "controls stay in place");
+    for team in [Team::Heroes, Team::Enemies] {
+        for rank in [5, 6] {
+            let empty = find_named(app.world_mut(), &format!("{team:?} Empty Rank {rank}"))
+                .expect("back rank");
+            assert_eq!(
+                app.world().get::<Node>(empty).expect("rank").display,
+                Display::Flex
+            );
+            assert!(app.world().get::<Button>(empty).is_none());
+        }
+    }
+    // Initial sparse rosters have no removed entities to reserve their space.
+    let mut sparse = app.world().resource::<LabyrinthView>().clone();
+    let snapshot = sparse.combat.as_mut().expect("combat");
+    snapshot.actors.retain(|actor| !removed.contains(&actor.id));
+    snapshot
+        .initiative
+        .retain(|entry| !removed.contains(&entry.actor));
+    snapshot.validate().expect("initial sparse fixture");
+    let mut fresh = mount(sparse);
+    for (name, expected) in tracked.iter().zip(after) {
+        let actual = rect(&mut fresh, name);
+        same_size(actual, expected);
+        assert!((actual.center() - expected.center()).abs().max_element() <= 1.0);
+    }
+    apply_action(fresh.world_mut(), Action::Choice(Choice::Reposition));
+    apply_action(fresh.world_mut(), Action::Actor(ActorId(4)));
+    run_frames(&mut fresh, 3);
+    let markers = [1, 4, 5].map(|id| rect(&mut fresh, &format!("Actor {id} Landing Marker")));
+    {
+        let mut view = fresh.world_mut().resource_mut::<LabyrinthView>();
+        let snapshot = view.combat.as_mut().expect("combat");
+        snapshot.hero_formation.swap(0, 1);
+        snapshot.revision += 1;
+        snapshot.validate().expect("repositioned projection");
+    }
+    run_frames(&mut fresh, 3);
+    for (id, marker) in [1, 4, 5].into_iter().zip(markers) {
+        let tile = rect(&mut fresh, &format!("Actor {id} Tile"));
+        assert!(
+            (marker.center().x - tile.center().x).abs() <= 1.0,
+            "preview destination for {id}"
+        );
+        assert!(
+            (marker.width() - tile.width()).abs() <= 1.0,
+            "preview footprint for {id}"
+        );
+    }
+}
+
+#[test]
 fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow_normal_1080() {
     large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow(
         1920,

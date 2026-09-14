@@ -82,8 +82,8 @@ pub(super) fn mount(world: &mut World, snapshot: &CombatSnapshot, viewport: UiVi
         width: Val::Percent(50.0),
         ..default()
     });
-    let heroes = formation(world, formations, "Your Company", "", false);
-    let enemies = formation(world, formations, "The Opposition", "", false);
+    let heroes = formation(world, formations, "Your Company", Team::Heroes);
+    let enemies = formation(world, formations, "The Opposition", Team::Enemies);
     for actor in &snapshot.actors {
         mount_actor(
             world,

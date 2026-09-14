@@ -56,7 +56,9 @@ is non-modal and can be fully hidden. Labyrinth's actor/initiative details use
 contextual cards rather than a second inspection menu. Only local game menus and
 explicit keyboard tooltip reading capture their respective input scopes.
 Passive tooltip previews do not consume Escape or history paging keys. Pinned,
-nested or actively read tooltips retain their own navigation priority.
+nested or actively read tooltips use the adopter's configured inspection shortcuts;
+`UiTooltipSettings::dismiss_key` defaults to Escape and may be disabled or rebound.
+Games can own Escape navigation and suspend inspection while a blocking menu is open.
 
 ### Contextual information without a shared screen design
 
@@ -85,12 +87,41 @@ late `Node` offsets or wait for a later frame to reveal valid geometry. The host
 is a full-target screen root; cards retain native layout and scroll behavior.
 Previews appear immediately and are pointer-transparent. Leaving before the
 configurable `UiTooltipSettings::lock_delay` (1 second by default) dismisses them
-immediately. Continuous hover locks a card until explicit dismissal, source
-replacement or a scope/disclosure change. An accent border and corner × indicate
-the locked state; there is no Pin/footer row. Retained click focus is not hover;
-keyboard inspection is explicit via T. This lifecycle is separate from placement
-and never delays display to mask invalid geometry. `UiTooltipDismissOnActivate`
-can suppress a transient hint on activation until its source is left.
+immediately. Continuous hover locks a card. Each pinned card exposes an accessible
+corner × control that closes that branch and its descendants; the configured
+dismiss key closes the deepest linked card first and then the root. Pinned chains
+ignore other hover sources, explicit-open actions and ordinary gameplay/outside
+clicks; linked navigation within the chain remains available. An accent border
+indicates the locked state. Previews have no close control, and neither state has
+a Pin/footer row. Closing a card suppresses fresh previews under a stationary
+pointer, and keyboard close cannot also activate a game shortcut.
+
+Source-entity rebuilds preserve stable subjects, while host replacement/removal,
+blocking modal scope changes and disclosure revocation clear invalid content.
+For a temporary blocking overlay, set `UiTooltipSuspension(true)` before
+`UiTooltipSystems::Resolve`, and update it again before `UiTooltipSystems::Render`
+if game actions open the overlay later in that frame. Suspension removes rendered
+cards and their hit targets, ignores hover/inspection activation and releases
+keyboard capture. It retains valid pinned subjects, including nested cards, but
+clears previews and any pending hover duration. Keep disclosed catalog entries
+available while temporarily hidden: missing subjects still close their branch,
+host replacement/removal still closes the chain, and transient source help still
+requires its live anchor. Suspension bypasses the temporary modal eligibility
+check; it does not bypass those lifetime and disclosure checks. `Back` and `Dismiss`
+lifecycle requests remain available while suspended.
+
+Set suspension to false when the overlay closes. Valid pins return immediately
+with current content. Keyboard inspection ends at suspension, so resuming cards
+neither reclaims focus nor restores a saved pre-menu target; the game owns menu
+focus restoration. `UiTooltipState::is_suspended()` reports the resolved state,
+and `captures_keyboard()` is false while suspended. The renderer also reads the
+resource directly to hide a newly covered card in the current frame.
+
+Retained click focus is not hover; keyboard inspection is explicit via T, with
+focus on the deepest card's first link or its close control when it has no links.
+This lifecycle is separate from placement and never delays display to mask invalid
+geometry. `UiTooltipDismissOnActivate` can suppress a transient hint on activation
+until its source is left.
 `UiTooltipAvoid` marks same-host surfaces, such as a visible activity log, whose
 measured rectangles placement should avoid. When space is insufficient, placement
 minimizes overlap; adopters still own surface organization. Labyrinth omits the

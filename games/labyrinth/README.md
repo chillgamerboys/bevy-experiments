@@ -215,7 +215,10 @@ Player and monster corpses preserve all occupied ranks, have separate HP equal t
 one quarter of living maximum HP (rounded up), and retain Bleed without refreshing
 it. Corpse effects tick at round end. Remains can be attacked by either team and
 expire after three full rounds, excluding creation: a round-2 corpse clears at
-round-5 end. Destruction/expiry compacts the formation. Healing/rescue cannot revive
+round-5 end. Destruction/expiry compacts the formation toward the center. Both sides
+always retain six fixed rank spaces: smaller rosters and cleared corpses leave
+empty back ranks without enlarging the characters, menus or controls. Two-rank
+actors retain their full footprint. Healing/rescue cannot revive
 corpses. All heroes down loses; all living enemies dead wins even with corpses left.
 The host can return to the lobby for a new test encounter; this is not campaign revival.
 See [formation and death contracts](docs/rules.md).
@@ -233,8 +236,9 @@ reservation. Established reconnection does not use the password.
 
 Leaving the lobby explicitly releases the reservation and returns owned heroes to
 the host. Leaving during combat keeps the participant reserved for reconnect.
-The host can open Game menu → Pause and assign, reassign surviving characters to
-connected participants, then explicitly resume. This changes control only: HP,
+The host can open Game menu → Party management → Pause and edit assignments,
+reassign surviving characters to connected participants, then explicitly resume.
+Opening or returning from a menu never resumes a paused encounter. This changes control only: HP,
 uses, initiative and status clocks do not advance. Stale commands are rejected even
 if the same hero was assigned away and back. A rules fault cannot be cleared this way.
 Host process restart ends the session; guest credentials cannot recover a lost world.
@@ -268,10 +272,14 @@ current selection. Exact source/target ranks are listed in ability tooltips;
 HP forecast segments remain attached to the affected actor.
 
 Hover an ability or status to see its card immediately. Leaving before 1 second
-hides it immediately; continuous hover locks it with an accent border and a small
-top-right **×**. Locked cards remain open over empty space, support related terms,
-and close via ×, an outside click, or **Escape** (deepest card first). Hovering a
-different source replaces the card and restarts the lock timer. **T** explicitly
+hides it immediately; continuous hover locks it with an accent border. Locked
+cards support related terms and stay open while hovering or clicking other
+characters and abilities. Each pinned card has a **×** control that closes that
+card and its linked descendants; closing the root clears the chain. Outside clicks
+preserve pins. **Escape** opens the Game menu directly, including while inspecting
+a pin or selecting an action, and returns through its separate Settings and Party
+management pages. Menus hide all tooltips and restore still-valid pins on return.
+Close the current card before inspecting another source. **T** explicitly
 opens keyboard inspection of the focused source; merely retaining clicked-button
 focus never reopens a preview. Game-menu and combat-log toggles have no tooltips.
 **K** toggles the equipped skillbook,
@@ -284,4 +292,5 @@ and [verification](docs/testing.md). The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.
 
-Active implementation and remaining acceptance: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).
+Active plan: [battle UI corrections and character customization](docs/plans/ui-and-character-builds.md).
+Earlier foundation and separate acceptance context: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).
