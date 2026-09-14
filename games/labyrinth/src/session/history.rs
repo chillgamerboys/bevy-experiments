@@ -66,6 +66,7 @@ pub(crate) struct HistoryPage {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct UncheckedHistoryPage {
     request_id: u64,
     encounter: u64,
@@ -319,8 +320,8 @@ impl EncounterHistory {
                     .get(&event.id)
                     .is_some_and(|known| known != event)
         }) || events
-            .windows(2)
-            .any(|pair| pair[0].id.checked_add(1) != Some(pair[1].id))
+            .array_windows::<2>()
+            .any(|[a, b]| a.id.checked_add(1) != Some(b.id))
         {
             return Err("Conflicting or invalid history records.");
         }

@@ -3,16 +3,16 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction, CombatEvent, CombatEventKind,
-    CombatPhase, CombatSnapshot, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, Effect, HeroClass,
-    HeroSetup, InitiativeEntry, MAX_ACTORS, MAX_COMBAT_WORK, PARTY_SIZE, RemovalReason, RuleError,
-    Team, status_definition,
+    status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction, CombatEvent,
+    CombatEventKind, CombatPhase, CombatSnapshot, Effect, HeroClass, HeroSetup, InitiativeEntry,
+    RemovalReason, RuleError, Team, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, MAX_ACTORS,
+    MAX_COMBAT_WORK, PARTY_SIZE,
 };
 
 #[cfg(test)]
 use crate::{
-    CombatOutcome, DamageKind, LegacySkillLoadout, Stat, StatusInstance, StatusKind, StatusTag,
-    legacy_skill_definition,
+    legacy_skill_definition, CombatOutcome, DamageKind, LegacySkillLoadout, Stat, StatusInstance,
+    StatusKind, StatusTag,
 };
 
 const MAX_WORK: usize = MAX_COMBAT_WORK;

@@ -1,6 +1,6 @@
 //! One host and one guest over the production encrypted loopback transport.
 use super::*;
-use crate::session::history::{HISTORY_PAGE_EVENTS, HistoryError, HistoryRequest};
+use crate::session::history::{HistoryError, HistoryRequest, HISTORY_PAGE_EVENTS};
 
 fn host_command(apps: &mut [App], command: SessionCommand) {
     let mut authority = app(apps, 0).world_mut().resource_mut::<PartyAuthority>();
@@ -59,13 +59,11 @@ fn advance_past(apps: &mut [App], minimum_next: u64) {
         }
         let combat = snapshot.combat.expect("combat");
         let actor = combat.active_actor.expect("live decision");
-        if combat.actor(actor).unwrap().team() == Team::Enemies {
-            assert!(
-                app(apps, 0)
-                    .world_mut()
-                    .resource_mut::<PartyAuthority>()
-                    .advance_enemy()
-            );
+        if combat.actor(actor).expect("valid history fixture").team() == Team::Enemies {
+            assert!(app(apps, 0)
+                .world_mut()
+                .resource_mut::<PartyAuthority>()
+                .advance_enemy());
         } else {
             host_command(
                 apps,
@@ -76,7 +74,10 @@ fn advance_past(apps: &mut [App], minimum_next: u64) {
             );
         }
     }
-    panic!("bounded encounter did not produce enough history");
+    assert!(
+        host_snapshot(apps).history.next >= minimum_next,
+        "bounded encounter must produce the required history"
+    );
 }
 
 fn all_history_recovered(apps: &mut [App]) -> bool {
@@ -113,7 +114,7 @@ fn assert_exact_archive(apps: &mut [App]) {
             );
             assert!(app.world().resource::<LabyrinthView>().events.len() <= 80);
         }
-        from = page.events.last().unwrap().id + 1;
+        from = page.events.last().expect("valid history fixture").id + 1;
     }
     assert_eq!(host_snapshot(apps), before);
 }
@@ -121,7 +122,7 @@ fn assert_exact_archive(apps: &mut [App]) {
 #[test]
 fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_combat_side_effects()
 {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = tempfile::tempdir().expect("valid history fixture");
     let profile = directory.path().join("history-guest.json");
     let mut apps = vec![socket_app(None), socket_app(Some(&profile))];
     open_default_host(&mut apps, "");
@@ -159,7 +160,7 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
         .world()
         .resource::<Runtime>()
         .attempt
-        .unwrap();
+        .expect("valid history fixture");
     start::disconnect_guest(app(&mut apps, 1).world_mut());
     assert_eq!(
         app(&mut apps, 1)
@@ -169,13 +170,17 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
         retained
     );
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
-        !host_snapshot(apps).players[1].connected
+        !host_snapshot(apps)
+            .players
+            .get(1)
+            .expect("guest slot")
+            .connected
     }));
     advance_past(&mut apps, next + 180);
 
     // Destroy the old guest App, load its saved profile into a fresh App, and
     // re-establish admission against the same live host (not OS-process evidence).
-    apps[1] = socket_app(Some(&profile));
+    *app(&mut apps, 1) = socket_app(Some(&profile));
     start::reconnect(app(&mut apps, 1).world_mut()).expect("reconnect");
     assert!(pump_until(
         &mut apps,
@@ -191,17 +196,25 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
     assert_exact_archive(&mut apps);
 
     let current = host_snapshot(&mut apps);
-    let stale_request = HistoryRequest {
-        request_id: 1,
-        encounter: current.encounter,
-        from: current.history.first,
-        limit: 64,
-    };
+    // Hold a real pending request while injecting delivery from the old physical
+    // attempt. A stale reply must neither add records nor consume that request.
+    let guest_world = app(&mut apps, 1).world_mut();
+    guest_world.insert_resource(EncounterHistory::default());
+    super::super::history::observe_snapshot(guest_world, &current).expect("recent window");
+    guest_world
+        .resource_mut::<Messages<HistoryRequest>>()
+        .clear();
+    super::super::history::tick(guest_world);
+    let stale_request = guest_world
+        .resource_mut::<Messages<HistoryRequest>>()
+        .drain()
+        .next()
+        .expect("pending page request");
     let stale_page = app(&mut apps, 0)
         .world()
         .resource::<PartyAuthority>()
         .history_page(0, stale_request)
-        .unwrap();
+        .expect("valid history fixture");
     let retained = app(&mut apps, 1)
         .world()
         .resource::<EncounterHistory>()
@@ -220,6 +233,31 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
         retained
     );
 
+    let current_attempt = app(&mut apps, 1)
+        .world()
+        .resource::<Runtime>()
+        .attempt
+        .expect("current attempt");
+    app(&mut apps, 1).world_mut().write_message(HistoryReply {
+        attempt: current_attempt,
+        request: stale_request,
+        result: Ok(stale_page.clone()),
+    });
+    super::super::history::receive(app(&mut apps, 1).world_mut());
+    assert!(
+        app(&mut apps, 1)
+            .world()
+            .resource::<EncounterHistory>()
+            .loaded_len()
+            > retained,
+        "the matching reply still completes the pending request"
+    );
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        all_history_recovered
+    ));
+
     // Reads did not break subsequent gameplay; then a new encounter must reject
     // an old encounter page even if it carries the current physical attempt.
     advance_past(&mut apps, current.history.next + 1);
@@ -235,7 +273,7 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
         .world()
         .resource::<Runtime>()
         .attempt
-        .unwrap();
+        .expect("valid history fixture");
     app(&mut apps, 1).world_mut().write_message(HistoryReply {
         attempt,
         request: stale_request,
@@ -248,7 +286,7 @@ fn encrypted_history_recovers_missed_windows_and_fresh_guest_reconnect_without_c
 }
 
 #[test]
-fn history_admission_ranges_and_queue_budget_preserve_authority_and_quiet_requests() {
+fn history_admission_ranges_and_queue_budget_preserve_authority() {
     let mut apps = vec![socket_app(None), socket_app(None)];
     open_default_host(&mut apps, "");
     join_guest(&mut apps);
@@ -260,7 +298,7 @@ fn history_admission_ranges_and_queue_budget_preserve_authority_and_quiet_reques
         .connections
         .keys()
         .next()
-        .unwrap();
+        .expect("valid history fixture");
     let stranger = app(&mut apps, 0).world_mut().spawn_empty().id();
     let request = HistoryRequest {
         request_id: 1,
@@ -293,7 +331,10 @@ fn history_admission_ranges_and_queue_budget_preserve_authority_and_quiet_reques
         1,
         "unadmitted connection receives no history"
     );
-    assert_eq!(responses[0].message.result, Err(HistoryError::InvalidRange));
+    assert_eq!(
+        responses.first().expect("one reply").message.result,
+        Err(HistoryError::InvalidRange)
+    );
     assert_eq!(world.resource::<PartyAuthority>().snapshot(0), before);
     for request_id in 2..=10 {
         world.write_message(FromClient {

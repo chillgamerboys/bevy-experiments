@@ -158,10 +158,9 @@ fn real_udp_host_and_guest_menus_do_not_suspend_authority_or_snapshot_delivery()
         })
     }));
     assert!(!host_snapshot(&mut apps).paused);
-    assert!(
-        apps.iter()
-            .all(|app| !app.world().resource::<Time<Virtual>>().is_paused())
-    );
+    assert!(apps
+        .iter()
+        .all(|app| !app.world().resource::<Time<Virtual>>().is_paused()));
     // A game command from the current owner still crosses transport/authority
     // while both menus remain open. Local UI input blocking is tested separately.
     send_action(
@@ -173,10 +172,11 @@ fn real_udp_host_and_guest_menus_do_not_suspend_authority_or_snapshot_delivery()
         combat(apps).turn_id != before.turn_id && converged(apps)
     }));
     for index in [0, 1] {
-        assert!(
-            bevy_gamekit::testing::find_named(app(&mut apps, index).world_mut(), "Game Menu Title")
-                .is_some()
-        );
+        assert!(bevy_gamekit::testing::find_named(
+            app(&mut apps, index).world_mut(),
+            "Game Menu Title"
+        )
+        .is_some());
     }
     assert!(!host_snapshot(&mut apps).paused);
 }
@@ -590,12 +590,10 @@ fn choose_repeated_sixth_class(apps: &mut [App]) {
         HeroClass::Knifehand,
         "fixture exercises a class change"
     );
-    assert!(
-        before
-            .company
-            .iter()
-            .any(|player| player.hero == HeroClass::Knifehand)
-    );
+    assert!(before
+        .company
+        .iter()
+        .any(|player| player.hero == HeroClass::Knifehand));
     app(apps, LAST_GUEST)
         .world_mut()
         .write_message(LabyrinthIntent::SelectHero {
@@ -1346,15 +1344,13 @@ fn real_handshake_offer_and_ack_loss_recover_one_peer_from_code_then_profile() {
         }),
         "offer was not observed at the real client receive boundary"
     );
-    assert!(
-        app(&mut apps, 1)
-            .world()
-            .resource::<ReconnectCredentialStorage>()
-            .store()
-            .load()
-            .expect("profile read")
-            .is_none()
-    );
+    assert!(app(&mut apps, 1)
+        .world()
+        .resource::<ReconnectCredentialStorage>()
+        .store()
+        .load()
+        .expect("profile read")
+        .is_none());
     let peer = *host_snapshot(&mut apps)
         .players
         .iter()
@@ -1494,13 +1490,11 @@ fn failed_profile_persistence_never_admits_and_original_invite_can_retry() {
         .expect("pending reservation");
     wait_guest_detached(&mut apps, peer);
     assert!(!app(&mut apps, 1).world().resource::<Runtime>().admitted);
-    assert!(
-        host_snapshot(&mut apps)
-            .players
-            .iter()
-            .filter(|player| player.slot != 0)
-            .all(|player| !player.connected)
-    );
+    assert!(host_snapshot(&mut apps)
+        .players
+        .iter()
+        .filter(|player| player.slot != 0)
+        .all(|player| !player.connected));
     app(&mut apps, 1)
         .world_mut()
         .insert_resource(ReconnectCredentialStorage::new(
@@ -1556,21 +1550,17 @@ fn incompatible_and_opaque_service_listings_do_not_open_direct_transport() {
     .resource::<LabyrinthView>()
     .listings
     .is_empty()));
-    assert!(
-        start::join_discovered(
-            app(&mut apps, 1).world_mut(),
-            target.session_id,
-            "temporary-party-pass".into()
-        )
-        .is_err()
-    );
-    assert!(
-        app(&mut apps, 1)
-            .world()
-            .resource::<Runtime>()
-            .connection
-            .is_none()
-    );
+    assert!(start::join_discovered(
+        app(&mut apps, 1).world_mut(),
+        target.session_id,
+        "temporary-party-pass".into()
+    )
+    .is_err());
+    assert!(app(&mut apps, 1)
+        .world()
+        .resource::<Runtime>()
+        .connection
+        .is_none());
     let metadata = app(&mut apps, 0)
         .world()
         .resource::<Hosted>()
@@ -1596,21 +1586,17 @@ fn incompatible_and_opaque_service_listings_do_not_open_direct_transport() {
             .iter()
             .any(|listing| listing.compatible)
     }));
-    assert!(
-        start::join_discovered(
-            app(&mut apps, 1).world_mut(),
-            target.session_id,
-            "temporary-party-pass".into()
-        )
-        .is_err()
-    );
-    assert!(
-        app(&mut apps, 1)
-            .world()
-            .resource::<Runtime>()
-            .connection
-            .is_none()
-    );
+    assert!(start::join_discovered(
+        app(&mut apps, 1).world_mut(),
+        target.session_id,
+        "temporary-party-pass".into()
+    )
+    .is_err());
+    assert!(app(&mut apps, 1)
+        .world()
+        .resource::<Runtime>()
+        .connection
+        .is_none());
     assert_eq!(
         app(&mut apps, 0)
             .world()
@@ -1993,11 +1979,9 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
         .skill_index(&ContentId::new("dagger_stab").expect("ID"))
         .expect("weapon skill");
     let target = *before.enemy_formation.first().expect("target");
-    assert!(
-        before
-            .legal_actions(ActorId(1))
-            .contains(&CombatAction::Skill { index, target })
-    );
+    assert!(before
+        .legal_actions(ActorId(1))
+        .contains(&CombatAction::Skill { index, target }));
     send_action(&mut apps, ActorId(1), CombatAction::Skill { index, target });
     assert!(pump_until(
         &mut apps,

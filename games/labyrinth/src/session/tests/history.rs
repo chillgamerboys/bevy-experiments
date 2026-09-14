@@ -1,7 +1,7 @@
 use super::*;
 use crate::session::history::{
-    EncounterHistory, HISTORY_PAGE_BYTES, HISTORY_PAGE_EVENTS, HistoryError, HistoryPage,
-    HistoryRequest,
+    EncounterHistory, HistoryError, HistoryPage, HistoryRequest, HISTORY_PAGE_BYTES,
+    HISTORY_PAGE_EVENTS,
 };
 use labyrinth_rules::{CombatEvent, CombatEventKind};
 
@@ -26,7 +26,7 @@ fn complete_archive_preserves_initial_outcomes_beyond_recent_window_without_quer
     let (mut authority, _) = started_party();
     let initial = authority.snapshot(0).events;
     assert!(matches!(
-        initial[0].event.kind,
+        initial.first().expect("initial event").event.kind,
         CombatEventKind::RoundStarted { round: 1 }
     ));
     long_archive(&mut authority);
@@ -47,12 +47,18 @@ fn complete_archive_preserves_initial_outcomes_beyond_recent_window_without_quer
         assert!(page.events.len() <= HISTORY_PAGE_EVENTS);
         assert!(serde_json::to_vec(&page).expect("encoding").len() <= HISTORY_PAGE_BYTES);
         let roundtrip: HistoryPage =
-            serde_json::from_slice(&serde_json::to_vec(&page).unwrap()).expect("validated page");
+            serde_json::from_slice(&serde_json::to_vec(&page).expect("valid history fixture"))
+                .expect("validated page");
         assert_eq!(roundtrip, page);
         from = page.events.last().expect("nonempty prefix").id + 1;
         recovered.extend(page.events);
     }
-    assert_eq!(&recovered[..initial.len()], &initial);
+    assert_eq!(
+        recovered
+            .get(..initial.len())
+            .expect("initial prefix retained"),
+        &initial
+    );
     assert_eq!(
         recovered,
         authority.events.iter().cloned().collect::<Vec<_>>()
@@ -109,11 +115,16 @@ fn pages_reject_unadmitted_stale_invalid_ranges_and_oversized_decoding() {
         Err(HistoryError::Unavailable)
     );
     let page = authority.history_page(0, valid).expect("host page");
-    let mut malformed = serde_json::to_value(&page).unwrap();
-    malformed["events"]
+    let mut malformed = serde_json::to_value(&page).expect("valid history fixture");
+    malformed
+        .get_mut("events")
+        .expect("events field")
         .as_array_mut()
-        .unwrap()
-        .push(serde_json::to_value(&page.events[0]).unwrap());
+        .expect("valid history fixture")
+        .push(
+            serde_json::to_value(page.events.first().expect("first event"))
+                .expect("valid history fixture"),
+        );
     assert!(serde_json::from_value::<HistoryPage>(malformed).is_err());
     let mut unordered = page.clone();
     unordered.events.swap(0, 1);
@@ -136,13 +147,14 @@ fn cache_recovers_gaps_deduplicates_overlap_and_rejects_conflicts_or_stale_encou
     assert!(!cache.complete());
     let first = authority
         .history_page(0, page_request(&authority, snapshot.history.first))
-        .unwrap();
+        .expect("valid history fixture");
     cache.merge_page(&first).expect("older page");
     let revision = cache.revision;
     cache.merge_page(&first).expect("overlap is idempotent");
     assert_eq!(cache.revision, revision);
     let mut conflict = first.clone();
-    conflict.events[0].event.kind = CombatEventKind::RoundStarted { round: 999 };
+    conflict.events.first_mut().expect("first event").event.kind =
+        CombatEventKind::RoundStarted { round: 999 };
     assert!(cache.merge_page(&conflict).is_err());
     assert_eq!(
         cache.revision, revision,
@@ -151,8 +163,8 @@ fn cache_recovers_gaps_deduplicates_overlap_and_rejects_conflicts_or_stale_encou
     while let Some(from) = cache.first_missing() {
         let page = authority
             .history_page(0, page_request(&authority, from))
-            .unwrap();
-        cache.merge_page(&page).unwrap();
+            .expect("valid history fixture");
+        cache.merge_page(&page).expect("valid history fixture");
     }
     assert!(cache.complete());
     assert_eq!(cache.loaded_len(), authority.events.len());
@@ -176,7 +188,7 @@ fn cache_recovers_gaps_deduplicates_overlap_and_rejects_conflicts_or_stale_encou
             },
             &new_events,
         )
-        .unwrap();
+        .expect("valid history fixture");
     assert_eq!(
         cache.first_missing(),
         Some(snapshot.history.next),
@@ -187,7 +199,9 @@ fn cache_recovers_gaps_deduplicates_overlap_and_rejects_conflicts_or_stale_encou
         first: snapshot.history.next + 82,
         next: snapshot.history.next + 82,
     };
-    cache.observe(snapshot.encounter + 1, next, &[]).unwrap();
+    cache
+        .observe(snapshot.encounter + 1, next, &[])
+        .expect("valid history fixture");
     assert!(cache.revision > old_revision);
     assert_eq!(cache.loaded_len(), 0);
     assert!(cache.merge_page(&first).is_err());
@@ -227,9 +241,12 @@ fn rematch_releases_archive_and_a_new_encounter_starts_after_previous_ids() {
     );
     let current = authority.snapshot(0);
     assert!(current.encounter > previous.encounter);
-    assert_eq!(current.events[0].id, previous.history.next);
+    assert_eq!(
+        current.events.first().expect("initial event").id,
+        previous.history.next
+    );
     assert!(matches!(
-        current.events[0].event.kind,
+        current.events.first().expect("initial event").event.kind,
         CombatEventKind::RoundStarted { round: 1 }
     ));
 }

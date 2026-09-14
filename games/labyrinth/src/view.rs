@@ -6,7 +6,7 @@ use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroCl
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
-pub use crate::session::history::{EncounterHistory, HISTORY_PAGE_EVENTS, HistoryBounds};
+pub use crate::session::history::{EncounterHistory, HistoryBounds, HISTORY_PAGE_EVENTS};
 
 pub use crate::session::{CompanyMember, FormationPlacement, LobbyFormation};
 

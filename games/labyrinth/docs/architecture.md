@@ -195,7 +195,7 @@ failed loads preserve the current scenario, formation and setup revision.
 Portable save remains playable Scenario JSON, with no participant or sparse-draft
 schema. Loading a stock or portable scenario restores compact placement and retains
 owners for matching actor identities. Editing just the seed preserves construction
-positions. Setup and assignment revisions cover these transitions; the v7 wire
+positions. Setup and assignment revisions cover these transitions; the v8 wire
 validates the draft/formation/company relationship before projecting it to a guest.
 
 The board keeps selection, type preview, placement and ownership next to their

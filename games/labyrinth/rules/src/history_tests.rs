@@ -23,14 +23,12 @@ fn constructor_returns_initial_round_turn_and_status_outcomes_without_changing_c
         Combat::from_scenario_with_events(&catalog, &scenario).expect("construction");
     assert_eq!(combat.snapshot(), expected);
     assert!(matches!(
-        events[0].kind,
+        events.first().expect("initial round").kind,
         CombatEventKind::RoundStarted { round: 1 }
     ));
-    assert!(
-        events
-            .iter()
-            .any(|event| matches!(event.kind, CombatEventKind::TurnStarted { .. }))
-    );
+    assert!(events
+        .iter()
+        .any(|event| matches!(event.kind, CombatEventKind::TurnStarted { .. })));
     assert!(events.iter().any(|event| matches!(
         event.kind,
         CombatEventKind::StatusTriggered {
@@ -45,7 +43,7 @@ fn constructor_returns_initial_round_turn_and_status_outcomes_without_changing_c
             ..
         }
     )));
-    assert!(events.windows(2).all(|pair| pair[0].id + 1 == pair[1].id));
+    assert!(events.array_windows::<2>().all(|[a, b]| a.id + 1 == b.id));
     let actor = expected.active_actor.expect("decision");
     let next = combat.apply(actor, CombatAction::Wait).expect("wait");
     assert_eq!(

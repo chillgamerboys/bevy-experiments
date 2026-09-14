@@ -23,15 +23,15 @@ use bevy_replicon::prelude::*;
 use sha2::{Digest as _, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use crate::session::history::HistoryRequest;
 use crate::{
     session::{
-        GameRequest, PLAYER_CAPACITY, PartyAuthority, RequestResult, SessionCommand,
-        SessionSnapshot,
+        GameRequest, PartyAuthority, RequestResult, SessionCommand, SessionSnapshot,
+        PLAYER_CAPACITY,
     },
     view::*,
 };

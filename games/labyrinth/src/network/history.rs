@@ -216,10 +216,11 @@ pub(super) fn tick(world: &mut World) {
                 .merge_page(&page)
                 .expect("local archive page matches its recent snapshot");
         }
-    } else if role == Role::Guest
-        && let Some(attempt) = attempt
-    {
-        world.resource_mut::<HistoryTransfer>().pending = Some((request, attempt, Instant::now()));
-        world.write_message(request);
+    } else if role == Role::Guest {
+        if let Some(attempt) = attempt {
+            world.resource_mut::<HistoryTransfer>().pending =
+                Some((request, attempt, Instant::now()));
+            world.write_message(request);
+        }
     }
 }

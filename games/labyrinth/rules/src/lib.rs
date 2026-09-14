@@ -18,8 +18,8 @@ pub mod scenario;
 mod status;
 
 pub use combat::Combat;
-pub use content::{LegacySkillDefinition, TargetRule, legacy_skill_definition, skills_for};
-pub use life::{CORPSE_ROUNDS, DEATH_SAVE_FAILURES, DEATH_SAVE_TARGET, LifeState};
+pub use content::{legacy_skill_definition, skills_for, LegacySkillDefinition, TargetRule};
+pub use life::{LifeState, CORPSE_ROUNDS, DEATH_SAVE_FAILURES, DEATH_SAVE_TARGET};
 pub use loadout::{HeroSetup, LegacySkillLoadout};
 pub use model::{
     ActorId, ActorKind, ActorSnapshot, CombatAction, CombatEvent, CombatEventKind, CombatOutcome,
@@ -31,8 +31,8 @@ pub use preview::{
     PreviewEvent, PreviewStatus,
 };
 pub use status::{
-    Boundary, DurationClock, Effect, Modifier, Reapplication, RemovalReason, Stat,
-    StatusDefinition, StatusInstance, StatusKind, StatusTag, StatusTiming, status_definition,
+    status_definition, Boundary, DurationClock, Effect, Modifier, Reapplication, RemovalReason,
+    Stat, StatusDefinition, StatusInstance, StatusKind, StatusTag, StatusTiming,
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.
