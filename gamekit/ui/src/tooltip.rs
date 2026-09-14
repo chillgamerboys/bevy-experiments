@@ -89,7 +89,8 @@ pub struct UiTooltipSettings {
     pub max_depth: usize,
     /// Optional local inspect shortcut; games may rebind it or use requests only.
     pub inspect_key: Option<KeyCode>,
-    /// Optional deepest-first dismiss shortcut.
+    /// Optional deepest-first dismiss shortcut. Set `None` when the game owns
+    /// that navigation key; pinned cards still expose their close controls.
     pub dismiss_key: Option<KeyCode>,
 }
 
@@ -104,7 +105,18 @@ impl Default for UiTooltipSettings {
     }
 }
 
+/// Temporarily hide inspection while a game-owned blocking overlay is open.
+///
+/// Set before [`UiTooltipSystems::Resolve`] to suppress input, and before
+/// [`UiTooltipSystems::Render`] when opening an overlay later in the frame.
+/// Valid pins survive; previews and keyboard ownership do not. Keep disclosed
+/// catalog entries available while suspended. Host replacement/removal and
+/// content revocation still invalidate pins. Resuming does not reclaim focus.
+#[derive(Resource, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UiTooltipSuspension(pub bool);
+
 /// Local inspection commands; these never represent gameplay activation.
+/// While suspended, only lifecycle commands `Back` and `Dismiss` are applied.
 #[derive(Message, Debug, Clone)]
 pub enum UiTooltipRequest {
     /// Open a known subject immediately (for example, from a skillbook), unless
@@ -112,8 +124,8 @@ pub enum UiTooltipRequest {
     Open(UiTooltipSubject),
     /// Keep the current chain open independently of pointer position.
     Pin,
-    /// Programmatically close the deepest card first. The native player control
-    /// is the configured dismiss key (Escape by default).
+    /// Programmatically close the deepest card first, like the configured
+    /// dismiss key (Escape by default). A card's × closes its selected branch.
     Back,
     /// Programmatically close the complete chain, for example during a game
     /// lifecycle transition. Ordinary pointer activation does not dismiss pins.
@@ -129,6 +141,7 @@ pub struct UiTooltipState {
     pub(crate) pinned: bool,
     pub(crate) keyboard: bool,
     pub(crate) consumed: bool,
+    pub(crate) suspended: bool,
     candidate: Option<UiTooltipSubject>,
     dwell: Duration,
     return_focus: Option<Entity>,
@@ -149,11 +162,32 @@ impl UiTooltipState {
     pub fn is_pinned(&self) -> bool {
         self.pinned
     }
+    /// Whether the game has temporarily hidden inspection and released its input.
+    #[must_use]
+    pub fn is_suspended(&self) -> bool {
+        self.suspended
+    }
     /// Games should skip their shortcuts when this is true. Escape is consumed
     /// for one frame even when it just closed the final card.
     #[must_use]
     pub fn captures_keyboard(&self) -> bool {
-        self.keyboard || self.consumed
+        !self.suspended && (self.keyboard || self.consumed)
+    }
+
+    fn set_suspended(&mut self, suspended: bool) {
+        self.suspended = suspended;
+        if suspended {
+            if !self.pinned {
+                self.dismiss();
+            }
+            self.keyboard = false;
+            self.consumed = false;
+            self.return_focus = None;
+            self.return_identity = None;
+            self.candidate = None;
+            self.dwell = Duration::ZERO;
+            self.suppressed = None;
+        }
     }
 
     fn dismiss(&mut self) {
@@ -222,7 +256,8 @@ pub enum UiTooltipSystems {
 
 /// Adds immediate previews, dwell-to-lock reading, linked cards, and a
 /// replaceable native renderer. Add alongside GameUiPlugin. `T` inspects/pins;
-/// Escape closes deepest-first. Pointer previews never steal keyboard focus.
+/// Escape closes deepest-first; pinned cards expose branch-close controls.
+/// Pointer previews never steal keyboard focus.
 pub struct GameUiTooltipPlugin;
 
 impl Plugin for GameUiTooltipPlugin {
@@ -236,6 +271,7 @@ impl Plugin for GameUiTooltipPlugin {
         app.init_resource::<UiTooltipSettings>()
             .init_resource::<UiTooltipCatalog>()
             .init_resource::<UiTooltipState>()
+            .init_resource::<UiTooltipSuspension>()
             .init_resource::<view::TooltipView>()
             .add_message::<UiTooltipRequest>()
             .configure_sets(
@@ -358,6 +394,7 @@ fn resolve(
         .get_resource::<Time<Real>>()
         .map_or(Duration::ZERO, Time::delta);
     let settings = world.resource::<UiTooltipSettings>().clone();
+    let suspended = world.resource::<UiTooltipSuspension>().0;
     let help = world.resource::<UiContextHelpState>().clone();
     let candidate = help.entity.and_then(|entity| {
         if world.get::<view::TooltipAction>(entity).is_some() {
@@ -437,141 +474,157 @@ fn resolve(
     };
     world.resource_scope(|world, mut state: Mut<UiTooltipState>| {
         let was_keyboard = state.keyboard;
-        let explicit_dismissal = (outside_click && !state.pinned)
-            || commands
-                .iter()
-                .any(|command| matches!(command, UiTooltipRequest::Dismiss))
-            || clicked
-                .iter()
-                .any(|action| matches!(action, view::TooltipAction::Close(0)))
-            || (escape && !editing && state.chain.len() == 1);
+        state.set_suspended(suspended);
+        let explicit_dismissal = !suspended
+            && ((outside_click && !state.pinned)
+                || commands
+                    .iter()
+                    .any(|command| matches!(command, UiTooltipRequest::Dismiss))
+                || clicked
+                    .iter()
+                    .any(|action| matches!(action, view::TooltipAction::Close(0)))
+                || (escape && !editing && state.chain.len() == 1));
         let host_changed = state.host.is_some() && state.host != host;
         state.host = host;
         state.consumed = false;
-        if page != 0 && !editing && !state.chain.is_empty() && (state.keyboard || over_card) {
-            view::scroll(world, page);
-            state.consumed = true;
-        }
-        if let Some((subject, Some(value), _)) = &candidate {
-            if !state.pinned || state.chain.first() == Some(subject) {
-                state.transient = Some((subject.clone(), value.clone()));
+        if suspended {
+            // Menu input and stale activations must not mutate the retained
+            // reading session. Explicit game lifecycle cleanup remains usable.
+            for command in commands {
+                match command {
+                    UiTooltipRequest::Back => {
+                        state.chain.pop();
+                    }
+                    UiTooltipRequest::Dismiss => state.dismiss(),
+                    UiTooltipRequest::Open(_) | UiTooltipRequest::Pin => {}
+                }
             }
-        }
-        let key = candidate
-            .as_ref()
-            .map(|(key, _, _)| key.clone())
-            .filter(|key| content(world, &state, key).is_some());
-        if state.dismissed_pointer.as_ref() != Some(&cursors) {
-            state.dismissed_pointer = None;
-        }
-        let pointer_key = pointer_candidate
-            .filter(|_| state.dismissed_pointer.is_none())
-            .and_then(|(subject, _, _)| key.as_ref().filter(|key| *key == subject))
-            .cloned();
-        if !(inspect && state.pinned) {
-            state.hover(pointer_key, delta, &settings);
-        }
-        if let Some((key, _, anchor)) = &candidate {
-            if state.chain.first() == Some(key) && !state.keyboard {
-                state.anchor = Some(*anchor);
+        } else {
+            if page != 0 && !editing && !state.chain.is_empty() && (state.keyboard || over_card) {
+                view::scroll(world, page);
+                state.consumed = true;
             }
-        }
-        if outside_click && !state.pinned {
-            state.dismiss();
-        }
-        // Adopters identify controls whose hint has served its purpose on use.
-        // Keep it suppressed until hover/focus leaves, including clicks that
-        // happen before the initial dwell completes. Inspection actions and
-        // deliberately pinned/nested reading sessions retain their lifecycle.
-        if let Some((subject, _, entity)) = &candidate {
-            if activated.contains(entity)
-                && world.get::<UiTooltipDismissOnActivate>(*entity).is_some()
-                && world.get::<UiTooltipOpen>(*entity).is_none()
-                && !state.pinned
-                && !state.keyboard
-                && state.chain.len() <= 1
-            {
+            if let Some((subject, Some(value), _)) = &candidate {
+                if !state.pinned || state.chain.first() == Some(subject) {
+                    state.transient = Some((subject.clone(), value.clone()));
+                }
+            }
+            let key = candidate
+                .as_ref()
+                .map(|(key, _, _)| key.clone())
+                .filter(|key| content(world, &state, key).is_some());
+            if state.dismissed_pointer.as_ref() != Some(&cursors) {
+                state.dismissed_pointer = None;
+            }
+            let pointer_key = pointer_candidate
+                .filter(|_| state.dismissed_pointer.is_none())
+                .and_then(|(subject, _, _)| key.as_ref().filter(|key| *key == subject))
+                .cloned();
+            if !(inspect && state.pinned) {
+                state.hover(pointer_key, delta, &settings);
+            }
+            if let Some((key, _, anchor)) = &candidate {
+                if state.chain.first() == Some(key) && !state.keyboard {
+                    state.anchor = Some(*anchor);
+                }
+            }
+            if outside_click && !state.pinned {
                 state.dismiss();
-                state.suppressed = Some(subject.clone());
             }
-        }
-        for (entity, subject) in opened {
-            if !state.pinned && content(world, &state, &subject).is_some() {
-                state.chain = vec![subject];
-                state.anchor = Some(entity);
-                state.pinned = true;
-            }
-        }
-        for command in commands {
-            match command {
-                UiTooltipRequest::Open(subject)
-                    if !state.pinned && content(world, &state, &subject).is_some() =>
+            // Adopters identify controls whose hint has served its purpose on use.
+            // Keep it suppressed until hover/focus leaves, including clicks that
+            // happen before the initial dwell completes. Inspection actions and
+            // deliberately pinned/nested reading sessions retain their lifecycle.
+            if let Some((subject, _, entity)) = &candidate {
+                if activated.contains(entity)
+                    && world.get::<UiTooltipDismissOnActivate>(*entity).is_some()
+                    && world.get::<UiTooltipOpen>(*entity).is_none()
+                    && !state.pinned
+                    && !state.keyboard
+                    && state.chain.len() <= 1
                 {
+                    state.dismiss();
+                    state.suppressed = Some(subject.clone());
+                }
+            }
+            for (entity, subject) in opened {
+                if !state.pinned && content(world, &state, &subject).is_some() {
                     state.chain = vec![subject];
+                    state.anchor = Some(entity);
                     state.pinned = true;
                 }
-                UiTooltipRequest::Pin => state.pinned = !state.chain.is_empty(),
-                UiTooltipRequest::Back => {
-                    state.chain.pop();
-                }
-                UiTooltipRequest::Dismiss => state.dismiss(),
-                UiTooltipRequest::Open(_) => {}
             }
-        }
-        for action in clicked {
-            match action {
-                view::TooltipAction::Close(depth) if state.pinned => {
-                    // Enter/Space closing keyboard inspection must not also
-                    // activate game shortcuts after focus has been restored.
-                    state.consumed |= state.keyboard;
-                    if depth == 0 {
-                        state.dismiss();
-                    } else {
-                        state.chain.truncate(depth);
-                        state.suppressed = state.candidate.clone();
+            for command in commands {
+                match command {
+                    UiTooltipRequest::Open(subject)
+                        if !state.pinned && content(world, &state, &subject).is_some() =>
+                    {
+                        state.chain = vec![subject];
+                        state.pinned = true;
+                    }
+                    UiTooltipRequest::Pin => state.pinned = !state.chain.is_empty(),
+                    UiTooltipRequest::Back => {
+                        state.chain.pop();
+                    }
+                    UiTooltipRequest::Dismiss => state.dismiss(),
+                    UiTooltipRequest::Open(_) => {}
+                }
+            }
+            for action in clicked {
+                match action {
+                    view::TooltipAction::Close(depth) if state.pinned => {
+                        // Enter/Space closing keyboard inspection must not also
+                        // activate game shortcuts after focus has been restored.
+                        state.consumed |= state.keyboard;
+                        if depth == 0 {
+                            state.dismiss();
+                        } else {
+                            state.chain.truncate(depth);
+                            state.suppressed = state.candidate.clone();
+                        }
+                    }
+                    view::TooltipAction::Link(depth, subject) => {
+                        if state.pinned && content(world, &state, &subject).is_some() {
+                            state.follow(depth, subject, settings.max_depth);
+                        }
+                    }
+                    view::TooltipAction::Close(_) => {}
+                }
+            }
+            if inspect && !editing {
+                // A preview may still belong to the previous source during dwell.
+                // Explicit inspection reads the new source immediately, but never
+                // replaces a deliberately pinned or nested reading session.
+                if state.chain.is_empty()
+                    || (state.chain.len() == 1 && !state.pinned && !state.keyboard && !over_card)
+                {
+                    if let Some(key) = key {
+                        state.chain = vec![key];
+                        state.anchor = candidate.as_ref().map(|(_, _, entity)| *entity);
                     }
                 }
-                view::TooltipAction::Link(depth, subject) => {
-                    if state.pinned && content(world, &state, &subject).is_some() {
-                        state.follow(depth, subject, settings.max_depth);
+                if !state.chain.is_empty() {
+                    state.pinned = true;
+                    state.keyboard = true;
+                    state.consumed = true;
+                    if !was_keyboard {
+                        state.return_focus = world.resource::<InputFocus>().get();
+                        state.return_identity = state
+                            .return_focus
+                            .and_then(|entity| world.get::<crate::UiFocusId>(entity))
+                            .cloned();
                     }
                 }
-                view::TooltipAction::Close(_) => {}
             }
-        }
-        if inspect && !editing {
-            // A preview may still belong to the previous source during dwell.
-            // Explicit inspection reads the new source immediately, but never
-            // replaces a deliberately pinned or nested reading session.
-            if state.chain.is_empty()
-                || (state.chain.len() == 1 && !state.pinned && !state.keyboard && !over_card)
-            {
-                if let Some(key) = key {
-                    state.chain = vec![key];
-                    state.anchor = candidate.as_ref().map(|(_, _, entity)| *entity);
-                }
+            if escape && !state.chain.is_empty() && !editing {
+                // Passive hints do not own navigation. Dismiss them alongside the
+                // game's Back action; pinned/nested reading still closes first.
+                let owns_navigation =
+                    state.keyboard || state.pinned || state.chain.len() > 1 || over_card;
+                state.chain.pop();
+                state.consumed |= owns_navigation;
+                state.suppressed = state.candidate.clone();
             }
-            if !state.chain.is_empty() {
-                state.pinned = true;
-                state.keyboard = true;
-                state.consumed = true;
-                if !was_keyboard {
-                    state.return_focus = world.resource::<InputFocus>().get();
-                    state.return_identity = state
-                        .return_focus
-                        .and_then(|entity| world.get::<crate::UiFocusId>(entity))
-                        .cloned();
-                }
-            }
-        }
-        if escape && !state.chain.is_empty() && !editing {
-            // Passive hints do not own navigation. Dismiss them alongside the
-            // game's Back action; pinned/nested reading still closes first.
-            let owns_navigation =
-                state.keyboard || state.pinned || state.chain.len() > 1 || over_card;
-            state.chain.pop();
-            state.consumed |= owns_navigation;
-            state.suppressed = state.candidate.clone();
         }
         // The catalog is the disclosure boundary, not the source entity's lifetime.
         if let Some(invalid) = state
@@ -585,13 +638,14 @@ fn resolve(
             if state.chain.first() == Some(subject)
                 && state.anchor.is_none_or(|entity| {
                     world.get::<UiContextHelp>(entity).is_none()
-                        || !crate::inspection_eligible(world, entity)
+                        || (!suspended && !crate::inspection_eligible(world, entity))
                 })
             {
                 state.dismiss();
             }
         }
-        let blocked = modal
+        let blocked = !suspended
+            && modal
             && state
                 .anchor
                 .is_none_or(|entity| !crate::inspection_eligible(world, entity));
@@ -608,7 +662,7 @@ fn resolve(
                 state.dismissed_pointer = Some(cursors.clone());
             }
         }
-        if was_keyboard && !state.keyboard {
+        if was_keyboard && !state.keyboard && !suspended {
             let target = state
                 .return_focus
                 .filter(|entity| crate::activation_eligible(world, *entity))
