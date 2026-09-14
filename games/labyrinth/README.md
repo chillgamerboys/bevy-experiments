@@ -160,7 +160,7 @@ The wheel and Page Up/Down or Home/End browse older events. New events and arriv
 pages preserve your reading position; **Latest** returns to the newest entry.
 **×** hides the panel and retains your place; incoming events never reopen it.
 Hover or focus a row to inspect its full text, including long names. The usual
-one-second pin, keyboard reading, × dismissal and menu suspension apply.
+two-second pin, keyboard reading, × dismissal and menu suspension apply.
 
 History uses a complete encounter archive and bounded authenticated pages. Combat
 snapshots still carry only the recent 80 events, while the log mounts at most 32

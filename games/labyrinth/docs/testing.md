@@ -223,7 +223,7 @@ not make every route above a manual gate.
   rows have no focus/pointer surface, retained reading state survives, and new
   arrivals never reopen it. Revoking disclosure clears rows and inspection even
   while hidden. Row inspection follows the existing immediate preview,
-  one-second pin, × dismissal and menu suspension lifecycle.
+  two-second pin, × dismissal and menu suspension lifecycle.
 - Review main menu, settings, leave and history at normal scale, with pointer,
   keyboard and resizing. Automated layout tests are not an interactive walk.
 
@@ -270,7 +270,7 @@ resizing when affected. Record missing required interaction/network evidence;
 unselected routes are not pending gates.
 
 Tooltip lifecycle regressions include immediate first-frame preview and departure,
-one-second continuous hover to lock, persistence over empty space and other sources,
+two-second continuous hover to lock, persistence over empty space and other sources,
 explicit keyboard inspection, visible × branch dismissal, and temporary modal suspension.
 Escape belongs to the Game menu; it does not dismiss Labyrinth's pinned cards.
 The native-layout test compares the card rectangle on every frame across locking:

@@ -24,7 +24,11 @@ fn immediate_preview_locks_only_after_continuous_hover_and_stays_until_dismissed
         !state.is_pinned(),
         "first sample cannot count preceding frame time"
     );
-    state.hover(Some(key("ability")), Duration::from_millis(999), &settings);
+    state.hover(
+        Some(key("ability")),
+        Duration::from_millis(1_999),
+        &settings,
+    );
     assert_eq!(state.subjects(), &[key("ability")]);
     assert!(!state.is_pinned());
     state.hover(Some(key("ability")), Duration::from_millis(1), &settings);
@@ -504,7 +508,7 @@ fn locked_card_survives_empty_space_and_outside_click_until_escape() {
         .entity_mut(anchor)
         .insert(Interaction::Hovered);
     step(&mut app, 1);
-    step(&mut app, 1000);
+    step(&mut app, 2000);
     app.world_mut().entity_mut(anchor).insert(Interaction::None);
     step(&mut app, 60_000);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
@@ -539,7 +543,7 @@ fn pinned_chain_ignores_other_hover_and_explicit_open_routes() {
         .entity_mut(anchor)
         .insert(Interaction::Hovered);
     step(&mut app, 1);
-    step(&mut app, 1000);
+    step(&mut app, 2000);
     let link = app
         .world_mut()
         .query::<(Entity, &view::TooltipAction)>()
