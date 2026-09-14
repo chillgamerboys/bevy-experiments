@@ -9,6 +9,31 @@ pub fn resolve(
     scope: &[String],
     gameplay: bool,
 ) -> Result<Value, String> {
+    resolve_with_promotion(config, base, level, scope, gameplay, false)
+}
+
+/// Resolve a selection with explicit promotion intent. Promotion is a caller
+/// classification; branch names and rigor never imply it.
+pub fn resolve_with_promotion(
+    config: &Value,
+    base: Option<&str>,
+    level: Option<&str>,
+    scope: &[String],
+    gameplay: bool,
+    promotion: bool,
+) -> Result<Value, String> {
+    resolve_impl(config, base, level, scope, gameplay, promotion, true)
+}
+
+fn resolve_impl(
+    config: &Value,
+    base: Option<&str>,
+    level: Option<&str>,
+    scope: &[String],
+    gameplay: bool,
+    promotion: bool,
+    include_promotion: bool,
+) -> Result<Value, String> {
     let policy = crate::verification::resolve(config, base, level)?;
     if policy.get("configured") != Some(&json!(true)) {
         if !scope.is_empty() || gameplay {
@@ -28,13 +53,19 @@ pub fn resolve(
     }
     scope.sort();
     scope.dedup();
-    let manual_required = gameplay
+    let manual_required = (if include_promotion { promotion } else { true })
+        && gameplay
         && policy.get("manual_sanity").and_then(Value::as_str) == Some("milestone")
         && policy.get("branch_required_level").and_then(Value::as_str) == Some("testing");
     use sha2::{Digest, Sha256};
-    let digest = format!("{:x}", Sha256::digest(json!({"policy_digest":policy.get("policy_digest"), "base":policy.get("receiving_branch"), "level":policy.get("level"), "scope":scope, "gameplay":gameplay}).to_string().as_bytes()));
+    let digest_input = if include_promotion {
+        json!({"policy_digest":policy.get("policy_digest"), "base":policy.get("receiving_branch"), "level":policy.get("level"), "scope":scope, "gameplay":gameplay, "promotion":promotion})
+    } else {
+        json!({"policy_digest":policy.get("policy_digest"), "base":policy.get("receiving_branch"), "level":policy.get("level"), "scope":scope, "gameplay":gameplay})
+    };
+    let digest = format!("{:x}", Sha256::digest(digest_input.to_string().as_bytes()));
     Ok(
-        json!({"selection_digest":digest,"policy":policy,"scope":scope,"gameplay":gameplay,
+        json!({"selection_digest":digest,"policy":policy,"scope":scope,"gameplay":gameplay,"promotion":promotion,
         "manual_sanity_required":manual_required,
         "claim":"resolved policy and caller-classified scope; not execution or human acceptance"}),
     )
@@ -73,7 +104,11 @@ pub fn validate(config: &Value, recorded: &Value) -> Result<(), String> {
         .get("gameplay")
         .and_then(Value::as_bool)
         .ok_or("missing verification gameplay classification")?;
-    let current = resolve(config, Some(base), Some(level), &scope, gameplay)?;
+    let has_promotion = recorded.get("promotion").is_some();
+    let promotion = recorded.get("promotion").and_then(Value::as_bool).unwrap_or(false);
+    // Records written before explicit promotion retain their historical
+    // manual-sanity classification and digest shape.
+    let current = resolve_impl(config, Some(base), Some(level), &scope, gameplay, promotion, has_promotion)?;
     for key in [
         "schema_version",
         "configured",
@@ -100,6 +135,9 @@ pub fn validate(config: &Value, recorded: &Value) -> Result<(), String> {
         if recorded.get(key) != current.get(key) {
             return Err(format!("verification selection changed: {key}"));
         }
+    }
+    if has_promotion && recorded.get("promotion") != current.get("promotion") {
+        return Err("verification selection changed: promotion".into());
     }
     Ok(())
 }
