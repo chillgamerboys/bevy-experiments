@@ -272,6 +272,8 @@ path = "devtools"
 index = "devtools/README.md"
 
 [commands.docs-check]
+# Reads the worktree/index; unrelated worker branches are not documentation inputs.
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
