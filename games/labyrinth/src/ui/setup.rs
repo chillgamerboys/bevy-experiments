@@ -9,9 +9,10 @@ mod tests;
 mod decision_tests;
 pub(super) mod details;
 mod layout;
+mod preview;
 
 use super::*;
-use labyrinth_rules::build::{ActorBuild, SkillGrant};
+use labyrinth_rules::build::SkillGrant;
 use labyrinth_rules::catalog::{ContentCatalog, ContentId};
 use labyrinth_rules::scenario::{Scenario, ScenarioActor};
 use std::collections::BTreeMap;
@@ -34,7 +35,6 @@ pub(super) enum SetupAction {
     ApplyInspected(ActorId, Selection),
     ConfirmDiscard,
     KeepEditing,
-    Preset(ContentId),
     Weapon(Option<ContentId>),
     Skill(ContentId),
     Ability(ContentId),
@@ -59,10 +59,10 @@ pub(super) enum Category {
 }
 impl Category {
     const ALL: [Self; 5] = [
+        Self::Parameters,
         Self::Equipment,
         Self::Skills,
         Self::Abilities,
-        Self::Parameters,
         Self::Moveset,
     ];
     fn name(self) -> &'static str {
@@ -80,7 +80,8 @@ pub(super) enum Selection {
     Weapon(Option<ContentId>),
     Skill(ContentId),
     Ability(ContentId),
-    Preset(ContentId),
+    EquipmentSkill(ContentId),
+    EquipmentAbility(ContentId),
     Move(ContentId),
 }
 #[derive(Debug, Clone)]
@@ -117,7 +118,7 @@ impl ActorEditor {
         Self {
             id: draft.id,
             original: draft.clone(),
-            category: Category::Equipment,
+            category: Category::Parameters,
             selections: BTreeMap::new(),
             detail_only: false,
             scrolls: BTreeMap::new(),
@@ -155,8 +156,31 @@ impl ActorEditor {
         self.selections.get(&self.category)
     }
     fn ensure_selection(&mut self, catalog: &ContentCatalog) {
-        if self.selections.contains_key(&self.category) {
-            return;
+        let weapon = self
+            .draft
+            .actor
+            .build
+            .weapon
+            .as_ref()
+            .and_then(|id| catalog.weapon(id));
+        if let Some(selection) = self.selections.get(&self.category) {
+            let valid = match selection {
+                Selection::EquipmentSkill(id) => weapon.is_some_and(|w| w.skills.contains(id)),
+                Selection::EquipmentAbility(id) => weapon.is_some_and(|w| w.abilities.contains(id)),
+                Selection::Move(id) => catalog
+                    .resolve_build(&self.draft.actor.build)
+                    .is_ok_and(|b| b.moveset.skills.iter().any(|s| &s.definition.id == id)),
+                Selection::Skill(id) => catalog.skill(id).is_some_and(|s| s.personal_selectable),
+                Selection::Ability(id) => {
+                    catalog.ability(id).is_some_and(|a| a.personal_selectable)
+                }
+                Selection::Weapon(id) => id.as_ref().is_none_or(|id| catalog.weapon(id).is_some()),
+            };
+            if valid {
+                return;
+            }
+            self.selections.remove(&self.category);
+            self.generation += 1;
         }
         let selection = match self.category {
             Category::Equipment => Some(Selection::Weapon(
@@ -171,13 +195,25 @@ impl ActorEditor {
             Category::Skills => catalog
                 .definition()
                 .skills
-                .first()
-                .map(|a| Selection::Skill(a.id.clone())),
+                .iter()
+                .find(|skill| skill.personal_selectable)
+                .map(|a| Selection::Skill(a.id.clone()))
+                .or_else(|| {
+                    weapon
+                        .and_then(|w| w.skills.first())
+                        .map(|id| Selection::EquipmentSkill(id.clone()))
+                }),
             Category::Abilities => catalog
                 .definition()
                 .abilities
-                .first()
-                .map(|a| Selection::Ability(a.id.clone())),
+                .iter()
+                .find(|ability| ability.personal_selectable)
+                .map(|a| Selection::Ability(a.id.clone()))
+                .or_else(|| {
+                    weapon
+                        .and_then(|w| w.abilities.first())
+                        .map(|id| Selection::EquipmentAbility(id.clone()))
+                }),
             Category::Parameters => None,
             Category::Moveset => catalog
                 .resolve_build(&self.draft.actor.build)
@@ -228,7 +264,7 @@ impl ActorEditor {
 
 pub(super) fn change_from_field(ui: &mut UiState, field: BuildField, value: &str) {
     // A queued event from the prior mounted draft must not overwrite Reload,
-    // preset selection, or another character before the replacement is mounted.
+    // equipment changes, or another character before the replacement is mounted.
     if ui
         .editor
         .as_ref()
@@ -344,9 +380,8 @@ pub(super) fn action(
             }
             let category = match selection {
                 Selection::Weapon(_) => Category::Equipment,
-                Selection::Skill(_) => Category::Skills,
-                Selection::Ability(_) => Category::Abilities,
-                Selection::Preset(_) => Category::Parameters,
+                Selection::Skill(_) | Selection::EquipmentSkill(_) => Category::Skills,
+                Selection::Ability(_) | Selection::EquipmentAbility(_) => Category::Abilities,
                 Selection::Move(_) => Category::Moveset,
             };
             if editor.category != category {
@@ -376,11 +411,14 @@ pub(super) fn action(
                 return None;
             }
             let edit = match selected {
-                Selection::Weapon(id) => SetupAction::Weapon(id),
+                Selection::Weapon(_) => {
+                    SetupAction::Weapon(details::proposed(editor, &selected, catalog).weapon)
+                }
                 Selection::Skill(id) => SetupAction::Skill(id),
                 Selection::Ability(id) => SetupAction::Ability(id),
-                Selection::Preset(id) => SetupAction::Preset(id),
-                Selection::Move(_) => return None,
+                Selection::Move(_)
+                | Selection::EquipmentSkill(_)
+                | Selection::EquipmentAbility(_) => return None,
             };
             return action(view, ui, edit);
         }
@@ -459,26 +497,6 @@ pub(super) fn action(
                     });
                 }
                 Err(error) => editor.error = Some(error),
-            }
-        }
-        SetupAction::Preset(id) => {
-            let editor = ui.editor.as_mut()?;
-            match ActorBuild::from_preset(catalog, &id) {
-                Ok(build) => {
-                    let mut draft = editor.draft.clone();
-                    draft.actor = build;
-                    draft.starting_hp = None;
-                    let original = editor.original.clone();
-                    let category = editor.category;
-                    let selections = editor.selections.clone();
-                    let next_generation = editor.generation + 1;
-                    *editor = ActorEditor::new(draft, editor.revision);
-                    editor.original = original;
-                    editor.category = category;
-                    editor.selections = selections;
-                    editor.generation = next_generation;
-                }
-                Err(error) => editor.error = Some(error.to_string()),
             }
         }
         SetupAction::Weapon(id) => {

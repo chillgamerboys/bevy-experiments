@@ -201,7 +201,15 @@ validates the draft/formation/company relationship before projecting it to a gue
 The board keeps selection, type preview, placement and ownership next to their
 spatial context; scenario I/O and invitations are secondary views. All actor
 customization uses one game-owned editor with category-local
-browsing and a single actor draft, source revision and apply/discard lifecycle.
+browsing and a single actor draft, source revision and save/discard lifecycle.
+Parameters is the default page; Equipment, Skills, Abilities and Moveset follow.
+The fixed header/footer and left sprite summary sit outside the scrolling browser
+and details. The summary reads the live draft, while sprite identity and fitting
+come from SceneAppearance. Parameters uses the full content width without an empty
+inspector. Personal catalog rows mutate only through explicit Add/Remove; From
+equipment rows are inspection-only. Inspecting an owned selection shows its current
+effective contribution separately from the proposed removal. Save & close waits
+for a matching authority acknowledgment; Discard changes reloads in place.
 Inspection is distinct from mutation. Effective comparisons come from the catalog
 resolver, preserving duplicate sources and passive contributions. Widgets do not
 recalculate combat behavior. Equipment-only definitions are inspectable but cannot
