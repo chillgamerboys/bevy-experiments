@@ -1,6 +1,6 @@
 # Model routing and task usage
 
-These opt-in commands require CLI 0.1.0-dev.5. They are independent of native
+These opt-in commands require CLI 0.1.0-dev.6. They are independent of native
 installation: policy resolution does not launch a worker or attest to its model.
 Use the host's actual supported models and effort settings when launching.
 
@@ -44,6 +44,34 @@ complex tasks start at their corresponding tiers. The next bounded attempt
 escalates; exceeding the configured attempt limit fails explicitly. A `--tier`
 override requires a reason. Unsupported model/effort choices fail without a silent
 fallback. The host still receives the returned settings explicitly at worker launch.
+
+## Mark workflow stages
+
+CLI 0.1.0-dev.6 adds atomic stage transitions. Call the first mark before work,
+then transition at meaningful boundaries instead of assembling receipts by hand:
+
+```sh
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage implementation --role coordinator --skill gameskills:plan
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage verification --role coordinator --skill gameskills:test
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage delivery --role coordinator --skill gameskills:create-pr --skill gameskills:audit-pr
+./target/ci/gameskills usage finish TASK --log SESSION.jsonl
+./target/ci/gameskills usage report TASK
+```
+
+Each transition uses one observed counter snapshot to close the previous interval
+and open the next. Identical marks and repeated finishes are idempotent. `--attempt`
+distinguishes attempts on a thread; finish infers the active role. Allowed stages
+are implementation, verification and delivery; repeat `--skill` for the active set.
+These are caller-marked boundaries, not automatic detection of skill invocation.
+The first mark is an observed baseline, not a zero baseline: earlier work is outside
+its measurement. Capture fresh workers from their verified first native counters
+when their initial request must be included. Unsupported telemetry remains unavailable.
+
+Reports group closed intervals by stage and exact active skill set. Mixed sets are
+not split into invented per-skill costs. Open intervals remain pending until closed;
+the report identifies them and excludes them from totals. Historical imports and
+checkpoints remain supported and appear as unclassified unless tagged. A model
+boundary cannot be priced as one known model. Keep historical receipts unchanged.
 
 ## Record actual usage
 
@@ -112,3 +140,27 @@ These small checks caught integration gaps without a game or display sweep.
 Shared tooltip timing changes also select consuming-game hover/pin regressions at
 normal resolution and a search of consumer guides. Library tests alone miss
 consumer frame budgets; numeric and written-out timing references both matter.
+
+## Lean delivery and CI waiting
+
+A settled constant or wording fix uses one delivery record, the relevant source/docs,
+one affected check batch and a concise diff review. It needs no separate plan file,
+queue or dispatched worker. Choose a short-context small-model session when the host
+supports that; resolving a model mapping cannot change an already-running coordinator.
+For larger independent work, provide workers exact ownership and executable/check
+commands instead of repeating repository discovery. Measure coordinator effort too.
+
+Development CI requires affected regressions (including shared-contract consumers)
+and necessary compilation. Broad compile/lint moves to milestone Testing; packaging
+and platform matrices move to Release. Reuse the same selected checks and valid
+evidence through review and delivery. See [CI policy](../../devtools/docs/ci.md).
+
+Use one `gh run watch RUN_ID --exit-status --compact --interval 30` process with a
+local log and host completion notification. Waiting should not cause recurring model
+queries or duplicate audits. The host's completion/resume support is an explicit
+constraint; the skills cannot add it merely by describing it.
+
+The tooltip pilot exposed excessive coordinator reasoning/polling and missed consumer
+timing fixtures. These changes address those mechanisms; measured savings require a
+new comparable accepted task. A shorter skill file or passing routing fixture alone
+is not a cost result.

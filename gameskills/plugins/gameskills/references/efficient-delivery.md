@@ -1,58 +1,76 @@
 # Efficient feature delivery
 
 Read this when an adopter opts into model routing, task usage reporting or standing
-feature-merge authorization. The project owns its branch and model mappings; these
-recommendations do not change another adopter's defaults or authorize side effects.
+feature-merge authorization. The project owns branch, model and check choices;
+these recommendations neither change another adopter's defaults nor grant permission.
 
-## Choose work and models
+## Match the workflow to the change
 
-Optimize total cost per accepted change with quality preserved. Report tokens and
-elapsed time alongside cost where measured; retries, review and rework count.
-Do not optimize worker usage while hiding coordinator effort. Compare equivalent
-outcomes before claiming savings; one small-model success is a trial, not proof of
-general superiority.
+Optimize total cost per accepted change, including coordinator context/reasoning,
+workers, retries, review, waiting turns and rework. Track quality and elapsed time;
+a cheaper worker alone does not establish a saving.
 
-Use `agents resolve` with the project's opt-in mapping and the host's actual model
-capabilities. Small models suit clear bounded fixes, inventory and mechanical work;
-shared architecture, ambiguous failures and consequential review can justify a
-stronger initial tier with a reason. After a bounded failed attempt, escalate using
-the configured attempt limit rather than looping indefinitely. Resolve the policy,
-then pass model/effort explicitly to the host. Record requested and observed choices
-separately. Unsupported mappings need correction, not a silent substitute.
+For a settled constant, copy or similarly bounded edit, use the lean solo path:
+record the goal, owned files, affected checks and endpoint in the existing delivery
+task; inspect relevant source/owner guidance once; implement; run one focused check
+batch; review the diff; deliver. No separate plan document, queue, worker or second
+reviewer is implied. Add one only when uncertainty or independent work justifies it.
+A lifecycle skill supplies its missing judgment, not another discovery/test pipeline.
 
-Give workers the goal, owned files, accepted constraints, current source, executable
-prefix, relevant evidence and stop conditions. Reference durable artifacts instead
-of forking the complete conversation. Do not fill every worker slot or commission
-another strong-model review without a concrete correctness benefit. Tiny changes
-can remain solo if spawning and coordination cost more than doing the work.
+Prefer a short-context small-model session for bounded work when the host supports
+it. Avoid keeping a strong coordinator reasoning alongside a worker doing the same
+edit. A host that cannot switch the current session must report that limit; a model
+label or `agents resolve` does not change it. Preserve supported host settings.
+For opted-in mappings, resolve actual capabilities and pass model/effort explicitly.
+Use standard/strong tiers for consequential ambiguity with a reason, and bounded
+escalation after a failed attempt instead of repeated speculative fixes.
 
-## Measure once
+When dispatch is worthwhile, provide exact owned paths, source identity, resolved
+constraints, executable prefix, affected consumers/tests and a stop condition.
+Do not fork full conversation history or fill available slots by default. Integrate
+worker evidence rather than repeating its completed investigation.
 
-Use `usage checkpoint` around native tasks where counters are exposed, or
-`usage import` with source-backed thread/attempt receipts. Capture a coordinator
-baseline before work and include all worker attempts, including failures. Record
-thread identity, requested/observed model and effort, timestamps and raw evidence
-references. Import each measured interval once; do not relabel an overlapping
-interval as another task. Missing counters or prices remain unavailable, never zero.
+## Select and measure once
 
-Use `usage report TASK` for the combined report. Cached input is a subset of input;
-reasoning is a subset of output. Pricing, when supplied, needs an explicit model
-mapping, source and date; computed cost is an estimate, not a billing observation.
-Native transcript parsing must emit counters/identity only, not prompt contents.
+Resolve verification from the receiving project and changed behavior once. Reuse
+that selection across implementation, review and delivery. Shared contract changes
+include affected consumers; narrow does not mean library-only. Unknown impact calls
+for bounded owner coverage. Changed inputs/failures can invalidate evidence; merely
+entering another skill cannot. Finish the affected doc/test sweep before publication.
 
-Keep reports compact: accepted outcome and source, actual models, available input/
-cache/output totals, elapsed time, attempts/escalations, cost availability and any
-quality/rework limitation. Do not print full stored plans or logs for routine status.
+When native counters are exposed, mark implementation, verification and delivery
+boundaries with `usage mark`, then `usage finish`. Each transition closes the previous
+interval and opens the next from one snapshot. Record an active skill set only when
+known; mixed sets are phase attribution, not exact costs caused by individual skills.
+Capture the first baseline before work, including coordinator and every worker.
+Existing `usage checkpoint` and source-backed imports remain valid for other hosts.
+Missing counters or prices are unavailable, never zero. Emit identity/counters only,
+not transcript contents. Do not repeatedly collect telemetry during idle waiting.
 
-## Integrate promptly
+Use one compact final `usage report`: outcome/source, observed models, input/cache/
+output totals, phases, elapsed time and rework. Cached input is a subset of input;
+reasoning is a subset of output. Explicit dated model rates permit an estimate,
+not a billing claim. Compare equivalent accepted outcomes before claiming savings.
 
-The adopter selects feature and promotion branches. One cohesive feature PR can
-contain several worker commits. Merge promptly once required checks and applicable
-review pass within standing authorization; an open PR is not a completed merge task.
-Keep milestone promotion explicit, preserve ancestry between long-lived branches,
-and inspect the actual remote result before syncing or advancing dependent work.
+## Wait and integrate
 
-Verification follows changed behavior and configured rigor. A timing-only tooltip
-fix selects its timing/lifecycle coverage; it does not automatically select every
-game, resolution, network journey or a full UI walkthrough. A changed visual flow
-still needs its relevant UI evidence. Never weaken acceptance to meet a usage target.
+Use a persistent provider watcher or host completion event for required CI; keep
+polling inside the process, not in repeated model turns. Redirect verbose progress
+to a local log and surface terminal status or actionable failures. On GitHub, an
+available `gh run watch RUN_ID --exit-status --compact --interval 30` supplies this
+behavior; it does not merge or grant approval. Continue independent useful work.
+If the host cannot resume on completion, report the limitation and use its longest
+supported nonblocking wait; do not invent further audits just to fill the wait.
+
+One cohesive feature belongs in one PR unless independent acceptance warrants a
+split. Merge promptly under standing authorization after required checks and review.
+Verify actual remote source/base and integration; preserve explicit milestone/main
+approval. Reuse applicable integration evidence after checking source/tree identity.
+A merge label cannot establish that an untested combined tree passed.
+
+Project-approved Development checks may defer broad compile/lint to milestone
+Testing and artifact/platform matrices to Release. Keep affected regressions and
+fail-closed selected gates. Remove duplicate push checks only when the receiving
+workflow ensures PR evidence covers the integrated tree. A timing fix needs affected
+timing/consumer coverage, not every game, display or E2E journey; visual changes still
+need relevant UI evidence. Never silently weaken agreed acceptance to meet a budget.

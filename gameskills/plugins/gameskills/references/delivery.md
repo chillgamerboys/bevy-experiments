@@ -45,7 +45,10 @@ agent-written PR delivery is not appropriate.
 Immediately before an authorized merge, confirm the current source/base,
 mergeability, required CI, review state, accepted findings and project rules.
 Rebase/merge conflicts are a new implementation state requiring affected checks.
-Integrate parallel streams serially and verify the combined result. Observe the
+Integrate parallel streams serially and verify the combined result. Reuse passing CI
+when its tested merge tree matches the observed integrated tree and required inputs
+are unchanged; a new commit ID alone does not require identical tests again. A
+different tree, advanced base or uncertain dependency needs affected verification. Observe the
 remote merge identity and check the resulting target revision. A helper recording
 an integration observation does not perform or independently prove the merge.
 

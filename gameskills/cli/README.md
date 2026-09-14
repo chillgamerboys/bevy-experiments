@@ -1,6 +1,6 @@
 # GameSkills Rust CLI
 
-The unpublished `0.1.0-dev.5` candidate installs immutable GameSkills instructions,
+The unpublished `0.1.0-dev.6` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
 executes configured command graphs with verifiable evidence. Its 13 core skills
 use `plan` as the default entrypoint; eleven optional skills live in six specialist
