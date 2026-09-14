@@ -253,12 +253,18 @@ timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 
+[commands.runner-probe-build]
+argv = ["cargo", "build", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--example", "runner_probe"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+git_refs = []
+
 [commands.rigor-test]
 argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--test", "verification", "--test", "verification_context", "--test", "configuration", "--test", "delivery", "--test", "runner", "--test", "workflow", "--test", "help", "--test", "cli", "--test", "adoption"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 git_refs = []
-requires = ["repo-test"]
+requires = ["repo-test", "runner-probe-build"]
 
 [commands.rigor-lint]
 argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "repo-devtools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]

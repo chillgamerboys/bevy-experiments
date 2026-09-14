@@ -94,6 +94,17 @@ cargo clippy --locked -p gameskills-cli --all-targets --profile ci -- -D warning
 cargo package --locked -p gameskills-cli
 ```
 
+Targeted runner integration tests need a freshly built subprocess probe:
+
+```sh
+cargo build --locked -p gameskills-cli --profile ci --example runner_probe
+cargo test --locked -p gameskills-cli --profile ci --test runner
+```
+
+Selecting `--test runner` omits Cargo's usual example build. An older probe can
+contain a previous CLI runtime and reject the current instruction bundle. The
+repository's `rigor-test` command builds this prerequisite explicitly.
+
 Successful commands return JSON; diagnostic failures have `error.code` and
 `error.message` with exit 2. A failed execution observation exits 1. Help/version
 are text. Native launch preserves its process status. Diagnostic wording and the
