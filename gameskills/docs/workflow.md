@@ -5,8 +5,9 @@ Start at `plan` for implementation or use a focused skill for a narrower request
 ## Verification scope
 
 Creative involvement and verification rigor are separate choices. This repository
-opts into Development for feature PRs to `dev`, Testing for milestone batches to
-`main`, and Release only for explicit release work. Development and Testing use
+maps `dev` to Development and `main` to Testing, with Release only for explicit
+release work. The current default remains `main`; the `dev` rollout is still pending
+as recorded in the [setup guide](../../docs/setup-and-launch.md#current-rollout-state). Development and Testing use
 macOS; Windows/Linux are release coverage. Changed UI flows use 1920×1080 Auto
 unless a display-specific defect or release support requires another case.
 
@@ -34,7 +35,7 @@ Configured capacity does not grant delegation, publication or merge permission.
 resources, target paths and worker limits. Run only the checks relevant to the task:
 
 ```sh
-gameskills run repo-check tooling-test --max-workers 1
+gameskills run docs-check --max-workers 1
 gameskills evidence validate RETURNED_RUN_ID
 ```
 

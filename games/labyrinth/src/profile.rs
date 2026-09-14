@@ -18,6 +18,8 @@ pub struct LaunchOptions {
     pub profile: String,
     /// Optional application data root; each profile gets its own child directory.
     pub data_dir: Option<PathBuf>,
+    /// Requested initial logical window size; the desktop may constrain it.
+    pub window_size: (u32, u32),
 }
 
 impl Default for LaunchOptions {
@@ -27,6 +29,7 @@ impl Default for LaunchOptions {
             seed: 42,
             profile: "default".to_owned(),
             data_dir: None,
+            window_size: (1920, 1080),
         }
     }
 }
@@ -60,6 +63,19 @@ impl LaunchOptions {
                         return Err(LaunchError::InvalidArguments);
                     }
                     options.data_dir = Some(PathBuf::from(path));
+                }
+                "--window-size" => {
+                    let size = args.next().ok_or(LaunchError::InvalidArguments)?;
+                    let (width, height) =
+                        size.split_once('x').ok_or(LaunchError::InvalidArguments)?;
+                    let dimension = |value: &str| {
+                        value
+                            .parse::<u32>()
+                            .ok()
+                            .filter(|value| *value > 0)
+                            .ok_or(LaunchError::InvalidArguments)
+                    };
+                    options.window_size = (dimension(width)?, dimension(height)?);
                 }
                 "--help" | "-h" => return Err(LaunchError::HelpRequested),
                 _ => return Err(LaunchError::InvalidArguments),
@@ -183,7 +199,7 @@ pub enum LaunchError {
 impl fmt::Display for LaunchError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::HelpRequested => "Labyrinth [--local] [--seed INTEGER] [--profile NAME] [--data-dir PATH]\nProfiles isolate reconnect state. Use host and guest-a through guest-e for local multiplayer tests. Never pass admission secrets on the command line.",
+            Self::HelpRequested => "Labyrinth [--local] [--seed INTEGER] [--profile NAME] [--data-dir PATH] [--window-size WIDTHxHEIGHT]\nDefault: main menu, seed 42, profile default, 1920x1080 logical window (desktop limits may apply), Auto UI scale. --local opens the offline battle setup lobby.\nProfiles isolate reconnect state. Use host and guest-a through guest-e for local multiplayer tests. Never pass admission secrets on the command line.",
             Self::InvalidArguments => "invalid launch arguments; use --help (admission secrets are not command-line options)",
             Self::InvalidProfile => "profile must contain 1-32 ASCII letters, numbers, hyphens or underscores",
             Self::StorageUnavailable => "profile storage is unavailable; try an explicit --data-dir",
@@ -219,6 +235,31 @@ mod tests {
                 .expect_err("invalid options rejected");
             assert!(!format!("{error:?} {error}").contains("do-not-echo-this"));
         }
+    }
+
+    #[test]
+    fn window_size_defaults_to_normal_and_accepts_explicit_desktop_sizes() {
+        assert_eq!(LaunchOptions::default().window_size, (1920, 1080));
+        let options =
+            LaunchOptions::parse(["--window-size", "1440x900", "--local"].map(str::to_owned))
+                .expect("explicit smaller desktop window");
+        assert_eq!(options.window_size, (1440, 900));
+        assert!(options.local);
+        for size in [
+            "0x1080",
+            "1920x0",
+            "1920",
+            "1920x1080x2",
+            "-1x1080",
+            "x1080",
+        ] {
+            assert!(LaunchOptions::parse(["--window-size", size].map(str::to_owned)).is_err());
+        }
+        assert!(LaunchOptions::parse(["--window-size"].map(str::to_owned)).is_err());
+        assert!(LaunchOptions::parse(
+            ["--window-size", "1440x900", "--window-size", "1920x1080"].map(str::to_owned)
+        )
+        .is_err());
     }
 
     #[test]

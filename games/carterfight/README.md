@@ -6,9 +6,11 @@ It intentionally has no multiplayer dependency.
 
 ## Run
 
-From the repository root: `cargo run -p carterfight`. From this directory:
-`cargo run`. Assets resolve to this package's `assets/` directory in both cases.
-The initial cold build includes 2D rendering and WAV audio; an all-feature build
+From the repository root or this directory:
+`cargo run --locked -p carterfight --profile ci`. Assets resolve to this package's `assets/` directory in both cases.
+The initial window request is 1280×720 logical pixels; verification uses its
+separately selected normal 1080p cases. See [setup and launch](../../docs/setup-and-launch.md)
+for profiles and asset-location limits. The initial cold build includes 2D rendering and WAV audio; an all-feature build
 is not required. On Linux, development packages for ALSA, udev, Wayland and
 xkbcommon are needed (the workspace CI installs them).
 

@@ -9,29 +9,36 @@ is no stress, PvP, campaign, loot, or host migration.
 From the repository root:
 
 ```sh
-cargo run -p labyrinth -- --local
+cargo run --locked -p labyrinth --profile ci -- --local
 ```
 
 Local mode opens the battle setup lobby, controls the whole party and opens no game transport. The Prototype stock option has four ordinary heroes plus a two-rank Lantern Wagon. The default seed
 is 42; use `--seed 91` to try a different reproducible fight. Plain
-`cargo run -p labyrinth` opens the main menu; choose **Play with friends** for
+`cargo run --locked -p labyrinth --profile ci` opens the main menu; choose **Play with friends** for
 hosting, discovery, direct joining or reconnection. No `--all-features` is needed.
+
+The native launcher requests 1920×1080 logical dimensions with Auto UI scale.
+Use `--window-size 1440x900` for a smaller desktop; the OS may constrain the actual
+window and Retina framebuffer pixels differ from logical dimensions. `--help`
+lists the launch options. See [setup and launch](../../docs/setup-and-launch.md)
+for prerequisites, build profiles and GameSkills installation; none of its tests
+or agent launch commands are required just to play.
 
 Every hosted company has six participant slots, independent of its heroes. Each side has up to six formation spaces; a two-rank wagon uses two spaces but does not consume another player slot.
 For six instances on one computer, build once, then run the resulting binary in
 six terminals with distinct profiles:
 
 ```sh
-cargo build -p labyrinth
-./target/debug/labyrinth --profile host
-./target/debug/labyrinth --profile guest-a
-./target/debug/labyrinth --profile guest-b
-./target/debug/labyrinth --profile guest-c
-./target/debug/labyrinth --profile guest-d
-./target/debug/labyrinth --profile guest-e
+cargo build --locked -p labyrinth --bin labyrinth --profile ci
+./target/ci/labyrinth --profile host
+./target/ci/labyrinth --profile guest-a
+./target/ci/labyrinth --profile guest-b
+./target/ci/labyrinth --profile guest-c
+./target/ci/labyrinth --profile guest-d
+./target/ci/labyrinth --profile guest-e
 ```
 
-On Windows use `target\debug\labyrinth.exe`. Profiles isolate reconnect storage
+On Windows use `target\ci\labyrinth.exe`. Profiles isolate reconnect storage
 and have an OS-held exclusive lock: accidentally launching two copies of one
 profile fails rather than overwriting another guest's identity. `--data-dir PATH`
 changes the application-data root; keep the same root/profile when restarting.

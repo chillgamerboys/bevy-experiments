@@ -3,8 +3,9 @@
 
 [The workflow](../../.github/workflows/gamekit.yml) resolves project verification
 policy, then selects affected packages and suites through
-[`repo-devtools ci`](../src/ci/mod.rs). Development PRs target `dev`; Testing milestone
-batches target `main`. Both use macOS for classification, policy, skills, Rust and
+[`repo-devtools ci`](../src/ci/mod.rs). The branch policy maps `dev` to Development and `main` to Testing.
+The repository currently receives PRs on `main`; creating and adopting `dev` is
+[pending rollout](../../docs/setup-and-launch.md#current-rollout-state). Both use macOS for classification, policy, skills, Rust and
 the aggregate gate. Windows/Linux are selected only at Release under this project's
 policy. These are project choices, not GameSkills defaults for other adopters.
 

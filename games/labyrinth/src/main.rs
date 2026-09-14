@@ -36,7 +36,7 @@ fn run() -> Result<(), String> {
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: profile.title(),
-            resolution: (1440, 900).into(),
+            resolution: options.window_size.into(),
             ..default()
         }),
         ..default()

@@ -15,23 +15,18 @@ configuration, queues and command evidence. The separate
 distribution checks. Both packages declare the tested Rust 1.97.1 minimum and remain
 unpublished. Prebuilt runtime adoption does not require a Rust compiler.
 
-```sh
-cargo run                         # Labyrinth multiplayer menu
-cargo run -- --local              # local Labyrinth battle
-cargo run -p carterfight
-cargo run -p deckbuilder
-```
-
-Running from a game's directory selects that package. Assets must not depend on
-the caller's directory. Ordinary runs use dev optimization; automated checks use
-`--profile ci`. Changing profiles/features can rebuild dependencies. An all-feature
-launch is not the documented default.
+Use [setup and launch](setup-and-launch.md) for the canonical commands, window
+sizes, profile isolation and optional agent setup. Quick iteration uses Cargo's
+`ci` profile; optimized local play uses `dev`. Cargo's build profile and GameSkills'
+verification level are independent. Assets must not depend on the caller's directory.
 
 ## Development and milestone delivery
 
-Feature work targets `dev` at Development rigor; milestone batches target `main` at
-Testing rigor. The project default base is configured independently of the current
-workspace branch. Resolve it with `gameskills verification resolve` and preserve the
+The current default and receiving branch is `main`, which resolves Testing. The
+planned rollout will send feature PRs to `dev` at Development rigor and milestone
+batches to `main`; `dev` has not yet been created. See
+[rollout status](setup-and-launch.md#current-rollout-state). The project default base
+is configured independently of the current workspace branch. Resolve it with `gameskills verification resolve` and preserve the
 actual receiving base in task/check records. Branch rollout must be observed before
 changing remote defaults; a local setting does not create or validate a branch.
 
@@ -42,7 +37,8 @@ only milestone batches with game effects. CI cannot attest to that response.
 ## Add a game
 
 1. Create `games/<name>/Cargo.toml`, a composition entrypoint and README with commands,
-   controls and initial non-goals. Workspace membership includes `games/*`.
+   controls and initial non-goals. Add the package path to the root Cargo workspace
+   `members` list; membership is explicit.
 2. Inherit workspace metadata/dependencies; opt into only needed capabilities and
    Bevy features. Keep pure domain code free of Bevy and I/O.
 3. Define local domain IDs, typed commands/intents and immutable presentation views.

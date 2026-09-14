@@ -3,7 +3,7 @@
 The unpublished `0.1.0-dev.4` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
 executes configured command graphs with verifiable evidence. Its 13 core skills
-use `plan` as the default entrypoint; eleven optional skills live in five specialist
+use `plan` as the default entrypoint; eleven optional skills live in six specialist
 packages. The internal Rust modules are not a stable public API.
 
 ```sh
@@ -17,7 +17,10 @@ gameskills native codex --verify
 gameskills native codex --verify-project
 ```
 
-Initial setup uses the instruction snapshot embedded in the executable. It needs
+Initial setup uses the instruction snapshot embedded in the executable. On an
+existing project, bare `setup --apply` also selects that embedded snapshot; use an
+explicit matching `--bundle` to hydrate or retain another recorded pin. See the
+[checkout procedure](../docs/installation.md#this-checkout-and-existing-pins). It needs
 no source checkout, network bundle fetch, Cargo or interpreter at runtime. Git is
 required for repository operations. The source installation needs Rust 1.97.1;
 prebuilt candidates are target-specific. There is no Bevy, GameKit or repository-tool
