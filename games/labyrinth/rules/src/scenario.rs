@@ -217,6 +217,20 @@ impl Scenario {
                 "encoded scenario exceeds byte limit",
             ));
         }
+        // Read only the bounded document version before interpreting new field shapes.
+        // The full second parse retains strict duplicate/unknown-field validation.
+        #[derive(Deserialize)]
+        struct SchemaHeader {
+            schema_version: u32,
+        }
+        let header: SchemaHeader = serde_json::from_str(source)
+            .map_err(|e| ContentError::new("scenario.json", e.to_string()))?;
+        if header.schema_version != SCENARIO_SCHEMA_VERSION {
+            return Err(ContentError::new(
+                "scenario.schema_version",
+                "unsupported scenario schema; recreate the scenario using schema 2 Skills/Abilities",
+            ));
+        }
         let scenario: Self = serde_json::from_str(source)
             .map_err(|e| ContentError::new("scenario.json", e.to_string()))?;
         scenario.validate(catalog)?;

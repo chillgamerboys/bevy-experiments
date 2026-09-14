@@ -306,6 +306,18 @@ impl ContentCatalog {
                 "encoded catalog exceeds byte limit",
             ));
         }
+        #[derive(Deserialize)]
+        struct SchemaHeader {
+            schema_version: u32,
+        }
+        let header: SchemaHeader =
+            toml::from_str(source).map_err(|e| ContentError::new("catalog.toml", e.to_string()))?;
+        if header.schema_version != CATALOG_SCHEMA_VERSION {
+            return Err(ContentError::new(
+                "schema_version",
+                "unsupported catalog schema; recreate this catalog using schema 2 Skills/Abilities",
+            ));
+        }
         let raw =
             toml::from_str(source).map_err(|e| ContentError::new("catalog.toml", e.to_string()))?;
         Self::new(raw)
