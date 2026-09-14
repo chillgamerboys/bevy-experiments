@@ -28,6 +28,20 @@ pub fn get(name: &str) -> Result<Suite, String> {
         "labyrinth-all" => ("labyrinth", &[""], false, false),
         "deckbuilder-all" => ("deckbuilder", &[""], false, false),
         "carterfight-all" => ("carterfight", &[""], false, false),
+        "gamekit-ui-tooltip" => ("bevy-gamekit-ui", &["tooltip::"], false, false),
+        "labyrinth-tooltip-consumers" => ("labyrinth", &[
+            "ui::tests::history::log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation_normal_1080",
+            "ui::tests::history::game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection_normal_1080",
+            "ui::tests::overlay_stability::artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log_normal_1080",
+            "ui::tests::overlay_stability::hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry_normal_1080",
+            "ui::tests::overlay_stability::tooltip_is_never_visible_at_unplaced_geometry_normal_1080",
+            "ui::tests::overlay_stability::opening_a_link_keeps_the_parent_tooltip_visible_normal_1080",
+            "ui::tests::overlay_stability::tooltip_pointer_and_native_wheel_do_not_select_underlying_characters_normal_1080",
+        ], true, false),
+        "deckbuilder-tooltip-consumers" => ("deckbuilder", &[
+            "tests::unavailable_cards_explain_each_reason_without_pointer_or_keyboard_activation_normal_1080",
+            "tests::card_inspection_refreshes_and_revokes_disclosed_content_with_the_match_view_normal_1080",
+        ], true, false),
         "labyrinth-ui-model" => ("labyrinth", &["ui::battle::actors::tests::", "ui::battle::history::tests::"], false, false),
         "labyrinth-session" => ("labyrinth", &["session::tests::"], false, false),
         "labyrinth-history" => ("labyrinth", &["session::tests::history::", "network::tests::history::"], false, false),
@@ -104,10 +118,29 @@ pub fn select(selection: &Selection) -> Vec<String> {
     let changed = |prefix: &str| selection.paths.iter().any(|p| p.starts_with(prefix));
     let exact = |path: &str| selection.paths.iter().any(|p| p == path);
     let shared_ui = changed("gamekit/ui/") || changed("gamekit/testing/");
+    let behavioral_paths: Vec<_> = selection
+        .paths
+        .iter()
+        .filter(|path| !path.ends_with(".md"))
+        .collect();
+    let narrow_tooltip = !behavioral_paths.is_empty()
+        && behavioral_paths.iter().all(|path| {
+            path.as_str() == "gamekit/ui/src/tooltip.rs"
+                || path.starts_with("gamekit/ui/src/tooltip/")
+        });
+    let broad_shared_ui = shared_ui && !narrow_tooltip;
     let shared_network = changed("gamekit/multiplayer/") || changed("gamekit/discovery/");
     let testing = matches!(verification::level(selection), Some("testing" | "release"));
     let release = verification::level(selection) == Some("release");
     let release_full = release && selection.full;
+    if narrow_tooltip
+        && selection
+            .packages
+            .iter()
+            .any(|package| package == "bevy-gamekit-ui")
+    {
+        add("gamekit-ui-tooltip");
+    }
     for package in &selection.packages {
         if release_full && game(package) {
             add(&format!("{package}-all"));
@@ -118,6 +151,13 @@ pub fn select(selection: &Selection) -> Vec<String> {
         }
         match package.as_str() {
             "labyrinth" => {
+                if narrow_tooltip {
+                    add("labyrinth-tooltip-consumers");
+                    if release {
+                        add("labyrinth-ui-compatibility");
+                    }
+                    continue;
+                }
                 // This baseline is pure authority/projection evidence, with no socket or UI App.
                 add("labyrinth-session");
                 if changed("games/labyrinth/src/session/history")
@@ -139,7 +179,7 @@ pub fn select(selection: &Selection) -> Vec<String> {
                     || changed("games/labyrinth/src/scene")
                     || changed("games/labyrinth/assets/")
                     || exact("games/labyrinth/src/lib.rs")
-                    || shared_ui;
+                    || broad_shared_ui;
                 if ui {
                     add("labyrinth-ui-normal");
                     add("labyrinth-ui-model");
@@ -147,13 +187,13 @@ pub fn select(selection: &Selection) -> Vec<String> {
                     if release {
                         add("labyrinth-ui-compatibility");
                     }
-                    if release_full || changed("games/labyrinth/src/ui/setup") || shared_ui {
+                    if release_full || changed("games/labyrinth/src/ui/setup") || broad_shared_ui {
                         add("labyrinth-editor");
                     }
-                    if release_full || changed("games/labyrinth/src/ui/shell") || shared_ui {
+                    if release_full || changed("games/labyrinth/src/ui/shell") || broad_shared_ui {
                         add("labyrinth-lobby");
                     }
-                    if release_full || changed("games/labyrinth/src/scene") || shared_ui {
+                    if release_full || changed("games/labyrinth/src/scene") || broad_shared_ui {
                         add("labyrinth-scene");
                     }
                 }
@@ -201,6 +241,13 @@ pub fn select(selection: &Selection) -> Vec<String> {
                 }
             }
             "deckbuilder" => {
+                if narrow_tooltip {
+                    add("deckbuilder-tooltip-consumers");
+                    if release {
+                        add("deckbuilder-ui-compatibility");
+                    }
+                    continue;
+                }
                 add("deckbuilder-domain");
                 if release_full || changed("games/deckbuilder/src/network") || shared_network {
                     add("deckbuilder-admission");
@@ -211,7 +258,7 @@ pub fn select(selection: &Selection) -> Vec<String> {
                 if release_full
                     || exact("games/deckbuilder/src/lib.rs")
                     || changed("games/deckbuilder/assets/")
-                    || shared_ui
+                    || broad_shared_ui
                 {
                     add("deckbuilder-ui-normal");
                     if release {
@@ -220,13 +267,16 @@ pub fn select(selection: &Selection) -> Vec<String> {
                 }
             }
             "carterfight" => {
+                if narrow_tooltip {
+                    continue;
+                }
                 add("carterfight-rules");
                 if release_full
                     || changed("games/carterfight/src/frontend/systems")
                     || changed("games/carterfight/src/frontend/tests")
                     || exact("games/carterfight/src/lib.rs")
                     || changed("games/carterfight/assets/")
-                    || shared_ui
+                    || broad_shared_ui
                 {
                     add("carterfight-ui-normal");
                     if release {
