@@ -76,6 +76,7 @@ pub fn parse(source: &str) -> Result<Table, String> {
         "targets",
         "tracking",
         "docs",
+        "verification",
     ];
     if let Some(key) = value.keys().find(|key| !allowed.contains(&key.as_str())) {
         return Err(format!("unknown configuration field: {key}"));
@@ -94,6 +95,13 @@ pub fn parse(source: &str) -> Result<Table, String> {
     }
     if value.contains_key("project") {
         let project = table(&value, "project")?;
+        if let Some(base) = project.get("delivery_base") {
+            let base = base
+                .as_str()
+                .ok_or("project.delivery_base must be a branch name")?;
+            crate::verification::validate_branch(base)
+                .map_err(|error| format!("project.delivery_base: {error}"))?;
+        }
         if let Some(endpoint) = project.get("delivery_target") {
             if !endpoint.as_str().is_some_and(|s| {
                 ["design", "implementation", "pr", "merge", "release"].contains(&s)
@@ -104,6 +112,9 @@ pub fn parse(source: &str) -> Result<Table, String> {
                 );
             }
         }
+    }
+    if let Some(verification) = value.get("verification") {
+        crate::verification::validate_configuration(verification)?;
     }
     if value.contains_key("tracking") {
         let tracking = table(&value, "tracking")?;

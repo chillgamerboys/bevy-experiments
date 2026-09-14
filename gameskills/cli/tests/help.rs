@@ -13,6 +13,7 @@ fn operational_and_nested_help_need_no_installation() -> Result<(), Box<dyn Erro
         (vec!["plan", "validate", "--help"], "--file"),
         (vec!["queue", "start", "--help"], "--expected-revision"),
         (vec!["evidence", "validate", "--help"], "RUN_ID"),
+        (vec!["verification", "resolve", "--help"], "--level"),
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_gameskills"))
             .arg("--root")

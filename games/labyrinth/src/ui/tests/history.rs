@@ -1,14 +1,35 @@
 use super::*;
 
 #[test]
-fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation() {
+fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation_normal_1080() {
+    log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation_compatibility() {
+    log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for keyboard in [false, true] {
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         let toolbar = find_named(app.world_mut(), "Battle Log Toggle").expect("log toggle");
         let point = visible_control_rect(
             app.world(),
             toolbar,
-            Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+            Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
         )
         .expect("toolbar geometry")
         .center();
@@ -40,10 +61,23 @@ fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation() {
 }
 
 #[test]
-fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection() {
+fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection_normal_1080() {
+    game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection_compatibility() {
+    game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(1280, 720, UiScaleMode::Auto);
+}
+
+fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     use bevy_gamekit::ui::{UiContextHelp, UiTooltipRequest, UiTooltipState};
     for keyboard in [false, true] {
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         let toolbar = find_named(app.world_mut(), "Battle Settings").expect("game menu");
         assert!(app.world().get::<UiContextHelp>(toolbar).is_none());
         let source = find_named(app.world_mut(), "Skill 0").expect("ability");
@@ -66,7 +100,7 @@ fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection() {
             assert!(focus_action(app.world_mut(), toolbar));
             tap_key(&mut app, KeyCode::Enter);
         } else {
-            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
             let point = visible_control_rect(app.world(), toolbar, viewport)
                 .expect("menu")
                 .center();
@@ -84,99 +118,123 @@ fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection() {
 }
 
 #[test]
-fn hidden_compact_and_history_have_distinct_content_and_input_surfaces() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        let mut app = app(width, height, UiScaleMode::Auto);
-        assert!(find_named(app.world_mut(), "Combat History").is_none());
-        assert!(find_named(app.world_mut(), "Inspector Toggle").is_none());
-        assert!(find_named(app.world_mut(), "Timeline Toggle").is_none());
-        assert!(find_named(app.world_mut(), "Battle Detail Drawer").is_none());
-        let before = app.world().resource::<LabyrinthView>().combat.clone();
-        let mut kinds = Vec::new();
-        for _ in 0..3 {
-            kinds.push(labyrinth_rules::CombatEventKind::Action {
-                actor: ActorId(105),
-                action: CombatAction::Wait,
-            });
-            kinds.push(labyrinth_rules::CombatEventKind::Damage {
-                source: ActorId(105),
-                target: ActorId(4),
-                amount: 4,
-                kind: labyrinth_rules::DamageKind::Direct,
-            });
-        }
-        app.world_mut().resource_mut::<LabyrinthView>().events = kinds
-            .into_iter()
-            .enumerate()
-            .map(|(i, kind)| crate::view::PresentedEvent {
-                id: i as u64 + 1,
-                event: labyrinth_rules::CombatEvent {
-                    id: i as u64 + 1,
-                    kind,
-                },
-            })
-            .collect();
-        run_frames(&mut app, 3);
-        assert!(
-            find_named(app.world_mut(), "Combat History").is_none(),
-            "incoming events never reopen the log"
-        );
-        let toolbar = find_named(app.world_mut(), "Battle Log Toggle").expect("open history");
-        assert!(click_action(&mut app, toolbar));
-        run_frames(&mut app, 3);
-        assert!(find_named(app.world_mut(), "History Latest").is_some());
-        assert!(find_named(app.world_mut(), "History Expand 1").is_some());
-        let compact = find_named(app.world_mut(), "History Toggle").expect("compact");
-        assert!(click_action(&mut app, compact));
-        run_frames(&mut app, 3);
-        assert_eq!(app.world().resource::<UiState>().log_mode, LogMode::Compact);
-        assert!(find_named(app.world_mut(), "History Latest").is_none());
-        assert!(find_named(app.world_mut(), "History Expand 1").is_none());
-        let summaries = app
-            .world_mut()
-            .query::<(&Name, &Text)>()
-            .iter(app.world())
-            .filter(|(name, _)| name.as_str() == "History Summary")
-            .map(|(_, text)| text.0.clone())
-            .collect::<Vec<_>>();
-        assert_eq!(summaries.len(), 2);
-        assert!(summaries.iter().all(|line| line.contains("−4 HP")));
-        let texts = app
-            .world_mut()
-            .query::<(Entity, &Name)>()
-            .iter(app.world())
-            .filter(|(_, name)| name.as_str() == "History Summary")
-            .map(|(entity, _)| entity)
-            .collect::<Vec<_>>();
-        for entity in texts {
-            let node = app
-                .world()
-                .get::<ComputedNode>(entity)
-                .expect("measured summary");
-            let visible = visible_control_rect(
-                app.world(),
-                entity,
-                Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
-            )
-            .expect("visible summary");
-            assert!(
-                visible.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
-                "compact summary clipped at {width}x{height}"
-            );
-        }
-        let hide = find_named(app.world_mut(), "History Hide").expect("hide compact");
-        assert!(click_action(&mut app, hide));
-        run_frames(&mut app, 3);
-        assert!(find_named(app.world_mut(), "Combat History").is_none());
-        assert!(find_named(app.world_mut(), "History Hide").is_none());
-        assert_eq!(app.world().resource::<InputFocus>().get(), Some(toolbar));
-        assert_eq!(app.world().resource::<LabyrinthView>().events.len(), 6);
-        assert_eq!(app.world().resource::<LabyrinthView>().combat, before);
-    }
+fn hidden_compact_and_history_have_distinct_content_and_input_surfaces_normal_1080() {
+    hidden_compact_and_history_have_distinct_content_and_input_surfaces(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
 }
 
 #[test]
-fn expanding_an_action_and_its_ability_is_inspection_not_gameplay() {
+fn hidden_compact_and_history_have_distinct_content_and_input_surfaces_compatibility() {
+    hidden_compact_and_history_have_distinct_content_and_input_surfaces(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    hidden_compact_and_history_have_distinct_content_and_input_surfaces(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+}
+
+fn hidden_compact_and_history_have_distinct_content_and_input_surfaces(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
+    assert!(find_named(app.world_mut(), "Combat History").is_none());
+    assert!(find_named(app.world_mut(), "Inspector Toggle").is_none());
+    assert!(find_named(app.world_mut(), "Timeline Toggle").is_none());
+    assert!(find_named(app.world_mut(), "Battle Detail Drawer").is_none());
+    let before = app.world().resource::<LabyrinthView>().combat.clone();
+    let mut kinds = Vec::new();
+    for _ in 0..3 {
+        kinds.push(labyrinth_rules::CombatEventKind::Action {
+            actor: ActorId(105),
+            action: CombatAction::Wait,
+        });
+        kinds.push(labyrinth_rules::CombatEventKind::Damage {
+            source: ActorId(105),
+            target: ActorId(4),
+            amount: 4,
+            kind: labyrinth_rules::DamageKind::Direct,
+        });
+    }
+    app.world_mut().resource_mut::<LabyrinthView>().events = kinds
+        .into_iter()
+        .enumerate()
+        .map(|(i, kind)| crate::view::PresentedEvent {
+            id: i as u64 + 1,
+            event: labyrinth_rules::CombatEvent {
+                id: i as u64 + 1,
+                kind,
+            },
+        })
+        .collect();
+    run_frames(&mut app, 3);
+    assert!(
+        find_named(app.world_mut(), "Combat History").is_none(),
+        "incoming events never reopen the log"
+    );
+    let toolbar = find_named(app.world_mut(), "Battle Log Toggle").expect("open history");
+    assert!(click_action(&mut app, toolbar));
+    run_frames(&mut app, 3);
+    assert!(find_named(app.world_mut(), "History Latest").is_some());
+    assert!(find_named(app.world_mut(), "History Expand 1").is_some());
+    let compact = find_named(app.world_mut(), "History Toggle").expect("compact");
+    assert!(click_action(&mut app, compact));
+    run_frames(&mut app, 3);
+    assert_eq!(app.world().resource::<UiState>().log_mode, LogMode::Compact);
+    assert!(find_named(app.world_mut(), "History Latest").is_none());
+    assert!(find_named(app.world_mut(), "History Expand 1").is_none());
+    let summaries = app
+        .world_mut()
+        .query::<(&Name, &Text)>()
+        .iter(app.world())
+        .filter(|(name, _)| name.as_str() == "History Summary")
+        .map(|(_, text)| text.0.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(summaries.len(), 2);
+    assert!(summaries.iter().all(|line| line.contains("−4 HP")));
+    let texts = app
+        .world_mut()
+        .query::<(Entity, &Name)>()
+        .iter(app.world())
+        .filter(|(_, name)| name.as_str() == "History Summary")
+        .map(|(entity, _)| entity)
+        .collect::<Vec<_>>();
+    for entity in texts {
+        let node = app
+            .world()
+            .get::<ComputedNode>(entity)
+            .expect("measured summary");
+        let visible = visible_control_rect(
+            app.world(),
+            entity,
+            Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+        )
+        .expect("visible summary");
+        assert!(
+            visible.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
+            "compact summary clipped at {width}x{height}"
+        );
+    }
+    let hide = find_named(app.world_mut(), "History Hide").expect("hide compact");
+    assert!(click_action(&mut app, hide));
+    run_frames(&mut app, 3);
+    assert!(find_named(app.world_mut(), "Combat History").is_none());
+    assert!(find_named(app.world_mut(), "History Hide").is_none());
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(toolbar));
+    assert_eq!(app.world().resource::<LabyrinthView>().events.len(), 6);
+    assert_eq!(app.world().resource::<LabyrinthView>().combat, before);
+}
+
+#[test]
+fn expanding_an_action_and_its_ability_is_inspection_not_gameplay_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let kinds = [
         labyrinth_rules::CombatEventKind::Action {

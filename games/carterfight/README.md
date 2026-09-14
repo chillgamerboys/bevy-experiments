@@ -51,19 +51,24 @@ painting; it does not own the dialogue, rules, camera or game flow.
 ```sh
 cargo test -p carterfight --all-targets --profile ci
 cargo clippy -p carterfight --all-targets --profile ci -- -D warnings
-cargo run -p carterfight --example carterfight_review --profile ci -- target/review/carterfight-720-auto.png 1280 720 auto battle
+cargo run -p carterfight --example carterfight_review --profile ci -- target/review/carterfight-1920-auto.png 1920 1080 auto battle
 ```
 
 Capture arguments are output, width, height, `auto`/`200`, and
-`intro`/`battle`/`damage`/`outro`. Review 1280×720, 1920×1080 and 3840×2160 at Auto
-and 200%. Captures drive local typed intents and are static evidence only.
+`intro`/`battle`/`damage`/`outro`. Changed UI flows use 1920×1080 Auto for
+Development/Testing. Logic-only fixes need focused rules checks, not an agent UI
+walk. The `carterfight-ui-normal` suite selects normal-display behavior; retained
+compatibility cases cover other sizes/scales when the defect or Release support
+requires them. Captures drive local typed intents and are static evidence only.
+Follow the shared [rigor and milestone policy](../../docs/testing.md).
 
 The original seven backend tests remain; determinism now compares exact ordered
 event contents. Additional tests cover narration timing, separate reveal/advance,
 selection/confirmation, full intro→battle→outro, duplicate input, native control
 activation and six viewport/scale layouts. These do not prove audio playback,
-actual OS pointer picking or visual quality. An interactive pass must check
-typewriting/chime, clicks, Tab/Shift-Tab, changing scale and scrolling separately.
+actual OS pointer picking or visual quality. When those behaviors change, select
+the relevant typewriting/chime, click, focus or scroll interactions. Scale changes
+are compatibility scope; the full journey is not required for every edit.
 
 Retained art, font, cursor and WAV are the original repository inputs. This
 migration does not make any additional licensing claim about those assets.

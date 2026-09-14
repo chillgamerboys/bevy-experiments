@@ -16,6 +16,9 @@ fn capture_intents(mut messages: MessageReader<LabyrinthIntent>, mut captured: R
     captured.0.extend(messages.read().cloned());
 }
 fn app(scale: UiScaleMode, sparse: bool) -> App {
+    sized_app(1280, 720, scale, sparse)
+}
+fn sized_app(width: u32, height: u32, scale: UiScaleMode, sparse: bool) -> App {
     let catalog = ContentCatalog::builtin().expect("catalog");
     let mut scenario = Scenario::stock(StockScenario::Prototype, 42, &catalog).expect("scenario");
     let mut formation = crate::view::LobbyFormation::compact(&scenario);
@@ -44,7 +47,7 @@ fn app(scale: UiScaleMode, sparse: bool) -> App {
         connected: true,
         ready: true,
     }];
-    let mut builder = TestAppBuilder::new().with_ui(1280, 720);
+    let mut builder = TestAppBuilder::new().with_ui(width, height);
     builder
         .app_mut()
         .insert_resource(LabyrinthView {
@@ -90,7 +93,10 @@ fn full_control(app: &mut App, name: &str) {
     let visible = visible_control_rect(
         app.world(),
         entity,
-        Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+        Rect::from_corners(
+            Vec2::ZERO,
+            app.world().resource::<ResolvedUiMetrics>().logical_size,
+        ),
     )
     .expect("visible control");
     let node = app.world().get::<ComputedNode>(entity).expect("computed");
@@ -102,60 +108,89 @@ fn full_control(app: &mut App, name: &str) {
 }
 
 #[test]
-fn occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus() {
+fn occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus_normal_1080()
+{
+    occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus_compatibility(
+) {
+    occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     use bevy::input::{mouse::MouseButtonInput, ButtonState};
-    for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-        let mut app = app(scale, false);
-        // Mount the real atlas dimensions/regions; an assetless fixture only
-        // exercises the otherwise empty parent button's hit region.
-        let atlas = Image::from_buffer(
-            include_bytes!("../../scene/assets/actors.png"),
-            bevy::image::ImageType::Extension("png"),
-            bevy::image::CompressedImageFormats::NONE,
-            true,
-            default(),
-            default(),
-        )
-        .expect("embedded actor atlas");
-        let image = app.world_mut().resource_mut::<Assets<Image>>().add(atlas);
-        let mut appearance = app
-            .world_mut()
-            .resource_mut::<crate::scene::SceneAppearance>();
-        appearance.actor_sheet = Some(image.clone());
-        appearance.wagon = Some(image.clone());
-        appearance.hauler = Some(image);
-        run_frames(&mut app, 5);
-        let art = find_named(app.world_mut(), "Actor 1 Constructor Art").expect("mounted art");
-        let position = visible_control_rect(
-            app.world(),
-            art,
-            Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
-        )
-        .expect("visible art")
-        .center();
-        let (window_id, mut window) = app
-            .world_mut()
-            .query::<(Entity, &mut Window)>()
-            .single_mut(app.world_mut())
-            .expect("window");
-        window.set_cursor_position(Some(position));
-        run_frames(&mut app, 2);
-        for state in [ButtonState::Pressed, ButtonState::Released] {
-            app.world_mut().write_message(MouseButtonInput {
-                button: MouseButton::Left,
-                state,
-                window: window_id,
-            });
-            app.update();
-        }
-        run_frames(&mut app, 3);
-        assert_eq!(
-            app.world().resource::<UiState>().constructor.selection,
-            Some((Team::Heroes, 1)),
-            "native pointer at {position:?}, {scale:?}"
-        );
-        assert!(find_named(app.world_mut(), "Edit Actor 1").is_some());
+    let mut app = sized_app(width, height, scale, false);
+    // Mount the real atlas dimensions/regions; an assetless fixture only
+    // exercises the otherwise empty parent button's hit region.
+    let atlas = Image::from_buffer(
+        include_bytes!("../../scene/assets/actors.png"),
+        bevy::image::ImageType::Extension("png"),
+        bevy::image::CompressedImageFormats::NONE,
+        true,
+        default(),
+        default(),
+    )
+    .expect("embedded actor atlas");
+    let image = app.world_mut().resource_mut::<Assets<Image>>().add(atlas);
+    let mut appearance = app
+        .world_mut()
+        .resource_mut::<crate::scene::SceneAppearance>();
+    appearance.actor_sheet = Some(image.clone());
+    appearance.wagon = Some(image.clone());
+    appearance.hauler = Some(image);
+    run_frames(&mut app, 5);
+    let art = find_named(app.world_mut(), "Actor 1 Constructor Art").expect("mounted art");
+    let position = visible_control_rect(
+        app.world(),
+        art,
+        Rect::from_corners(
+            Vec2::ZERO,
+            app.world().resource::<ResolvedUiMetrics>().logical_size,
+        ),
+    )
+    .expect("visible art")
+    .center();
+    let (window_id, mut window) = app
+        .world_mut()
+        .query::<(Entity, &mut Window)>()
+        .single_mut(app.world_mut())
+        .expect("window");
+    window.set_cursor_position(Some(position));
+    run_frames(&mut app, 2);
+    for state in [ButtonState::Pressed, ButtonState::Released] {
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state,
+            window: window_id,
+        });
+        app.update();
     }
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world().resource::<UiState>().constructor.selection,
+        Some((Team::Heroes, 1)),
+        "native pointer at {position:?}, {scale:?}"
+    );
+    assert!(find_named(app.world_mut(), "Edit Actor 1").is_some());
 }
 
 #[test]
@@ -347,24 +382,48 @@ fn scenario_submission_replaces_local_validation_feedback() {
     );
 }
 #[test]
-fn footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent() {
-    for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-        let mut app = app(scale, true);
-        activate(&mut app, "Select Heroes Rank 2");
-        activate(&mut app, "Inspect Type scout");
-        full_control(&mut app, "Commit Placement");
-        full_control(&mut app, "Start Encounter");
-        let board = find_named(app.world_mut(), "Construction Battlefield").expect("board");
-        let node = app
-            .world()
-            .get::<ComputedNode>(board)
-            .expect("board layout");
-        assert!(node.size().x > 1000.0);
-        assert!(text(&mut app, "Type Move back_rank_shot Facts").contains("Acting ranks:"));
-        if scale == UiScaleMode::Percent200 {
-            activate(&mut app, "Back To Types");
-            assert!(find_named(app.world_mut(), "Character Type Picker").is_some());
-        }
+fn footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent_normal_1080() {
+    footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent_compatibility() {
+    footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = sized_app(width, height, scale, true);
+    activate(&mut app, "Select Heroes Rank 2");
+    activate(&mut app, "Inspect Type scout");
+    full_control(&mut app, "Commit Placement");
+    full_control(&mut app, "Start Encounter");
+    let board = find_named(app.world_mut(), "Construction Battlefield").expect("board");
+    let node = app
+        .world()
+        .get::<ComputedNode>(board)
+        .expect("board layout");
+    assert!(node.size().x > 1000.0);
+    assert!(text(&mut app, "Type Move back_rank_shot Facts").contains("Acting ranks:"));
+    if scale == UiScaleMode::Percent200 {
+        activate(&mut app, "Back To Types");
+        assert!(find_named(app.world_mut(), "Character Type Picker").is_some());
     }
 }
 #[test]
@@ -560,7 +619,8 @@ fn queued_move_destination_cannot_retarget_a_mounted_confirmation() {
         .is_none());
 }
 #[test]
-fn reconnecting_guest_can_inspect_but_cannot_commit_and_keyboard_scroll_reaches_full_moves() {
+fn reconnecting_guest_can_inspect_but_cannot_commit_and_keyboard_scroll_reaches_full_moves_compatibility(
+) {
     let mut app = app(UiScaleMode::Percent200, true);
     activate(&mut app, "Select Heroes Rank 2");
     activate(&mut app, "Inspect Type scout");

@@ -7,6 +7,7 @@ Gamekit is optional to an adopter. The [catalog](catalog.md) owns skill boundari
 ## Runtime ownership
 
 - `cli/src/config.rs`: project configuration structure and defaults.
+- `cli/src/verification.rs`: deterministic project rigor and receiving-branch policy resolution.
 - `cli/src/docs.rs`: read-only documentation discovery, independent of installation.
 - `cli/src/installation/`: bundle verification, atomic setup, native adapters and migration.
 - `cli/src/installation/registration.rs`: project-scoped Codex settings ownership and same-pin repair.
@@ -65,6 +66,27 @@ evidence, not an authenticated MCP invocation. The agent owns the actual connect
 call and raw evidence. This keeps provider credentials out of core and avoids
 requiring an extra helper for a connection the host already supplies. Existing
 observer argv configurations retain command behavior; mixed modes fail explicitly.
+
+## Verification policy and acceptance
+
+Optional `[verification]` separates verification depth from creative involvement.
+The core resolver owns the normalized policy and identity; project adapters own
+changed-input analysis and command/journey selection. CI exchanges versioned JSON
+with the resolver, keeping repository tooling independent of CLI implementation and
+avoiding separate platform defaults in workflow YAML. See the
+[CLI configuration contract](../cli/README.md#verification-policy).
+
+A receiving-branch requirement is a floor for explicit level selection. Unknown
+impact broadens affected coverage within that level; it does not silently become
+Release. Existing configurations and historical evidence keep their original
+meaning. `project.delivery_base` is explicit and defaults to `main` for adopters
+that omit it; changing the current feature branch is not part of resolution.
+
+Policy selection, command execution, agent observations and developer sanity are
+separate evidence. Milestone acceptance for affected game behavior needs the actual
+developer response and its candidate/journey applicability; caller-authored records
+cannot independently authenticate a human. Ordinary development has no milestone
+gate. Documentation/tooling-only work without game effects needs no gameplay tour.
 
 ## Command ref identity
 

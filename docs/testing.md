@@ -1,6 +1,27 @@
 # Tests and evidence
 
-From the repository root, with Rust 1.97.1:
+Resolve `gameskills verification resolve --base BRANCH` before selecting checks.
+Development feature PRs to `dev` and Testing milestone batches to `main` run on
+macOS. Windows/Linux are Release checks. Creative involvement and Cargo's `ci`
+build profile are independent of this policy.
+
+Choose the affected owner suites and relevant build/lint checks. Logic-only changes
+need no agent screenshots or UI walkthrough. For presentation or interaction changes,
+inspect the changed flow at 1920×1080 Auto. End-to-end checks follow affected journeys
+and boundaries; process recovery or every UI route is not implied by any game edit.
+Retain compatibility tests and select them when display support or the defect needs
+them. Check that filtered tests actually run; zero matches do not prove coverage.
+
+Milestone promotions affecting game behavior require the developer's actual sanity
+response tied to the candidate and journey. No manual gate holds individual dev PRs
+open. Narrative docs/tooling without game effects need no gameplay sanity check.
+Adding a test, running a test and manually checking the game are separate choices.
+Stop when applicable checks pass unless a new change, failure or unresolved concern
+justifies more; out-of-scope coverage is not unfinished acceptance.
+
+The [CI selector](../devtools/docs/ci.md) owns package, suite and branch routing. The
+commands below are the broad available validation set, run from the repository root
+with Rust 1.97.1; they are not a default development checklist:
 
 ```sh
 cargo fmt --all -- --check

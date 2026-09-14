@@ -531,3 +531,60 @@ fn isolated_controller_allows_cargo_to_rebuild_the_tested_binary() {
         original
     );
 }
+
+#[test]
+fn standalone_policy_controls_platforms_and_dispatch_does_not_force_release() {
+    let repo = Repo::new();
+    let files = tempfile::tempdir().expect("policy fixture");
+    let policy_path = files.path().join("policy.json");
+    let event_path = files.path().join("event.json");
+    let policy = json!({"schema_version":1,"ok":true,"configured":true,
+        "receiving_branch":"dev","branch_required_level":"development","level":"development",
+        "platforms":["macos"],"display":{"width":1920,"height":1080,"scale":"auto"},
+        "manual_sanity":"milestone","policy_digest":"a".repeat(64),"reasons":[]});
+    std::fs::write(&policy_path, policy.to_string()).expect("write policy");
+    std::fs::write(&event_path, json!({"ref":"refs/heads/dev"}).to_string()).expect("write event");
+    let selected = result(
+        repo.command(&[
+            "ci",
+            "select",
+            "--base",
+            &repo.base,
+            "--policy",
+            policy_path.to_str().expect("path"),
+        ])
+        .env("GITHUB_EVENT_NAME", "workflow_dispatch")
+        .env("GITHUB_EVENT_PATH", &event_path)
+        .output()
+        .expect("select"),
+        true,
+    );
+    assert_eq!(selected.get("full"), Some(&json!(false)));
+    assert_eq!(
+        selected.pointer("/verification/level"),
+        Some(&json!("development"))
+    );
+    assert_eq!(
+        selected.pointer("/verification/platforms"),
+        Some(&json!(["macos"]))
+    );
+    // A dev policy cannot be supplied to lower a main-target PR's acceptance.
+    std::fs::write(
+        &event_path,
+        json!({"pull_request":{"base":{"sha":repo.base,"ref":"main"}}}).to_string(),
+    )
+    .expect("write event");
+    let failed = result(
+        repo.command(&[
+            "ci",
+            "select",
+            "--policy",
+            policy_path.to_str().expect("path"),
+        ])
+        .env("GITHUB_EVENT_PATH", &event_path)
+        .output()
+        .expect("select mismatch"),
+        false,
+    );
+    assert!(failed.to_string().contains("receiving branch"));
+}

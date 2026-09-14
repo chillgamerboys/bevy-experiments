@@ -1,6 +1,6 @@
 # GameSkills Rust CLI
 
-The unpublished `0.1.0-dev.3` candidate installs immutable GameSkills instructions,
+The unpublished `0.1.0-dev.4` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
 executes configured command graphs with verifiable evidence. Its 13 core skills
 use `plan` as the default entrypoint; eleven optional skills live in five specialist
@@ -110,6 +110,101 @@ actual license/notice files, registry names and release ownership still require
 the planned public-release audit. See [distribution](../../docs/distribution.md) and
 [adopter guidance](../docs/installation.md).
 
+
+## Verification policy
+
+Verification is opt-in and independent of creative involvement and Cargo build
+profiles. Existing adopters without `[verification]` keep their current checks.
+A project can configure its delivery base separately from the current feature branch:
+
+```toml
+[project]
+delivery_base = "dev"
+
+[verification]
+default_level = "development"
+manual_sanity = "milestone"
+
+[verification.branches]
+dev = "development"
+main = "testing"
+
+[verification.display]
+width = 1920
+height = 1080
+scale = "auto"
+
+[verification.levels.development]
+platforms = ["macos"]
+[verification.levels.testing]
+platforms = ["macos"]
+[verification.levels.release]
+platforms = ["macos", "windows", "linux"]
+```
+
+All three level tables are required, with nonempty, unique platform lists. Higher
+levels retain the platforms required below them. Branch names are short Git branch
+names, not refs or revision expressions. The optional display has positive dimensions
+and currently supports `scale = "auto"`. `manual_sanity` accepts `milestone` or
+`never` (the default); it describes gate timing, not a human acceptance result.
+
+```sh
+gameskills verification resolve
+gameskills verification resolve --base main
+gameskills verification resolve --base dev --level release
+```
+
+Resolution reads configuration without setup, Git, writes or an agent session. It
+returns schema 1 JSON with `configured`, `receiving_branch`, `branch_required_level`,
+`level`, `platforms`, `display`, `manual_sanity`, `policy_digest` and `reasons`.
+The digest binds the complete normalized policy and default delivery base. The base
+defaults to `project.delivery_base`, or legacy `main` when absent. An unmapped base
+uses `default_level` and reports that reason. An explicit level below the receiving
+branch's requirement (or the default for an unmapped base) fails; requesting Release does not authorize publication.
+
+Without `[verification]`, `configured` is false, level/display are null, platforms
+are empty and an explicit `--level` fails rather than inventing requirements. The
+project adapter still owns affected packages, suites and journeys: this resolver
+selects policy, not test commands or coverage. Unknown impact can broaden affected
+component selection without escalating platforms or displays to Release.
+
+These fields require CLI 0.1.0-dev.4 or newer and a compatible instruction bundle. Update
+through the supported setup path; do not reinterpret historical records or edit
+installed cache files. See [verification and evidence](../plugins/gameskills/references/verification.md#rigor-and-affected-scope)
+and [milestone sanity](../plugins/gameskills/references/delivery.md#milestone-sanity).
+
+### Persisting task scope and observations
+
+```sh
+gameskills delivery start damage-fix --goal "Correct damage rounding" --base dev --scope rules --gameplay --check rules-test
+gameskills run rules-test --base dev --scope rules
+gameskills delivery scope damage-fix --scope rules --gameplay
+```
+
+`start` records resolved policy and caller-classified scope; `--gameplay` identifies
+game effects for milestone sanity. `scope` explicitly binds or updates that selection,
+preserves prior selections and the original task/base, and retains the previous level
+when `--level` is omitted. Repeated `--check` options replace the required command
+list while preserving its prior value; omitting them keeps the existing checks. Supplying the complete scope/gameplay classification is the
+caller's responsibility. Neither command executes checks or claims human acceptance.
+
+`run` accepts `--base`, `--level`, and repeated `--scope` labels. Its record includes
+the policy and scope alongside the selected command graph. Evidence must cover the
+task's scope labels, policy and receiving base at the same or a stronger level.
+Policy or scope changes require reassessment; old records are not relabeled. For
+commands with selected Git inputs, the runner additionally binds the actual receiving
+base, preferring `refs/remotes/origin/BASE` and falling back to `refs/heads/BASE`.
+Fetch the intended branch before running checks when neither exists.
+
+A configured gameplay milestone requires an explicit observation with
+`delivery check TASK --manual-observation FILE`. Paths are relative to `--root`.
+The file contains schema 1 JSON with `task_id`, `source_head`, `verification_digest`
+(the task's `verification.selection_digest`), `result` (`passed`), `observer`,
+`journey`, and `evidence_reference` pointing to the developer's actual response.
+Its task, candidate and selected scope must match. The result labels this as
+caller-supplied evidence: the CLI does not authenticate the person or perform play.
+Missing/stale/failed observations leave milestone acceptance incomplete; ordinary
+Development tasks and tooling-only milestones need no gameplay observation.
 
 ## Tracker observations
 

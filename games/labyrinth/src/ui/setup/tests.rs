@@ -392,91 +392,110 @@ fn activate(app: &mut App, name: &str, pointer: bool) {
     run_frames(app, 4);
 }
 #[test]
-fn native_browse_inspect_equip_and_footer_work_at_supported_sizes() {
-    for (width, height) in [(1280, 720), (1920, 1080)] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            for pointer in [false, true] {
-                let mut app = app(width, height, scale);
-                let before = app.world().resource::<LabyrinthView>().scenario.clone();
-                let original = app
-                    .world()
-                    .resource::<UiState>()
-                    .editor
-                    .as_ref()
-                    .expect("editor")
-                    .draft
-                    .clone();
-                activate(&mut app, "Weapon greatsword", pointer);
-                assert_eq!(
-                    app.world()
-                        .resource::<UiState>()
-                        .editor
-                        .as_ref()
-                        .expect("editor")
-                        .draft,
-                    original,
-                    "browsing never equips"
-                );
-                let title = find_named(app.world_mut(), "Inspected Choice Title")
-                    .expect("persistent details");
-                assert_eq!(
-                    app.world().get::<Text>(title).expect("text").0,
-                    "Greatsword"
-                );
-                for name in [
-                    "Apply Inspected Choice",
-                    "Apply Build",
-                    "Reload Build",
-                    "Close Build",
-                ] {
-                    let entity =
-                        find_named(app.world_mut(), name).expect("footer or explicit choice");
-                    let rect = visible_control_rect(
-                        app.world(),
-                        entity,
-                        Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
-                    )
-                    .expect("reachable without browsing scroll");
-                    assert!(
-                        rect.width() >= 43.5 && rect.height() >= 43.5,
-                        "{name} {width} {scale:?}: {rect:?}"
-                    );
-                }
-                activate(&mut app, "Apply Inspected Choice", pointer);
-                assert_eq!(
-                    app.world()
-                        .resource::<UiState>()
-                        .editor
-                        .as_ref()
-                        .expect("editor")
-                        .draft
-                        .actor
-                        .build
-                        .weapon,
-                    Some(id("greatsword"))
-                );
-                assert_eq!(app.world().resource::<LabyrinthView>().scenario, before);
-                activate(&mut app, "Close Build", pointer);
-                assert!(find_named(app.world_mut(), "Discard Confirmation").is_some());
-                activate(&mut app, "Keep Editing", pointer);
-                assert_eq!(
-                    app.world()
-                        .resource::<UiState>()
-                        .editor
-                        .as_ref()
-                        .expect("draft retained")
-                        .draft
-                        .actor
-                        .build
-                        .weapon,
-                    Some(id("greatsword"))
-                );
-            }
+fn native_browse_inspect_equip_and_footer_work_at_supported_sizes_normal_1080() {
+    native_browse_inspect_equip_and_footer_work_at_supported_sizes(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn native_browse_inspect_equip_and_footer_work_at_supported_sizes_compatibility() {
+    native_browse_inspect_equip_and_footer_work_at_supported_sizes(1280, 720, UiScaleMode::Auto);
+    native_browse_inspect_equip_and_footer_work_at_supported_sizes(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+    native_browse_inspect_equip_and_footer_work_at_supported_sizes(
+        1920,
+        1080,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn native_browse_inspect_equip_and_footer_work_at_supported_sizes(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    for pointer in [false, true] {
+        let mut app = app(width, height, scale);
+        let before = app.world().resource::<LabyrinthView>().scenario.clone();
+        let original = app
+            .world()
+            .resource::<UiState>()
+            .editor
+            .as_ref()
+            .expect("editor")
+            .draft
+            .clone();
+        activate(&mut app, "Weapon greatsword", pointer);
+        assert_eq!(
+            app.world()
+                .resource::<UiState>()
+                .editor
+                .as_ref()
+                .expect("editor")
+                .draft,
+            original,
+            "browsing never equips"
+        );
+        let title =
+            find_named(app.world_mut(), "Inspected Choice Title").expect("persistent details");
+        assert_eq!(
+            app.world().get::<Text>(title).expect("text").0,
+            "Greatsword"
+        );
+        for name in [
+            "Apply Inspected Choice",
+            "Apply Build",
+            "Reload Build",
+            "Close Build",
+        ] {
+            let entity = find_named(app.world_mut(), name).expect("footer or explicit choice");
+            let rect = visible_control_rect(
+                app.world(),
+                entity,
+                Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+            )
+            .expect("reachable without browsing scroll");
+            assert!(
+                rect.width() >= 43.5 && rect.height() >= 43.5,
+                "{name} {width} {scale:?}: {rect:?}"
+            );
         }
+        activate(&mut app, "Apply Inspected Choice", pointer);
+        assert_eq!(
+            app.world()
+                .resource::<UiState>()
+                .editor
+                .as_ref()
+                .expect("editor")
+                .draft
+                .actor
+                .build
+                .weapon,
+            Some(id("greatsword"))
+        );
+        assert_eq!(app.world().resource::<LabyrinthView>().scenario, before);
+        activate(&mut app, "Close Build", pointer);
+        assert!(find_named(app.world_mut(), "Discard Confirmation").is_some());
+        activate(&mut app, "Keep Editing", pointer);
+        assert_eq!(
+            app.world()
+                .resource::<UiState>()
+                .editor
+                .as_ref()
+                .expect("draft retained")
+                .draft
+                .actor
+                .build
+                .weapon,
+            Some(id("greatsword"))
+        );
     }
 }
 #[test]
-fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_focus() {
+fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_focus_compatibility()
+{
     use bevy::text::EditableText;
     let mut app = app(1280, 720, UiScaleMode::Percent200);
     activate(&mut app, "Category Innate", false);
@@ -523,7 +542,7 @@ fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_f
 }
 
 #[test]
-fn first_detail_fold_shows_effects_and_ranks_and_native_paging_reaches_sources() {
+fn first_detail_fold_shows_effects_and_ranks_and_native_paging_reaches_sources_compatibility() {
     let mut app = app(1280, 720, UiScaleMode::Percent200);
     activate(&mut app, "Weapon greatsword", false);
     let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280., 720.));

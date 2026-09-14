@@ -48,128 +48,135 @@ fn activate(app: &mut App, entity: Entity, keyboard: bool) {
 }
 
 #[test]
-fn medic_commands_refresh_text_help_and_selection_after_scout_commits() {
-    for keyboard in [false, true] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("combat");
-            advance_to(&mut combat, ActorId(4));
-            let mut app = app(1920, 1080, scale);
-            app.init_resource::<CombatCommands>()
-                .add_systems(PostUpdate, capture_commands);
-            app.world_mut().resource_mut::<LabyrinthView>().combat = Some(combat.snapshot());
-            run_frames(&mut app, 5);
-            let old_skill = find_named(app.world_mut(), "Skill 0").expect("scout skill");
-            activate(&mut app, old_skill, keyboard);
-            assert_eq!(
-                app.world().resource::<UiState>().selected,
-                Some(Choice::Ability(0))
-            );
-            let target = find_named(app.world_mut(), "Actor 105").expect("rear enemy");
-            activate(&mut app, target, keyboard);
-            let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
-            assert!(
-                activation_eligible(app.world_mut(), confirm),
-                "confirm eligibility: keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, tooltip={:?}",
-                app.world().resource::<UiState>().selected,
-                app.world().resource::<UiState>().target,
-                app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects()
-            );
-            activate(&mut app, confirm, keyboard);
-            let diagnostics = app
-                .world_mut()
-                .query::<(
-                    Entity,
-                    &Name,
-                    &ComputedNode,
-                    &UiGlobalTransform,
-                    Option<&Interaction>,
-                )>()
-                .iter(app.world())
-                .filter(|(entity, name, _, _, interaction)| {
-                    *entity == confirm
-                        || name.as_str().starts_with("Tooltip Card")
-                        || interaction.is_some_and(|interaction| *interaction != Interaction::None)
-                })
-                .map(|(_, name, node, transform, interaction)| {
-                    (
-                        name.as_str().to_owned(),
-                        node.size(),
-                        transform.translation,
-                        interaction.copied(),
-                    )
-                })
-                .collect::<Vec<_>>();
-            let commands = std::mem::take(&mut app.world_mut().resource_mut::<CombatCommands>().0);
-            assert_eq!(
-                commands,
-                vec![(
-                    ActorId(4),
-                    CombatAction::Ability {
-                        index: 0,
-                        target: ActorId(105),
-                    },
-                )],
-                "keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, confirm={:?}, tooltip={:?}, selection={:?}, geometry={diagnostics:?}",
-                app.world().resource::<UiState>().selected,
-                app.world().resource::<UiState>().target,
-                app.world().get::<Interaction>(confirm),
-                app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
-                battle::selected_action(app.world().resource::<LabyrinthView>(), app.world().resource::<UiState>())
-            );
-            for (actor, action) in commands {
-                combat.apply(actor, action).expect("authoritative action");
-            }
-            advance_to(&mut combat, ActorId(6));
-            let next = combat.snapshot();
-            next.validate().expect("valid decision transition");
-            app.world_mut().resource_mut::<LabyrinthView>().combat = Some(next.clone());
-            run_frames(&mut app, 5);
-            assert!(app.world().get_entity(old_skill).is_err());
-            assert_eq!(app.world().resource::<UiState>().selected, None);
+fn medic_commands_refresh_text_help_and_selection_after_scout_commits_normal_1080() {
+    medic_commands_refresh_text_help_and_selection_after_scout_commits(UiScaleMode::Auto);
+}
 
-            for (name, choice, heading) in [
-                ("Reposition", Choice::Reposition, "Reposition"),
-                ("Skill 0", Choice::Ability(0), "Mend"),
-                ("Skill 1", Choice::Ability(1), "Staunch"),
-            ] {
-                let button = find_named(app.world_mut(), name).expect("medic control");
-                activate(&mut app, button, keyboard);
-                assert_eq!(app.world().resource::<UiState>().selected, Some(choice));
-                assert_eq!(
-                    app.world().get::<UiSkinOverrides>(button),
-                    Some(&app.world().resource::<LabyrinthAppearance>().control(true)),
-                    "{name}: selected control must update its skin"
-                );
-                assert_eq!(
-                    app.world().get::<BorderColor>(button),
-                    Some(&BorderColor::all(
-                        app.world().resource::<LabyrinthAppearance>().accent
-                    )),
-                    "{name}: skin must reach the rendered control component"
-                );
-                let state = app.world().resource::<UiContextHelpState>();
-                assert_eq!(state.entity, Some(button));
-                let content = state.content.as_ref().expect("current medic help");
-                assert!(content.title.contains(heading) || content.body.contains(heading));
-                // Retained click/keyboard focus no longer creates a preview.
-                // Explicitly inspect the newly selected command's current data.
-                tap_key(&mut app, KeyCode::KeyT);
-                run_frames(&mut app, 8);
-                let title = find_named(app.world_mut(), "Tooltip Title");
-                assert!(title.is_some(), "current tooltip: {name}, keyboard={keyboard}, scale={scale:?}, source={:?}, state={:?}, help={:?}",
-                    app.world().get::<bevy_gamekit::ui::UiTooltipSource>(button),
-                    app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
-                    app.world().resource::<UiContextHelpState>());
-                let title = title.expect("current tooltip");
-                assert!(!text(&app, title).contains(skill_definition(SkillId::BackRankShot).name));
-                assert_eq!(
-                    app.world().resource::<LabyrinthView>().combat.as_ref(),
-                    Some(&next)
-                );
-                assert!(app.world().resource::<CombatCommands>().0.is_empty());
-                tap_key(&mut app, KeyCode::Escape);
-                run_frames(&mut app, 2);
-            }
+#[test]
+fn medic_commands_refresh_text_help_and_selection_after_scout_commits_compatibility() {
+    medic_commands_refresh_text_help_and_selection_after_scout_commits(UiScaleMode::Percent200);
+}
+
+fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiScaleMode) {
+    for keyboard in [false, true] {
+        let mut combat = Combat::new(42, DEFAULT_HERO_ROSTER).expect("combat");
+        advance_to(&mut combat, ActorId(4));
+        let mut app = app(1920, 1080, scale);
+        app.init_resource::<CombatCommands>()
+            .add_systems(PostUpdate, capture_commands);
+        app.world_mut().resource_mut::<LabyrinthView>().combat = Some(combat.snapshot());
+        run_frames(&mut app, 5);
+        let old_skill = find_named(app.world_mut(), "Skill 0").expect("scout skill");
+        activate(&mut app, old_skill, keyboard);
+        assert_eq!(
+            app.world().resource::<UiState>().selected,
+            Some(Choice::Ability(0))
+        );
+        let target = find_named(app.world_mut(), "Actor 105").expect("rear enemy");
+        activate(&mut app, target, keyboard);
+        let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
+        assert!(
+            activation_eligible(app.world_mut(), confirm),
+            "confirm eligibility: keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, tooltip={:?}",
+            app.world().resource::<UiState>().selected,
+            app.world().resource::<UiState>().target,
+            app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects()
+        );
+        activate(&mut app, confirm, keyboard);
+        let diagnostics = app
+            .world_mut()
+            .query::<(
+                Entity,
+                &Name,
+                &ComputedNode,
+                &UiGlobalTransform,
+                Option<&Interaction>,
+            )>()
+            .iter(app.world())
+            .filter(|(entity, name, _, _, interaction)| {
+                *entity == confirm
+                    || name.as_str().starts_with("Tooltip Card")
+                    || interaction.is_some_and(|interaction| *interaction != Interaction::None)
+            })
+            .map(|(_, name, node, transform, interaction)| {
+                (
+                    name.as_str().to_owned(),
+                    node.size(),
+                    transform.translation,
+                    interaction.copied(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let commands = std::mem::take(&mut app.world_mut().resource_mut::<CombatCommands>().0);
+        assert_eq!(
+            commands,
+            vec![(
+                ActorId(4),
+                CombatAction::Ability {
+                    index: 0,
+                    target: ActorId(105),
+                },
+            )],
+            "keyboard={keyboard}, scale={scale:?}, selected={:?}, target={:?}, confirm={:?}, tooltip={:?}, selection={:?}, geometry={diagnostics:?}",
+            app.world().resource::<UiState>().selected,
+            app.world().resource::<UiState>().target,
+            app.world().get::<Interaction>(confirm),
+            app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
+            battle::selected_action(app.world().resource::<LabyrinthView>(), app.world().resource::<UiState>())
+        );
+        for (actor, action) in commands {
+            combat.apply(actor, action).expect("authoritative action");
+        }
+        advance_to(&mut combat, ActorId(6));
+        let next = combat.snapshot();
+        next.validate().expect("valid decision transition");
+        app.world_mut().resource_mut::<LabyrinthView>().combat = Some(next.clone());
+        run_frames(&mut app, 5);
+        assert!(app.world().get_entity(old_skill).is_err());
+        assert_eq!(app.world().resource::<UiState>().selected, None);
+
+        for (name, choice, heading) in [
+            ("Reposition", Choice::Reposition, "Reposition"),
+            ("Skill 0", Choice::Ability(0), "Mend"),
+            ("Skill 1", Choice::Ability(1), "Staunch"),
+        ] {
+            let button = find_named(app.world_mut(), name).expect("medic control");
+            activate(&mut app, button, keyboard);
+            assert_eq!(app.world().resource::<UiState>().selected, Some(choice));
+            assert_eq!(
+                app.world().get::<UiSkinOverrides>(button),
+                Some(&app.world().resource::<LabyrinthAppearance>().control(true)),
+                "{name}: selected control must update its skin"
+            );
+            assert_eq!(
+                app.world().get::<BorderColor>(button),
+                Some(&BorderColor::all(
+                    app.world().resource::<LabyrinthAppearance>().accent
+                )),
+                "{name}: skin must reach the rendered control component"
+            );
+            let state = app.world().resource::<UiContextHelpState>();
+            assert_eq!(state.entity, Some(button));
+            let content = state.content.as_ref().expect("current medic help");
+            assert!(content.title.contains(heading) || content.body.contains(heading));
+            // Retained click/keyboard focus no longer creates a preview.
+            // Explicitly inspect the newly selected command's current data.
+            tap_key(&mut app, KeyCode::KeyT);
+            run_frames(&mut app, 8);
+            let title = find_named(app.world_mut(), "Tooltip Title");
+            assert!(title.is_some(), "current tooltip: {name}, keyboard={keyboard}, scale={scale:?}, source={:?}, state={:?}, help={:?}",
+                app.world().get::<bevy_gamekit::ui::UiTooltipSource>(button),
+                app.world().resource::<bevy_gamekit::ui::UiTooltipState>().subjects(),
+                app.world().resource::<UiContextHelpState>());
+            let title = title.expect("current tooltip");
+            assert!(!text(&app, title).contains(skill_definition(SkillId::BackRankShot).name));
+            assert_eq!(
+                app.world().resource::<LabyrinthView>().combat.as_ref(),
+                Some(&next)
+            );
+            assert!(app.world().resource::<CombatCommands>().0.is_empty());
+            tap_key(&mut app, KeyCode::Escape);
+            run_frames(&mut app, 2);
         }
     }
 }

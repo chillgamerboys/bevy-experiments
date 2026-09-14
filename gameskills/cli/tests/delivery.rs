@@ -494,3 +494,262 @@ fn mcp_receipt_cannot_override_command_tracking() -> Result<(), Box<dyn Error>> 
         .contains("requires required MCP tracking"));
     Ok(())
 }
+
+fn rigor_fixture(root: &Path) -> Result<(), Box<dyn Error>> {
+    let mut config = std::fs::read_to_string(root.join("gameskills.toml"))?;
+    config.push_str(
+        r#"
+delivery_base = "dev"
+[verification]
+default_level = "development"
+manual_sanity = "milestone"
+[verification.branches]
+dev = "development"
+main = "testing"
+[verification.display]
+width = 1920
+height = 1080
+scale = "auto"
+[verification.levels.development]
+platforms = ["macos"]
+[verification.levels.testing]
+platforms = ["macos"]
+[verification.levels.release]
+platforms = ["macos", "linux", "windows"]
+[commands.probe]
+argv = ["true"]
+git_refs = []
+"#,
+    );
+    std::fs::write(root.join("gameskills.toml"), config)?;
+    git(root, &["add", "gameskills.toml"])?;
+    git(root, &["commit", "-m", "rigor"])?;
+    git(root, &["branch", "dev"])?;
+    Ok(())
+}
+
+#[test]
+fn development_scope_defaults_and_runner_evidence_remain_bound() -> Result<(), Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    rigor_fixture(root)?;
+    let task = cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "logic",
+            "--goal",
+            "Fix damage",
+            "--endpoint",
+            "implementation",
+            "--scope",
+            "rules",
+            "--gameplay",
+            "--check",
+            "probe",
+        ],
+    )?;
+    assert_eq!(task.pointer("/record/base"), Some(&json!("dev")), "{task}");
+    assert_eq!(
+        task.pointer("/record/verification/manual_sanity_required"),
+        Some(&json!(false))
+    );
+    let run = cli(root, &["run", "probe", "--scope", "rules"])?;
+    assert_eq!(run.get("ok"), Some(&json!(true)), "{run}");
+    let run_id = at(&run, "/run_id").as_str().ok_or("missing run")?;
+    let result = cli(root, &["delivery", "check", "logic", "--evidence", run_id])?;
+    assert_eq!(result.get("ok"), Some(&json!(true)), "{result}");
+    let show = cli(root, &["evidence", "show", run_id])?;
+    assert_eq!(
+        show.pointer("/record/verification/policy/receiving_branch"),
+        Some(&json!("dev"))
+    );
+    let resumed = cli(
+        root,
+        &[
+            "run",
+            "probe",
+            "--base",
+            "dev",
+            "--level",
+            "development",
+            "--scope",
+            "rules",
+            "--resume",
+            run_id,
+        ],
+    )?;
+    assert_eq!(resumed.get("ok"), Some(&json!(true)), "{resumed}");
+    let resumed_id = at(&resumed, "/run_id")
+        .as_str()
+        .ok_or("missing resumed run")?;
+    let resumed = cli(root, &["evidence", "show", resumed_id])?;
+    assert_eq!(
+        resumed.pointer("/record/resumed_from"),
+        Some(&json!(run_id))
+    );
+    assert_eq!(
+        resumed.pointer("/record/verification/selection_digest"),
+        show.pointer("/record/verification/selection_digest")
+    );
+    assert_ne!(
+        resumed.pointer("/record/verification/policy/reasons"),
+        show.pointer("/record/verification/policy/reasons")
+    );
+    let failed = cli(
+        root,
+        &["run", "probe", "--base", "main", "--resume", run_id],
+    )?;
+    assert_eq!(failed.get("ok"), Some(&json!(false)), "{failed}");
+    cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "milestone",
+            "--goal",
+            "Milestone",
+            "--endpoint",
+            "implementation",
+            "--base",
+            "main",
+            "--check",
+            "probe",
+        ],
+    )?;
+    let wrong = cli(
+        root,
+        &["delivery", "check", "milestone", "--evidence", run_id],
+    )?;
+    assert_eq!(wrong.get("ok"), Some(&json!(false)), "{wrong}");
+    assert!(
+        at(&wrong, "/reasons")
+            .to_string()
+            .contains("different verification"),
+        "{wrong}"
+    );
+    Ok(())
+}
+
+#[test]
+fn milestone_requires_actual_candidate_bound_manual_reference() -> Result<(), Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    rigor_fixture(root)?;
+    let task = cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "milestone",
+            "--goal",
+            "Milestone",
+            "--endpoint",
+            "implementation",
+            "--base",
+            "main",
+            "--gameplay",
+            "--scope",
+            "rules",
+        ],
+    )?;
+    let missing = cli(root, &["delivery", "check", "milestone"])?;
+    assert_eq!(missing.get("ok"), Some(&json!(false)), "{missing}");
+    assert!(
+        at(&missing, "/reasons")
+            .to_string()
+            .contains("manual sanity"),
+        "{missing}"
+    );
+    let file = root.join(".gameskills/manual.json");
+    let observation = json!({"schema_version":1,"task_id":"milestone","source_head":git(root,&["rev-parse","HEAD"])?,"verification_digest":at(&task, "/record/verification/selection_digest"),"result":"passed","observer":"fixture developer","journey":"one combat turn","evidence_reference":"fixture response, not a real gameplay observation"});
+    std::fs::write(&file, observation.to_string())?;
+    let passed = cli(
+        root,
+        &[
+            "delivery",
+            "check",
+            "milestone",
+            "--manual-observation",
+            file.to_str().ok_or("path")?,
+        ],
+    )?;
+    assert_eq!(passed.get("ok"), Some(&json!(true)), "{passed}");
+    assert!(at(&passed, "/observations/manual_sanity/claim")
+        .as_str()
+        .ok_or("claim")?
+        .contains("not independently authenticated"));
+    git(root, &["commit", "--allow-empty", "-m", "new candidate"])?;
+    let stale = cli(
+        root,
+        &[
+            "delivery",
+            "check",
+            "milestone",
+            "--manual-observation",
+            file.to_str().ok_or("path")?,
+        ],
+    )?;
+    assert_eq!(stale.get("ok"), Some(&json!(false)), "{stale}");
+    assert!(
+        at(&stale, "/reasons").to_string().contains("stale"),
+        "{stale}"
+    );
+    cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "tools",
+            "--goal",
+            "Tooling milestone",
+            "--endpoint",
+            "implementation",
+            "--base",
+            "main",
+        ],
+    )?;
+    let tools = cli(root, &["delivery", "check", "tools"])?;
+    assert_eq!(tools.get("ok"), Some(&json!(true)), "{tools}");
+    Ok(())
+}
+
+#[test]
+fn adopting_policy_keeps_legacy_task_and_requires_explicit_scope() -> Result<(), Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    cli(
+        root,
+        &[
+            "delivery",
+            "start",
+            "existing",
+            "--goal",
+            "Existing task",
+            "--endpoint",
+            "implementation",
+        ],
+    )?;
+    let before = cli(root, &["delivery", "show", "existing"])?;
+    rigor_fixture(root)?;
+    let unbound = cli(root, &["delivery", "check", "existing"])?;
+    assert_eq!(unbound.get("ok"), Some(&json!(false)), "{unbound}");
+    let bound = cli(
+        root,
+        &["delivery", "scope", "existing", "--scope", "tooling"],
+    )?;
+    assert_eq!(bound.get("ok"), Some(&json!(true)), "{bound}");
+    assert_eq!(
+        bound.pointer("/record/initial_source"),
+        before.pointer("/record/initial_source")
+    );
+    assert_eq!(bound.pointer("/record/base"), Some(&json!("main")));
+    assert_eq!(
+        bound.pointer("/record/verification_history"),
+        Some(&json!([null]))
+    );
+    let checked = cli(root, &["delivery", "check", "existing"])?;
+    assert_eq!(checked.get("ok"), Some(&json!(true)), "{checked}");
+    Ok(())
+}

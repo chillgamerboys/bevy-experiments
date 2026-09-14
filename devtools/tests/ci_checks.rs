@@ -617,3 +617,260 @@ fn runner_stops_at_first_failed_child_and_reports_its_position() -> TestResult {
     }
     Ok(())
 }
+
+fn configured(level: &str, packages: &[&str], paths: &[&str]) -> Selection {
+    let mut value = selection();
+    value.packages = packages.iter().map(|p| (*p).into()).collect();
+    value.paths = paths.iter().map(|p| (*p).into()).collect();
+    value.verification = Some(json!({
+        "schema_version":1,"ok":true,"configured":true,
+        "receiving_branch": if level == "development" {"dev"} else {"main"},
+        "branch_required_level":if level == "development" {"development"} else {"testing"},
+        "level":level,
+        "platforms":if level == "release" {vec!["macos","windows","linux"]} else {vec!["macos"]},
+        "display":{"width":1920,"height":1080,"scale":"auto"},
+        "manual_sanity":"milestone","policy_digest":"a".repeat(64),"reasons":[]
+    }));
+    value.suites = repo_devtools::ci::suites::select(&value);
+    value
+}
+
+#[test]
+fn configured_logic_runs_positive_authority_without_ui_or_sockets() -> TestResult {
+    let value = configured(
+        "development",
+        &["labyrinth", "labyrinth-rules"],
+        &["games/labyrinth/rules/src/turn.rs"],
+    );
+    let commands = checks::commands(&value, Job::Rust)?;
+    assert_eq!(value.suites, ["labyrinth-session"]);
+    assert!(commands
+        .iter()
+        .any(|cmd| cmd == &argv(&["repo-devtools", "ci", "suite", "labyrinth-session"])));
+    assert!(
+        !commands
+            .iter()
+            .any(|cmd| cmd.get(1).is_some_and(|v| v == "test")
+                && cmd.iter().any(|v| v == "labyrinth"))
+    );
+    assert_eq!(
+        repo_devtools::ci::verification::runners(&value),
+        ["macos-latest"]
+    );
+    Ok(())
+}
+
+#[test]
+fn admission_and_process_are_distinct_affected_journeys() -> TestResult {
+    let admission = configured(
+        "development",
+        &["labyrinth"],
+        &["games/labyrinth/src/network/admission.rs"],
+    );
+    assert!(admission.suites.contains(&"labyrinth-admission".into()));
+    assert!(!admission.suites.contains(&"labyrinth-process".into()));
+    assert!(!admission.suites.iter().any(|s| s.contains("ui")));
+    let process = configured(
+        "testing",
+        &["labyrinth"],
+        &["games/labyrinth/src/network/tests/process.rs"],
+    );
+    assert!(process.suites.contains(&"labyrinth-process".into()));
+    checks::validate(&process)?;
+    Ok(())
+}
+
+#[test]
+fn ui_normal_and_release_compatibility_are_separate_positive_suites() -> TestResult {
+    for level in ["development", "testing", "release"] {
+        let value = configured(
+            level,
+            &["labyrinth"],
+            &["games/labyrinth/src/ui/battle/help.rs"],
+        );
+        assert!(value.suites.contains(&"labyrinth-ui-normal".into()));
+        assert_eq!(
+            value.suites.contains(&"labyrinth-ui-compatibility".into()),
+            level == "release"
+        );
+        assert!(!value.suites.contains(&"labyrinth-admission".into()));
+        assert_eq!(
+            repo_devtools::ci::verification::runners(&value).len(),
+            if level == "release" { 3 } else { 1 }
+        );
+        checks::validate(&value)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn full_affected_scope_does_not_force_release_or_every_journey() -> TestResult {
+    let mut value = configured(
+        "testing",
+        &["labyrinth", "deckbuilder", "carterfight"],
+        &[".github/workflows/gamekit.yml"],
+    );
+    value.full = true;
+    value.skills = true;
+    value.distribution = false;
+    value.minimal = false;
+    value.wasm = false;
+    value.deny = false;
+    checks::validate(&value)?;
+    assert_eq!(
+        value.suites,
+        [
+            "carterfight-rules",
+            "deckbuilder-domain",
+            "labyrinth-presentation",
+            "labyrinth-session"
+        ]
+    );
+    assert_eq!(
+        repo_devtools::ci::verification::runners(&value),
+        ["macos-latest"]
+    );
+    Ok(())
+}
+
+#[test]
+fn policy_and_suite_tampering_fail_before_execution() -> TestResult {
+    let mut value = configured(
+        "development",
+        &["labyrinth"],
+        &["games/labyrinth/src/session/mod.rs"],
+    );
+    value.suites.clear();
+    assert!(checks::validate(&value).is_err());
+    let mut value = configured("development", &["labyrinth"], &[]);
+    value.verification.as_mut().ok_or("policy")?["branch_required_level"] = json!("testing");
+    assert!(checks::validate(&value).is_err());
+    assert!(repo_devtools::ci::suites::get("--help").is_err());
+    Ok(())
+}
+
+#[test]
+fn test_listing_and_zero_execution_cannot_establish_coverage() {
+    use repo_devtools::ci::suites::{listed_tests, passed_tests};
+    assert_eq!(listed_tests("0 tests, 0 benchmarks\n"), 0);
+    assert_eq!(
+        listed_tests("network::one: test\nnetwork::two: test\n2 tests, 0 benchmarks\n"),
+        2
+    );
+    assert_eq!(
+        passed_tests(
+            "test result: ok. 0 passed; 0 failed; 2 ignored; 7 filtered out; finished in 0.0s"
+        ),
+        0
+    );
+    assert_eq!(
+        passed_tests(
+            "test result: ok. 2 passed; 0 failed; 0 ignored; 7 filtered out; finished in 0.1s"
+        ),
+        2
+    );
+    assert_eq!(passed_tests("network::one: test"), 0);
+}
+
+#[test]
+fn explicit_full_release_covers_preserved_game_cases_and_process_recovery() -> TestResult {
+    let mut value = configured("release", &["labyrinth", "deckbuilder", "carterfight"], &[]);
+    value.full = true;
+    value.skills = true;
+    value.suites = repo_devtools::ci::suites::select(&value);
+    assert_eq!(
+        value.suites,
+        [
+            "carterfight-all",
+            "deckbuilder-all",
+            "labyrinth-all",
+            "labyrinth-process"
+        ]
+    );
+    checks::validate(&value)?;
+    Ok(())
+}
+
+#[test]
+fn configured_jobs_do_not_duplicate_classifier_or_cli_runtime_tests() -> TestResult {
+    let mut value = configured(
+        "testing",
+        &["gameskills-cli", "repo-devtools"],
+        &["devtools/src/ci/checks.rs"],
+    );
+    value.skills = true;
+    let skills = checks::commands(&value, Job::Skills)?;
+    let rust = checks::commands(&value, Job::Rust)?;
+    assert!(!skills.iter().flatten().any(|arg| arg == "ci_routing"));
+    assert!(!rust
+        .iter()
+        .any(|cmd| cmd.get(1).is_some_and(|a| a == "test")
+            && cmd
+                .iter()
+                .any(|a| a == "gameskills-cli" || a == "repo-devtools")));
+    assert!(skills
+        .iter()
+        .any(|cmd| cmd.get(1).is_some_and(|a| a == "test")
+            && cmd.iter().any(|a| a == "gameskills-cli")));
+    Ok(())
+}
+
+#[test]
+fn test_body_classification_tracks_assertion_changes_and_ignores_comments() -> TestResult {
+    use repo_devtools::ci::suites::test_bodies;
+    let source =
+        "#[cfg(test)] mod tests { #[test] fn case() { assert_eq!(1, 1); } fn helper() {} }";
+    let original = test_bodies(source, "network")?;
+    assert_eq!(original.len(), 1);
+    assert!(original.contains_key("network::tests::case"));
+    assert_eq!(
+        original,
+        test_bodies(
+            &source.replace("assert_eq!", "/* comment */ assert_eq!"),
+            "network"
+        )?
+    );
+    assert_ne!(
+        original,
+        test_bodies(&source.replace("1, 1", "1, 2"), "network")?
+    );
+    Ok(())
+}
+
+#[test]
+fn test_only_module_changes_do_not_claim_gameplay_changed() -> TestResult {
+    use repo_devtools::ci::suites::production_source;
+    let before =
+        "pub fn rule() -> u32 { 1 } #[cfg(test)] mod tests { #[test] fn old() { assert!(true); } }";
+    let after = "pub fn rule() -> u32 { 1 } #[cfg(test)] mod tests { #[test] fn new_normal_1080() { assert_eq!(2, 2); } }";
+    assert_eq!(production_source(before)?, production_source(after)?);
+    assert_ne!(
+        production_source(before)?,
+        production_source(&after.replace("{ 1 }", "{ 2 }"))?
+    );
+    Ok(())
+}
+
+#[test]
+fn changed_repository_test_targets_execute_or_require_classification() -> TestResult {
+    for target in ["inputs", "cli"] {
+        let value = configured(
+            "development",
+            &["repo-devtools"],
+            &[&format!("devtools/tests/{target}.rs")],
+        );
+        let commands = checks::commands(&value, Job::Rust)?;
+        assert!(commands
+            .iter()
+            .any(|cmd| cmd.windows(2).any(|pair| pair == ["--test", target])));
+    }
+    let value = configured(
+        "development",
+        &["repo-devtools"],
+        &["devtools/tests/new_contract.rs"],
+    );
+    assert!(checks::commands(&value, Job::Rust)
+        .expect_err("unmapped target")
+        .contains("new_contract"));
+    Ok(())
+}

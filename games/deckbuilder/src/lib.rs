@@ -1406,7 +1406,7 @@ mod tests {
     }
 
     #[test]
-    fn pointer_flow_uses_authoritative_game_owned_reducer() {
+    fn pointer_flow_uses_authoritative_game_owned_reducer_normal_1080() {
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         start_solo(&mut app);
         let spark = find_named(app.world_mut(), "Card Spark").expect("hand contains Spark");
@@ -1526,7 +1526,7 @@ mod tests {
     }
 
     #[test]
-    fn unavailable_cards_explain_each_reason_without_pointer_or_keyboard_activation() {
+    fn unavailable_cards_explain_each_reason_without_pointer_or_keyboard_activation_normal_1080() {
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         start_solo(&mut app);
         inspect_unavailable_card(
@@ -1559,7 +1559,7 @@ mod tests {
     }
 
     #[test]
-    fn card_inspection_refreshes_and_revokes_disclosed_content_with_the_match_view() {
+    fn card_inspection_refreshes_and_revokes_disclosed_content_with_the_match_view_normal_1080() {
         use bevy_gamekit::ui::{UiTooltipCatalog, UiTooltipState};
         use domain::{CommandOutcome, DeckAuthority, GameRequest, RequestId, Seat};
 
@@ -1647,7 +1647,7 @@ mod tests {
     }
 
     #[test]
-    fn keyboard_activation_matches_pointer_activation() {
+    fn keyboard_activation_matches_pointer_activation_normal_1080() {
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         run_frames(&mut app, 3);
         let multiplayer = find_named(app.world_mut(), "Multiplayer").expect("menu control");
@@ -1661,7 +1661,7 @@ mod tests {
     }
 
     #[test]
-    fn game_menu_traps_and_restores_focus() {
+    fn game_menu_traps_and_restores_focus_normal_1080() {
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
         start_solo(&mut app);
         let pause = find_named(app.world_mut(), "Game menu").expect("Game menu exists");
@@ -1677,8 +1677,29 @@ mod tests {
     }
 
     #[test]
-    fn escape_backs_out_of_leave_confirmation_without_pausing_or_leaving() {
-        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+    fn escape_backs_out_of_leave_confirmation_without_pausing_or_leaving_normal_1080() {
+        escape_backs_out_of_leave_confirmation_without_pausing_or_leaving(
+            1920,
+            1080,
+            UiScaleMode::Auto,
+        );
+    }
+
+    #[test]
+    fn escape_backs_out_of_leave_confirmation_without_pausing_or_leaving_compatibility() {
+        escape_backs_out_of_leave_confirmation_without_pausing_or_leaving(
+            1280,
+            720,
+            UiScaleMode::Auto,
+        );
+    }
+
+    fn escape_backs_out_of_leave_confirmation_without_pausing_or_leaving(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
+        let mut app = test_app(width, height, scale);
         start_solo(&mut app);
         tap_key(&mut app, KeyCode::Escape);
         run_frames(&mut app, 3);
@@ -1714,56 +1735,64 @@ mod tests {
     }
 
     #[test]
-    fn responsive_matrix_preserves_regions_and_target_sizes() {
-        for (width, height, scale) in [
-            (1280, 720, UiScaleMode::Auto),
-            (1920, 1080, UiScaleMode::Auto),
-            (3840, 2160, UiScaleMode::Auto),
-            (1280, 720, UiScaleMode::Percent200),
-            (1920, 1080, UiScaleMode::Percent200),
-            (3840, 2160, UiScaleMode::Percent200),
-        ] {
-            let mut app = test_app(width, height, scale);
-            start_solo(&mut app);
-            let snapshot = ui_tree_snapshot(app.world_mut());
-            let rendered = snapshot.to_string();
-            assert!(rendered.contains("Match HUD [hud]"));
-            assert!(rendered.contains("Action Rail [action-rail]"));
-            assert!(rendered.contains("Activity Feed [activity-feed]"));
-            for node in snapshot
-                .nodes
-                .iter()
-                .filter(|node| node.action && !node.disabled)
-            {
-                assert!(node.size.x >= 44.0, "{} is too narrow", node.path);
-                assert!(node.size.y >= 44.0, "{} is too short", node.path);
-            }
-            let actions = {
-                let world = app.world_mut();
-                let mut query = world
-                    .query_filtered::<Entity, (With<bevy_gamekit::ui::UiAction>, Without<UiDisabled>)>(
-                    );
-                query.iter(world).collect::<Vec<_>>()
-            };
-            for entity in actions {
-                assert!(focus_action(app.world_mut(), entity));
-                run_frames(&mut app, 3);
-                let visible = bevy_gamekit::testing::visible_control_rect(
-                    app.world(),
-                    entity,
-                    Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
-                )
-                .expect("focused control must be visible");
-                assert!(
-                    visible.width() >= 43.5 && visible.height() >= 43.5,
-                    "focused control is clipped: {visible:?}"
+    fn responsive_matrix_preserves_regions_and_target_sizes_normal_1080() {
+        responsive_matrix_preserves_regions_and_target_sizes(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn responsive_matrix_preserves_regions_and_target_sizes_compatibility() {
+        responsive_matrix_preserves_regions_and_target_sizes(1280, 720, UiScaleMode::Auto);
+        responsive_matrix_preserves_regions_and_target_sizes(3840, 2160, UiScaleMode::Auto);
+        responsive_matrix_preserves_regions_and_target_sizes(1280, 720, UiScaleMode::Percent200);
+        responsive_matrix_preserves_regions_and_target_sizes(1920, 1080, UiScaleMode::Percent200);
+        responsive_matrix_preserves_regions_and_target_sizes(3840, 2160, UiScaleMode::Percent200);
+    }
+
+    fn responsive_matrix_preserves_regions_and_target_sizes(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
+        let mut app = test_app(width, height, scale);
+        start_solo(&mut app);
+        let snapshot = ui_tree_snapshot(app.world_mut());
+        let rendered = snapshot.to_string();
+        assert!(rendered.contains("Match HUD [hud]"));
+        assert!(rendered.contains("Action Rail [action-rail]"));
+        assert!(rendered.contains("Activity Feed [activity-feed]"));
+        for node in snapshot
+            .nodes
+            .iter()
+            .filter(|node| node.action && !node.disabled)
+        {
+            assert!(node.size.x >= 44.0, "{} is too narrow", node.path);
+            assert!(node.size.y >= 44.0, "{} is too short", node.path);
+        }
+        let actions = {
+            let world = app.world_mut();
+            let mut query = world
+                .query_filtered::<Entity, (With<bevy_gamekit::ui::UiAction>, Without<UiDisabled>)>(
                 );
-            }
+            query.iter(world).collect::<Vec<_>>()
+        };
+        for entity in actions {
+            assert!(focus_action(app.world_mut(), entity));
+            run_frames(&mut app, 3);
+            let visible = bevy_gamekit::testing::visible_control_rect(
+                app.world(),
+                entity,
+                Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+            )
+            .expect("focused control must be visible");
+            assert!(
+                visible.width() >= 43.5 && visible.height() >= 43.5,
+                "focused control is clipped: {visible:?}"
+            );
         }
     }
 
     #[test]
-    fn service_style_fake_provider_uses_the_same_browser_and_join_selection() {
+    fn service_style_fake_provider_uses_the_same_browser_and_join_selection_normal_1080() {
         use bevy_gamekit::discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
 
         let mut app = test_app(1920, 1080, UiScaleMode::Auto);
@@ -1822,7 +1851,24 @@ mod tests {
     }
 
     #[test]
-    fn compact_scaled_forms_scroll_every_enabled_control_into_view() {
+    fn compact_scaled_forms_scroll_every_enabled_control_into_view_normal_1080() {
+        compact_scaled_forms_scroll_every_enabled_control_into_view(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn compact_scaled_forms_scroll_every_enabled_control_into_view_compatibility() {
+        compact_scaled_forms_scroll_every_enabled_control_into_view(
+            1280,
+            720,
+            UiScaleMode::Percent200,
+        );
+    }
+
+    fn compact_scaled_forms_scroll_every_enabled_control_into_view(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
         for screen in [
             Screen::Multiplayer,
             Screen::Host,
@@ -1830,7 +1876,7 @@ mod tests {
             Screen::Browser,
             Screen::Password,
         ] {
-            let mut app = test_app(1280, 720, UiScaleMode::Percent200);
+            let mut app = test_app(width, height, scale);
             app.world_mut().resource_mut::<DeckbuilderUi>().screen = screen;
             app.world_mut().resource_mut::<UiDirty>().0 = true;
             run_frames(&mut app, 4);
@@ -1857,7 +1903,7 @@ mod tests {
                 let visible = bevy_gamekit::testing::visible_control_rect(
                     app.world(),
                     entity,
-                    Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+                    Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
                 );
                 assert!(
                     visible.is_some(),
@@ -1874,8 +1920,29 @@ mod tests {
     }
 
     #[test]
-    fn host_form_uses_native_fields_and_secret_buffers_clear_after_attempts() {
-        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+    fn host_form_uses_native_fields_and_secret_buffers_clear_after_attempts_normal_1080() {
+        host_form_uses_native_fields_and_secret_buffers_clear_after_attempts(
+            1920,
+            1080,
+            UiScaleMode::Auto,
+        );
+    }
+
+    #[test]
+    fn host_form_uses_native_fields_and_secret_buffers_clear_after_attempts_compatibility() {
+        host_form_uses_native_fields_and_secret_buffers_clear_after_attempts(
+            1280,
+            720,
+            UiScaleMode::Auto,
+        );
+    }
+
+    fn host_form_uses_native_fields_and_secret_buffers_clear_after_attempts(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
+        let mut app = test_app(width, height, scale);
         run_frames(&mut app, 3);
         let multiplayer = find_named(app.world_mut(), "Multiplayer").expect("menu control");
         assert!(click_action(&mut app, multiplayer));
@@ -1919,8 +1986,21 @@ mod tests {
     }
 
     #[test]
-    fn direct_join_button_activates_after_real_field_edit() {
-        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+    fn direct_join_button_activates_after_real_field_edit_normal_1080() {
+        direct_join_button_activates_after_real_field_edit(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn direct_join_button_activates_after_real_field_edit_compatibility() {
+        direct_join_button_activates_after_real_field_edit(1280, 720, UiScaleMode::Auto);
+    }
+
+    fn direct_join_button_activates_after_real_field_edit(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
+        let mut app = test_app(width, height, scale);
         run_frames(&mut app, 3);
         let multiplayer = find_named(app.world_mut(), "Multiplayer").expect("menu control");
         assert!(click_action(&mut app, multiplayer));
@@ -1959,8 +2039,17 @@ mod tests {
     }
 
     #[test]
-    fn hosted_code_has_an_explicit_copy_action() {
-        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+    fn hosted_code_has_an_explicit_copy_action_normal_1080() {
+        hosted_code_has_an_explicit_copy_action(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn hosted_code_has_an_explicit_copy_action_compatibility() {
+        hosted_code_has_an_explicit_copy_action(1280, 720, UiScaleMode::Auto);
+    }
+
+    fn hosted_code_has_an_explicit_copy_action(width: u32, height: u32, scale: UiScaleMode) {
+        let mut app = test_app(width, height, scale);
         run_frames(&mut app, 3);
         {
             let mut ui = app.world_mut().resource_mut::<DeckbuilderUi>();
@@ -1988,7 +2077,20 @@ mod tests {
     }
 
     #[test]
-    fn direct_join_button_hands_a_valid_code_to_real_udp_transport() {
+    fn direct_join_button_hands_a_valid_code_to_real_udp_transport_normal_1080() {
+        direct_join_button_hands_a_valid_code_to_real_udp_transport(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn direct_join_button_hands_a_valid_code_to_real_udp_transport_compatibility() {
+        direct_join_button_hands_a_valid_code_to_real_udp_transport(1280, 720, UiScaleMode::Auto);
+    }
+
+    fn direct_join_button_hands_a_valid_code_to_real_udp_transport(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
         let advertised_host = network::default_advertised_host()
             .unwrap_or_else(|| std::net::Ipv4Addr::LOCALHOST.to_string());
         let advertised_address = advertised_host
@@ -1999,8 +2101,8 @@ mod tests {
         let port = probe.local_addr().expect("probe address").port();
         drop(probe);
 
-        let mut host = test_app(1280, 720, UiScaleMode::Auto);
-        let mut guest = test_app(1280, 720, UiScaleMode::Auto);
+        let mut host = test_app(width, height, scale);
+        let mut guest = test_app(width, height, scale);
         run_frames(&mut host, 3);
         run_frames(&mut guest, 3);
         network::start_host(
@@ -2060,8 +2162,21 @@ mod tests {
     }
 
     #[test]
-    fn discovery_password_button_activates_after_real_field_edit() {
-        let mut app = test_app(1280, 720, UiScaleMode::Auto);
+    fn discovery_password_button_activates_after_real_field_edit_normal_1080() {
+        discovery_password_button_activates_after_real_field_edit(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn discovery_password_button_activates_after_real_field_edit_compatibility() {
+        discovery_password_button_activates_after_real_field_edit(1280, 720, UiScaleMode::Auto);
+    }
+
+    fn discovery_password_button_activates_after_real_field_edit(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
+        let mut app = test_app(width, height, scale);
         run_frames(&mut app, 3);
         {
             let mut ui = app.world_mut().resource_mut::<DeckbuilderUi>();
@@ -2103,7 +2218,20 @@ mod tests {
     }
 
     #[test]
-    fn discovered_route_password_button_reaches_real_udp_transport() {
+    fn discovered_route_password_button_reaches_real_udp_transport_normal_1080() {
+        discovered_route_password_button_reaches_real_udp_transport(1920, 1080, UiScaleMode::Auto);
+    }
+
+    #[test]
+    fn discovered_route_password_button_reaches_real_udp_transport_compatibility() {
+        discovered_route_password_button_reaches_real_udp_transport(1280, 720, UiScaleMode::Auto);
+    }
+
+    fn discovered_route_password_button_reaches_real_udp_transport(
+        width: u32,
+        height: u32,
+        scale: UiScaleMode,
+    ) {
         use bevy_gamekit::discovery::{ExpectedSession, FakeDiscoveryProvider, SessionMetadata};
         use bevy_gamekit::session::{DirectConnectionCode, DiscoveredDirectTarget};
 
@@ -2117,8 +2245,8 @@ mod tests {
         let port = probe.local_addr().expect("probe address").port();
         drop(probe);
 
-        let mut host = test_app(1280, 720, UiScaleMode::Auto);
-        let mut guest = test_app(1280, 720, UiScaleMode::Auto);
+        let mut host = test_app(width, height, scale);
+        let mut guest = test_app(width, height, scale);
         run_frames(&mut host, 3);
         run_frames(&mut guest, 3);
         network::start_host(

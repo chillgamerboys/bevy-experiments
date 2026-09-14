@@ -9,4 +9,6 @@ pub mod docs;
 pub mod installation;
 pub mod platform;
 pub mod runner;
+pub mod verification;
+pub mod verification_context;
 pub mod workflow;

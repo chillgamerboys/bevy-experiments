@@ -820,3 +820,98 @@ fn source_layout_rename_preserves_base_and_head_paths_and_runs_full_checks() -> 
     );
     Ok(())
 }
+
+fn development_policy() -> serde_json::Value {
+    serde_json::json!({"schema_version":1,"ok":true,"configured":true,
+        "receiving_branch":"dev","branch_required_level":"development","level":"development",
+        "platforms":["macos"],"display":{"width":1920,"height":1080,"scale":"auto"},
+        "manual_sanity":"milestone","policy_digest":"a".repeat(64),"reasons":[]})
+}
+
+#[test]
+fn configured_ci_change_broadens_owners_but_retains_macos_and_pure_game_baselines() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut value = fixture.changed(&[".github/workflows/gamekit.yml"])?;
+    ci::verification::apply(fixture.root(), &mut value, development_policy())?;
+    assert!(value.full);
+    assert!(value.packages.contains(&"labyrinth".into()));
+    assert_eq!(ci::verification::runners(&value), ["macos-latest"]);
+    assert!(!value.distribution && !value.wasm && !value.minimal && !value.deny);
+    assert_eq!(
+        value.suites,
+        [
+            "carterfight-rules",
+            "deckbuilder-domain",
+            "labyrinth-session"
+        ]
+    );
+    ci::checks::validate(&value)?;
+    Ok(())
+}
+
+#[test]
+fn configured_rules_and_ui_changes_select_distinct_journeys() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut rules = fixture.changed(&["games/labyrinth/rules/src/lib.rs"])?;
+    ci::verification::apply(fixture.root(), &mut rules, development_policy())?;
+    assert_eq!(rules.suites, ["labyrinth-session"]);
+    fixture.reset()?;
+    let mut ui = fixture.changed(&["games/labyrinth/src/ui/battle/help.rs"])?;
+    ci::verification::apply(fixture.root(), &mut ui, development_policy())?;
+    assert!(ui.suites.contains(&"labyrinth-ui-normal".into()));
+    assert!(!ui.suites.iter().any(|name| name.contains("admission")
+        || name.contains("process")
+        || name.contains("compatibility")));
+    Ok(())
+}
+
+#[test]
+fn configured_docs_and_skill_only_changes_do_not_require_game_suites() -> TestResult {
+    let fixture = Fixture::new()?;
+    for path in [
+        "docs/existing.md",
+        "gameskills/plugins/gameskills/skills/test/SKILL.md",
+    ] {
+        let mut value = fixture.changed(&[path])?;
+        ci::verification::apply(fixture.root(), &mut value, development_policy())?;
+        assert!(value.suites.is_empty());
+        assert!(!value.rust);
+        fixture.reset()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn unmapped_changed_game_test_requires_classification_instead_of_a_false_pass() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut value = fixture.changed(&["games/labyrinth/src/network/new_boundary.rs"])?;
+    assert!(ci::verification::apply(fixture.root(), &mut value, development_policy()).is_err());
+    fixture.reset()?;
+    fixture.write(
+        "games/labyrinth/src/network/tests.rs",
+        "#[test] fn new_unmapped_journey() { assert!(true); }",
+    )?;
+    let mut value = fixture.select()?;
+    let error = ci::verification::apply(fixture.root(), &mut value, development_policy())
+        .expect_err("unmatched test");
+    assert!(error.contains("new_unmapped_journey"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn explicit_full_scope_retains_changed_test_classification() -> TestResult {
+    let fixture = Fixture::new()?;
+    fixture.write(
+        "games/labyrinth/src/network/tests.rs",
+        "#[test] fn missing_suite() {}",
+    )?;
+    let head = fixture.save()?;
+    let mut value = ci::select(fixture.root(), Some(&fixture.base), &head, true)?;
+    assert!(value
+        .paths
+        .contains(&"games/labyrinth/src/network/tests.rs".into()));
+    let error = ci::verification::apply(fixture.root(), &mut value, development_policy())
+        .expect_err("full scope cannot hide test");
+    assert!(error.contains("missing_suite"));
+    Ok(())
+}

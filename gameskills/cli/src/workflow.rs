@@ -346,6 +346,132 @@ fn last_report(entry: &Entry) -> Result<&Value, String> {
         .ok_or_else(|| "returned order has no report".into())
 }
 
+// Historical policy is opaque to the current project configuration. Check its
+// recorded shape and internal selection binding without claiming it applies now.
+fn historical_verification(recorded: &Value) -> Result<(), String> {
+    if recorded.is_null() {
+        return Ok(());
+    }
+    mapping(recorded, "historical verification")?;
+    let policy = at(recorded, &["policy"]);
+    mapping(policy, "historical verification policy")?;
+    if policy.get("schema_version") != Some(&json!(1))
+        || policy.get("configured") != Some(&json!(true))
+    {
+        return Err("unsupported historical verification policy schema".into());
+    }
+    let levels = ["development", "testing", "release"];
+    if !levels.contains(&string(policy, "level"))
+        || policy.get("branch_required_level").is_none_or(|required| {
+            !required.is_null() && !required.as_str().is_some_and(|s| levels.contains(&s))
+        })
+    {
+        return Err("invalid historical verification level".into());
+    }
+    crate::verification::validate_branch(string(policy, "receiving_branch"))?;
+    let platforms = policy
+        .get("platforms")
+        .and_then(Value::as_array)
+        .filter(|values| !values.is_empty())
+        .ok_or("historical verification platforms must be nonempty")?;
+    let mut unique = std::collections::BTreeSet::new();
+    if platforms.iter().any(|platform| {
+        !platform.as_str().is_some_and(|name| {
+            ["macos", "windows", "linux"].contains(&name) && unique.insert(name)
+        })
+    }) {
+        return Err("invalid historical verification platforms".into());
+    }
+    let display = policy
+        .get("display")
+        .ok_or("missing historical display target")?;
+    if !display.is_null()
+        && (display.get("scale") != Some(&json!("auto"))
+            || ["width", "height"].iter().any(|key| {
+                !display
+                    .get(key)
+                    .and_then(Value::as_u64)
+                    .is_some_and(|n| n > 0 && u32::try_from(n).is_ok())
+            }))
+    {
+        return Err("invalid historical verification display target".into());
+    }
+    if !["never", "milestone"].contains(&string(policy, "manual_sanity")) {
+        return Err("invalid historical manual sanity timing".into());
+    }
+    let policy_digest = text(at(policy, &["policy_digest"]), "historical policy digest")?;
+    if policy_digest.len() != 64
+        || !policy_digest
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err("invalid historical policy digest".into());
+    }
+    let scope = recorded
+        .get("scope")
+        .and_then(Value::as_array)
+        .ok_or("invalid historical verification scope")?;
+    let scope = scope
+        .iter()
+        .map(|value| text(value, "historical verification scope"))
+        .collect::<Result<Vec<_>, _>>()?;
+    if !scope
+        .windows(2)
+        .all(|pair| matches!(pair, [left, right] if left < right))
+    {
+        return Err("historical verification scope must be sorted and unique".into());
+    }
+    let gameplay = recorded
+        .get("gameplay")
+        .and_then(Value::as_bool)
+        .ok_or("invalid historical gameplay classification")?;
+    let manual_required = gameplay
+        && string(policy, "manual_sanity") == "milestone"
+        && string(policy, "branch_required_level") == "testing";
+    if recorded.get("manual_sanity_required") != Some(&json!(manual_required)) {
+        return Err("invalid historical manual sanity requirement".into());
+    }
+    let expected = digest(
+        &json!({"policy_digest":policy_digest,"base":policy["receiving_branch"],"level":policy["level"],"scope":scope,"gameplay":gameplay}),
+    )?;
+    if recorded.get("selection_digest") != Some(&json!(expected)) {
+        return Err("historical verification selection digest mismatch".into());
+    }
+    Ok(())
+}
+
+fn structural_record(record: &Value) -> Result<Value, String> {
+    historical_verification(at(record, &["verification"]))?;
+    let mut copy = record.clone();
+    copy.as_object_mut()
+        .ok_or("historical record must be an object")?
+        .remove("verification");
+    if let Some(orders) = copy.get_mut("orders").and_then(Value::as_array_mut) {
+        for order in orders {
+            *order = structural_record(order)?;
+        }
+    }
+    Ok(copy)
+}
+
+fn verification_blockers(queue: &Queue, entry: &Entry, config: &Value) -> Vec<String> {
+    [
+        ("plan", at(&queue.plan, &["verification"])),
+        ("order", at(&entry.spec, &["verification"])),
+    ]
+    .into_iter()
+    .filter_map(|(owner, recorded)| {
+        crate::verification_context::validate(config, recorded)
+            .err()
+            .map(|error| {
+                format!(
+                    "{owner} verification: {error}; prepare a fresh plan with the current policy"
+                )
+            })
+    })
+    .collect()
+}
+
 fn load(
     directory: &storage::Directory,
     queue_id: &str,
@@ -371,7 +497,12 @@ fn load(
         &["packages"],
         queue.plan.get("packages").cloned().unwrap_or(Value::Null),
     )?;
-    validation::validate_plan(&queue.plan, root, &recorded_config, false)?;
+    recorded_config
+        .as_object_mut()
+        .ok_or("configuration must be an object")?
+        .remove("verification");
+    let structural_plan = structural_record(&queue.plan)?;
+    validation::validate_plan(&structural_plan, root, &recorded_config, false)?;
     for (name, entry) in &queue.orders {
         if string(&entry.spec, "id") != name
             || !["pending", "running", "blocked", "reported", "integrated"]
@@ -379,7 +510,14 @@ fn load(
         {
             return Err("invalid queue order identity or state".into());
         }
-        validate_order(&entry.spec, &queue.plan, &recorded_config)?;
+        let structural_spec = structural_record(&entry.spec)?;
+        validate_order(&structural_spec, &structural_plan, &recorded_config)?;
+        if !crate::verification_context::covers(
+            at(&queue.plan, &["verification"]),
+            at(&entry.spec, &["verification"]),
+        ) {
+            return Err("historical order verification does not cover its plan".into());
+        }
         if ["running", "reported", "integrated"].contains(&entry.state.as_str())
             && entry.checkout.is_none()
         {
@@ -453,7 +591,7 @@ fn create(plan: &Value, root: &Path, config: &Value) -> Result<Value, String> {
 fn blockers(queue: &Queue, order_id: &str, config: &Value) -> Result<Vec<String>, String> {
     let entry = get_entry(queue, order_id)?;
     let spec = &entry.spec;
-    let mut reasons = vec![];
+    let mut reasons = verification_blockers(queue, entry, config);
     let selected = list(config, "packages");
     let missing: Vec<_> = list(spec, "packages")
         .into_iter()
@@ -556,6 +694,11 @@ fn status(queue_id: &str, root: &Path, config: &Value) -> Result<Value, String> 
                     .get(dep)
                     .is_none_or(|e| e.state != "integrated"))
                 .map(|dep| format!("merge dependency {dep} is not integrated"))
+                .chain(if entry.state == "integrated" {
+                    vec![]
+                } else {
+                    verification_blockers(&queue, entry, config)
+                })
                 .collect::<Vec<_>>()),
         )?;
     }
@@ -699,6 +842,11 @@ fn mutate(
     let payload = payload.unwrap_or(Value::Null);
     let name;
     if action == "inject" {
+        crate::verification_context::validate(config, at(&queue.plan, &["verification"])).map_err(
+            |error| {
+                format!("plan verification: {error}; prepare a fresh plan with the current policy")
+            },
+        )?;
         let spec = validate_order(&payload, &queue.plan, config)?;
         text(at(&spec, &["reason"]), "injection reason")?;
         if list(&spec, "investigation").is_empty() {
@@ -734,7 +882,9 @@ fn mutate(
                 && validation::resource_conflict(&spec, &other.spec)
                 && !validation::depends(&specifications, &name, other_name)
             {
-                return Err(format!("injected shared resource collision with {other_name}; add a dispatch dependency"));
+                return Err(format!(
+                    "injected shared resource collision with {other_name}; add a dispatch dependency"
+                ));
             }
         }
         queue.orders.insert(name.clone(), Entry::pending(spec));
@@ -803,6 +953,10 @@ fn mutate(
                 entry.state = "reported".into();
             }
             "integrated" => {
+                let reasons = verification_blockers(&queue, &entry, config);
+                if !reasons.is_empty() {
+                    return Err(reasons.join("; "));
+                }
                 if entry.state != "reported" {
                     return Err(format!(
                         "integrated requires reported state, found {}",

@@ -4,7 +4,8 @@ All commands run from the repository root unless stated otherwise. The checked-i
 toolchain pins Rust 1.97.1 for the workspace and its locked Bevy 0.19 dependencies.
 Linux builds need the window,
 input and ALSA development libraries installed by CI; live LAN browsing also needs
-Avahi. Native targets are macOS/Linux/Windows. Capability wasm compile checks do not
+Avahi. Early Development and Testing verification use macOS. Windows/Linux builds are
+reserved for Release; native support targets remain macOS/Linux/Windows. Capability wasm compile checks do not
 promise packaged browser games. Repository maintenance and GameSkills runtime logic
 are Rust; metadata and agent instructions remain data and Markdown.
 
@@ -26,6 +27,18 @@ the caller's directory. Ordinary runs use dev optimization; automated checks use
 `--profile ci`. Changing profiles/features can rebuild dependencies. An all-feature
 launch is not the documented default.
 
+## Development and milestone delivery
+
+Feature work targets `dev` at Development rigor; milestone batches target `main` at
+Testing rigor. The project default base is configured independently of the current
+workspace branch. Resolve it with `gameskills verification resolve` and preserve the
+actual receiving base in task/check records. Branch rollout must be observed before
+changing remote defaults; a local setting does not create or validate a branch.
+
+Follow [testing scope](testing.md): focused logic checks, changed UI flows at 1080p
+Auto, and relevant end-to-end journeys. The developer's manual sanity check gates
+only milestone batches with game effects. CI cannot attest to that response.
+
 ## Add a game
 
 1. Create `games/<name>/Cargo.toml`, a composition entrypoint and README with commands,
@@ -37,7 +50,8 @@ launch is not the documented default.
 4. Add local domain fixtures and production-plugin tests. Reuse mechanics, not another
    game's assertions. Shared contracts need independent capability tests.
 5. Configure game-owned assets and retain license/provenance. Supply a skin without
-   game-name branches in shared UI. Add static and interactive presentation checks.
+   game-name branches in shared UI. Select presentation/input checks for the new
+   player-facing flow at the configured display target.
 6. Update navigation and verify launch from root and the game directory.
 
 The standard application entry point is the [facade](../gamekit/facade/README.md):

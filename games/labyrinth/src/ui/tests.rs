@@ -128,7 +128,7 @@ fn app(width: u32, height: u32, scale: UiScaleMode) -> App {
 }
 
 #[test]
-fn pointer_and_keyboard_commit_the_same_typed_owned_action() {
+fn pointer_and_keyboard_commit_the_same_typed_owned_action_normal_1080() {
     for keyboard in [false, true] {
         let mut app = app(1920, 1080, UiScaleMode::Auto);
         let actor = app
@@ -164,7 +164,7 @@ fn pointer_and_keyboard_commit_the_same_typed_owned_action() {
 }
 
 #[test]
-fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
+fn battlefield_and_status_identity_survive_snapshot_and_rank_changes_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let actor = find_named(app.world_mut(), "Actor 1").expect("hero control");
     {
@@ -219,7 +219,7 @@ fn battlefield_and_status_identity_survive_snapshot_and_rank_changes() {
 }
 
 #[test]
-fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
+fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
     let snapshot = app
@@ -254,7 +254,7 @@ fn invalid_skills_remain_inspectable_and_remote_ownership_blocks_commit() {
 }
 
 #[test]
-fn reconnect_overlay_traps_focus_and_restores_after_recovery() {
+fn reconnect_overlay_traps_focus_and_restores_after_recovery_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let wait = find_named(app.world_mut(), "Wait").expect("wait");
     assert!(focus_action(app.world_mut(), wait));
@@ -282,48 +282,97 @@ fn reconnect_overlay_traps_focus_and_restores_after_recovery() {
 }
 
 #[test]
-fn six_viewports_preserve_keyboard_reachability_and_semantic_regions() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            let mut app = app(width, height, scale);
-            let tree = ui_tree_snapshot(app.world_mut()).to_string();
-            for name in [
-                "Battle HUD",
-                "Combat Action Rail",
-                "Initiative Timeline",
-                "Actor 1",
-                "Actor 106",
-            ] {
-                assert!(tree.contains(name), "missing {name}");
-            }
-            let actions = app
-                .world_mut()
-                .query_filtered::<Entity, With<UiAction>>()
-                .iter(app.world())
-                .collect::<Vec<_>>();
-            for entity in actions {
-                if !activation_eligible(app.world_mut(), entity) {
-                    continue;
-                }
-                assert!(focus_action(app.world_mut(), entity));
-                run_frames(&mut app, 4);
-                let viewport =
-                    Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-                let visible = visible_control_rect(app.world(), entity, viewport)
-                    .expect("focused control is not entirely clipped");
-                assert!(
-                    visible.width() >= 43.5 && visible.height() >= 43.5,
-                    "{width}x{height} {scale:?} {:?}: {visible:?}",
-                    app.world().get::<Name>(entity)
-                );
-            }
+fn six_viewports_preserve_keyboard_reachability_and_semantic_regions_normal_1080() {
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn six_viewports_preserve_keyboard_reachability_and_semantic_regions_compatibility() {
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(1280, 720, UiScaleMode::Auto);
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+        1920,
+        1080,
+        UiScaleMode::Percent200,
+    );
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+    six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+        3840,
+        2160,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn six_viewports_preserve_keyboard_reachability_and_semantic_regions(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
+    let tree = ui_tree_snapshot(app.world_mut()).to_string();
+    for name in [
+        "Battle HUD",
+        "Combat Action Rail",
+        "Initiative Timeline",
+        "Actor 1",
+        "Actor 106",
+    ] {
+        assert!(tree.contains(name), "missing {name}");
+    }
+    let actions = app
+        .world_mut()
+        .query_filtered::<Entity, With<UiAction>>()
+        .iter(app.world())
+        .collect::<Vec<_>>();
+    for entity in actions {
+        if !activation_eligible(app.world_mut(), entity) {
+            continue;
         }
+        assert!(focus_action(app.world_mut(), entity));
+        run_frames(&mut app, 4);
+        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+        let visible = visible_control_rect(app.world(), entity, viewport)
+            .expect("focused control is not entirely clipped");
+        assert!(
+            visible.width() >= 43.5 && visible.height() >= 43.5,
+            "{width}x{height} {scale:?} {:?}: {visible:?}",
+            app.world().get::<Name>(entity)
+        );
     }
 }
 
 #[test]
-fn native_forms_clear_secret_buffers_and_emit_only_typed_intents() {
-    let mut app = app(1280, 720, UiScaleMode::Percent200);
+fn native_forms_clear_secret_buffers_and_emit_only_typed_intents_normal_1080() {
+    native_forms_clear_secret_buffers_and_emit_only_typed_intents(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn native_forms_clear_secret_buffers_and_emit_only_typed_intents_compatibility() {
+    native_forms_clear_secret_buffers_and_emit_only_typed_intents(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn native_forms_clear_secret_buffers_and_emit_only_typed_intents(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
     run_frames(&mut app, 3);
     apply_action(app.world_mut(), Action::Form(Form::Multiplayer));
@@ -355,7 +404,7 @@ fn native_forms_clear_secret_buffers_and_emit_only_typed_intents() {
 }
 
 #[test]
-fn stale_selection_is_not_relabelled_as_the_next_decision_or_encounter() {
+fn stale_selection_is_not_relabelled_as_the_next_decision_or_encounter_normal_1080() {
     for new_encounter in [false, true] {
         let mut app = app(1920, 1080, UiScaleMode::Auto);
         apply_action(app.world_mut(), Action::Choice(Choice::Wait));
@@ -378,7 +427,7 @@ fn stale_selection_is_not_relabelled_as_the_next_decision_or_encounter() {
 }
 
 #[test]
-fn damage_feedback_deduplicates_events_and_does_not_replay_on_recovery() {
+fn damage_feedback_deduplicates_events_and_does_not_replay_on_recovery_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let event = crate::view::PresentedEvent {
         id: 100,
@@ -422,8 +471,21 @@ fn damage_feedback_deduplicates_events_and_does_not_replay_on_recovery() {
 }
 
 #[test]
-fn leaving_the_browser_by_escape_stops_provider_activity() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn leaving_the_browser_by_escape_stops_provider_activity_normal_1080() {
+    leaving_the_browser_by_escape_stops_provider_activity(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn leaving_the_browser_by_escape_stops_provider_activity_compatibility() {
+    leaving_the_browser_by_escape_stops_provider_activity(1280, 720, UiScaleMode::Auto);
+}
+
+fn leaving_the_browser_by_escape_stops_provider_activity(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
     apply_action(app.world_mut(), Action::Form(Form::Browser));
     app.world_mut()
@@ -438,10 +500,23 @@ fn leaving_the_browser_by_escape_stops_provider_activity() {
 }
 
 #[test]
-fn backing_out_of_admission_forms_cancels_pending_work() {
+fn backing_out_of_admission_forms_cancels_pending_work_normal_1080() {
+    backing_out_of_admission_forms_cancels_pending_work(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn backing_out_of_admission_forms_cancels_pending_work_compatibility() {
+    backing_out_of_admission_forms_cancels_pending_work(1280, 720, UiScaleMode::Auto);
+}
+
+fn backing_out_of_admission_forms_cancels_pending_work(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for form in [Form::Host, Form::Direct, Form::Password] {
         for escape in [false, true] {
-            let mut app = app(1280, 720, UiScaleMode::Auto);
+            let mut app = app(width, height, scale);
             *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
             apply_action(app.world_mut(), Action::Form(form));
             app.world_mut()
@@ -465,8 +540,29 @@ fn backing_out_of_admission_forms_cancels_pending_work() {
 }
 
 #[test]
-fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view() {
-    let mut app = app(1280, 720, UiScaleMode::Percent200);
+fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view_normal_1080() {
+    compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view_compatibility() {
+    compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
     for form in [Form::Host, Form::Direct, Form::Browser, Form::Password] {
         apply_action(app.world_mut(), Action::Form(form));
@@ -487,7 +583,7 @@ fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view() {
             let visible = visible_control_rect(
                 app.world(),
                 entity,
-                Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+                Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
             )
             .expect("focused field or control must be visible");
             assert!(
@@ -500,7 +596,7 @@ fn compact_scaled_admission_forms_scroll_all_controls_and_fields_into_view() {
 }
 
 #[test]
-fn default_720_battle_overview_shows_every_actor_identity_and_hp_without_scrolling() {
+fn default_720_battle_overview_shows_every_actor_identity_and_hp_without_scrolling_compatibility() {
     let mut app = app(1280, 720, UiScaleMode::Auto);
     for actor in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
         let text = find_named(app.world_mut(), &format!("Actor {actor} Summary"))
@@ -521,7 +617,7 @@ fn default_720_battle_overview_shows_every_actor_identity_and_hp_without_scrolli
 }
 
 #[test]
-fn large_text_fits_actor_overlays_without_overlapping_neighbors() {
+fn large_text_fits_actor_overlays_without_overlapping_neighbors_compatibility() {
     let mut app = app(1280, 720, UiScaleMode::Percent200);
     for actor in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
         let text = find_named(app.world_mut(), &format!("Actor {actor} Summary")).expect("summary");
@@ -546,7 +642,24 @@ fn large_text_fits_actor_overlays_without_overlapping_neighbors() {
 }
 
 #[test]
-fn another_consumer_sees_activations_after_labyrinth_translates_them() {
+fn another_consumer_sees_activations_after_labyrinth_translates_them_normal_1080() {
+    another_consumer_sees_activations_after_labyrinth_translates_them(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn another_consumer_sees_activations_after_labyrinth_translates_them_compatibility() {
+    another_consumer_sees_activations_after_labyrinth_translates_them(1280, 720, UiScaleMode::Auto);
+}
+
+fn another_consumer_sees_activations_after_labyrinth_translates_them(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     #[derive(Resource, Default)]
     struct Audit(Vec<Entity>);
     fn record(mut messages: MessageReader<UiActivated>, mut audit: ResMut<Audit>) {
@@ -554,7 +667,7 @@ fn another_consumer_sees_activations_after_labyrinth_translates_them() {
             .0
             .extend(messages.read().map(|message| message.entity));
     }
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+    let mut app = app(width, height, scale);
     app.init_resource::<Audit>()
         .add_systems(Update, record.after(LabyrinthUiSystems::Input));
     let wait = find_named(app.world_mut(), "Wait").expect("wait");
@@ -568,7 +681,7 @@ fn another_consumer_sees_activations_after_labyrinth_translates_them() {
 }
 
 #[test]
-fn semantic_scale_round_trip_preserves_actor_identity_and_baseline_dimensions() {
+fn semantic_scale_round_trip_preserves_actor_identity_and_baseline_dimensions_compatibility() {
     let mut app = app(1280, 720, UiScaleMode::Auto);
     let actor = find_named(app.world_mut(), "Actor 1").expect("actor");
     let baseline = app.world().get::<Node>(actor).expect("node").min_height;
@@ -585,7 +698,7 @@ fn semantic_scale_round_trip_preserves_actor_identity_and_baseline_dimensions() 
 }
 
 #[test]
-fn facing_front_ranks_are_presentation_only_and_selection_is_distinct() {
+fn facing_front_ranks_are_presentation_only_and_selection_is_distinct_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let before = app.world().resource::<LabyrinthView>().combat.clone();
     let heroes = find_named(app.world_mut(), "Your Company Ranks").expect("formation");
@@ -626,8 +739,21 @@ fn facing_front_ranks_are_presentation_only_and_selection_is_distinct() {
 }
 
 #[test]
-fn reduced_motion_uses_the_shared_preference_without_changing_rules() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn reduced_motion_uses_the_shared_preference_without_changing_rules_normal_1080() {
+    reduced_motion_uses_the_shared_preference_without_changing_rules(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn reduced_motion_uses_the_shared_preference_without_changing_rules_compatibility() {
+    reduced_motion_uses_the_shared_preference_without_changing_rules(1280, 720, UiScaleMode::Auto);
+}
+
+fn reduced_motion_uses_the_shared_preference_without_changing_rules(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     let before = app.world().resource::<LabyrinthView>().combat.clone();
     apply_action(app.world_mut(), Action::ReducedMotion);
     assert!(app.world().resource::<UiMotionPreference>().reduced);
@@ -636,7 +762,7 @@ fn reduced_motion_uses_the_shared_preference_without_changing_rules() {
 }
 
 #[test]
-fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank() {
+fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let mut combat =
         Combat::new(42, [HeroClass::Gatekeeper; PARTY_SIZE]).expect("repeated classes");
@@ -706,7 +832,7 @@ fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank(
 }
 
 #[test]
-fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_loadouts() {
+fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_loadouts_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let mut next_id = 0;
     let heroes = DEFAULT_HERO_ROSTER.map(|class| {
@@ -747,8 +873,29 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
 }
 
 #[test]
-fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators_normal_1080() {
+    six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators_compatibility() {
+    six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectators(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
         view.mode = ViewMode::Lobby;
@@ -792,9 +939,30 @@ fn six_participant_lobby_requires_controllers_ready_and_allows_unready_spectator
 }
 
 #[test]
-fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
+fn ability_and_target_selection_never_commit_without_explicit_confirmation_normal_1080() {
+    ability_and_target_selection_never_commit_without_explicit_confirmation(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn ability_and_target_selection_never_commit_without_explicit_confirmation_compatibility() {
+    ability_and_target_selection_never_commit_without_explicit_confirmation(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn ability_and_target_selection_never_commit_without_explicit_confirmation(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for keyboard in [false, true] {
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         let snapshot = app
             .world()
             .resource::<LabyrinthView>()
@@ -833,7 +1001,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
                 assert!(focus_action(app.world_mut(), control));
                 tap_key(&mut app, KeyCode::Enter);
             } else {
-                pointer_control(&mut app, control, Vec2::new(1280.0, 720.0));
+                pointer_control(&mut app, control, Vec2::new(width as f32, height as f32));
             }
             run_frames(&mut app, 2);
             assert!(!app
@@ -852,7 +1020,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
             assert!(focus_action(app.world_mut(), confirm));
             tap_key(&mut app, KeyCode::Space);
         } else {
-            pointer_control(&mut app, confirm, Vec2::new(1280.0, 720.0));
+            pointer_control(&mut app, confirm, Vec2::new(width as f32, height as f32));
         }
         let intents: Vec<_> = app
             .world_mut()
@@ -871,46 +1039,84 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation() {
 }
 
 #[test]
-fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            let mut app = app(width, height, scale);
-            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-            let stage = find_named(app.world_mut(), "Facing Formations").expect("stage");
-            assert_eq!(
-                app.world()
-                    .get::<Node>(stage)
-                    .expect("stage layout")
-                    .overflow,
-                Overflow::DEFAULT
-            );
-            let mut rectangles = Vec::new();
-            for id in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
-                let entity = find_named(app.world_mut(), &format!("Actor {id}")).expect("actor");
-                let rect = visible_control_rect(app.world(), entity, viewport)
-                    .expect("art visible before focus/scroll");
-                assert!(
-                    rect.width() >= 43.5 && rect.height() >= 43.5,
-                    "{width} {scale:?} actor{id}: {rect:?}"
-                );
-                rectangles.push((entity, rect));
-            }
-            apply_action(app.world_mut(), Action::InspectActor(ActorId(1)));
-            run_frames(&mut app, 3);
-            for (entity, before) in rectangles {
-                assert_eq!(
-                    visible_control_rect(app.world(), entity, viewport),
-                    Some(before)
-                );
-            }
-            tap_key(&mut app, KeyCode::Escape);
-            assert!(app
-                .world()
-                .resource::<bevy_gamekit::ui::UiTooltipState>()
-                .subjects()
-                .is_empty());
-        }
+fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage_normal_1080() {
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage_compatibility()
+{
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        1920,
+        1080,
+        UiScaleMode::Percent200,
+    );
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+    all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+        3840,
+        2160,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_stage(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+    let stage = find_named(app.world_mut(), "Facing Formations").expect("stage");
+    assert_eq!(
+        app.world()
+            .get::<Node>(stage)
+            .expect("stage layout")
+            .overflow,
+        Overflow::DEFAULT
+    );
+    let mut rectangles = Vec::new();
+    for id in [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106] {
+        let entity = find_named(app.world_mut(), &format!("Actor {id}")).expect("actor");
+        let rect = visible_control_rect(app.world(), entity, viewport)
+            .expect("art visible before focus/scroll");
+        assert!(
+            rect.width() >= 43.5 && rect.height() >= 43.5,
+            "{width} {scale:?} actor{id}: {rect:?}"
+        );
+        rectangles.push((entity, rect));
     }
+    apply_action(app.world_mut(), Action::InspectActor(ActorId(1)));
+    run_frames(&mut app, 3);
+    for (entity, before) in rectangles {
+        assert_eq!(
+            visible_control_rect(app.world(), entity, viewport),
+            Some(before)
+        );
+    }
+    tap_key(&mut app, KeyCode::Escape);
+    assert!(app
+        .world()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
+        .subjects()
+        .is_empty());
 }
 
 /// Native UI hit-test evidence: unlike click_action, this never assigns Interaction.
@@ -945,9 +1151,30 @@ fn pointer_control(app: &mut App, entity: Entity, viewport: Vec2) {
 }
 
 #[test]
-fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
-    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls_normal_1080() {
+    game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls_compatibility() {
+    game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
     let target = find_named(app.world_mut(), "Actor 103").expect("target");
     let point = visible_control_rect(app.world(), target, viewport)
         .expect("bounds")
@@ -967,8 +1194,29 @@ fn game_menu_blocks_pointer_fallthrough_to_world_anchored_actor_controls() {
 }
 
 #[test]
-fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
-    let mut app = app(1280, 720, UiScaleMode::Percent200);
+fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries_normal_1080() {
+    history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries_compatibility() {
+    history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     let actor = find_named(app.world_mut(), "Actor 1").expect("actor");
     assert!(focus_action(app.world_mut(), actor));
     {
@@ -1081,8 +1329,29 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries() {
 }
 
 #[test]
-fn multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm_normal_1080() {
+    multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm_compatibility() {
+    multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn multiple_owned_characters_follow_active_turn_and_spectators_cannot_confirm(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     let active = app
         .world()
         .resource::<LabyrinthView>()

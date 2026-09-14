@@ -30,8 +30,21 @@ fn no_combat_intent(app: &mut App) {
 }
 
 #[test]
-fn rank_numbers_stay_plain_when_showing_ability_range_and_selection() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn rank_numbers_stay_plain_when_showing_ability_range_and_selection_normal_1080() {
+    rank_numbers_stay_plain_when_showing_ability_range_and_selection(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn rank_numbers_stay_plain_when_showing_ability_range_and_selection_compatibility() {
+    rank_numbers_stay_plain_when_showing_ability_range_and_selection(1280, 720, UiScaleMode::Auto);
+}
+
+fn rank_numbers_stay_plain_when_showing_ability_range_and_selection(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     let snapshot = app
         .world()
         .resource::<LabyrinthView>()
@@ -54,9 +67,30 @@ fn rank_numbers_stay_plain_when_showing_ability_range_and_selection() {
 }
 
 #[test]
-fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target() {
+fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target_normal_1080() {
+    timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target_compatibility() {
+    timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for keyboard in [false, true] {
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         let before = app.world().resource::<LabyrinthView>().combat.clone();
         apply_action(app.world_mut(), Action::Choice(Choice::Wait));
         apply_action(app.world_mut(), Action::Actor(ActorId(103)));
@@ -68,7 +102,7 @@ fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target() 
             assert!(focus_action(app.world_mut(), portrait));
             tap_key(&mut app, KeyCode::Enter);
         } else {
-            pointer_control(&mut app, portrait, Vec2::new(1280.0, 720.0));
+            pointer_control(&mut app, portrait, Vec2::new(width as f32, height as f32));
         }
         run_frames(&mut app, 3);
         let ui = app.world().resource::<UiState>();
@@ -116,7 +150,7 @@ fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target() 
 }
 
 #[test]
-fn timeline_absent_actor_keeps_parentage_and_identity_until_battle_teardown() {
+fn timeline_absent_actor_keeps_parentage_and_identity_until_battle_teardown_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let portrait = find_named(app.world_mut(), "Initiative Actor 106").expect("portrait");
     let parent = app
@@ -176,7 +210,7 @@ fn timeline_absent_actor_keeps_parentage_and_identity_until_battle_teardown() {
 }
 
 #[test]
-fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
+fn off_turn_owned_ability_has_a_forecast_but_cannot_commit_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
     let snapshot = app
@@ -273,7 +307,25 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
 }
 
 #[test]
-fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales() {
+fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales_normal_1080() {
+    every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales_compatibility() {
+    every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(1280, 720, UiScaleMode::Auto);
+    every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     let shortcuts = [
         KeyCode::Digit1,
         KeyCode::Digit2,
@@ -284,91 +336,89 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales() {
         KeyCode::Digit7,
         KeyCode::Digit8,
     ];
-    for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-        let mut app = app(1280, 720, scale);
-        let owner = app
-            .world()
-            .resource::<LabyrinthView>()
-            .company
-            .get(5)
-            .expect("sixth seat")
-            .actor;
+    let mut app = app(width, height, scale);
+    let owner = app
+        .world()
+        .resource::<LabyrinthView>()
+        .company
+        .get(5)
+        .expect("sixth seat")
+        .actor;
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        network_ownership(&mut view);
+        view.player = Some(5);
+    }
+    for count in 0..=MAX_EQUIPPED_ABILITIES {
         {
             let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-            network_ownership(&mut view);
-            view.player = Some(5);
+            set_legacy_skills(
+                view.combat.as_mut().expect("combat"),
+                owner,
+                &SkillId::ALL.into_iter().take(count).collect::<Vec<_>>(),
+            );
         }
-        for count in 0..=MAX_EQUIPPED_ABILITIES {
-            {
-                let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-                set_legacy_skills(
-                    view.combat.as_mut().expect("combat"),
-                    owner,
-                    &SkillId::ALL.into_iter().take(count).collect::<Vec<_>>(),
-                );
+        run_frames(&mut app, 4);
+        assert!(find_named(app.world_mut(), &format!("Skill {count}")).is_none());
+        let skills = (0..count)
+            .map(|index| {
+                find_named(app.world_mut(), &format!("Skill {index}")).expect("equipped slot")
+            })
+            .collect::<Vec<_>>();
+        for (index, &entity) in skills.iter().enumerate() {
+            let skill = *SkillId::ALL.get(index).expect("equipped catalog entry");
+            if index == 0 {
+                assert!(focus_action(app.world_mut(), entity));
+            } else {
+                tap_key(&mut app, KeyCode::Tab);
             }
             run_frames(&mut app, 4);
-            assert!(find_named(app.world_mut(), &format!("Skill {count}")).is_none());
-            let skills = (0..count)
-                .map(|index| {
-                    find_named(app.world_mut(), &format!("Skill {index}")).expect("equipped slot")
-                })
-                .collect::<Vec<_>>();
-            for (index, &entity) in skills.iter().enumerate() {
-                let skill = *SkillId::ALL.get(index).expect("equipped catalog entry");
-                if index == 0 {
-                    assert!(focus_action(app.world_mut(), entity));
-                } else {
-                    tap_key(&mut app, KeyCode::Tab);
-                }
-                run_frames(&mut app, 4);
-                assert_eq!(
-                    app.world().resource::<InputFocus>().get(),
-                    Some(entity),
-                    "{count} abilities, slot {index}, {scale:?}"
-                );
-                let visible = visible_control_rect(
-                    app.world(),
-                    entity,
-                    Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
-                )
-                .expect("focused skill is visible");
-                assert!(
-                    visible.width() >= 43.5 && visible.height() >= 43.5,
-                    "{count} abilities, slot {index}, {scale:?}: {visible:?}"
-                );
-                tap_key(&mut app, KeyCode::Enter);
-                assert_eq!(
-                    app.world().resource::<UiState>().selected,
-                    Some(Choice::Ability(index as u8))
-                );
-                assert!(app
-                    .world()
-                    .get::<AccessibleLabel>(entity)
-                    .expect("accessible ability")
-                    .0
-                    .contains(skill_definition(skill).name));
-            }
-            for (index, key) in shortcuts.iter().copied().enumerate().take(count) {
-                tap_key(&mut app, key);
-                assert_eq!(
-                    app.world().resource::<UiState>().selected,
-                    Some(Choice::Ability(index as u8))
-                );
-            }
-            let wait =
-                find_named(app.world_mut(), "Wait").expect("universal remains for empty loadout");
-            assert!(focus_action(app.world_mut(), wait));
+            assert_eq!(
+                app.world().resource::<InputFocus>().get(),
+                Some(entity),
+                "{count} abilities, slot {index}, {scale:?}"
+            );
+            let visible = visible_control_rect(
+                app.world(),
+                entity,
+                Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+            )
+            .expect("focused skill is visible");
+            assert!(
+                visible.width() >= 43.5 && visible.height() >= 43.5,
+                "{count} abilities, slot {index}, {scale:?}: {visible:?}"
+            );
             tap_key(&mut app, KeyCode::Enter);
-            if count == 0 {
-                tap_key(&mut app, KeyCode::Digit1);
-                assert_eq!(
-                    app.world().resource::<UiState>().selected,
-                    Some(Choice::Wait)
-                );
-            }
-            no_combat_intent(&mut app);
+            assert_eq!(
+                app.world().resource::<UiState>().selected,
+                Some(Choice::Ability(index as u8))
+            );
+            assert!(app
+                .world()
+                .get::<AccessibleLabel>(entity)
+                .expect("accessible ability")
+                .0
+                .contains(skill_definition(skill).name));
         }
+        for (index, key) in shortcuts.iter().copied().enumerate().take(count) {
+            tap_key(&mut app, key);
+            assert_eq!(
+                app.world().resource::<UiState>().selected,
+                Some(Choice::Ability(index as u8))
+            );
+        }
+        let wait =
+            find_named(app.world_mut(), "Wait").expect("universal remains for empty loadout");
+        assert!(focus_action(app.world_mut(), wait));
+        tap_key(&mut app, KeyCode::Enter);
+        if count == 0 {
+            tap_key(&mut app, KeyCode::Digit1);
+            assert_eq!(
+                app.world().resource::<UiState>().selected,
+                Some(Choice::Wait)
+            );
+        }
+        no_combat_intent(&mut app);
     }
 }
 
@@ -400,7 +450,7 @@ fn presented_strings(app: &mut App) -> Vec<(String, String)> {
 }
 
 #[test]
-fn concealed_state_changes_do_not_leak_through_text_accessibility_or_context_help() {
+fn concealed_state_changes_do_not_leak_through_text_accessibility_or_context_help_normal_1080() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
     let source = app
         .world()
@@ -494,12 +544,33 @@ fn concealed_state_changes_do_not_leak_through_text_accessibility_or_context_hel
 }
 
 #[test]
-fn replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay() {
-    let mut app = app(1280, 720, UiScaleMode::Percent200);
+fn replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay_normal_1080() {
+    replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay_compatibility() {
+    replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn replacement_palette_changes_paint_without_changing_layout_selection_or_gameplay(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     apply_action(app.world_mut(), Action::Choice(Choice::Wait));
     run_frames(&mut app, 3);
     let before = app.world().resource::<LabyrinthView>().combat.clone();
-    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
     let nodes = app
         .world_mut()
         .query_filtered::<Entity, With<Node>>()
