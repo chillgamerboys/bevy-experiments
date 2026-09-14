@@ -70,14 +70,58 @@ fn duplicate_import_is_idempotent_but_conflicts_and_thread_overlap_are_rejected(
             .contains("conflicting")
     );
 
-    let path = write_json(root, "overlap.json", &receipt("task", "attempt-2", 19, 30))?;
+    let path = write_json(root, "overlap.json", &receipt("task", "attempt-2", 30, 40))?;
     assert!(
         call(root, &["import", "--file", &path])
             .expect_err("same thread ranges must not overlap")
             .contains("overlaps")
     );
+    let path = write_json(
+        root,
+        "same-second.json",
+        &receipt("task", "attempt-same-second", 20, 20),
+    )?;
+    assert!(
+        call(root, &["import", "--file", &path])
+            .expect_err("counter overlap must be found even in a zero-second wall interval")
+            .contains("cumulative-token")
+    );
+
+    let mut adjacent = receipt("task", "attempt-3", 20, 30);
+    for (field, start, end) in [
+        ("input_tokens", 1100, 2100),
+        ("cached_input_tokens", 220, 420),
+        ("output_tokens", 110, 210),
+        ("reasoning_output_tokens", 22, 42),
+    ] {
+        adjacent["start"][field] = json!(start);
+        adjacent["end"][field] = json!(end);
+    }
+    adjacent["evidence_reference"] = json!("host:adjacent");
+    let path = write_json(root, "adjacent.json", &adjacent)?;
+    assert_eq!(call(root, &["import", "--file", &path])?["imported"], true);
+
+    let path = write_json(root, "cross-task.json", &receipt("other-task", "a", 50, 60))?;
+    assert!(
+        call(root, &["import", "--file", &path])
+            .expect_err("counter overlap across tasks must fail")
+            .contains("existing task task")
+    );
     let report = call(root, &["report", "task"])?;
-    assert_eq!(report["total"]["receipt_count"], 1);
+    assert_eq!(report["total"]["receipt_count"], 2);
+    assert!(report.get("receipts").is_none());
+    assert_eq!(report["observed_span_seconds"], 20);
+    assert_eq!(report["summed_thread_seconds"], 20);
+    assert_eq!(report["attempt_count"], 2);
+    assert_eq!(
+        report["models"]["observed"]["models"],
+        json!(["observed-model"])
+    );
+    assert!(
+        call(root, &["report", "task", "--details"])?
+            .get("receipts")
+            .is_some()
+    );
     Ok(())
 }
 
@@ -87,6 +131,7 @@ fn decreasing_and_invalid_subset_counters_are_rejected() -> Test {
     let root = directory.path();
     let mut decreasing = receipt("task", "attempt-1", 10, 20);
     decreasing["end"]["input_tokens"] = json!(99);
+    decreasing["end"]["cached_input_tokens"] = json!(20);
     let path = write_json(root, "decreasing.json", &decreasing)?;
     assert!(
         call(root, &["import", "--file", &path])
@@ -182,10 +227,40 @@ fn known_rates_price_uncached_cached_and_output_using_the_observed_model() -> Te
     Ok(())
 }
 
-fn native_log(path: &Path, input: u64, cached: u64, output: u64, secret: &str) -> Test {
+#[test]
+fn report_rejects_counter_total_overflow() -> Test {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    for (name, thread) in [("one", "thread-one"), ("two", "thread-two")] {
+        let mut value = receipt("overflow", name, 10, 20);
+        value["thread"] = json!(thread);
+        value["start"]["input_tokens"] = json!(0);
+        value["end"]["input_tokens"] = json!(u64::MAX);
+        value["start"]["cached_input_tokens"] = json!(0);
+        value["end"]["cached_input_tokens"] = json!(0);
+        value["evidence_reference"] = json!(format!("host:{name}"));
+        let path = write_json(root, &format!("{name}.json"), &value)?;
+        call(root, &["import", "--file", &path])?;
+    }
+    assert!(
+        call(root, &["report", "overflow"])
+            .expect_err("u64 sum overflow must be explicit")
+            .contains("exceeds u64")
+    );
+    Ok(())
+}
+
+fn native_log(
+    path: &Path,
+    model: &str,
+    input: u64,
+    cached: u64,
+    output: u64,
+    secret: &str,
+) -> Test {
     let lines = [
         json!({"type":"session_meta","payload":{"id":"thread-native","client":"codex"}}),
-        json!({"type":"turn_context","payload":{"model":"native-model","effort":"high"}}),
+        json!({"type":"turn_context","payload":{"model":model,"effort":"high"}}),
         json!({"type":"event_msg","payload":{"type":"agent_message","message":secret}}),
         json!({"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{
             "input_tokens":input,
@@ -210,7 +285,7 @@ fn native_checkpoint_pair_records_one_delta_without_disclosing_transcript_text()
     let root = directory.path();
     let log = root.join("session.jsonl");
     let secret = "PRIVATE TRANSCRIPT CONTENT MUST NOT ESCAPE";
-    native_log(&log, 100, 20, 40, secret)?;
+    native_log(&log, "native-model", 100, 20, 40, secret)?;
     let log_text = log.to_string_lossy();
     let start = call(
         root,
@@ -230,7 +305,7 @@ fn native_checkpoint_pair_records_one_delta_without_disclosing_transcript_text()
     assert_eq!(start["recorded"], true);
     assert!(!start.to_string().contains(secret));
 
-    native_log(&log, 500, 120, 140, secret)?;
+    native_log(&log, "native-model", 500, 120, 140, secret)?;
     let end = call(
         root,
         &[
@@ -265,11 +340,53 @@ fn native_checkpoint_pair_records_one_delta_without_disclosing_transcript_text()
     )?;
     assert_eq!(duplicate["duplicate"], true);
 
-    let report = call(root, &["report", "native-task"])?;
+    let report = call(root, &["report", "native-task", "--details"])?;
     assert_eq!(report["total"]["totals"]["input_tokens"], 400);
     assert_eq!(report["total"]["totals"]["cached_input_tokens"], 100);
     assert_eq!(report["total"]["totals"]["output_tokens"], 100);
     assert!(!report.to_string().contains(secret));
+    Ok(())
+}
+
+#[test]
+fn native_model_change_marks_the_interval_model_unavailable() -> Test {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    let log = root.join("session.jsonl");
+    native_log(&log, "model-a", 10, 2, 4, "private-a")?;
+    let log_text = log.to_string_lossy();
+    call(
+        root,
+        &[
+            "checkpoint",
+            "mixed-model",
+            "--log",
+            &log_text,
+            "--phase",
+            "start",
+            "--role",
+            "coordinator",
+        ],
+    )?;
+    native_log(&log, "model-b", 30, 4, 10, "private-b")?;
+    call(
+        root,
+        &[
+            "checkpoint",
+            "mixed-model",
+            "--log",
+            &log_text,
+            "--phase",
+            "end",
+            "--role",
+            "coordinator",
+        ],
+    )?;
+    let report = call(root, &["report", "mixed-model", "--details"])?;
+    assert_eq!(report["models"]["observed"]["models"], json!([]));
+    assert_eq!(report["models"]["observed"]["unavailable_receipts"], 1);
+    assert!(report["receipts"][0]["observed"].get("model").is_none());
+    assert_eq!(report["receipts"][0]["observed"]["effort"], "high");
     Ok(())
 }
 
@@ -299,11 +416,10 @@ fn native_checkpoint_refuses_missing_identity_or_counters_instead_of_fabricating
     )
     .expect_err("missing counters must fail");
     assert!(error.contains("counters are unavailable"));
+    let checkpoints = root.join(".gameskills/usage/checkpoints");
     assert!(
-        !root
-            .join(".gameskills/usage/checkpoints")
-            .read_dir()?
-            .any(|entry| {
+        !checkpoints.exists()
+            || !checkpoints.read_dir()?.any(|entry| {
                 entry
                     .ok()
                     .is_some_and(|entry| entry.file_name().to_string_lossy().ends_with(".json"))
