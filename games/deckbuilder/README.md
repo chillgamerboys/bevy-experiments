@@ -20,7 +20,7 @@ networking continue while the menu is open. Inspect disabled/selected states and
 the activity feed. Menu navigation/layout uses shared Gamekit primitives.
 
 Hover a card to preview its rules and current availability; hold the pointer for
-one second to keep the explanation open. Each card also has a separate Inspect
+two seconds to keep the explanation open. Each card also has a separate Inspect
 control: use Tab/Shift+Tab and Enter/Space to read it even when the card cannot be
 played. `T` pins the hovered or focused explanation and enters keyboard inspection;
 Escape closes pinned inspection; press Escape again to open the Game menu.

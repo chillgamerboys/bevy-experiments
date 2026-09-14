@@ -108,3 +108,7 @@ A compact worker brief includes repository lint conventions and affected callers
 Here Rust tests use `expect` and checked access; changes to verification-context
 serialization include workflow queue compatibility tests as well as resolver tests.
 These small checks caught integration gaps without a game or display sweep.
+
+Shared tooltip timing changes also select consuming-game hover/pin regressions at
+normal resolution and a search of consumer guides. Library tests alone miss
+consumer frame budgets; numeric and written-out timing references both matter.
