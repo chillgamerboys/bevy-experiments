@@ -116,9 +116,30 @@ fn intro_battle_and_outro_preserve_the_complete_local_game() {
 }
 
 #[test]
-fn pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path() {
+fn pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path_normal_1080() {
+    pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path_compatibility() {
+    pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for route in 0..3 {
-        let mut app = app(1280, 720, UiScaleMode::Auto, true);
+        let mut app = app(width, height, scale, true);
         let choose = find_named(app.world_mut(), "Choose jab").expect("move button");
         match route {
             0 => {
@@ -149,8 +170,21 @@ fn pointer_enter_space_and_number_shortcuts_share_the_selection_commit_path() {
 }
 
 #[test]
-fn disabled_moves_do_not_interrupt_narration_and_space_only_reveals() {
-    let mut app = app(1280, 720, UiScaleMode::Auto, false);
+fn disabled_moves_do_not_interrupt_narration_and_space_only_reveals_normal_1080() {
+    disabled_moves_do_not_interrupt_narration_and_space_only_reveals(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn disabled_moves_do_not_interrupt_narration_and_space_only_reveals_compatibility() {
+    disabled_moves_do_not_interrupt_narration_and_space_only_reveals(1280, 720, UiScaleMode::Auto);
+}
+
+fn disabled_moves_do_not_interrupt_narration_and_space_only_reveals(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale, false);
     let choose = find_named(app.world_mut(), "Choose jab").expect("move button");
     assert!(!activation_eligible(app.world_mut(), choose));
     tap_key(&mut app, KeyCode::Digit1);
@@ -164,8 +198,21 @@ fn disabled_moves_do_not_interrupt_narration_and_space_only_reveals() {
 }
 
 #[test]
-fn duplicate_confirm_messages_cannot_cross_the_narration_boundary() {
-    let mut app = app(1280, 720, UiScaleMode::Auto, true);
+fn duplicate_confirm_messages_cannot_cross_the_narration_boundary_normal_1080() {
+    duplicate_confirm_messages_cannot_cross_the_narration_boundary(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn duplicate_confirm_messages_cannot_cross_the_narration_boundary_compatibility() {
+    duplicate_confirm_messages_cannot_cross_the_narration_boundary(1280, 720, UiScaleMode::Auto);
+}
+
+fn duplicate_confirm_messages_cannot_cross_the_narration_boundary(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale, true);
     app.world_mut()
         .resource_mut::<Runtime>()
         .apply(&CarterfightIntent::SelectMove("jab"));
@@ -180,39 +227,76 @@ fn duplicate_confirm_messages_cannot_cross_the_narration_boundary() {
 }
 
 #[test]
-fn six_viewports_keep_all_enabled_controls_reachable_and_labels_readable() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            let mut app = app(width, height, scale, true);
-            let actions = app
-                .world_mut()
-                .query_filtered::<Entity, With<UiAction>>()
-                .iter(app.world())
-                .collect::<Vec<_>>();
-            for action in actions {
-                if !activation_eligible(app.world_mut(), action) {
-                    continue;
-                }
-                assert!(focus_action(app.world_mut(), action));
-                run_frames(&mut app, 4);
-                let visible = visible_control_rect(
-                    app.world(),
-                    action,
-                    Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
-                )
-                .expect("focused control visible");
-                assert!(
-                    visible.width() >= 43.5 && visible.height() >= 43.5,
-                    "{width}x{height} {scale:?}: {visible:?}"
-                );
-            }
-            assert!(app
-                .world_mut()
-                .query::<&UiTextStyle>()
-                .iter(app.world())
-                .all(|style| style.base_size.is_none_or(|size| size >= 18.0)));
+fn six_viewports_keep_all_enabled_controls_reachable_and_labels_readable_normal_1080() {
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn six_viewports_keep_all_enabled_controls_reachable_and_labels_readable_compatibility() {
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        1920,
+        1080,
+        UiScaleMode::Percent200,
+    );
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+    six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+        3840,
+        2160,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn six_viewports_keep_all_enabled_controls_reachable_and_labels_readable(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale, true);
+    let actions = app
+        .world_mut()
+        .query_filtered::<Entity, With<UiAction>>()
+        .iter(app.world())
+        .collect::<Vec<_>>();
+    for action in actions {
+        if !activation_eligible(app.world_mut(), action) {
+            continue;
         }
+        assert!(focus_action(app.world_mut(), action));
+        run_frames(&mut app, 4);
+        let visible = visible_control_rect(
+            app.world(),
+            action,
+            Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+        )
+        .expect("focused control visible");
+        assert!(
+            visible.width() >= 43.5 && visible.height() >= 43.5,
+            "{width}x{height} {scale:?}: {visible:?}"
+        );
     }
+    assert!(app
+        .world_mut()
+        .query::<&UiTextStyle>()
+        .iter(app.world())
+        .all(|style| style.base_size.is_none_or(|size| size >= 18.0)));
 }
 
 #[test]

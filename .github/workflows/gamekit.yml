@@ -3,8 +3,22 @@ name: Gamekit
 on:
   pull_request: {}
   push:
-    branches: [main]
-  workflow_dispatch: {}
+    branches: [dev, main]
+  workflow_dispatch:
+    inputs:
+      level:
+        description: Verification level (auto follows the receiving branch)
+        type: choice
+        options: [auto, development, testing, release]
+        default: auto
+      base_commit:
+        description: Optional committed comparison base for a scoped workflow probe
+        type: string
+        required: false
+      full_scope:
+        description: Check all affected owners without changing verification level
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,9 +33,10 @@ env:
 
 jobs:
   classify:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       selection: ${{ steps.scope.outputs.selection }}
+      runners: ${{ steps.scope.outputs.runners }}
       skills: ${{ steps.scope.outputs.skills }}
       rust: ${{ steps.scope.outputs.rust }}
       policy: ${{ steps.scope.outputs.policy }}
@@ -38,8 +53,27 @@ jobs:
       - run: cargo run --locked -p repo-devtools --profile ci -- check
       - name: Verify CI routing, selected commands and final-gate failure contracts
         run: cargo test --locked -p repo-devtools --profile ci --test ci_routing --test ci_checks --test ci_cli
+      - name: Resolve receiving-project verification policy
+        env:
+          RECEIVING_BRANCH: ${{ github.base_ref || github.ref_name }}
+          REQUESTED_LEVEL: ${{ inputs.level }}
+        shell: bash
+        run: |
+          args=(verification resolve --base "$RECEIVING_BRANCH")
+          if [[ -n "$REQUESTED_LEVEL" && "$REQUESTED_LEVEL" != auto ]]; then
+            args+=(--level "$REQUESTED_LEVEL")
+          fi
+          cargo run --locked -p gameskills-cli --profile ci -- "${args[@]}" > "$RUNNER_TEMP/verification-policy.json"
       - id: scope
-        run: cargo run --locked -p repo-devtools --profile ci -- ci select
+        env:
+          COMPARISON_BASE: ${{ inputs.base_commit }}
+          FULL_SCOPE: ${{ inputs.full_scope }}
+        shell: bash
+        run: |
+          args=(ci select --policy "$RUNNER_TEMP/verification-policy.json")
+          if [[ -n "$COMPARISON_BASE" ]]; then args+=(--base "$COMPARISON_BASE"); fi
+          if [[ "$FULL_SCOPE" == true ]]; then args+=(--full); fi
+          cargo run --locked -p repo-devtools --profile ci -- "${args[@]}"
 
   skills:
     needs: classify
@@ -47,7 +81,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(needs.classify.outputs.runners) }}
     runs-on: ${{ matrix.os }}
     env:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
@@ -69,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(needs.classify.outputs.runners) }}
     runs-on: ${{ matrix.os }}
     env:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
@@ -104,7 +138,11 @@ jobs:
   policy:
     needs: classify
     if: needs.classify.outputs.policy == 'true'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.classify.outputs.runners) }}
+    runs-on: ${{ matrix.os }}
     env:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
     steps:
@@ -114,6 +152,7 @@ jobs:
           toolchain: '1.97.1'
           components: clippy,rustfmt
       - name: Install Linux window-system dependencies
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo run --locked -p repo-devtools --profile ci --target-dir target/ci-controller -- ci run policy
@@ -121,7 +160,7 @@ jobs:
   ci:
     if: always()
     needs: [classify, skills, rust, policy]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     env:
       CI_SELECTION: ${{ needs.classify.outputs.selection }}
       CI_NEEDS: ${{ toJSON(needs) }}

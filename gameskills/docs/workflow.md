@@ -2,6 +2,27 @@
 
 Start at `plan` for implementation or use a focused skill for a narrower request.
 
+## Verification scope
+
+Creative involvement and verification rigor are separate choices. This repository
+opts into Development for feature PRs to `dev`, Testing for milestone batches to
+`main`, and Release only for explicit release work. Development and Testing use
+macOS; Windows/Linux are release coverage. Changed UI flows use 1920×1080 Auto
+unless a display-specific defect or release support requires another case.
+
+Resolve policy with `gameskills verification resolve --base BRANCH`, then select
+checks for affected behavior and consumers. Logic-only fixes need no automatic agent
+screenshots or UI walkthrough. End-to-end tests cover affected journeys, not every
+game edit. A milestone batch affecting gameplay also requires the developer's actual
+candidate-bound sanity response. Ordinary development and docs/tooling-only work
+without game effects have no manual gameplay gate.
+
+Use the [CLI configuration contract](../cli/README.md#verification-policy) for opt-in
+fields and the [repository selector](../../devtools/docs/ci.md) for actual suites.
+Other adopters without verification configuration retain their existing requirements.
+Increasing rigor cannot weaken the receiving branch's requirements, grant merge
+permission or authorize release publication.
+
 ## Work and evidence
 
 Use `plan` for a complete scoped workflow or invoke a focused toolbox skill for a
@@ -28,6 +49,8 @@ not launch models. `dispatch` uses the host's worker mechanism with actual suppo
 model/effort settings. Inherit session defaults unless an authorized mapping exists.
 Worker reports remain caller-supplied references, separate from runner observations.
 A passing command alone does not establish visual quality or release readiness.
+Stop verification when applicable checks pass unless changed inputs, failures or
+unresolved concerns justify more. Unselected coverage is not unfinished acceptance.
 
 
 ## Documentation context

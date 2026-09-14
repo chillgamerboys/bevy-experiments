@@ -106,213 +106,235 @@ fn capture(mut intents: MessageReader<LabyrinthIntent>, mut commands: ResMut<Com
 }
 
 #[test]
-fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable() {
-    for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-        let combat = authored_combat();
-        let snapshot = combat.snapshot();
-        assert_eq!(snapshot.active_actor, Some(ActorId(1)));
-        // Sparse formations fit much taller real artwork than the full roster.
-        // Help must retain useful body space after the art has loaded.
-        let mut app = super::overlay_stability::scene_app(1280, 720, scale);
-        app.init_resource::<Commands>()
-            .add_systems(PostUpdate, capture);
-        app.world_mut().resource_mut::<LabyrinthView>().combat = Some(snapshot.clone());
-        run_frames(&mut app, 5);
-        let controls = (0..14)
-            .map(|index| {
-                find_named(app.world_mut(), &format!("Skill {index}"))
-                    .expect("every granted ability")
-            })
-            .collect::<Vec<_>>();
-        assert!(find_named(app.world_mut(), "Skill 14").is_none());
-        let first = *controls.first().expect("first");
-        assert!(focus_action(app.world_mut(), first));
-        for (index, &control) in controls.iter().enumerate() {
-            if index > 0 {
-                tap_key(&mut app, KeyCode::Tab);
-            }
-            run_frames(&mut app, 4);
-            assert_eq!(
-                app.world().resource::<InputFocus>().get(),
-                Some(control),
-                "Tab reaches {index} at {scale:?}"
-            );
-            let rect = visible_control_rect(
-                app.world(),
-                control,
-                Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
-            )
-            .expect("visible focused ability");
-            assert!(
-                rect.width() >= 43.5 && rect.height() >= 43.5,
-                "{index} {scale:?}: {rect:?}"
-            );
-            tap_key(&mut app, KeyCode::Enter);
-            assert_eq!(
-                app.world().resource::<UiState>().selected,
-                Some(Choice::Ability(index as u8))
-            );
-            let subject = app
-                .world()
-                .get::<UiTooltipSource>(control)
-                .expect("inspectable")
-                .0
-                .clone();
-            assert!(subject.0.contains("encounter/1/actor/1/ability/technique_"));
-            let content = app
-                .world()
-                .resource::<UiTooltipCatalog>()
-                .0
-                .get(&subject)
-                .expect("effective card");
-            assert_eq!(content.title, format!("Technique {index}"));
-            assert!(content
-                .facts
-                .iter()
-                .any(|fact| fact.contains("captain_training")));
-            assert!(content
-                .facts
-                .iter()
-                .any(|fact| fact.contains("base damage")));
-            if index == 0 {
-                assert!(content
-                    .facts
-                    .iter()
-                    .any(|fact| fact.contains("5 base damage")));
-                assert!(content
-                    .facts
-                    .iter()
-                    .any(|fact| fact.contains("captain_mastery")));
-            }
-            tap_key(&mut app, KeyCode::KeyT);
-            run_frames(&mut app, 5);
-            let title =
-                find_named(app.world_mut(), "Tooltip Title").expect("native inspect opens card");
-            assert_eq!(
-                app.world().get::<Text>(title).expect("title").0,
-                format!("Technique {index}")
-            );
-            let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
-            let card = find_named(app.world_mut(), "Tooltip Card 0").expect("help card");
-            let card_rect =
-                visible_control_rect(app.world(), card, viewport).expect("visible help");
-            for name in [
-                "Actor 1 Summary",
-                "Actor 101 Summary",
-                "Actor 1 HP Track",
-                "Actor 101 HP Track",
-                "Confirm Combat Action",
-            ] {
-                let control = find_named(app.world_mut(), name).expect("reserved control");
-                let control_rect = visible_control_rect(app.world(), control, viewport)
-                    .expect("reserved control visible");
-                assert!(card_rect.intersect(control_rect).is_empty());
-            }
-            let facts = app
-                .world_mut()
-                .query::<(Entity, &Name, &Text)>()
-                .iter(app.world())
-                .filter(|(_, name, text)| {
-                    name.as_str() == "Tooltip Fact"
-                        && (text.0.contains("base damage")
-                            || text.0.starts_with("From  ")
-                            || text.0.starts_with("Target "))
-                })
-                .map(|(entity, _, _)| entity)
-                .collect::<Vec<_>>();
-            assert_eq!(facts.len(), 3);
-            for fact in facts {
-                let rect = visible_control_rect(app.world(), fact, viewport)
-                    .expect("effects and ranks visible in the first help fold");
-                let node = app.world().get::<ComputedNode>(fact).expect("fact layout");
-                assert!(
-                    rect.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
-                    "help clips mechanics at {scale:?}: {rect:?}"
-                );
-            }
-            tap_key(&mut app, KeyCode::End);
-            run_frames(&mut app, 3);
-            let description =
-                find_named(app.world_mut(), "Tooltip Description").expect("authored explanation");
-            let description_rect = visible_control_rect(app.world(), description, viewport)
-                .expect("help paging reaches its explanation");
-            assert!(description_rect.height() >= 20.0);
-            tap_key(&mut app, KeyCode::Escape);
-            let target = find_named(app.world_mut(), "Actor 101").expect("target");
-            assert!(focus_action(app.world_mut(), target));
-            tap_key(&mut app, KeyCode::Enter);
-            assert!(
-                app.world().resource::<Commands>().0.is_empty(),
-                "selection never commits"
-            );
-            let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
-            assert!(focus_action(app.world_mut(), confirm));
-            tap_key(&mut app, KeyCode::Enter);
-            let commands = std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0);
-            let action = CombatAction::Ability {
-                index: index as u8,
-                target: ActorId(101),
-            };
-            assert_eq!(commands, vec![(ActorId(1), action)]);
-            let mut resolved = combat.clone();
-            resolved
-                .apply(ActorId(1), action)
-                .expect("real authoritative commit");
-            let damage = if index == 0 { 5 } else { 2 };
-            for target in [ActorId(101), ActorId(102)] {
-                assert_eq!(
-                    resolved.snapshot().actor(target).expect("target").hp,
-                    100 - damage
-                );
-            }
-            assert_eq!(
-                app.world().resource::<LabyrinthView>().combat.as_ref(),
-                Some(&snapshot)
-            );
-            // Restore the previous command focus so the next ability is reached by Tab.
-            assert!(focus_action(app.world_mut(), control));
+fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable_normal_1080() {
+    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable_compatibility() {
+    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmable(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let combat = authored_combat();
+    let snapshot = combat.snapshot();
+    assert_eq!(snapshot.active_actor, Some(ActorId(1)));
+    // Sparse formations fit much taller real artwork than the full roster.
+    // Help must retain useful body space after the art has loaded.
+    let mut app = super::overlay_stability::scene_app(width, height, scale);
+    app.init_resource::<Commands>()
+        .add_systems(PostUpdate, capture);
+    app.world_mut().resource_mut::<LabyrinthView>().combat = Some(snapshot.clone());
+    run_frames(&mut app, 5);
+    let controls = (0..14)
+        .map(|index| {
+            find_named(app.world_mut(), &format!("Skill {index}")).expect("every granted ability")
+        })
+        .collect::<Vec<_>>();
+    assert!(find_named(app.world_mut(), "Skill 14").is_none());
+    let first = *controls.first().expect("first");
+    assert!(focus_action(app.world_mut(), first));
+    for (index, &control) in controls.iter().enumerate() {
+        if index > 0 {
+            tap_key(&mut app, KeyCode::Tab);
         }
+        run_frames(&mut app, 4);
+        assert_eq!(
+            app.world().resource::<InputFocus>().get(),
+            Some(control),
+            "Tab reaches {index} at {scale:?}"
+        );
+        let rect = visible_control_rect(
+            app.world(),
+            control,
+            Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+        )
+        .expect("visible focused ability");
+        assert!(
+            rect.width() >= 43.5 && rect.height() >= 43.5,
+            "{index} {scale:?}: {rect:?}"
+        );
+        tap_key(&mut app, KeyCode::Enter);
+        assert_eq!(
+            app.world().resource::<UiState>().selected,
+            Some(Choice::Ability(index as u8))
+        );
+        let subject = app
+            .world()
+            .get::<UiTooltipSource>(control)
+            .expect("inspectable")
+            .0
+            .clone();
+        assert!(subject.0.contains("encounter/1/actor/1/ability/technique_"));
+        let content = app
+            .world()
+            .resource::<UiTooltipCatalog>()
+            .0
+            .get(&subject)
+            .expect("effective card");
+        assert_eq!(content.title, format!("Technique {index}"));
+        assert!(content
+            .facts
+            .iter()
+            .any(|fact| fact.contains("captain_training")));
+        assert!(content
+            .facts
+            .iter()
+            .any(|fact| fact.contains("base damage")));
+        if index == 0 {
+            assert!(content
+                .facts
+                .iter()
+                .any(|fact| fact.contains("5 base damage")));
+            assert!(content
+                .facts
+                .iter()
+                .any(|fact| fact.contains("captain_mastery")));
+        }
+        tap_key(&mut app, KeyCode::KeyT);
+        run_frames(&mut app, 5);
+        let title =
+            find_named(app.world_mut(), "Tooltip Title").expect("native inspect opens card");
+        assert_eq!(
+            app.world().get::<Text>(title).expect("title").0,
+            format!("Technique {index}")
+        );
+        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("help card");
+        let card_rect = visible_control_rect(app.world(), card, viewport).expect("visible help");
         for name in [
-            "Reposition",
-            "Rescue",
-            "Defend",
-            "Wait",
+            "Actor 1 Summary",
+            "Actor 101 Summary",
+            "Actor 1 HP Track",
+            "Actor 101 HP Track",
             "Confirm Combat Action",
         ] {
-            let control = find_named(app.world_mut(), name).expect("utility control");
-            let visible = visible_control_rect(
-                app.world(),
-                control,
-                Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
-            )
-            .expect("visible utility");
-            let node = app
-                .world()
-                .get::<ComputedNode>(control)
-                .expect("measured utility");
+            let control = find_named(app.world_mut(), name).expect("reserved control");
+            let control_rect = visible_control_rect(app.world(), control, viewport)
+                .expect("reserved control visible");
+            assert!(card_rect.intersect(control_rect).is_empty());
+        }
+        let facts = app
+            .world_mut()
+            .query::<(Entity, &Name, &Text)>()
+            .iter(app.world())
+            .filter(|(_, name, text)| {
+                name.as_str() == "Tooltip Fact"
+                    && (text.0.contains("base damage")
+                        || text.0.starts_with("From  ")
+                        || text.0.starts_with("Target "))
+            })
+            .map(|(entity, _, _)| entity)
+            .collect::<Vec<_>>();
+        assert_eq!(facts.len(), 3);
+        for fact in facts {
+            let rect = visible_control_rect(app.world(), fact, viewport)
+                .expect("effects and ranks visible in the first help fold");
+            let node = app.world().get::<ComputedNode>(fact).expect("fact layout");
             assert!(
-                visible.width() + 0.5 >= node.size().x * node.inverse_scale_factor,
-                "{name} clipped at {scale:?}"
+                rect.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
+                "help clips mechanics at {scale:?}: {rect:?}"
             );
         }
-        // The final scrolled move also uses the normal native pointer path.
-        let last = *controls.last().expect("fourteenth move");
+        tap_key(&mut app, KeyCode::End);
+        run_frames(&mut app, 3);
+        let description =
+            find_named(app.world_mut(), "Tooltip Description").expect("authored explanation");
+        let description_rect = visible_control_rect(app.world(), description, viewport)
+            .expect("help paging reaches its explanation");
+        assert!(description_rect.height() >= 20.0);
+        tap_key(&mut app, KeyCode::Escape);
         let target = find_named(app.world_mut(), "Actor 101").expect("target");
+        assert!(focus_action(app.world_mut(), target));
+        tap_key(&mut app, KeyCode::Enter);
+        assert!(
+            app.world().resource::<Commands>().0.is_empty(),
+            "selection never commits"
+        );
         let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
-        for control in [last, target, confirm] {
-            pointer_control(&mut app, control, Vec2::new(1280.0, 720.0));
+        assert!(focus_action(app.world_mut(), confirm));
+        tap_key(&mut app, KeyCode::Enter);
+        let commands = std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0);
+        let action = CombatAction::Ability {
+            index: index as u8,
+            target: ActorId(101),
+        };
+        assert_eq!(commands, vec![(ActorId(1), action)]);
+        let mut resolved = combat.clone();
+        resolved
+            .apply(ActorId(1), action)
+            .expect("real authoritative commit");
+        let damage = if index == 0 { 5 } else { 2 };
+        for target in [ActorId(101), ActorId(102)] {
+            assert_eq!(
+                resolved.snapshot().actor(target).expect("target").hp,
+                100 - damage
+            );
         }
         assert_eq!(
-            std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0),
-            vec![(
-                ActorId(1),
-                CombatAction::Ability {
-                    index: 13,
-                    target: ActorId(101)
-                }
-            )]
+            app.world().resource::<LabyrinthView>().combat.as_ref(),
+            Some(&snapshot)
+        );
+        // Restore the previous command focus so the next ability is reached by Tab.
+        assert!(focus_action(app.world_mut(), control));
+    }
+    for name in [
+        "Reposition",
+        "Rescue",
+        "Defend",
+        "Wait",
+        "Confirm Combat Action",
+    ] {
+        let control = find_named(app.world_mut(), name).expect("utility control");
+        let visible = visible_control_rect(
+            app.world(),
+            control,
+            Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
+        )
+        .expect("visible utility");
+        let node = app
+            .world()
+            .get::<ComputedNode>(control)
+            .expect("measured utility");
+        assert!(
+            visible.width() + 0.5 >= node.size().x * node.inverse_scale_factor,
+            "{name} clipped at {scale:?}"
         );
     }
+    // The final scrolled move also uses the normal native pointer path.
+    let last = *controls.last().expect("fourteenth move");
+    let target = find_named(app.world_mut(), "Actor 101").expect("target");
+    let confirm = find_named(app.world_mut(), "Confirm Combat Action").expect("confirm");
+    for control in [last, target, confirm] {
+        pointer_control(&mut app, control, Vec2::new(width as f32, height as f32));
+    }
+    assert_eq!(
+        std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0),
+        vec![(
+            ActorId(1),
+            CombatAction::Ability {
+                index: 13,
+                target: ActorId(101)
+            }
+        )]
+    );
 }
 
 #[test]
@@ -366,7 +388,28 @@ fn effective_multi_target_forecast_names_every_target_and_conceals_secondary_unk
 }
 
 #[test]
-fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names() {
+fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_normal_1080() {
+    ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names_compatibility() {
+    ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     let (catalog, mut scenario) = authored_scenario();
     let mut apprentice = scenario.heroes.first().expect("captain").clone();
     apprentice.id = ActorId(2);
@@ -376,7 +419,7 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
     let snapshot = Combat::from_scenario(&catalog, &scenario)
         .expect("two custom actors")
         .snapshot();
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+    let mut app = app(width, height, scale);
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
         network_ownership(&mut view);
@@ -463,7 +506,28 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
 }
 
 #[test]
-fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present() {
+fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present_normal_1080() {
+    queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present_compatibility() {
+    queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     use bevy::ecs::system::RunSystemOnce;
 
     // Exercise the production translation boundary with queued native-entity
@@ -473,7 +537,7 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present() 
         let original = Combat::from_scenario(&catalog, &scenario)
             .expect("original scenario")
             .snapshot();
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         app.world_mut().resource_mut::<LabyrinthView>().combat = Some(original.clone());
         run_frames(&mut app, 5);
         let skill = find_named(app.world_mut(), "Skill 0").expect("original technique zero");

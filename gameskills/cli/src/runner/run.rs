@@ -17,10 +17,42 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 const CLAIM: &str = "observed command checks only";
+
+fn bind_base(
+    root: &Path,
+    commands: &mut BTreeMap<String, Spec>,
+    verification: &Value,
+) -> Result<(), String> {
+    let Some(base) = verification
+        .pointer("/policy/receiving_branch")
+        .and_then(Value::as_str)
+    else {
+        return Ok(());
+    };
+    let remote = format!("refs/remotes/origin/{base}");
+    let local = format!("refs/heads/{base}");
+    let reference = [remote, local].into_iter().find(|name| identity::git(root, &["show-ref", "--verify", name]).is_ok())
+        .ok_or_else(|| format!("receiving base {base} is unavailable; fetch or create the intended base before verification"))?;
+    for spec in commands.values_mut() {
+        if let crate::config::GitRefs::Selected(refs) = &mut spec.git_refs {
+            refs.push(reference.clone());
+            refs.sort();
+            refs.dedup();
+        }
+    }
+    Ok(())
+}
+
 #[derive(Parser)]
 struct Arguments {
     #[arg(required = true)]
     names: Vec<String>,
+    #[arg(long)]
+    base: Option<String>,
+    #[arg(long)]
+    level: Option<String>,
+    #[arg(long = "scope")]
+    scope: Vec<String>,
     #[arg(long)]
     max_workers: Option<usize>,
     #[arg(long, default_value = "30")]
@@ -113,7 +145,10 @@ fn validate(directory: &Directory, record: &Value, root: &Path, config: &Value, 
     }
     let check = (|| -> Result<(), String> {
         let selected = graph::strings(record.get("selected"), "selected")?;
-        let (commands, order) = graph::graph(root, config, &selected)?;
+        let verification = record.get("verification").unwrap_or(&Value::Null);
+        crate::verification_context::validate(config, verification)?;
+        let (mut commands, order) = graph::graph(root, config, &selected)?;
+        bind_base(root, &mut commands, verification)?;
         let current = identity::identity(root, config, &commands)?;
         if record.get("identity") != Some(&current) {
             reasons.extend(identity::differences(
@@ -396,7 +431,15 @@ fn run(root: &Path, config: &Value, args: &[OsString], helper: &Path) -> Result<
     .map_err(|e| e.to_string())?;
     args.names.sort();
     args.names.dedup();
-    let (commands, order) = graph::graph(root, config, &args.names)?;
+    let verification = crate::verification_context::resolve(
+        config,
+        args.base.as_deref(),
+        args.level.as_deref(),
+        &args.scope,
+        false,
+    )?;
+    let (mut commands, order) = graph::graph(root, config, &args.names)?;
+    bind_base(root, &mut commands, &verification)?;
     let dispatch = config.get("dispatch").cloned().unwrap_or_else(|| json!({}));
     let dispatch = dispatch.as_object().ok_or("dispatch must be a mapping")?;
     let cap = dispatch
@@ -450,8 +493,12 @@ fn run(root: &Path, config: &Value, args: &[OsString], helper: &Path) -> Result<
         if previous.get("run_id") != Some(&json!(id)) {
             return Err("resume record has the wrong run identity".into());
         }
+        let previous_verification = previous.get("verification").unwrap_or(&Value::Null);
+        crate::verification_context::validate(config, previous_verification)
+            .map_err(|error| format!("cannot resume: {error}"))?;
         if previous.get("identity") != Some(&identity)
             || previous.get("selected") != Some(&json!(args.names))
+            || previous_verification.get("selection_digest") != verification.get("selection_digest")
         {
             return Err(
                 "cannot resume: source or execution inputs changed; start a new run".into(),
@@ -467,7 +514,7 @@ fn run(root: &Path, config: &Value, args: &[OsString], helper: &Path) -> Result<
     if !state::lock(&active)? {
         return Err("new active lock unexpectedly held".into());
     }
-    let mut record = json!({"schema_version":2,"runtime":"rust","run_id":id,"status":"running","selected":args.names,"order":order,"commands":commands,"identity":identity,"results":{},"started_at":now(),"max_workers":workers,"resource_wait_seconds":args.resource_wait_seconds,"resumed_from":args.resume,"claim":CLAIM});
+    let mut record = json!({"schema_version":2,"runtime":"rust","run_id":id,"status":"running","selected":args.names,"order":order,"commands":commands,"identity":identity,"results":{},"started_at":now(),"max_workers":workers,"resource_wait_seconds":args.resource_wait_seconds,"resumed_from":args.resume,"verification":verification,"claim":CLAIM});
     save(&directory, &record)?;
     drop(lifecycle);
     if let Err(error) = schedule(

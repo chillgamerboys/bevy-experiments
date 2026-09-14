@@ -10,7 +10,8 @@ Read [project context](../../references/project-context.md),
 [verification](../../references/verification.md). Resolve the actual repository,
 PR, source HEAD, target/base and relevant config/dependency/artifact/environment
 identities. Recover the accepted plan and project requirements without adding
-unrelated gates. Missing required inputs remain visible.
+unrelated gates. Resolve the receiving branch's rigor and affected scope; a milestone
+review considers the combined batch. Missing required inputs remain visible.
 
 Map each acceptance claim to relevant review judgment, command results,
 documentation checks and applicable playtest/UI/multiplayer evidence. Invoke the
@@ -22,8 +23,11 @@ supply review, manual interaction, human enjoyment or overall audit acceptance.
 Inspect current CI and required review state. Resolve findings with the owning
 implementer, then refresh source identity and affected evidence. Never relabel an
 old record for a new HEAD or count a stopped/skipped command as completed. A docs
-change needs no automatic native game walk; a visual/gameplay claim needs evidence
-at that level.
+or logic-only change needs no automatic native game walk; a visual/gameplay claim
+needs evidence at its selected level. Coverage outside that scope is not unfinished
+acceptance. Apply a configured milestone sanity gate only to affected game behavior,
+using the developer's actual candidate-bound response; CI and agent inspection do
+not establish it.
 
 Produce a source-bound acceptance record with each requirement's evidence and
 status: satisfied, failed, pending or unavailable, plus unresolved findings and

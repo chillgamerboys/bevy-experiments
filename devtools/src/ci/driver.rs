@@ -1,6 +1,6 @@
 //! Executable CI boundary: explicit arguments, GitHub file protocol and child jobs.
 
-use super::{checks, head, select, Job, Selection};
+use super::{checks, head, select, suites, verification, Job, Selection};
 use crate::support;
 use clap::Subcommand;
 use serde_json::{json, Value};
@@ -23,6 +23,14 @@ pub enum Operation {
         /// Select every check; workflow_dispatch also requests this behavior.
         #[arg(long)]
         full: bool,
+        /// JSON output from gameskills verification resolve.
+        #[arg(long)]
+        policy: Option<std::path::PathBuf>,
+    },
+    /// Run a positive game test suite; zero matching tests is an error.
+    Suite {
+        /// Repository-owned suite name.
+        name: String,
     },
     /// Run a selected job from CI_SELECTION, streaming child logs before the JSON result.
     Run {
@@ -93,7 +101,12 @@ fn event_base(event: &Value) -> Result<Option<String>, String> {
 fn run_child(root: &Path, argv: &[String]) -> Result<(), String> {
     let (program, arguments) = argv.split_first().ok_or("empty CI command")?;
     writeln!(std::io::stderr().lock(), "+ {argv:?}").map_err(|error| error.to_string())?;
-    let status = Command::new(program)
+    let executable = if program == "repo-devtools" {
+        std::env::current_exe().map_err(|error| error.to_string())?
+    } else {
+        program.into()
+    };
+    let status = Command::new(executable)
         .args(arguments)
         .current_dir(root)
         .stdin(Stdio::null())
@@ -113,6 +126,7 @@ pub fn execute(root: &Path, operation: Operation) -> Result<Value, String> {
             base,
             head: requested_head,
             full,
+            policy,
         } => {
             let event = environment("GITHUB_EVENT_PATH")?
                 .map(|path| support::read_json(Path::new(&path)))
@@ -120,15 +134,37 @@ pub fn execute(root: &Path, operation: Operation) -> Result<Value, String> {
                 .unwrap_or_else(|| json!({}));
             let base = base.or(event_base(&event)?);
             let head = requested_head.map_or_else(|| head(root), Ok)?;
-            let selection = select(
+            let mut selection = select(
                 root,
                 base.as_deref(),
                 &head,
-                full || environment("GITHUB_EVENT_NAME")?.as_deref() == Some("workflow_dispatch"),
+                full || (policy.is_none()
+                    && environment("GITHUB_EVENT_NAME")?.as_deref() == Some("workflow_dispatch")),
             )?;
+            if let Some(path) = policy {
+                let policy = support::read_json(&path)?;
+                // A policy prepared for a different receiving branch cannot lower this PR.
+                let actual_branch = event
+                    .pointer("/pull_request/base/ref")
+                    .and_then(Value::as_str)
+                    .or_else(|| {
+                        event
+                            .get("ref")
+                            .and_then(Value::as_str)
+                            .and_then(|s| s.strip_prefix("refs/heads/"))
+                    });
+                if actual_branch.is_some_and(|branch| {
+                    policy.get("receiving_branch").and_then(Value::as_str) != Some(branch)
+                }) {
+                    return Err("verification policy does not match receiving branch".into());
+                }
+                verification::apply(root, &mut selection, policy)?;
+            }
             checks::validate(&selection)?;
             let encoded = serde_json::to_string(&selection).map_err(|error| error.to_string())?;
-            let mut outputs = format!("selection={encoded}\n");
+            let runners = serde_json::to_string(&verification::runners(&selection))
+                .map_err(|e| e.to_string())?;
+            let mut outputs = format!("selection={encoded}\nrunners={runners}\n");
             for job in [Job::Skills, Job::Rust, Job::Policy] {
                 outputs.push_str(&format!("{}={}\n", job.name(), selection.selected(job)));
             }
@@ -140,6 +176,12 @@ pub fn execute(root: &Path, operation: Operation) -> Result<Value, String> {
                 &format!("### Selected CI\n\n```json\n{pretty}\n```\n"),
             )?;
             serde_json::to_value(selection).map_err(|error| error.to_string())
+        }
+        Operation::Suite { name } => {
+            let count = suites::run(root, &name)?;
+            Ok(
+                json!({"schema_version":1,"ok":true,"scope":"ci_suite","suite":name,"tests_executed":count}),
+            )
         }
         Operation::Gate => {
             let selection = parse_selection(&required("CI_SELECTION")?)?;

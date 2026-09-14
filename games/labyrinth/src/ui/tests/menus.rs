@@ -1,29 +1,58 @@
 use super::*;
 
 #[test]
-fn main_menu_wrapped_footer_fits_inside_its_surface() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        let mut app = app(width, height, UiScaleMode::Auto);
-        *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
-        run_frames(&mut app, 5);
-        let advice = find_named(app.world_mut(), "Local Play Advice").expect("footer");
-        let bounds = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-        let visible = visible_control_rect(app.world(), advice, bounds).expect("visible footer");
-        let node = app
-            .world()
-            .get::<ComputedNode>(advice)
-            .copied()
-            .expect("measured text");
-        assert!(
-            visible.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
-            "wrapped footer clipped at {width}x{height}: visible={visible:?}, measured={node:?} tree={}", ui_tree_snapshot(app.world_mut())
-        );
-    }
+fn main_menu_wrapped_footer_fits_inside_its_surface_normal_1080() {
+    main_menu_wrapped_footer_fits_inside_its_surface(1920, 1080, UiScaleMode::Auto);
 }
 
 #[test]
-fn local_navigation_blocks_only_own_input_and_leave_requires_confirmation() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn main_menu_wrapped_footer_fits_inside_its_surface_compatibility() {
+    main_menu_wrapped_footer_fits_inside_its_surface(1280, 720, UiScaleMode::Auto);
+    main_menu_wrapped_footer_fits_inside_its_surface(3840, 2160, UiScaleMode::Auto);
+}
+
+fn main_menu_wrapped_footer_fits_inside_its_surface(width: u32, height: u32, scale: UiScaleMode) {
+    let mut app = app(width, height, scale);
+    *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
+    run_frames(&mut app, 5);
+    let advice = find_named(app.world_mut(), "Local Play Advice").expect("footer");
+    let bounds = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+    let visible = visible_control_rect(app.world(), advice, bounds).expect("visible footer");
+    let node = app
+        .world()
+        .get::<ComputedNode>(advice)
+        .copied()
+        .expect("measured text");
+    assert!(
+        visible.height() + 0.5 >= node.size().y * node.inverse_scale_factor,
+        "wrapped footer clipped at {width}x{height}: visible={visible:?}, measured={node:?} tree={}", ui_tree_snapshot(app.world_mut())
+    );
+}
+
+#[test]
+fn local_navigation_blocks_only_own_input_and_leave_requires_confirmation_normal_1080() {
+    local_navigation_blocks_only_own_input_and_leave_requires_confirmation(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn local_navigation_blocks_only_own_input_and_leave_requires_confirmation_compatibility() {
+    local_navigation_blocks_only_own_input_and_leave_requires_confirmation(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn local_navigation_blocks_only_own_input_and_leave_requires_confirmation(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     let before = app.world().resource::<LabyrinthView>().combat.clone();
     apply_action(app.world_mut(), Action::Choice(Choice::Wait));
     let source = find_named(app.world_mut(), "Battle Settings").expect("game menu");
@@ -78,13 +107,26 @@ fn local_navigation_blocks_only_own_input_and_leave_requires_confirmation() {
 }
 
 #[test]
-fn menu_close_cannot_clear_connection_or_fault_suspension() {
+fn menu_close_cannot_clear_connection_or_fault_suspension_normal_1080() {
+    menu_close_cannot_clear_connection_or_fault_suspension(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn menu_close_cannot_clear_connection_or_fault_suspension_compatibility() {
+    menu_close_cannot_clear_connection_or_fault_suspension(1280, 720, UiScaleMode::Auto);
+}
+
+fn menu_close_cannot_clear_connection_or_fault_suspension(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     for reason in [
         crate::view::CombatInterruption::WaitingForPlayers,
         crate::view::CombatInterruption::Reconnecting,
         crate::view::CombatInterruption::Halted,
     ] {
-        let mut app = app(1280, 720, UiScaleMode::Auto);
+        let mut app = app(width, height, scale);
         apply_action(app.world_mut(), Action::Settings);
         {
             let mut view = app.world_mut().resource_mut::<LabyrinthView>();
@@ -103,8 +145,29 @@ fn menu_close_cannot_clear_connection_or_fault_suspension() {
 }
 
 #[test]
-fn admission_notice_refresh_preserves_native_field_entity_value_and_focus() {
-    let mut app = app(1280, 720, UiScaleMode::Auto);
+fn admission_notice_refresh_preserves_native_field_entity_value_and_focus_normal_1080() {
+    admission_notice_refresh_preserves_native_field_entity_value_and_focus(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn admission_notice_refresh_preserves_native_field_entity_value_and_focus_compatibility() {
+    admission_notice_refresh_preserves_native_field_entity_value_and_focus(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn admission_notice_refresh_preserves_native_field_entity_value_and_focus(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = app(width, height, scale);
     *app.world_mut().resource_mut::<LabyrinthView>() = LabyrinthView::default();
     apply_action(app.world_mut(), Action::Form(Form::Direct));
     run_frames(&mut app, 3);

@@ -1,6 +1,6 @@
 //! Validate CI records, plan literal child arguments and audit required job results.
 
-use super::{head, Job, Selection};
+use super::{head, suites, verification, Job, Selection};
 use serde_json::Value;
 use std::path::Path;
 
@@ -44,6 +44,7 @@ pub fn validate(selection: &Selection) -> Result<(), String> {
         }
     }
     if selection.full
+        && verification::level(selection).is_none()
         && ![
             selection.skills,
             selection.rust,
@@ -58,8 +59,29 @@ pub fn validate(selection: &Selection) -> Result<(), String> {
     {
         return Err("full selection omitted checks".into());
     }
-    if selection.rust && !selection.full && selection.packages.is_empty() {
+    if selection.rust
+        && (!selection.full || verification::level(selection).is_some())
+        && selection.packages.is_empty()
+    {
         return Err("selected Rust checks without packages".into());
+    }
+    if selection.full
+        && verification::level(selection).is_some()
+        && !(selection.skills && selection.rust && selection.policy)
+    {
+        return Err("full affected scope omitted an owner job".into());
+    }
+    if let Some(policy) = &selection.verification {
+        verification::validate(policy)?;
+    }
+    for name in &selection.suites {
+        let suite = suites::get(name)?;
+        if !selection.packages.iter().any(|p| p == suite.package) {
+            return Err(format!("suite {name} has no selected owner"));
+        }
+    }
+    if verification::level(selection).is_some() && selection.suites != suites::select(selection) {
+        return Err("positive suites differ from selected impact".into());
     }
     Ok(())
 }
@@ -95,7 +117,7 @@ fn argv(arguments: &[&str]) -> Vec<String> {
 }
 
 fn cargo_packages(selection: &Selection) -> Vec<String> {
-    if selection.full {
+    if selection.full && verification::level(selection).is_none() {
         argv(&["--workspace"])
     } else {
         selection
@@ -128,6 +150,59 @@ fn repository_command(command: &str, action: &str) -> Vec<String> {
     ])
 }
 
+fn repository_tests(selection: &Selection) -> Result<Vec<&'static str>, String> {
+    let mut targets = std::collections::BTreeSet::new();
+    for path in &selection.paths {
+        if let Some(target) = path
+            .strip_prefix("devtools/tests/")
+            .and_then(|p| p.strip_suffix(".rs"))
+            .filter(|p| !p.contains('/'))
+        {
+            if !matches!(target, "ci_routing" | "ci_checks" | "ci_cli") {
+                let known = [
+                    "inputs",
+                    "cli",
+                    "bundle",
+                    "catalog",
+                    "contracts",
+                    "legacy",
+                    "repository",
+                    "distribution",
+                    "distribution_archives",
+                ];
+                let target = known
+                    .into_iter()
+                    .find(|known| *known == target)
+                    .ok_or_else(|| format!("classify new repository test target {target}"))?;
+                targets.insert(target);
+            }
+        }
+        for (source, tests) in [
+            ("bundle", &["bundle"] as &[&str]),
+            ("distribution", &["distribution", "distribution_archives"]),
+            ("catalog", &["catalog"]),
+            ("contracts", &["contracts"]),
+            ("legacy", &["legacy"]),
+            ("repository", &["repository"]),
+            ("markdown", &["repository"]),
+            ("support", &["inputs"]),
+        ] {
+            if path == &format!("devtools/src/{source}.rs")
+                || path.starts_with(&format!("devtools/tests/{source}"))
+            {
+                targets.extend(tests.iter().copied());
+            }
+        }
+        if matches!(
+            path.as_str(),
+            "devtools/src/main.rs" | "devtools/src/lib.rs"
+        ) {
+            targets.insert("cli");
+        }
+    }
+    Ok(targets.into_iter().collect())
+}
+
 /// Build the ordered literal argument vectors for one selected CI job.
 ///
 /// Paths containing spaces remain one argument; no shell expansion is performed.
@@ -144,21 +219,23 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
     let mut commands = Vec::new();
     match job {
         Job::Skills => {
-            commands.push(argv(&[
-                "cargo",
-                "test",
-                "--locked",
-                "-p",
-                "repo-devtools",
-                "--profile",
-                "ci",
-                "--test",
-                "ci_routing",
-                "--test",
-                "ci_checks",
-                "--test",
-                "ci_cli",
-            ]));
+            if verification::level(selection).is_none() {
+                commands.push(argv(&[
+                    "cargo",
+                    "test",
+                    "--locked",
+                    "-p",
+                    "repo-devtools",
+                    "--profile",
+                    "ci",
+                    "--test",
+                    "ci_routing",
+                    "--test",
+                    "ci_checks",
+                    "--test",
+                    "ci_cli",
+                ]));
+            }
             commands.push(repository_command("skills", "legacy"));
             commands.push(repository_command("skills", "validate"));
             commands.push(repository_command("bundle", "check"));
@@ -171,6 +248,48 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                 "--profile",
                 "ci",
             ]));
+        }
+        Job::Rust if verification::level(selection).is_some() => {
+            // Compile selected consumers, then execute only named game suites.
+            commands.push(package_command(
+                "check",
+                &packages,
+                &["--locked", "--all-targets", "--profile", "ci"],
+            ));
+            for package in selection.packages.iter().filter(|p| !suites::game(p)) {
+                if package == "gameskills-cli" && selection.skills {
+                    continue;
+                }
+                if package == "repo-devtools" && verification::level(selection) != Some("release") {
+                    // Classification already owns CI fixtures. Execute other affected tool
+                    // contracts once, without selecting unrelated Cargo artifact probes.
+                    for target in repository_tests(selection)? {
+                        commands.push(package_command(
+                            "test",
+                            &["-p".into(), package.clone()],
+                            &["--locked", "--profile", "ci", "--test", target],
+                        ));
+                    }
+                } else {
+                    commands.push(package_command(
+                        "test",
+                        &["-p".into(), package.clone()],
+                        &["--locked", "--all-features", "--profile", "ci"],
+                    ));
+                }
+            }
+            for name in &selection.suites {
+                commands.push(vec![
+                    "repo-devtools".into(),
+                    "ci".into(),
+                    "suite".into(),
+                    name.clone(),
+                ]);
+            }
+            if selection.distribution {
+                commands.push(repository_command("distribution", "check"));
+                commands.push(repository_command("distribution", "archives"));
+            }
         }
         Job::Rust => {
             if selection.full

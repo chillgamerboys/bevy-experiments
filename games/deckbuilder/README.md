@@ -73,6 +73,11 @@ Use `200` for semantic scaling and `match`, `multiplayer`, `host` or `browser` f
 the route. `help-energy`, `help-played` and `help-turn` capture the corresponding
 card restriction through the existing production UI actions. These authored
 captures do not establish native keyboard/pointer interaction or hover timing.
-Review all three supported viewport sizes at Auto/200%, then separately
-walk keyboard/pointer, focus, modal, scrolling and resizing. Screenshots are not
-gameplay or interaction assertions.
+For changed UI presentation or interaction, inspect the affected route at 1920×1080
+Auto and exercise its relevant inputs. Logic-only fixes need no agent UI walk.
+The `deckbuilder-ui-normal` suite runs normal-display behavioral checks; retained
+`compatibility` tests cover other sizes/scales when a defect or Release support
+requires them. End-to-end checks follow affected journeys. Screenshots are not
+gameplay or interaction assertions. Follow the shared
+[rigor and milestone policy](../../docs/testing.md), including milestone-only
+developer sanity for game effects.

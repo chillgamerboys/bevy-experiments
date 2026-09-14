@@ -6,9 +6,33 @@ clients = ["codex", "claude"]
 [project]
 name = "Bevy Experiments"
 delivery_target = "pr"
+# Bootstrap remains on main until the validated dev branch is adopted.
+delivery_base = "main"
 
 [creative]
 default_level = 2
+
+[verification]
+default_level = "development"
+manual_sanity = "milestone"
+
+[verification.branches]
+dev = "development"
+main = "testing"
+
+[verification.display]
+width = 1920
+height = 1080
+scale = "auto"
+
+[verification.levels.development]
+platforms = ["macos"]
+
+[verification.levels.testing]
+platforms = ["macos"]
+
+[verification.levels.release]
+platforms = ["macos", "linux", "windows"]
 
 [dispatch]
 # Owner approved parallel implementation with at most five workers.
@@ -37,15 +61,15 @@ timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.skills-validate]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "skills", "validate"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.legacy-skills-validate]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "skills", "legacy"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
@@ -56,29 +80,29 @@ timeout_seconds = 1800
 resources = ["project:cargo-target"]
 
 [commands.skills-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "gameskills-linear", "--profile", "ci"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 requires = ["skills-validate"]
 
 [commands.repo-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "test", "--locked", "-p", "repo-devtools", "--profile", "ci", "--test", "ci_routing", "--test", "ci_checks", "--test", "ci_cli"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.rust-format]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "fmt", "--all", "--", "--check"]
 timeout_seconds = 120
 
 [commands.tooling-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "-p", "gameskills-linear", "-p", "repo-devtools", "--profile", "ci"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
@@ -89,80 +113,80 @@ timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.tooling-lint]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "gameskills-linear", "-p", "repo-devtools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.ui-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "test", "-p", "bevy-gamekit-ui", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
 [commands.rules-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "test", "-p", "labyrinth-rules", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
 [commands.labyrinth-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
-argv = ["cargo", "test", "--locked", "-p", "labyrinth", "--profile", "ci", "--", "--nocapture"]
+# Baseline rules/session checks; select UI or network suites for affected behavior.
+git_refs = []
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-session"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 requires = ["rules-test"]
 
 [commands.labyrinth-lint]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "clippy", "--locked", "-p", "labyrinth", "-p", "labyrinth-rules", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
 [commands.labyrinth-movement-test]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
-argv = ["cargo", "test", "--locked", "-p", "labyrinth", "--profile", "ci", "--lib", "ui::tests::movement", "--", "--nocapture", "--test-threads=1"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
+argv = ["cargo", "test", "--locked", "-p", "labyrinth", "--profile", "ci", "--lib", "ui::tests::movement", "--", "--skip", "compatibility", "--nocapture", "--test-threads=1"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
 [commands.labyrinth-build]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "build", "--locked", "-p", "labyrinth", "--bin", "labyrinth", "--profile", "ci"]
 timeout_seconds = 1200
 resources = ["project:cargo-target"]
 
 [commands.labyrinth-render-movement]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
-argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-1280.png", "1280", "720", "auto", "movement"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
+argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-1920.png", "1920", "1080", "auto", "movement"]
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
 [commands.labyrinth-render-movement-large-text]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-200.png", "1280", "720", "200", "movement"]
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
 [commands.labyrinth-render-movement-wide]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-1920.png", "1920", "1080", "auto", "movement"]
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
 [commands.labyrinth-render-movement-blocked]
-# Source checks depend on this review base, not unrelated worker branches.
-git_refs = ["refs/remotes/origin/main"]
-argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-blocked-1280.png", "1280", "720", "auto", "movement-blocked"]
+# These commands consume source; the runner binds the resolved receiving base.
+git_refs = []
+argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-movement-blocked-1920.png", "1920", "1080", "auto", "movement-blocked"]
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
@@ -227,3 +251,185 @@ index = "devtools/README.md"
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
+
+
+[commands.runner-probe-build]
+argv = ["cargo", "build", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--example", "runner_probe"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.rigor-test]
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--test", "verification", "--test", "verification_context", "--test", "configuration", "--test", "delivery", "--test", "runner", "--test", "workflow", "--test", "help", "--test", "cli", "--test", "adoption"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+git_refs = []
+requires = ["repo-test", "runner-probe-build"]
+
+[commands.rigor-lint]
+argv = ["cargo", "clippy", "--locked", "-p", "gameskills-cli", "-p", "repo-devtools", "--all-targets", "--profile", "ci", "--", "-D", "warnings"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.carterfight-all]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "carterfight-all"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.carterfight-rules]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "carterfight-rules"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.carterfight-ui-compatibility]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "carterfight-ui-compatibility"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.carterfight-ui-normal]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "carterfight-ui-normal"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-admission]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-admission"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-all]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-all"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-domain]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-domain"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-network]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-network"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-ui-compatibility]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-ui-compatibility"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.deckbuilder-ui-normal]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "deckbuilder-ui-normal"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-admission]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-admission"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-all]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-all"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-editor]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-editor"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-lobby]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-lobby"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-network-discovery]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-network-discovery"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-network-gameplay]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-network-gameplay"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-network-requests]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-network-requests"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-network-spatial]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-network-spatial"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-presentation]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-presentation"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-process]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-process"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-profile]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-profile"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-scene]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-scene"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-session]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-session"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-ui-compatibility]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-ui-compatibility"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-ui-model]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-ui-model"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-ui-normal]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-ui-normal"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-worker]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-worker"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []

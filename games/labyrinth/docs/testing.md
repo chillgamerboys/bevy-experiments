@@ -3,8 +3,22 @@
 Repeatable checks for the current game. Record observations against the tested
 build and route; Git and PR history retain earlier results.
 
-Run from the repository root. CI profile uses the same source/features with faster unoptimized
-compilation; ordinary play uses the default development profile.
+Choose coverage from the changed behavior and resolved project rigor. Development
+and Testing use macOS; Windows/Linux are Release coverage. A logic-only fix needs
+relevant owner tests, not an agent UI walkthrough. UI changes use the affected flow
+at 1920×1080 Auto. End-to-end coverage follows affected journeys: an admission fix
+does not automatically select process death, all six players or every provider.
+
+The developer's manual sanity check gates only milestone batches affecting game
+behavior. The route inventories below are selectable checks, not a checklist for
+every PR. Docs/tooling without game effects need no gameplay check. Coverage outside
+the selected scope is not unfinished acceptance. Stop once relevant checks pass
+unless a new change, failure or unresolved concern justifies more.
+
+Run from the repository root. Cargo's CI profile speeds compilation independently
+of verification rigor; ordinary play uses the default development profile. These
+commands include broad suites for explicit use; the
+[CI selector](../../../devtools/docs/ci.md) owns focused suite execution.
 
 ```sh
 cargo test -p labyrinth-rules --profile ci
@@ -18,6 +32,22 @@ cargo deny check
 cargo run --locked -p repo-devtools --profile ci -- skills legacy
 cargo test --locked -p gameskills-cli --profile ci
 ```
+
+## Focused suites
+
+`repo-devtools ci suite labyrinth-ui-normal` selects tests ending in `normal_1080`.
+They run the relevant retained assertions at 1920×1080 Auto. Former compound matrix
+tests share assertion helpers with separately named `compatibility` cases; those
+retain smaller/larger windows, large text and resize-specific behavior without
+running them in the normal suite. `labyrinth-editor` and `labyrinth-lobby` cover
+ordinary state/intent tests without duplicating the normal wrappers. The suite runner
+lists and executes selected tests and rejects zero-match success.
+
+Select rules/session/admission/process suites for those affected boundaries instead
+of using the UI suite for logic-only work. See the
+[repository suite owner](../../../devtools/src/ci/suites.rs) for actual names and
+selection. Automated native-input messages are behavioral coverage, not an agent
+window walkthrough or developer sanity response.
 
 ## What each layer proves
 
@@ -53,22 +83,24 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
   target/review/labyrinth-1920-auto.png 1920 1080 auto combat
 ```
 
-Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
+For Development/Testing UI changes, inspect only the affected route at 1920×1080
+Auto. Other sizes/scales are compatibility cases selected for a relevant defect
+or explicit Release support, not routine acceptance. Retain their automated tests.
 Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
 `paused`, `abilities`, `ability-help`, `editor` and `editor-actions`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
 
-For customization, review lobby, character editor and complete-ability overflow at
-1280×720 and 1920×1080, including 200% scaling. Automatic focus scrolling is part
+When customization presentation or interaction changes, review the affected lobby,
+character editor or ability-overflow path at 1920×1080 Auto. Automatic focus scrolling is part
 of usability; verify controls can be reached beyond the first visible rows.
 Static frames and headless native-input messages remain distinct from a desktop walk.
 
 The spatial preparation routes are `construction`, `construction-picker`,
 `construction-gap`, `construction-enemy` and `construction-owners`. Review the
 facing formation, actual multi-rank art/span, selected destination, type mechanics,
-ownership and blocked-deployment reason at 1280×720 Auto/200% and wide Auto. The
+ownership and blocked-deployment reason at 1920×1080 Auto when those views change. The
 selected type's useful moves must be visible before placement; large text uses a
 focused list/detail route rather than hiding facts beneath repeated navigation.
 Judge the complete task, including removing a character, choosing another type,
@@ -120,11 +152,13 @@ Keep artifacts in a private temporary directory and redact codes and credentials
 - Close the host. All guests become disconnected; a new host process is a new
   session, not a persisted campaign.
 - Resize during action selection and modal use. Traverse all relevant controls
-  at automatic/200% semantic scale, scroll the inspector/feed, and check focus
+  at the selected display/scale, scroll the inspector/feed, and check focus
   restoration. Review damage/bleed feedback without allowing animation to gate turns.
 
 Cross-machine LAN/tailnet and interactive results must be recorded with the tested
-route and build. Passing deterministic CI is not a substitute for these manual gates.
+route and build when those claims are selected. Deterministic CI cannot establish
+cross-machine operation or supply a milestone developer sanity response. It does
+not make every route above a manual gate.
 
 ## Local menu and history acceptance
 
@@ -139,7 +173,7 @@ route and build. Passing deterministic CI is not a substitute for these manual g
   that a tall actor's own preview cannot intercept the target click. Static
   captures establish presentation only; desktop motion still needs visual review.
 - The fourteen-ability route loads the real atlas with one hero and two enemies
-  at Auto/200%. Effects and ranks must be visible in the first help fold, paging
+  at the selected display/scale. Effects and ranks must be visible in the first help fold, paging
   must reach the authored explanation, and cards must leave HP, character
   summaries and Confirm clear. A visible title alone does not establish usable help.
 - Open host and guest menus/settings during a live encounter: snapshots and peer
@@ -195,14 +229,16 @@ Keep Labyrinth's forecast evidence at two separate levels:
 Vary concealed inputs while keeping public facts fixed and compare the resulting
 presentation, including error shape and derived values. Test partial disclosure,
 not only an entirely concealed actor. Separately review projected HP segments,
-pending effect markers and confirmation clarity at all supported canvas sizes.
+pending effect markers and confirmation clarity at the selected display target;
+use other supported sizes only when compatibility is in scope.
 Normal encounters remain fully revealed: a hidden-information fixture is neither
 an implemented reveal ability nor evidence that network payloads are filtered.
 
 No automated selection test, snapshot or forecast parity check establishes the
-feel of the dock. A pointer/keyboard walk still checks hover-to-focus transitions,
+feel of the dock. When those interactions change, a pointer/keyboard walk checks hover-to-focus transitions,
 off-turn inspection, ability -> target -> Confirm, modal return, overflow and
-resizing. Record any missing interactive or cross-machine evidence explicitly.
+resizing when affected. Record missing required interaction/network evidence;
+unselected routes are not pending gates.
 
 Tooltip lifecycle regressions include immediate first-frame preview and departure,
 one-second continuous hover to lock, persistence over empty space, source switching,
@@ -211,10 +247,10 @@ The native-layout test compares the card rectangle on every frame across locking
 the preview must use the same shorter geometry as the locked card, not reserve an
 extra footer. Native pointer tests close the × over an underlying character and
 verify that stationary-pointer dismissal does not reveal a new tooltip. Render
-`labyrinth_review ... 1280 720 auto help` and `help-locked` for separate authored
+`labyrinth_review ... 1920 1080 auto help` and `help-locked` for separate authored
 presentation states; those captures freeze timing and do not prove hover duration.
 
-## Unresolved verification
+## Additional selectable routes and coverage boundaries
 
 The unified editor and preparation require decision-information checks as well as
 input/layout checks. Compare a dagger and greatsword at different acting ranks,
@@ -233,7 +269,8 @@ Editor lifecycle coverage in `ui/setup_tests.rs` includes permission loss/return
 without remounting fields, retained drafts/carets, and independent footprint/choice
 restrictions. Decision coverage in `ui/setup/tests.rs` verifies that prerequisite
 rejections use catalog move names while resolution still controls eligibility.
-These checks do not replace the native walk. The queued-hotbar regression sends a
+These checks do not establish a native walk; select one when the changed
+interaction requires it. The queued-hotbar regression sends a
 synthetic `UiActivated` batch through production translation before Present, with
 an unchanged positive control and a replaced valid build. It tests source binding,
 not a desktop pointer reproduction. Preserve the baseline wrong-action failure
@@ -242,4 +279,5 @@ and the fixed result in the UI revision evidence.
 Historical local reviews did not establish cross-machine LAN/Tailscale behavior,
 all window-resize paths or manual round-six corpse expiry. Deterministic lifecycle
 and localhost tests prove different claims. Recheck these routes when the related
-behavior is next reviewed; do not infer a fresh pass from a removed milestone report.
+behavior and rigor require them; they do not block unrelated development work.
+Do not infer a fresh pass from a removed milestone report.

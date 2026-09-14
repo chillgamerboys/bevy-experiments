@@ -43,7 +43,9 @@ A plan is a JSON object. `schema_version`, `id`, `goal`, `delivery_target`,
 `repository`, `versions`, `packages`, `decisions`, and `orders` are required.
 `creative_level` defaults to the configured level. An order inherits the plan's
 creative level and packages unless it explicitly chooses a subset of packages
-and its own bounded creative level.
+and its own bounded creative level. Carry the independently resolved verification
+policy, actual receiving branch, affected scope and selected command reasons into
+the plan and orders; do not turn a worker handoff into a fresh broader test policy.
 
 ```json
 {

@@ -29,7 +29,7 @@ capability, use available project guidance for the bounded work and preserve any
 verification gap. Do not silently install it.
 
 Project-owned `gameskills.toml` selects packages, targets, commands, compatibility,
-creative defaults and execution roles. Inspect it along with manifests, lockfiles,
+creative defaults, optional verification rigor and execution roles. Inspect it along with manifests, lockfiles,
 CI and relevant project documentation. Configuration expresses choices; it does
 not demonstrate that a command ran or a client/package combination was tested.
 Existing `.bevy-gamekit/overlays/` material is local context when migrating an

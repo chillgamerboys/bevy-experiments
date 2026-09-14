@@ -54,7 +54,33 @@ fn git(root: &Path, args: &[&str]) -> String {
         .to_owned()
 }
 fn config_text(value: &Value) -> String {
-    format!("schema_version = 1\npackages = {}\n[creative]\ndefault_level = {}\n[dispatch]\nenabled = {}\nmax_workers = {}\n", at(value,"/packages"), at(value,"/creative/default_level"), at(value,"/dispatch/enabled"), at(value,"/dispatch/max_workers"))
+    let mut source = format!(
+        "schema_version = 1\npackages = {}\n[creative]\ndefault_level = {}\n[dispatch]\nenabled = {}\nmax_workers = {}\n",
+        at(value, "/packages"),
+        at(value, "/creative/default_level"),
+        at(value, "/dispatch/enabled"),
+        at(value, "/dispatch/max_workers")
+    );
+    if let Some(project) = value.get("project") {
+        source.push_str(&format!(
+            "[project]\ndelivery_base = {}\n",
+            at(project, "/delivery_base")
+        ));
+    }
+    if let Some(policy) = value.get("verification") {
+        source.push_str(&format!(
+            "[verification]\ndefault_level = {}\nmanual_sanity = {}\n[verification.branches]\ndev = {}\nmain = {}\n[verification.display]\nwidth = {}\nheight = {}\nscale = {}\n",
+            at(policy, "/default_level"), at(policy, "/manual_sanity"), at(policy, "/branches/dev"), at(policy, "/branches/main"),
+            at(policy, "/display/width"), at(policy, "/display/height"), at(policy, "/display/scale")
+        ));
+        for level in ["development", "testing", "release"] {
+            source.push_str(&format!(
+                "[verification.levels.{level}]\nplatforms = {}\n",
+                at(policy, &format!("/levels/{level}/platforms"))
+            ));
+        }
+    }
+    source
 }
 struct Fixture {
     _temp: TempDir,
@@ -419,6 +445,138 @@ fn repository_source_base_and_commit_identity() {
 mod posix {
     use super::*;
     use std::os::unix::fs::{symlink, PermissionsExt};
+
+    fn with_verification(config: &Value) -> Value {
+        changed(
+            config.clone(),
+            json!({
+                "project": {"delivery_base": "main"},
+                "verification": {
+                    "default_level": "development",
+                    "manual_sanity": "milestone",
+                    "branches": {"dev": "development", "main": "testing"},
+                    "display": {"width": 1920, "height": 1080, "scale": "auto"},
+                    "levels": {
+                        "development": {"platforms": ["macos"]},
+                        "testing": {"platforms": ["macos"]},
+                        "release": {"platforms": ["macos", "windows", "linux"]}
+                    }
+                }
+            }),
+        )
+    }
+
+    #[test]
+    fn adopting_verification_preserves_queue_history_and_blocks_further_execution() {
+        let f = Fixture::new();
+        f.create(vec![
+            f.order("pending"),
+            f.order("blocked"),
+            f.order("reported"),
+        ]);
+        let blocked = f.tree("blocked-worker");
+        f.start("blocked", &blocked);
+        f.block("blocked", "Waiting for policy discussion");
+        let reported = f.tree("reported-worker");
+        f.start("reported", &reported);
+        f.report("reported", &reported);
+        let original = f.read();
+        let bytes = fs::read(f.path()).expect("historical bytes");
+        let adopted = with_verification(&f.config);
+        fs::write(f.root.join("gameskills.toml"), config_text(&adopted)).expect("adopt policy");
+        let status = f.status(&adopted).expect("historical queue stays readable");
+        assert_eq!(at(&status, "/queue/config_changed"), true);
+        assert_eq!(at(&status, "/queue/plan"), at(&original, "/plan"));
+        for name in ["pending", "blocked", "reported"] {
+            assert_eq!(
+                at(&status, &format!("/queue/orders/{name}/spec")),
+                at(&original, &format!("/orders/{name}/spec"))
+            );
+            assert!(at(
+                &status,
+                &format!("/queue/orders/{name}/merge_waiting_reasons")
+            )
+            .to_string()
+            .contains("verification policy is not recorded"));
+        }
+        assert!(at(&status, "/queue/orders/pending/waiting_reasons")
+            .to_string()
+            .contains("verification policy is not recorded"));
+        assert!(at(&status, "/queue/orders/blocked/waiting_reasons")
+            .to_string()
+            .contains("verification policy is not recorded"));
+        assert_eq!(
+            fs::read(f.path()).expect("status did not rewrite queue"),
+            bytes
+        );
+
+        for (action, order, tree) in [
+            ("start", "pending", Some(blocked.as_path())),
+            ("resume", "blocked", Some(blocked.as_path())),
+            ("integrated", "reported", None),
+            ("inject", "", None),
+        ] {
+            f.unchanged("verification policy is not recorded", || {
+                f.mutate_config(action, order, Value::Null, tree, f.revision(), &adopted)
+            });
+        }
+    }
+
+    #[test]
+    fn changed_verification_policy_remains_visible_without_reinterpreting_stored_selection() {
+        let mut f = Fixture::new();
+        f.config = with_verification(&f.config);
+        fs::write(f.root.join("gameskills.toml"), config_text(&f.config)).expect("initial policy");
+        f.create(vec![f.order("one")]);
+        let original = f.read();
+        let bytes = fs::read(f.path()).expect("queue bytes");
+        let mut changed = f.config.clone();
+        *changed
+            .pointer_mut("/verification/manual_sanity")
+            .expect("fixture field") = json!("never");
+        fs::write(f.root.join("gameskills.toml"), config_text(&changed)).expect("changed policy");
+        let status = f
+            .status(&changed)
+            .expect("historical policy stays readable");
+        assert_eq!(at(&status, "/queue/config_changed"), true);
+        assert_eq!(
+            at(&status, "/queue/plan/verification"),
+            at(&original, "/plan/verification")
+        );
+        assert_eq!(
+            at(&status, "/queue/orders/one/spec/verification"),
+            at(&original, "/orders/one/spec/verification")
+        );
+        assert!(at(&status, "/queue/orders/one/waiting_reasons")
+            .to_string()
+            .contains("verification policy changed"));
+        assert_eq!(fs::read(f.path()).expect("status preserved history"), bytes);
+        let worker = f.tree("worker");
+        f.unchanged("verification policy changed", || {
+            f.mutate_config(
+                "start",
+                "one",
+                Value::Null,
+                Some(&worker),
+                f.revision(),
+                &changed,
+            )
+        });
+
+        let mut malformed = original;
+        *malformed
+            .pointer_mut("/orders/one/spec/verification/policy/schema_version")
+            .expect("fixture field") = json!(9);
+        fs::write(
+            f.path(),
+            serde_json::to_vec(&malformed).expect("modified fixture"),
+        )
+        .expect("write malformed history");
+        assert!(f
+            .status(&changed)
+            .expect_err("invalid schema remains an error")
+            .contains("historical verification policy schema"));
+    }
     #[test]
     fn ownership_rejects_symlink_parent_and_leaf() {
         let f = Fixture::new();

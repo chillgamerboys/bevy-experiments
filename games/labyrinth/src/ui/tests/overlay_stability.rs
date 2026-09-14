@@ -225,157 +225,217 @@ fn hover_control(app: &mut App, entity: Entity, viewport: Rect) {
 }
 
 #[test]
-fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        let mut app = scene_app(width, height, UiScaleMode::Auto);
-        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-        let actor = find_named(app.world_mut(), "Actor 105").expect("actor");
-        let layout = app
-            .world()
-            .get::<crate::scene::SceneActorLayout>(actor)
-            .expect("layout anchor")
-            .0;
-        let column = visible_control_rect(app.world(), layout, viewport).expect("column");
-        let hit = visible_control_rect(app.world(), actor, viewport).expect("hit area");
-        let kind = app
-            .world()
-            .resource::<LabyrinthView>()
-            .combat
-            .as_ref()
-            .expect("combat")
-            .actor(ActorId(105))
-            .expect("actor")
-            .kind;
-        let art =
-            crate::scene::actor_art_size(app.world(), kind, column.size()).expect("loaded art");
-        assert!(
-            (hit.size() - art.max(Vec2::splat(44.0)).min(column.size()))
-                .abs()
-                .max_element()
-                < 1.0
-        );
-        let empty = Vec2::new(column.center().x, column.min.y + 12.0);
-        assert!(!hit.contains(empty));
-        hover_at(&mut app, empty);
-        assert_eq!(
-            app.world().get::<Interaction>(actor),
-            Some(&Interaction::None)
-        );
-        assert!(app
-            .world()
-            .resource::<bevy_gamekit::ui::UiTooltipState>()
-            .subjects()
-            .is_empty());
-        native_pointer_click(&mut app, empty);
-        assert_eq!(app.world().resource::<UiState>().target, None);
-        native_pointer_click(&mut app, hit.center());
-        assert_eq!(app.world().resource::<UiState>().target, Some(ActorId(105)));
-        let toggle = find_named(app.world_mut(), "Battle Log Toggle").expect("log");
-        let toggle_rect = visible_control_rect(app.world(), toggle, viewport).expect("toggle");
-        native_pointer_click(&mut app, toggle_rect.center());
-        run_frames(&mut app, 3);
-        hover_at(&mut app, hit.center());
-        let panel = find_named(app.world_mut(), "Combat History").expect("history");
-        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("actor tooltip");
-        let panel_rect = visible_control_rect(app.world(), panel, viewport).expect("log bounds");
-        let card_rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");
-        assert!(
-            panel_rect.intersect(card_rect).is_empty(),
-            "tooltip covers log at {width}x{height}"
-        );
-    }
+fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log_normal_1080() {
+    artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
 }
 
 #[test]
-fn overlay_selection_forecasts_and_drawers_never_move_world_characters() {
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
-            let mut app = scene_app(width, height, scale);
-            let snapshot = app
-                .world()
-                .resource::<LabyrinthView>()
-                .combat
-                .clone()
-                .expect("combat");
-            let source = snapshot.active_actor.expect("acting hero");
-            let skills = snapshot.actor(source).expect("hero").skills().to_vec();
-            let expected = geometry(&mut app);
-            for (index, skill) in skills.into_iter().enumerate() {
-                keyboard_control(&mut app, &format!("Skill {index}"));
-                assert_eq!(
-                    app.world().resource::<UiState>().selected,
-                    Some(Choice::Ability(index as u8))
-                );
+fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log_compatibility() {
+    artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+}
+
+fn artwork_hit_regions_exclude_empty_formation_space_and_tooltips_avoid_the_log(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = scene_app(width, height, scale);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+    let actor = find_named(app.world_mut(), "Actor 105").expect("actor");
+    let layout = app
+        .world()
+        .get::<crate::scene::SceneActorLayout>(actor)
+        .expect("layout anchor")
+        .0;
+    let column = visible_control_rect(app.world(), layout, viewport).expect("column");
+    let hit = visible_control_rect(app.world(), actor, viewport).expect("hit area");
+    let kind = app
+        .world()
+        .resource::<LabyrinthView>()
+        .combat
+        .as_ref()
+        .expect("combat")
+        .actor(ActorId(105))
+        .expect("actor")
+        .kind;
+    let art = crate::scene::actor_art_size(app.world(), kind, column.size()).expect("loaded art");
+    assert!(
+        (hit.size() - art.max(Vec2::splat(44.0)).min(column.size()))
+            .abs()
+            .max_element()
+            < 1.0
+    );
+    let empty = Vec2::new(column.center().x, column.min.y + 12.0);
+    assert!(!hit.contains(empty));
+    hover_at(&mut app, empty);
+    assert_eq!(
+        app.world().get::<Interaction>(actor),
+        Some(&Interaction::None)
+    );
+    assert!(app
+        .world()
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
+        .subjects()
+        .is_empty());
+    native_pointer_click(&mut app, empty);
+    assert_eq!(app.world().resource::<UiState>().target, None);
+    native_pointer_click(&mut app, hit.center());
+    assert_eq!(app.world().resource::<UiState>().target, Some(ActorId(105)));
+    let toggle = find_named(app.world_mut(), "Battle Log Toggle").expect("log");
+    let toggle_rect = visible_control_rect(app.world(), toggle, viewport).expect("toggle");
+    native_pointer_click(&mut app, toggle_rect.center());
+    run_frames(&mut app, 3);
+    hover_at(&mut app, hit.center());
+    let panel = find_named(app.world_mut(), "Combat History").expect("history");
+    let card = find_named(app.world_mut(), "Tooltip Card 0").expect("actor tooltip");
+    let panel_rect = visible_control_rect(app.world(), panel, viewport).expect("log bounds");
+    let card_rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");
+    assert!(
+        panel_rect.intersect(card_rect).is_empty(),
+        "tooltip covers log at {width}x{height}"
+    );
+}
+
+#[test]
+fn overlay_selection_forecasts_and_drawers_never_move_world_characters_normal_1080() {
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn overlay_selection_forecasts_and_drawers_never_move_world_characters_compatibility() {
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        1280,
+        720,
+        UiScaleMode::Percent200,
+    );
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        1920,
+        1080,
+        UiScaleMode::Percent200,
+    );
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+    overlay_selection_forecasts_and_drawers_never_move_world_characters(
+        3840,
+        2160,
+        UiScaleMode::Percent200,
+    );
+}
+
+fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
+    let mut app = scene_app(width, height, scale);
+    let snapshot = app
+        .world()
+        .resource::<LabyrinthView>()
+        .combat
+        .clone()
+        .expect("combat");
+    let source = snapshot.active_actor.expect("acting hero");
+    let skills = snapshot.actor(source).expect("hero").skills().to_vec();
+    let expected = geometry(&mut app);
+    for (index, skill) in skills.into_iter().enumerate() {
+        keyboard_control(&mut app, &format!("Skill {index}"));
+        assert_eq!(
+            app.world().resource::<UiState>().selected,
+            Some(Choice::Ability(index as u8))
+        );
+        unchanged(
+            &mut app,
+            &expected,
+            &snapshot,
+            &format!("{width}x{height} {scale:?}: selecting {skill:?}"),
+        );
+        // A valid target may not exist when a skill is unavailable from
+        // the current rank. Invalid inspection must still stay stable.
+        for valid in [true, false] {
+            let target = snapshot.actors.iter().find(|actor| {
+                snapshot
+                    .validate_action_target(
+                        source,
+                        &CombatAction::Skill {
+                            skill,
+                            target: actor.id,
+                        },
+                    )
+                    .is_ok()
+                    == valid
+            });
+            if let Some(target) = target {
+                keyboard_control(&mut app, &format!("Actor {}", target.id.0));
+                assert_eq!(app.world().resource::<UiState>().target, Some(target.id));
                 unchanged(
                     &mut app,
                     &expected,
                     &snapshot,
-                    &format!("{width}x{height} {scale:?}: selecting {skill:?}"),
+                    &format!("{width}x{height} {scale:?}: {skill:?}, valid={valid}"),
                 );
-                // A valid target may not exist when a skill is unavailable from
-                // the current rank. Invalid inspection must still stay stable.
-                for valid in [true, false] {
-                    let target = snapshot.actors.iter().find(|actor| {
-                        snapshot
-                            .validate_action_target(
-                                source,
-                                &CombatAction::Skill {
-                                    skill,
-                                    target: actor.id,
-                                },
-                            )
-                            .is_ok()
-                            == valid
-                    });
-                    if let Some(target) = target {
-                        keyboard_control(&mut app, &format!("Actor {}", target.id.0));
-                        assert_eq!(app.world().resource::<UiState>().target, Some(target.id));
-                        unchanged(
-                            &mut app,
-                            &expected,
-                            &snapshot,
-                            &format!("{width}x{height} {scale:?}: {skill:?}, valid={valid}"),
-                        );
-                    }
-                }
-                let selection = app.world().resource::<UiState>().selected;
-                let target = app.world().resource::<UiState>().target;
-                {
-                    let toggle = "Battle Log Toggle";
-                    let button = find_named(app.world_mut(), toggle).expect("drawer toggle");
-                    pointer_control(&mut app, button, Vec2::new(width as f32, height as f32));
-                    let ui = app.world().resource::<UiState>();
-                    assert_eq!(ui.log_mode, LogMode::History);
-                    unchanged(&mut app, &expected, &snapshot, toggle);
-                    tap_key(&mut app, KeyCode::Escape);
-                    unchanged(
-                        &mut app,
-                        &expected,
-                        &snapshot,
-                        "closing selected-state drawer",
-                    );
-                    let ui = app.world().resource::<UiState>();
-                    assert_eq!(ui.selected, selection);
-                    assert_eq!(ui.target, target);
-                    assert_eq!(ui.log_mode, LogMode::Hidden);
-                }
-                keyboard_control(&mut app, "Cancel Combat Selection");
-                assert!(app.world().resource::<UiState>().selected.is_none());
-                unchanged(&mut app, &expected, &snapshot, "cancel ability and target");
-            }
-            for (name, choice) in [("Wait", Choice::Wait), ("Defend", Choice::Defend)] {
-                keyboard_control(&mut app, name);
-                assert_eq!(app.world().resource::<UiState>().selected, Some(choice));
-                unchanged(&mut app, &expected, &snapshot, name);
-                keyboard_control(&mut app, "Cancel Combat Selection");
-                unchanged(&mut app, &expected, &snapshot, "cancel utility");
             }
         }
+        let selection = app.world().resource::<UiState>().selected;
+        let target = app.world().resource::<UiState>().target;
+        {
+            let toggle = "Battle Log Toggle";
+            let button = find_named(app.world_mut(), toggle).expect("drawer toggle");
+            pointer_control(&mut app, button, Vec2::new(width as f32, height as f32));
+            let ui = app.world().resource::<UiState>();
+            assert_eq!(ui.log_mode, LogMode::History);
+            unchanged(&mut app, &expected, &snapshot, toggle);
+            tap_key(&mut app, KeyCode::Escape);
+            unchanged(
+                &mut app,
+                &expected,
+                &snapshot,
+                "closing selected-state drawer",
+            );
+            let ui = app.world().resource::<UiState>();
+            assert_eq!(ui.selected, selection);
+            assert_eq!(ui.target, target);
+            assert_eq!(ui.log_mode, LogMode::Hidden);
+        }
+        keyboard_control(&mut app, "Cancel Combat Selection");
+        assert!(app.world().resource::<UiState>().selected.is_none());
+        unchanged(&mut app, &expected, &snapshot, "cancel ability and target");
+    }
+    for (name, choice) in [("Wait", Choice::Wait), ("Defend", Choice::Defend)] {
+        keyboard_control(&mut app, name);
+        assert_eq!(app.world().resource::<UiState>().selected, Some(choice));
+        unchanged(&mut app, &expected, &snapshot, name);
+        keyboard_control(&mut app, "Cancel Combat Selection");
+        unchanged(&mut app, &expected, &snapshot, "cancel utility");
     }
 }
 
 #[test]
-fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free() {
+fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free_normal_1080() {
     let mut app = scene_app(1920, 1080, UiScaleMode::Auto);
     assert!(find_named(app.world_mut(), "Selected Skill").is_none());
     assert!(find_named(app.world_mut(), "Target Legality").is_none());
@@ -441,10 +501,31 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free() {
 }
 
 #[test]
-fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry() {
+fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry_normal_1080() {
+    hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry_compatibility() {
+    hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+}
+
+fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     use bevy_gamekit::ui::UiTooltipState;
-    let mut app = scene_app(1280, 720, UiScaleMode::Auto);
-    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0));
+    let mut app = scene_app(width, height, scale);
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
     let source = find_named(app.world_mut(), "Skill 0").expect("source");
     let point = visible_control_rect(app.world(), source, viewport)
         .expect("source geometry")
@@ -516,12 +597,21 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry() {
 }
 
 #[test]
-fn tooltip_is_never_visible_at_unplaced_geometry() {
+fn tooltip_is_never_visible_at_unplaced_geometry_normal_1080() {
+    tooltip_is_never_visible_at_unplaced_geometry(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn tooltip_is_never_visible_at_unplaced_geometry_compatibility() {
+    tooltip_is_never_visible_at_unplaced_geometry(1280, 720, UiScaleMode::Auto);
+}
+
+fn tooltip_is_never_visible_at_unplaced_geometry(width: u32, height: u32, scale: UiScaleMode) {
     use bevy_gamekit::ui::{
         UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject,
     };
 
-    let mut app = scene_app(1280, 720, UiScaleMode::Auto);
+    let mut app = scene_app(width, height, scale);
     let subject = UiTooltipSubject("placement-regression".to_owned());
     for body in [
         "Short explanation".to_owned(),
@@ -584,7 +674,7 @@ fn tooltip_is_never_visible_at_unplaced_geometry() {
 }
 
 #[test]
-fn tooltip_resize_is_placed_before_clipping_in_the_same_frame() {
+fn tooltip_resize_is_placed_before_clipping_in_the_same_frame_compatibility() {
     use bevy_gamekit::ui::{
         UiTooltipCatalog, UiTooltipContent, UiTooltipRequest, UiTooltipSubject,
     };
@@ -648,8 +738,17 @@ fn tooltip_resize_is_placed_before_clipping_in_the_same_frame() {
 }
 
 #[test]
-fn opening_a_link_keeps_the_parent_tooltip_visible() {
-    let mut app = scene_app(1280, 720, UiScaleMode::Auto);
+fn opening_a_link_keeps_the_parent_tooltip_visible_normal_1080() {
+    opening_a_link_keeps_the_parent_tooltip_visible(1920, 1080, UiScaleMode::Auto);
+}
+
+#[test]
+fn opening_a_link_keeps_the_parent_tooltip_visible_compatibility() {
+    opening_a_link_keeps_the_parent_tooltip_visible(1280, 720, UiScaleMode::Auto);
+}
+
+fn opening_a_link_keeps_the_parent_tooltip_visible(width: u32, height: u32, scale: UiScaleMode) {
+    let mut app = scene_app(width, height, scale);
     let source = find_named(app.world_mut(), "Skill 0").expect("ability");
     assert!(focus_action(app.world_mut(), source));
     tap_key(&mut app, KeyCode::KeyT);
@@ -690,118 +789,141 @@ fn opening_a_link_keeps_the_parent_tooltip_visible() {
 }
 
 #[test]
-fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters() {
+fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters_normal_1080() {
+    tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
+        1920,
+        1080,
+        UiScaleMode::Auto,
+    );
+}
+
+#[test]
+fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters_compatibility() {
+    tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
+        1280,
+        720,
+        UiScaleMode::Auto,
+    );
+    tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
+        3840,
+        2160,
+        UiScaleMode::Auto,
+    );
+}
+
+fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
+    width: u32,
+    height: u32,
+    scale: UiScaleMode,
+) {
     use bevy_gamekit::ui::{UiTooltipRequest, UiTooltipState};
-    for (width, height) in [(1280, 720), (1920, 1080), (3840, 2160)] {
-        let mut app = scene_app(width, height, UiScaleMode::Auto);
-        let expected = geometry(&mut app);
-        let snapshot = app
-            .world()
-            .resource::<LabyrinthView>()
-            .combat
-            .clone()
-            .expect("combat");
-        let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-        let source = find_named(app.world_mut(), "Skill 0").expect("ability");
-        hover_control(&mut app, source, viewport);
-        run_frames(&mut app, 8);
-        assert!(app.world().resource::<UiTooltipState>().is_pinned());
-        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("card");
-        let rect = visible_control_rect(app.world(), card, viewport).expect("visible card");
-        assert!(
-            app.world()
-                .get::<InheritedVisibility>(card)
-                .expect("visibility")
-                .get(),
-            "tooltip not visible at {width}x{height}: rect={rect:?}, node={:?}",
-            app.world().get::<Node>(card)
-        );
-        let bounds = app
-            .world_mut()
-            .query::<&bevy_gamekit::ui::UiTooltipBounds>()
-            .single(app.world())
-            .expect("safe area")
-            .0;
-        assert!(
-            rect.max.y <= bounds.max.y + 1.0,
-            "keep HP visible: {rect:?}, {bounds:?}"
-        );
-        let target = app.world().resource::<UiState>().target;
-        native_pointer_click(&mut app, rect.min + Vec2::splat(20.0));
-        run_frames(&mut app, 3);
-        assert_eq!(app.world().resource::<UiState>().target, target);
-        unchanged(&mut app, &expected, &snapshot, "tooltip click");
-        app.world_mut().write_message(UiTooltipRequest::Dismiss);
-        run_frames(&mut app, 1);
-        let wait = find_named(app.world_mut(), "Wait").expect("wait");
-        app.world_mut().entity_mut(wait).insert(UiContextHelp {
-            title: "Wait".to_owned(),
-            body: ["Waiting spends a turn without changing formation."; 128].join("\n"),
-        });
-        assert!(focus_action(app.world_mut(), wait));
-        tap_key(&mut app, KeyCode::KeyT);
-        run_frames(&mut app, 8);
-        let card = find_named(app.world_mut(), "Tooltip Card 0").expect("long card");
-        let rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");
-        app.world_mut().resource_mut::<InputFocus>().clear();
-        hover_at(&mut app, rect.center());
-        let before = app
-            .world()
+    let mut app = scene_app(width, height, scale);
+    let expected = geometry(&mut app);
+    let snapshot = app
+        .world()
+        .resource::<LabyrinthView>()
+        .combat
+        .clone()
+        .expect("combat");
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
+    let source = find_named(app.world_mut(), "Skill 0").expect("ability");
+    hover_control(&mut app, source, viewport);
+    run_frames(&mut app, 8);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    let card = find_named(app.world_mut(), "Tooltip Card 0").expect("card");
+    let rect = visible_control_rect(app.world(), card, viewport).expect("visible card");
+    assert!(
+        app.world()
+            .get::<InheritedVisibility>(card)
+            .expect("visibility")
+            .get(),
+        "tooltip not visible at {width}x{height}: rect={rect:?}, node={:?}",
+        app.world().get::<Node>(card)
+    );
+    let bounds = app
+        .world_mut()
+        .query::<&bevy_gamekit::ui::UiTooltipBounds>()
+        .single(app.world())
+        .expect("safe area")
+        .0;
+    assert!(
+        rect.max.y <= bounds.max.y + 1.0,
+        "keep HP visible: {rect:?}, {bounds:?}"
+    );
+    let target = app.world().resource::<UiState>().target;
+    native_pointer_click(&mut app, rect.min + Vec2::splat(20.0));
+    run_frames(&mut app, 3);
+    assert_eq!(app.world().resource::<UiState>().target, target);
+    unchanged(&mut app, &expected, &snapshot, "tooltip click");
+    app.world_mut().write_message(UiTooltipRequest::Dismiss);
+    run_frames(&mut app, 1);
+    let wait = find_named(app.world_mut(), "Wait").expect("wait");
+    app.world_mut().entity_mut(wait).insert(UiContextHelp {
+        title: "Wait".to_owned(),
+        body: ["Waiting spends a turn without changing formation."; 128].join("\n"),
+    });
+    assert!(focus_action(app.world_mut(), wait));
+    tap_key(&mut app, KeyCode::KeyT);
+    run_frames(&mut app, 8);
+    let card = find_named(app.world_mut(), "Tooltip Card 0").expect("long card");
+    let rect = visible_control_rect(app.world(), card, viewport).expect("card bounds");
+    app.world_mut().resource_mut::<InputFocus>().clear();
+    hover_at(&mut app, rect.center());
+    let before = app
+        .world()
+        .get::<ScrollPosition>(card)
+        .map_or(0.0, |position| position.0.y);
+    let window = app
+        .world_mut()
+        .query_filtered::<Entity, With<Window>>()
+        .single(app.world())
+        .expect("window");
+    let event = bevy::input::mouse::MouseWheel {
+        unit: bevy::input::mouse::MouseScrollUnit::Line,
+        x: 0.0,
+        y: -8.0,
+        window,
+        phase: bevy::input::touch::TouchPhase::Moved,
+    };
+    app.world_mut().write_message(event);
+    app.world_mut()
+        .write_message(bevy::window::WindowEvent::MouseWheel(event));
+    run_frames(&mut app, 3);
+    let after = app
+        .world()
+        .get::<ScrollPosition>(card)
+        .expect("native scroll")
+        .0
+        .y;
+    assert!(after > before, "native wheel scrolls inspection, not game");
+    tap_key(&mut app, KeyCode::End);
+    run_frames(&mut app, 3);
+    let node = app.world().get::<ComputedNode>(card).expect("card");
+    let maximum = ((node.content_size().y - node.size().y) * node.inverse_scale_factor).max(0.0);
+    assert!(
+        (app.world()
             .get::<ScrollPosition>(card)
-            .map_or(0.0, |position| position.0.y);
-        let window = app
-            .world_mut()
-            .query_filtered::<Entity, With<Window>>()
-            .single(app.world())
-            .expect("window");
-        let event = bevy::input::mouse::MouseWheel {
-            unit: bevy::input::mouse::MouseScrollUnit::Line,
-            x: 0.0,
-            y: -8.0,
-            window,
-            phase: bevy::input::touch::TouchPhase::Moved,
-        };
-        app.world_mut().write_message(event);
-        app.world_mut()
-            .write_message(bevy::window::WindowEvent::MouseWheel(event));
-        run_frames(&mut app, 3);
-        let after = app
-            .world()
-            .get::<ScrollPosition>(card)
-            .expect("native scroll")
+            .expect("end position")
             .0
-            .y;
-        assert!(after > before, "native wheel scrolls inspection, not game");
-        tap_key(&mut app, KeyCode::End);
-        run_frames(&mut app, 3);
-        let node = app.world().get::<ComputedNode>(card).expect("card");
-        let maximum =
-            ((node.content_size().y - node.size().y) * node.inverse_scale_factor).max(0.0);
-        assert!(
-            (app.world()
-                .get::<ScrollPosition>(card)
-                .expect("end position")
-                .0
-                .y
-                - maximum)
-                .abs()
-                < 1.0
-        );
-        tap_key(&mut app, KeyCode::Home);
-        run_frames(&mut app, 3);
-        assert_eq!(
-            app.world()
-                .get::<ScrollPosition>(card)
-                .expect("home position")
-                .0
-                .y,
-            0.0
-        );
-        assert!(!app
-            .world()
-            .resource::<UiTooltipState>()
-            .subjects()
-            .is_empty());
-        unchanged(&mut app, &expected, &snapshot, "tooltip scroll");
-    }
+            .y
+            - maximum)
+            .abs()
+            < 1.0
+    );
+    tap_key(&mut app, KeyCode::Home);
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world()
+            .get::<ScrollPosition>(card)
+            .expect("home position")
+            .0
+            .y,
+        0.0
+    );
+    assert!(!app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    unchanged(&mut app, &expected, &snapshot, "tooltip scroll");
 }

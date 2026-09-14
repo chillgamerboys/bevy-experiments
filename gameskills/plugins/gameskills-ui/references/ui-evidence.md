@@ -1,10 +1,16 @@
 # UI verification evidence
 
-Write the presentation/input claim and record build/source, route, window logical
-size, device scale, semantic scale, assets and relevant settings. Choose the
-viewport matrix from target support and the reported defect. Do not add a maximum
-scale gate simply because a previous project used one; preserve explicitly retained
-automated regressions even when a manual pass is deferred.
+Use this evidence when the change affects presentation or interaction. Logic-only
+fixes do not automatically need agent captures or a UI walk. Record the affected
+claim, build/source, route and relevant display/settings. Use the project's resolved
+rigor and display target; a normal-size check is sufficient when that is the selected
+scope. Add compatibility cases for an affected defect or explicit support requirement,
+not because another project used them. Preserve retained regressions without making
+every viewport/scale part of every run.
+
+Choose only the evidence layers needed by the claim. The table describes their
+boundaries, not three mandatory passes for each edit. End-to-end UI walks cover the
+changed journey; do not tour unrelated menus or repeat an applicable observation.
 
 | Layer | Inspect | Boundary |
 |---|---|---|
@@ -28,7 +34,8 @@ relationship. Attractive art cannot compensate for a misleading hierarchy, and
 unclipped controls do not establish visual quality. Cite the actual state and its
 consequence; distinguish a consequential design finding from a taste preference.
 
-Walk a complete frequent task and a meaningful correction through actual states.
+When a complete flow changes, walk that task and a meaningful correction through
+actual states.
 Notice whether the next action can be discovered without foreknowledge, comparisons
 require memorization, or navigation repeats editing and loses context. For example,
 follow creation through selection and commitment rather than testing each dialog
@@ -44,12 +51,15 @@ those fields; they do not prove that the native cursor hits a control. Capture
 actual frames for visual claims. Authored screenshot states can freeze time, so
 explicitly exercise hover duration, locking and animation outside those captures.
 
-Walk the promised route to completion, including hidden/disabled controls, focused
-content after scrolling, modal return, rebuilt views, source removal and mistakes.
+For the selected route, exercise affected hidden/disabled controls, focus, scrolling,
+modal return, rebuilt views, source removal and correction paths.
 Do not infer a legal gameplay action from text rendered about it; assert typed
 intent and game-owned validation at the appropriate separate test seam.
 
 Report failures with reproducible input path, viewport/scale and evidence layer.
-Keep unavailable rendering/native input explicit, even if headless tests pass.
+Keep required unavailable rendering/native input explicit, even if headless tests
+pass; evidence outside the selected scope is not pending acceptance. A configured
+developer sanity gate belongs to milestone promotion, and an agent observation
+cannot supply the developer's response.
 Reuse equivalent evidence only while source, assets, settings and environment
 remain applicable; a later HEAD cannot inherit an old capture by relabeling it.

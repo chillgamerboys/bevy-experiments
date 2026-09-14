@@ -39,8 +39,25 @@ mod posix {
             endpoint: Option<String>,
             #[arg(long)]
             repo: Option<String>,
-            #[arg(long, default_value = "main")]
-            base: String,
+            #[arg(long)]
+            base: Option<String>,
+            #[arg(long)]
+            level: Option<String>,
+            #[arg(long = "scope")]
+            scope: Vec<String>,
+            #[arg(long)]
+            gameplay: bool,
+            #[arg(long = "check")]
+            checks: Vec<String>,
+        },
+        Scope {
+            id: String,
+            #[arg(long)]
+            level: Option<String>,
+            #[arg(long = "scope")]
+            scope: Vec<String>,
+            #[arg(long)]
+            gameplay: bool,
             #[arg(long = "check")]
             checks: Vec<String>,
         },
@@ -69,6 +86,8 @@ mod posix {
             evidence: Vec<String>,
             #[arg(long)]
             tracker_observation: Option<std::path::PathBuf>,
+            #[arg(long)]
+            manual_observation: Option<std::path::PathBuf>,
         },
     }
     fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -107,11 +126,13 @@ mod posix {
         .map_err(|e| e.to_string())?;
         let (id, create) = match &args.command {
             Operation::Start { id, .. } => (id, true),
-            Operation::Bind { id, .. }
+            Operation::Scope { id, .. }
+            | Operation::Bind { id, .. }
             | Operation::Show { id }
             | Operation::Check { id, .. }
             | Operation::Note { id, .. } => (id, false),
         };
+        let id = id.clone();
         if id.is_empty()
             || id.len() > 64
             || !id
@@ -136,6 +157,9 @@ mod posix {
             endpoint,
             repo,
             base,
+            level,
+            scope,
+            gameplay,
             checks,
             ..
         } = &args.command
@@ -156,6 +180,17 @@ mod posix {
             if !["design", "implementation", "pr", "merge", "release"].contains(&endpoint) {
                 return Err("invalid delivery endpoint".into());
             }
+            let base = base
+                .clone()
+                .map(Ok)
+                .unwrap_or_else(|| crate::verification::delivery_base(config))?;
+            let verification = crate::verification_context::resolve(
+                config,
+                Some(&base),
+                level.as_deref(),
+                scope,
+                *gameplay,
+            )?;
             if goal.trim().is_empty() || base.starts_with('-') || base.is_empty() {
                 return Err("goal and base must be nonempty".into());
             }
@@ -164,7 +199,7 @@ mod posix {
                     return Err(format!("unknown configured check: {check}"));
                 }
             }
-            let record = json!({"schema_version":1,"id":id,"goal":goal,"endpoint":endpoint,"repo":repo,"base":base,"checks":checks,"initial_source":before,"instruction_lock":crate::platform::read_ordinary_file(&root.join("gameskills.lock.json")).map_err(|e|e.to_string())?,"cli_version":env!("CARGO_PKG_VERSION"),"binding":{},"remaining_work":[],"authorization":"session authorization must be consulted; this record grants none","last_observation":null});
+            let record = json!({"schema_version":1,"id":id,"goal":goal,"endpoint":endpoint,"repo":repo,"base":base,"checks":checks,"initial_source":before,"instruction_lock":crate::platform::read_ordinary_file(&root.join("gameskills.lock.json")).map_err(|e|e.to_string())?,"cli_version":env!("CARGO_PKG_VERSION"),"binding":{},"remaining_work":[],"authorization":"session authorization must be consulted; this record grants none","last_observation":null,"verification":verification});
             directory.write_json(&file, &envelope(&record))?;
             return Ok(
                 json!({"ok":true,"record":record,"claim":"task intent; no delivery observed"}),
@@ -178,6 +213,55 @@ mod posix {
             Operation::Show { .. } => Ok(
                 json!({"ok":true,"record":record,"claim":"stored intent and historical observations; run check for current delivery"}),
             ),
+            Operation::Scope {
+                level,
+                scope,
+                gameplay,
+                checks,
+                ..
+            } => {
+                let selected = crate::verification_context::resolve(
+                    config,
+                    Some(text(&record, "base")?),
+                    level.as_deref().or_else(|| {
+                        record
+                            .pointer("/verification/policy/level")
+                            .and_then(Value::as_str)
+                    }),
+                    &scope,
+                    gameplay,
+                )?;
+                for check in &checks {
+                    if config.get("commands").and_then(|c| c.get(check)).is_none() {
+                        return Err(format!("unknown configured check: {check}"));
+                    }
+                }
+                let prior = record.get("verification").cloned().unwrap_or(Value::Null);
+                let fields = record.as_object_mut().ok_or("invalid task")?;
+                fields
+                    .entry("verification_history")
+                    .or_insert_with(|| json!([]))
+                    .as_array_mut()
+                    .ok_or("invalid scope history")?
+                    .push(prior);
+                if !checks.is_empty() {
+                    let prior_checks =
+                        fields.get("checks").cloned().ok_or("missing task checks")?;
+                    fields
+                        .entry("check_history")
+                        .or_insert_with(|| json!([]))
+                        .as_array_mut()
+                        .ok_or("invalid check history")?
+                        .push(prior_checks);
+                    fields.insert("checks".into(), json!(checks));
+                }
+                fields.insert("verification".into(), selected);
+                fields.insert("last_observation".into(), Value::Null);
+                directory.write_json(&file, &envelope(&record))?;
+                Ok(
+                    json!({"ok":true,"record":record,"claim":"resolved scope; no checks or manual acceptance observed"}),
+                )
+            }
             Operation::Bind {
                 pr, issue, project, ..
             } => {
@@ -219,6 +303,7 @@ mod posix {
             Operation::Check {
                 evidence,
                 tracker_observation,
+                manual_observation,
                 ..
             } => {
                 let tracking_required = config
@@ -232,6 +317,10 @@ mod posix {
                     return Err("--tracker-observation requires required MCP tracking for a PR, merge or release task".into());
                 }
                 let mut reasons = Vec::new();
+                let verification = record.get("verification").unwrap_or(&Value::Null);
+                if let Err(error) = crate::verification_context::validate(config, verification) {
+                    reasons.push(format!("verification scope: {error}; use delivery scope after reviewing the changed requirements"));
+                }
                 if let Some(work) = record.get("remaining_work").and_then(Value::as_array) {
                     for item in work {
                         reasons.push(format!(
@@ -240,8 +329,32 @@ mod posix {
                         ));
                     }
                 }
-                let mut observations =
-                    json!({"source":before,"evidence":[],"pr":null,"tracker":null});
+                let mut observations = json!({"source":before,"evidence":[],"pr":null,"tracker":null,"verification":verification,"manual_sanity":null});
+                let human = manual_observation
+                    .as_deref()
+                    .map(|file| {
+                        let bytes = crate::platform::read_ordinary_file(&root.join(file))
+                            .map_err(|e| e.to_string())?;
+                        serde_json::from_str::<Value>(&bytes)
+                            .map_err(|e| format!("invalid manual observation: {e}"))
+                    })
+                    .transpose()?;
+                match crate::verification_context::manual_observation(
+                    &id,
+                    before
+                        .pointer("/repository/head")
+                        .and_then(Value::as_str)
+                        .ok_or("missing source head")?,
+                    verification,
+                    human.as_ref(),
+                ) {
+                    Ok(result) => {
+                        *observations
+                            .get_mut("manual_sanity")
+                            .ok_or("missing manual sanity observation field")? = result;
+                    }
+                    Err(error) => reasons.push(error),
+                }
                 if before.get("status").and_then(Value::as_str) != Some("") {
                     reasons.push("worktree has uncommitted changes".to_string());
                 }
@@ -262,6 +375,15 @@ mod posix {
                     )?;
                     if valid.get("ok") != Some(&json!(true)) {
                         reasons.push(format!("evidence {run} is invalid"));
+                    } else if !crate::verification_context::covers(
+                        verification,
+                        result
+                            .pointer("/record/verification")
+                            .unwrap_or(&Value::Null),
+                    ) {
+                        reasons.push(format!(
+                            "evidence {run} has a different verification policy/base or lower level"
+                        ));
                     } else if let Some(commands) = result
                         .pointer("/record/commands")
                         .and_then(Value::as_object)
@@ -365,7 +487,19 @@ mod posix {
         if repository.get("nameWithOwner").and_then(Value::as_str) != Some(repo) {
             return Err("remote repository identity mismatch".into());
         }
-        let mut v=json_command(root,"gh",&["pr","view",pr,"--repo",repo,"--json","url,body,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,mergeCommit"])?;
+        let mut v = json_command(
+            root,
+            "gh",
+            &[
+                "pr",
+                "view",
+                pr,
+                "--repo",
+                repo,
+                "--json",
+                "url,body,state,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,mergeCommit",
+            ],
+        )?;
         if v.get("headRefOid") != source.pointer("/repository/head") {
             return Err(
                 "remote PR source differs from current HEAD; push the current commits".into(),

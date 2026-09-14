@@ -129,3 +129,12 @@ in [framework follow-ups](plans/framework-followups.md).
 Documentation mappings are optional and require CLI 0.1.0-dev.3 or newer. Upgrade
 the executable before adopting them. See [architecture](architecture.md#documentation-discovery)
 for defaults and custom layouts, and [workflow](workflow.md#documentation-context) for use.
+
+
+Verification policy and `project.delivery_base` are optional adopter choices. Existing
+projects retain their branch and checks until explicitly configured. Update to a
+compatible executable and bundle before adopting the
+[verification fields](../cli/README.md#verification-policy). Validate the candidate
+in an isolated consumer, then use supported `setup --bundle PATH --apply`; preserve
+prior pins, overlays, records and installed caches. After native readiness is observed,
+a running host may still need a new session to load revised skill instructions.

@@ -8,6 +8,8 @@ use std::process::Command;
 pub mod checks;
 pub mod driver;
 mod selector;
+pub mod suites;
+pub mod verification;
 
 /// Conditional jobs exposed by the GitHub Actions workflow.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ValueEnum)]
@@ -64,6 +66,15 @@ pub struct Selection {
     pub wasm: bool,
     /// Check dependency policy.
     pub deny: bool,
+    /// Resolved standalone GameSkills policy, absent for the legacy contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<serde_json::Value>,
+    /// Positive game suite selection; ordinary package commands must not expand it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suites: Vec<String>,
+    /// Derived game-effect scope; no human acceptance is inferred. None means unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gameplay_affected: Option<bool>,
 }
 
 impl Selection {
@@ -84,6 +95,9 @@ impl Selection {
             minimal: true,
             wasm: true,
             deny: true,
+            verification: None,
+            suites: Vec::new(),
+            gameplay_affected: None,
         }
     }
 

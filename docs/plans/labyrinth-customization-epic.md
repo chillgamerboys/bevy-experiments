@@ -439,7 +439,7 @@ Completion dependencies: S4, S5.
 
 #### Verification
 
-Focused UI/presentation/preview regressions and native walks at 1280x720 and wider layouts, automatic and relevant large-text scale; owner testing guide determines final coverage.
+Select UI/presentation/preview regressions and changed native journeys through the project rigor policy. Development and Testing use normal 1920x1080 Auto; extra displays belong to explicit release support. Logic-only work requires no agent visual walk.
 
 #### Outside this slice
 

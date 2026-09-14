@@ -226,6 +226,22 @@ pub(super) fn validate_order(order: &Value, plan: &Value, config: &Value) -> Res
         )?;
     }
     level(at(&order, &["creative_level"]))?;
+    if order.get("verification").is_none() {
+        put(
+            &mut order,
+            &["verification"],
+            at(plan, &["verification"]).clone(),
+        )?;
+    }
+    crate::verification_context::validate(config, at(&order, &["verification"]))?;
+    if !crate::verification_context::covers(
+        at(plan, &["verification"]),
+        at(&order, &["verification"]),
+    ) {
+        return Err(
+            "order verification cannot weaken the plan or change its receiving base".into(),
+        );
+    }
     mapping(at(&order, &["owner"]), "owner")?;
     if !["agent", "human"].contains(&string(at(&order, &["owner"]), "kind")) {
         return Err("owner.kind must be agent or human".into());
@@ -466,6 +482,11 @@ pub(super) fn validate_plan(
         )?;
     }
     level(at(&plan, &["creative_level"]))?;
+    if current && plan.get("verification").is_none() && config.get("verification").is_some() {
+        let selection = crate::verification_context::resolve(config, None, None, &[], false)?;
+        put(&mut plan, &["verification"], selection)?;
+    }
+    crate::verification_context::validate(config, at(&plan, &["verification"]))?;
     strings(at(&plan, &["decisions"]), "plan decisions")?;
     let packages = strings(at(&plan, &["packages"]), "plan packages")?;
     let selected = list(config, "packages");

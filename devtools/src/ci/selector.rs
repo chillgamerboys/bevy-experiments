@@ -265,9 +265,16 @@ fn workspace(root: &Path, revision: &str) -> Result<Workspace, String> {
         {
             return Err("invalid or duplicate workspace package name".into());
         }
-        result.dynamic |= package
-            .get("build")
-            .is_some_and(|value| value.as_bool() != Some(false));
+        // Cargo auto-discovers build.rs beside this package's Cargo.toml only.
+        // A domain module named src/build.rs (or a fixture elsewhere) is ordinary
+        // source, and package.build=false disables even the root build script.
+        result.dynamic |= match package.get("build") {
+            Some(toml::Value::Boolean(false)) => false,
+            Some(_) => true,
+            None => paths
+                .iter()
+                .any(|path| *path == format!("{parent}/build.rs")),
+        };
         manifests.insert(name.to_owned(), manifest);
     }
     if result.packages.is_empty() {
@@ -324,7 +331,6 @@ fn workspace(root: &Path, revision: &str) -> Result<Workspace, String> {
             }
         }
     }
-    result.dynamic |= paths.iter().any(|path| path.ends_with("/build.rs"));
     let candidates = Command::new("git")
         .args(["grep", "-l", "-z", "-e", "include", revision, "--", "*.rs"])
         .current_dir(root)
@@ -420,6 +426,9 @@ fn compare(root: &Path, base: &str, head: &str) -> Result<Selection, String> {
         minimal: false,
         wasm: false,
         deny: false,
+        verification: None,
+        suites: Vec::new(),
+        gameplay_affected: None,
     };
     let mut affected = Names::new();
     for path in &result.paths {
@@ -583,15 +592,27 @@ pub(super) fn select(
     let head = commit(root, head)?;
     let requested = base.map(str::to_owned);
     if full {
-        return Ok(Selection::full(
-            head,
-            requested,
-            "Manual full-suite run".into(),
-        ));
+        let paths = base
+            .and_then(|base| changed_paths(root, base, &head).ok())
+            .unwrap_or_default();
+        let mut selection = Selection::full(head, requested, "Manual full-suite run".into());
+        selection.paths = paths;
+        return Ok(selection);
     }
     Ok(
         compare(root, base.unwrap_or_default(), &head).unwrap_or_else(|error| {
-            Selection::full(head, requested, format!("Conservative fallback: {error}"))
+            let paths = base
+                .and_then(|base| changed_paths(root, base, &head).ok())
+                .unwrap_or_default();
+            let mut selection =
+                Selection::full(head, requested, format!("Conservative fallback: {error}"));
+            selection.paths = paths;
+            selection
         }),
     )
+}
+
+/// Current committed package names, for rigor-aware full affected scope.
+pub(super) fn package_names(root: &Path, head: &str) -> Result<Vec<String>, String> {
+    Ok(workspace(root, head)?.packages.into_keys().collect())
 }
