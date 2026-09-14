@@ -559,24 +559,9 @@ mod posix {
             ) {
                 return Err("merge is not contained in the current remote target".into());
             }
-            let source_in_target = json_command(
-                root,
-                "gh",
-                &[
-                    "api",
-                    &format!("repos/{repo}/compare/{pr_head}...{target_sha}"),
-                ],
-            )?;
-            if !matches!(
-                source_in_target.get("status").and_then(Value::as_str),
-                Some("ahead" | "identical")
-            ) {
-                return Err("original PR head is not contained in the current remote target".into());
-            }
             if pr_head != local_head {
-                if !git_ancestor(root, local_head, target_sha)
-                    || !git_ancestor(root, pr_head, target_sha)
-                    || !git_ancestor(root, merge, target_sha)
+                if !git_ancestor(root, merge, local_head)
+                    || !git_ancestor(root, local_head, target_sha)
                 {
                     return Err("local HEAD is not an integrated revision of the current remote target".into());
                 }

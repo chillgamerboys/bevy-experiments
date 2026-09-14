@@ -84,8 +84,8 @@ fn scope_is_canonical_and_manual_sanity_only_gates_gameplay_milestones(
     assert_eq!(at(&milestone, "/manual_sanity_required"), true);
     assert_eq!(at(&milestone, "/promotion"), true);
     assert!(context::manual_observation("milestone", "head", &milestone, None).is_err());
-    let release_on_dev = selection(&config, "dev", Some("release"), &["session"], true)?;
-    assert_eq!(at(&release_on_dev, "/manual_sanity_required"), false);
+    let release_on_dev = promoted_selection(&config, "dev", Some("release"), &["session"], true)?;
+    assert_eq!(at(&release_on_dev, "/manual_sanity_required"), true);
     let release_on_main = promoted_selection(&config, "main", Some("release"), &["session"], true)?;
     assert_eq!(at(&release_on_main, "/manual_sanity_required"), true);
 

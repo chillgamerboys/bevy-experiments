@@ -55,8 +55,7 @@ fn resolve_impl(
     scope.dedup();
     let manual_required = (if include_promotion { promotion } else { true })
         && gameplay
-        && policy.get("manual_sanity").and_then(Value::as_str) == Some("milestone")
-        && policy.get("branch_required_level").and_then(Value::as_str) == Some("testing");
+        && policy.get("manual_sanity").and_then(Value::as_str) == Some("milestone");
     use sha2::{Digest, Sha256};
     let digest_input = if include_promotion {
         json!({"policy_digest":policy.get("policy_digest"), "base":policy.get("receiving_branch"), "level":policy.get("level"), "scope":scope, "gameplay":gameplay, "promotion":promotion})
