@@ -409,7 +409,8 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
             let ui = app.world().resource::<UiState>();
             assert_eq!(ui.log_mode, LogMode::History);
             unchanged(&mut app, &expected, &snapshot, toggle);
-            tap_key(&mut app, KeyCode::Escape);
+            let hide = find_named(app.world_mut(), "History Hide").expect("hide log");
+            assert!(click_action(&mut app, hide));
             unchanged(
                 &mut app,
                 &expected,

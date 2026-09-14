@@ -34,33 +34,33 @@ history, and make character customization reflect one coherent backend model.
 - Combat history has one compact presentation with the full current encounter,
   rather than a separate bulky History mode or only two recent outcomes.
 
-## Current work and blockers
+## Current implementation and remaining delivery
 
 Observed on 2026-09-14:
 
-- [PR #42](https://github.com/chillgamerboys/bevy-experiments/pull/42) is open at
-  `f605eda73aa43bad120e8b1e4050425b94c6533e`, branch
-  `codex/fixed-formation-tooltips`, base `main`. Fixed formation sizing and pin
-  persistence are implemented there. Its Escape-only policy is now superseded.
-- PR #42's Rust CI and aggregate check failed. The known failure is
-  `overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes` in
-  `src/ui/battle/actors.rs`: its fixture mounts new grid-dependent actor tiles in
-  an obsolete 180px flex row. Repair the fixture with production `formation(...)`
-  parents and retain its geometry/overflow assertions. Later Rust checks did not
-  run, so further failures are possible; observe the complete rerun.
-- A pending uncommitted × restoration is already in `gamekit/ui/src/tooltip.rs`,
-  `tooltip/view.rs` and `tooltip/tests.rs`. Preserve and finish that patch. It has
-  only been formatted; its new Cargo tests and adopter assertions have not run.
-- Earlier tests and rendered evidence belong to PR #42's older source. They do
-  not establish acceptance of the pending patch or this redesign.
+- Batch1 extends [PR #42](https://github.com/chillgamerboys/bevy-experiments/pull/42),
+  branch `codex/fixed-formation-tooltips`, base `main`. Local changes restore ×,
+  retain valid pins through menus, separate Party management and preserve visible
+  interruption recovery. The obsolete flex-row actor fixture is repaired; its
+  focused geometry regression passes. The old remote Escape-only implementation
+  and its failed CI remain superseded inputs until the updated branch is published.
+- Shared tooltip suspension and focus/close regression tests pass. Combined
+  normal1080 UI verification, affected renders and current PR checks are pending;
+  historical screenshots or old successful commands do not certify new inputs.
+- Batch2's pure rules model is complete in isolated work; 83 rules tests plus one
+  Rustdoc and strict rules lint pass. Application/schema consumers are being
+  migrated before publication. Editor redesign and compact full-history delivery
+  remain required in Batches3/4.
 - [PR #41](https://github.com/chillgamerboys/bevy-experiments/pull/41), the separate
-  setup/launch audit, remains open at `6922c3b7d093b3755139d5fca5ae950d5e745d5a`
-  with successful CI. Its normal-window defaults and `--window-size` option are
-  absent from this branch. Reconcile documented commands with the actual candidate;
-  do not pretend PR #41 is merged or add its option to this branch's launch command.
-- The installed GameSkills bundle is `0.1.0-dev.3`; the available local executable
-  is `./target/ci/gameskills` version `0.1.0-dev.4`. Installed-pin status passed.
+  setup/launch audit, remains open. Its normal-window defaults and `--window-size`
+  option are absent from this branch. Do not document that option here as available.
+- The installed GameSkills bundle is `0.1.0-dev.3`; the local executable is
+  `./target/ci/gameskills` version `0.1.0-dev.4`. Installed-pin status passed.
   Project base is still `main`; the proposed `dev` default rollout is separate work.
+- Delivery tasks `formation-tooltip` and `character-build-model` bind the actual
+  issues/PRs as available. Queue `ui-builds-20260914` tracks isolated workers.
+  `.context/gameskills-usage/` retains per-thread implementation counters and
+  observed workflow costs. No merge is authorized.
 
 ## Requirement and regression inventory
 
