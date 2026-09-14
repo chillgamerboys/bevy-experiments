@@ -55,6 +55,10 @@ impl Plugin for LabyrinthUiPlugin {
             bevy_gamekit::ui::GameUiFeedPlugin,
             crate::scene::LabyrinthScenePlugin,
         ))
+        .insert_resource(bevy_gamekit::ui::UiTooltipSettings {
+            dismiss_key: None,
+            ..default()
+        })
         .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
         .init_resource::<UiState>()
         .init_resource::<LabyrinthAppearance>()
@@ -95,6 +99,10 @@ impl Plugin for LabyrinthUiPlugin {
         .add_systems(Startup, load_default_font)
         .add_systems(
             Update,
+            sync_tooltip_suspension.before(bevy_gamekit::ui::UiTooltipSystems::Resolve),
+        )
+        .add_systems(
+            Update,
             appearance::apply.before(GameUiSystems::EmitActivations),
         )
         .add_systems(Update, glyphs::refresh.after(LabyrinthUiSystems::Present))
@@ -133,6 +141,7 @@ enum Form {
 enum MenuPage {
     Game,
     Settings,
+    Party,
     Leave,
 }
 
@@ -197,6 +206,7 @@ enum Action {
     Leave,
     ConfirmLeave,
     GameMenu,
+    PartyManagement,
     ToggleLan,
     ToggleTailnet,
     Ready(bool),
@@ -279,12 +289,6 @@ fn collect_actions(world: &mut World, mut cursor: Local<MessageCursor<UiActivate
 }
 
 fn keyboard_shortcuts(world: &mut World) {
-    if world
-        .resource::<bevy_gamekit::ui::UiTooltipState>()
-        .captures_keyboard()
-    {
-        return;
-    }
     let focus = world.resource::<InputFocus>().get();
     if world.resource::<UiState>().editor.is_some() {
         let composing = focus
@@ -321,10 +325,6 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     let keys = world.resource::<ButtonInput<KeyCode>>();
-    if keys.just_pressed(KeyCode::KeyK) && !world.resource::<UiState>().menus.is_open() {
-        apply_action(world, Action::ToggleSkillbook);
-        return;
-    }
     if keys.just_pressed(KeyCode::Escape) {
         if world.resource::<LabyrinthView>().mode == ViewMode::Lobby
             && !world.resource::<UiState>().menus.is_open()
@@ -336,7 +336,26 @@ fn keyboard_shortcuts(world: &mut World) {
             );
             return;
         }
-        apply_action(world, Action::Cancel);
+        let combat_menu = world.resource::<LabyrinthView>().mode == ViewMode::Combat
+            && !world.resource::<UiState>().menus.is_open();
+        apply_action(
+            world,
+            if combat_menu {
+                Action::GameMenu
+            } else {
+                Action::Cancel
+            },
+        );
+        return;
+    }
+    if world
+        .resource::<bevy_gamekit::ui::UiTooltipState>()
+        .captures_keyboard()
+    {
+        return;
+    }
+    if keys.just_pressed(KeyCode::KeyK) && !world.resource::<UiState>().menus.is_open() {
+        apply_action(world, Action::ToggleSkillbook);
         return;
     }
     if world.resource::<UiState>().menus.is_open() || world.resource::<LabyrinthView>().paused {
@@ -475,6 +494,12 @@ fn apply_action(world: &mut World, action: Action) {
                 }
                 Action::GameMenu => {
                     ui.menus.open(MenuPage::Game);
+                    None
+                }
+                Action::PartyManagement => {
+                    if !view.local && view.mode == ViewMode::Combat {
+                        ui.menus.open(MenuPage::Party);
+                    }
                     None
                 }
                 Action::ConfirmLeave => {
@@ -686,6 +711,18 @@ fn present(world: &mut World) {
         shell::overlays(world, &view, &mut ui);
         setup::present(world, &view, &mut ui);
     });
+    // Actions can open a menu after tooltip Resolve. Hide cards in this same frame.
+    sync_tooltip_suspension(world);
+}
+
+fn sync_tooltip_suspension(world: &mut World) {
+    let ui = world.resource::<UiState>();
+    let view = world.resource::<LabyrinthView>();
+    let suspended =
+        ui.menus.is_open() || ui.editor.is_some() || view.paused || view.mode == ViewMode::Menu;
+    world
+        .resource_mut::<bevy_gamekit::ui::UiTooltipSuspension>()
+        .0 = suspended;
 }
 
 fn despawn_marked<T: Component>(world: &mut World) {

@@ -565,7 +565,7 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
         );
     }
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
-    assert!(find_named(app.world_mut(), "Tooltip Close").is_none());
+    assert!(find_named(app.world_mut(), "Tooltip Close").is_some());
     let pinned = app.world().resource::<UiTooltipState>().subjects().to_vec();
     move_pointer(&mut app, Vec2::new(5.0, 5.0));
     run_frames(&mut app, 15);
@@ -584,7 +584,8 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
         "gameplay input still works"
     );
     assert_eq!(app.world().resource::<UiTooltipState>().subjects(), pinned);
-    tap_key(&mut app, KeyCode::Escape);
+    let close = find_named(app.world_mut(), "Tooltip Close").expect("pinned close control");
+    assert!(click_action(&mut app, close));
     assert!(
         find_named(app.world_mut(), "Tooltip Card 0").is_none(),
         "after closing: {:?}",
@@ -593,7 +594,7 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
     run_frames(&mut app, 15);
     assert!(
         find_named(app.world_mut(), "Tooltip Card 0").is_none(),
-        "Escape cannot reopen a different source under a stationary cursor"
+        "closing cannot reopen a different source under a stationary cursor"
     );
     move_pointer(&mut app, point);
     app.update();
