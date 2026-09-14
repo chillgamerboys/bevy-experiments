@@ -342,7 +342,42 @@ fn same_identity(left: &Receipt, right: &Receipt) -> bool {
 }
 
 fn overlaps(left: &Receipt, right: &Receipt) -> bool {
-    left.thread == right.thread && left.start.at < right.end.at && right.start.at < left.end.at
+    fn counters(
+        left_start: Option<u64>,
+        left_end: Option<u64>,
+        right_start: Option<u64>,
+        right_end: Option<u64>,
+    ) -> bool {
+        matches!(
+            (left_start, left_end, right_start, right_end),
+            (Some(ls), Some(le), Some(rs), Some(re)) if ls < re && rs < le
+        )
+    }
+    left.client == right.client
+        && left.thread == right.thread
+        && (left.start.at < right.end.at && right.start.at < left.end.at
+            || counters(
+                left.start.input_tokens,
+                left.end.input_tokens,
+                right.start.input_tokens,
+                right.end.input_tokens,
+            )
+            || counters(
+                left.start.output_tokens,
+                left.end.output_tokens,
+                right.start.output_tokens,
+                right.end.output_tokens,
+            ))
+}
+
+fn reject_overlap(existing: &Receipt, receipt: &Receipt) -> Result<(), String> {
+    if overlaps(existing, receipt) {
+        return Err(format!(
+            "usage receipt overlaps an existing time or cumulative-token range for client/thread {}/{} (existing task {})",
+            receipt.client, receipt.thread, existing.task
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -358,11 +393,18 @@ fn add_receipt(state: &State, receipt: Receipt) -> Result<bool, String> {
                 "conflicting usage receipt for the same task/thread/attempt/client identity".into(),
             );
         }
-        if overlaps(existing, &receipt) {
-            return Err(format!(
-                "usage receipt overlaps an existing range for thread {}",
-                receipt.thread
-            ));
+        reject_overlap(existing, &receipt)?;
+    }
+    for entry in state.tasks.entries()? {
+        let Some(other_task) = entry.strip_suffix(".json") else {
+            continue;
+        };
+        if other_task == receipt.task {
+            continue;
+        }
+        identifier("stored task", other_task)?;
+        for existing in load_task(state, other_task)?.receipts {
+            reject_overlap(&existing, &receipt)?;
         }
     }
     record.receipts.push(receipt);
@@ -406,15 +448,29 @@ fn one_option(args: &[OsString], option: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(path))
 }
 
-fn parsed_report_args(args: &[OsString]) -> Result<(&str, Option<PathBuf>), String> {
+fn parsed_report_args(args: &[OsString]) -> Result<(&str, Option<PathBuf>, bool), String> {
     let task = args.first().ok_or("usage report requires TASK")?;
     let task = text(task)?;
     identifier("task", task)?;
-    match args {
-        [_] => Ok((task, None)),
-        [_, option, path] if text(option)? == "--rates" => Ok((task, Some(PathBuf::from(path)))),
-        _ => Err("usage report TASK [--rates FILE]".into()),
+    let mut rates = None;
+    let mut details = false;
+    let mut index = 1;
+    while index < args.len() {
+        match text(args.get(index).ok_or("missing report option")?)? {
+            "--rates" if rates.is_none() => {
+                rates = Some(PathBuf::from(
+                    args.get(index + 1).ok_or("--rates requires FILE")?,
+                ));
+                index += 2;
+            }
+            "--details" if !details => {
+                details = true;
+                index += 1;
+            }
+            option => return Err(format!("unknown or repeated report option {option}")),
+        }
     }
+    Ok((task, rates, details))
 }
 
 fn caller_path(root: &Path, path: PathBuf) -> PathBuf {
@@ -438,13 +494,22 @@ fn summarize<'a>(receipts: impl Iterator<Item = &'a Receipt>) -> Result<Value, S
     let field = |read: fn(&Delta) -> Option<u64>| {
         let known: Vec<u64> = deltas.iter().filter_map(read).collect();
         let complete = !deltas.is_empty() && known.len() == deltas.len();
-        let total = (!known.is_empty()).then(|| known.into_iter().sum::<u64>());
-        (total, complete)
+        let total = if known.is_empty() {
+            None
+        } else {
+            Some(
+                known
+                    .into_iter()
+                    .try_fold(0_u64, u64::checked_add)
+                    .ok_or("usage token total exceeds u64")?,
+            )
+        };
+        Ok::<_, String>((total, complete))
     };
-    let (input, input_complete) = field(|d| d.input);
-    let (cached, cached_complete) = field(|d| d.cached);
-    let (output, output_complete) = field(|d| d.output);
-    let (reasoning, reasoning_complete) = field(|d| d.reasoning);
+    let (input, input_complete) = field(|d| d.input)?;
+    let (cached, cached_complete) = field(|d| d.cached)?;
+    let (output, output_complete) = field(|d| d.output)?;
+    let (reasoning, reasoning_complete) = field(|d| d.reasoning)?;
     let mut incomplete = Vec::new();
     for (name, complete) in [
         ("input_tokens", input_complete),
@@ -472,6 +537,24 @@ fn summarize<'a>(receipts: impl Iterator<Item = &'a Receipt>) -> Result<Value, S
         },
         "incomplete_fields": incomplete,
     }))
+}
+
+fn model_summary(receipts: &[Receipt], requested: bool) -> Value {
+    let mut models = std::collections::BTreeSet::new();
+    let mut unavailable = 0_u64;
+    for receipt in receipts {
+        let selection = if requested {
+            receipt.requested.as_ref()
+        } else {
+            receipt.observed.as_ref()
+        };
+        if let Some(model) = selection.and_then(|selection| selection.model.as_deref()) {
+            models.insert(model);
+        } else {
+            unavailable += 1;
+        }
+    }
+    json!({"models":models,"unavailable_receipts":unavailable})
 }
 
 fn parse_rates(path: &Path) -> Result<Rates, String> {
@@ -538,6 +621,9 @@ fn cost(receipts: &[Receipt], rates: Option<&Rates>) -> Result<Value, String> {
             + cached as f64 * rate.cached_input_per_million
             + output as f64 * rate.output_per_million)
             / 1_000_000.0;
+        if !amount.is_finite() {
+            return Err("usage cost estimate exceeds finite numeric range".into());
+        }
     }
     Ok(json!({
         "available": true,
@@ -551,7 +637,7 @@ fn cost(receipts: &[Receipt], rates: Option<&Rates>) -> Result<Value, String> {
 
 #[cfg(unix)]
 fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
-    let (task, rates_path) = parsed_report_args(args)?;
+    let (task, rates_path, details) = parsed_report_args(args)?;
     let rates_path = rates_path.map(|path| caller_path(root, path));
     let rates = rates_path.as_deref().map(parse_rates).transpose()?;
     let state = state(root)?;
@@ -563,15 +649,56 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
     let workers = summarize(record.receipts.iter().filter(|r| r.role == "worker"))?;
     let total = summarize(record.receipts.iter())?;
     let estimate = cost(&record.receipts, rates.as_ref())?;
-    Ok(json!({
+    let first = record
+        .receipts
+        .iter()
+        .map(|receipt| receipt.start.at)
+        .min()
+        .ok_or("usage report has no receipt start")?;
+    let last = record
+        .receipts
+        .iter()
+        .map(|receipt| receipt.end.at)
+        .max()
+        .ok_or("usage report has no receipt end")?;
+    let thread_seconds = record
+        .receipts
+        .iter()
+        .try_fold(0_u64, |total, receipt| {
+            total.checked_add(receipt.end.at - receipt.start.at)
+        })
+        .ok_or("summed usage thread seconds exceeds u64")?;
+    let attempts: std::collections::BTreeSet<_> = record
+        .receipts
+        .iter()
+        .map(|receipt| (&receipt.client, &receipt.thread, &receipt.attempt))
+        .collect();
+    let mut result = json!({
         "schema_version": 1,
         "task": task,
         "contributions": {"coordinator": coordinator, "workers": workers},
         "total": total,
+        "receipt_count": record.receipts.len(),
+        "attempt_count": attempts.len(),
+        "observed_span_seconds": last - first,
+        "summed_thread_seconds": thread_seconds,
+        "models": {
+            "requested": model_summary(&record.receipts, true),
+            "observed": model_summary(&record.receipts, false)
+        },
         "cost_estimate": estimate,
-        "receipts": record.receipts,
         "claim": "known deltas from cumulative counters; missing telemetry is reported as unavailable"
-    }))
+    });
+    if details {
+        result
+            .as_object_mut()
+            .ok_or("usage report must be an object")?
+            .insert(
+                "receipts".into(),
+                serde_json::to_value(record.receipts).map_err(|error| error.to_string())?,
+            );
+    }
+    Ok(result)
 }
 
 #[derive(Default)]
@@ -639,6 +766,22 @@ struct NativeObservation {
     client: String,
     observed: Selection,
     counters: CounterSnapshot,
+}
+
+fn interval_selection(start: &Selection, end: &Selection) -> Option<Selection> {
+    let selection = Selection {
+        model: if start.model.is_some() && start.model == end.model {
+            start.model.clone()
+        } else {
+            None
+        },
+        effort: if start.effort.is_some() && start.effort == end.effort {
+            start.effort.clone()
+        } else {
+            None
+        },
+    };
+    (selection.model.is_some() || selection.effort.is_some()).then_some(selection)
 }
 
 fn native_observation(path: &Path) -> Result<NativeObservation, String> {
@@ -815,6 +958,7 @@ fn checkpoint(root: &Path, args: &[OsString]) -> Result<Value, String> {
     {
         return Err("native end checkpoint does not match its start identity".into());
     }
+    let observed = interval_selection(&start.observed, &observation.observed);
     let receipt = Receipt {
         schema_version: 1,
         task: args.task.clone(),
@@ -823,7 +967,7 @@ fn checkpoint(root: &Path, args: &[OsString]) -> Result<Value, String> {
         client: observation.client,
         role: role.into(),
         requested: None,
-        observed: Some(observation.observed),
+        observed,
         start: start.snapshot,
         end: observation.counters,
         evidence_reference: log.display().to_string(),
