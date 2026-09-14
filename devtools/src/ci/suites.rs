@@ -57,6 +57,10 @@ pub fn get(name: &str) -> Result<Suite, String> {
         "labyrinth-network-gameplay" => ("labyrinth", &[
             "network::tests::real_udp_six_players_reject_seventh_and_wrong_ownership_then_finish_encounter",
             "network::tests::encrypted_custom_build_and_saved_scenario_share_the_live_rules_path",
+            "network::tests::incompatible_and_opaque_service_listings_do_not_open_direct_transport",
+            "network::tests::queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn",
+            "network::tests::real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat",
+            "network::tests::real_udp_wagon_ownership_reconnects_without_changing_participant_capacity",
         ], true, false),
         "labyrinth-process" => ("labyrinth", &[PROCESS], true, true),
         "deckbuilder-domain" => ("deckbuilder", &["domain::tests::"], false, false),
