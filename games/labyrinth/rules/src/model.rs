@@ -176,7 +176,8 @@ impl ActorKind {
     }
 }
 
-/// Typed skill catalog IDs; their order is also deterministic AI tie-breaking.
+/// Fixed legacy Skill IDs retained for trusted fixtures and explicit action aliases.
+/// Current authored Skills use ContentId and frozen Moveset order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SkillId {
     /// Gatekeeper's strong front attack.
@@ -355,7 +356,7 @@ pub struct ActorSnapshot {
     pub max_hp: u16,
     /// Immutable base speed.
     pub base_speed: u16,
-    /// Explicit equipped skills, independent of the class starter preset.
+    /// Frozen active Moveset and passive Ability resolution.
     pub resolved_build: crate::build::ResolvedBuild,
     /// Build selections whose resolved view is validated against the frozen catalog.
     pub build: crate::build::CharacterBuild,
@@ -412,7 +413,7 @@ impl ActorSnapshot {
             _ => (self.hp, self.max_hp),
         }
     }
-    /// This actor's actual equipped skills, not its class starter preset.
+    /// Legacy-recognized members of the actual Moveset; excludes new authored IDs.
     #[must_use]
     pub fn legacy_skills(&self) -> Vec<SkillId> {
         self.resolved_build

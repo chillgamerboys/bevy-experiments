@@ -14,6 +14,8 @@ pub const MAX_CATALOG_BYTES: usize = 1_048_576;
 pub const MAX_CATALOG_ENTRIES: usize = 256;
 /// Maximum distinct active skills on one resolved actor.
 pub const MAX_MOVESET_SKILLS: usize = 64;
+/// Maximum distinct passive Abilities selected or granted on one actor.
+pub const MAX_BUILD_ABILITIES: usize = 64;
 /// Maximum ordered effects on one resolved skill.
 pub const MAX_SKILL_EFFECTS: usize = 16;
 /// Maximum configured maximum HP and authored direct damage/healing.
@@ -194,13 +196,13 @@ pub enum UpgradeOperation {
     /// Union this six-rank mask into allowed target ranks.
     ExtendTargetRanks(u8),
 }
-/// A learned contribution to a separately granted skill.
+/// A passive contribution to a separately granted active Skill.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SkillUpgrade {
     /// The skill must already be granted in the completed build.
     pub skill: ContentId,
-    /// Ordered contributions applied once per selected learned skill.
+    /// Ordered contributions applied once per effective passive Ability.
     pub operations: Vec<UpgradeOperation>,
 }
 /// A bounded passive effect, never an action or arbitrary event callback.
@@ -253,7 +255,7 @@ pub struct ActorPreset {
     pub base_speed: u16,
     /// Default occupied ranks, 1–6.
     pub footprint: u8,
-    /// Default grants, learned skills and optional weapon.
+    /// Default personal Skills/Abilities and optional weapon.
     pub build: CharacterBuild,
 }
 /// Untrusted authored input. Validate with [`ContentCatalog::new`] before use.
@@ -270,7 +272,7 @@ pub struct CatalogDefinition {
     /// One-weapon choices.
     #[serde(default)]
     pub weapons: Vec<WeaponDefinition>,
-    /// Learned grant/upgrade definitions.
+    /// Passive Ability definitions.
     #[serde(default)]
     pub abilities: Vec<AbilityDefinition>,
     /// Defaults for either team.
@@ -364,7 +366,7 @@ impl ContentCatalog {
             unique_ids(
                 &format!("{path}.abilities"),
                 &weapon.abilities.iter().collect::<Vec<_>>(),
-                MAX_MOVESET_SKILLS,
+                MAX_BUILD_ABILITIES,
             )?;
             for id in &weapon.abilities {
                 if catalog.ability(id).is_none() {
@@ -372,19 +374,19 @@ impl ContentCatalog {
                 }
             }
         }
-        for skill in &catalog.definition.abilities {
-            let path = format!("abilities.{}", skill.id);
-            text_field(&format!("{path}.name"), &skill.name, 128)?;
-            text_field(&format!("{path}.description"), &skill.description, 2048)?;
-            catalog.validate_requirements(&path, &skill.requirements)?;
-            if skill.upgrades.is_empty() && skill.effects.is_empty() {
+        for ability in &catalog.definition.abilities {
+            let path = format!("abilities.{}", ability.id);
+            text_field(&format!("{path}.name"), &ability.name, 128)?;
+            text_field(&format!("{path}.description"), &ability.description, 2048)?;
+            catalog.validate_requirements(&path, &ability.requirements)?;
+            if ability.upgrades.is_empty() && ability.effects.is_empty() {
                 return Err(ContentError::new(
                     &path,
                     "a passive Ability needs an upgrade or effect",
                 ));
             }
-            if skill.effects.len() > MAX_SKILL_EFFECTS
-                || skill.effects.iter().any(|effect| {
+            if ability.effects.len() > MAX_SKILL_EFFECTS
+                || ability.effects.iter().any(|effect| {
                     matches!(
                         effect,
                         PassiveEffect::ReduceNegativeStatusDuration { amount: 0 }
@@ -398,12 +400,16 @@ impl ContentCatalog {
             }
             unique_ids(
                 &format!("{path}.upgrades"),
-                &skill.upgrades.iter().map(|u| &u.skill).collect::<Vec<_>>(),
+                &ability
+                    .upgrades
+                    .iter()
+                    .map(|u| &u.skill)
+                    .collect::<Vec<_>>(),
                 MAX_MOVESET_SKILLS,
             )?;
-            for upgrade in &skill.upgrades {
+            for upgrade in &ability.upgrades {
                 let base = catalog.skill(&upgrade.skill).ok_or_else(|| {
-                    ContentError::new(&path, format!("missing skill {}", upgrade.skill))
+                    ContentError::new(&path, format!("missing Skill {}", upgrade.skill))
                 })?;
                 let mut effective = base.clone();
                 apply_upgrade(base, &mut effective, upgrade, &path)?;
@@ -437,7 +443,7 @@ impl ContentCatalog {
     pub fn definition(&self) -> &CatalogDefinition {
         &self.definition
     }
-    /// Find an skill by stable key.
+    /// Find an active Skill by stable key.
     #[must_use]
     pub fn skill(&self, id: &ContentId) -> Option<&SkillDefinition> {
         self.definition.skills.iter().find(|a| &a.id == id)
@@ -447,7 +453,7 @@ impl ContentCatalog {
     pub fn weapon(&self, id: &ContentId) -> Option<&WeaponDefinition> {
         self.definition.weapons.iter().find(|a| &a.id == id)
     }
-    /// Find a learned skill by stable key.
+    /// Find a passive Ability by stable key.
     #[must_use]
     pub fn ability(&self, id: &ContentId) -> Option<&AbilityDefinition> {
         self.definition.abilities.iter().find(|a| &a.id == id)

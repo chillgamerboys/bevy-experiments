@@ -510,3 +510,70 @@ fn stock_snapshot_sizes_are_measured_and_catalog_freezing_ignores_later_edits() 
     combat.apply(ActorId(1), action).unwrap();
     assert_eq!(combat.state.actor(ActorId(101)).unwrap().hp, 94);
 }
+
+#[test]
+fn resilient_application_refresh_and_preview_use_one_runtime_rule() {
+    let (catalog, mut scenario) = fixture("dagger", &[1]);
+    scenario.heroes[0].actor.build.abilities = vec![id("assassin_bleeding_dagger")];
+    scenario.enemies[0].actor.build.abilities = vec![id("resilient")];
+    let mut combat = Combat::from_scenario(&catalog, &scenario).unwrap();
+    let action = ability_action(&combat, "dagger_stab", 101);
+    let before = combat.clone();
+    let preview = combat
+        .snapshot()
+        .preview_action(ActorId(1), &action)
+        .unwrap();
+    assert_eq!(combat, before);
+    assert!(preview.events.iter().any(|event| matches!(event, crate::PreviewEvent::StatusApplied(status) if status.kind == StatusKind::Bleed && status.remaining == 2)));
+    let applied = combat.apply(ActorId(1), action).unwrap();
+    assert!(applied.iter().any(|event| matches!(&event.kind, CombatEventKind::StatusApplied { instance } if instance.kind == StatusKind::Bleed && instance.remaining == 2)));
+    let old_id = combat.state.actor(ActorId(101)).unwrap().statuses[0].id;
+    let mut refreshed = vec![];
+    combat
+        .add_status(
+            ActorId(1),
+            ActorId(101),
+            StatusKind::Bleed,
+            &mut refreshed,
+            &mut Work(MAX_WORK),
+        )
+        .unwrap();
+    assert!(refreshed.iter().any(|event| matches!(&event.kind, CombatEventKind::StatusRefreshed { instance } if instance.id == old_id && instance.remaining == 2)));
+    let snapshot = combat.snapshot();
+    let restored: CombatSnapshot =
+        serde_json::from_slice(&serde_json::to_vec(&snapshot).unwrap()).unwrap();
+    assert_eq!(restored, snapshot);
+    assert_eq!(
+        restored.actor(ActorId(101)).unwrap().statuses[0].remaining,
+        2
+    );
+    assert!(combat
+        .legal_actions(combat.state.active_actor.unwrap())
+        .iter()
+        .all(|action| !matches!(action, CombatAction::LegacySkill { .. })));
+}
+
+#[test]
+fn resilient_starting_conditions_shorten_defaults_but_preserve_explicit_remaining() {
+    for (remaining, expected) in [(None, 2), (Some(2), 2), (Some(1), 1)] {
+        let (catalog, mut scenario) = fixture("dagger", &[1]);
+        scenario.enemies[0].actor.build.abilities = vec![id("resilient")];
+        scenario.enemies[0].starting_statuses = vec![crate::scenario::StartingStatus {
+            kind: StatusKind::Bleed,
+            source: Some(ActorId(1)),
+            remaining,
+        }];
+        let encoded = scenario.to_json().unwrap();
+        let restored = Scenario::from_json(&encoded, &catalog).unwrap();
+        let combat = Combat::from_scenario(&catalog, &restored).unwrap();
+        assert_eq!(combat.state.active_actor, Some(ActorId(1)));
+        assert_eq!(
+            combat.state.actor(ActorId(101)).unwrap().statuses[0].remaining,
+            expected
+        );
+        let snapshot = combat.snapshot();
+        let roundtrip: CombatSnapshot =
+            serde_json::from_slice(&serde_json::to_vec(&snapshot).unwrap()).unwrap();
+        assert_eq!(snapshot, roundtrip);
+    }
+}

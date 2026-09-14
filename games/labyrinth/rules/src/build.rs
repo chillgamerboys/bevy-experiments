@@ -2,7 +2,8 @@
 use crate::{
     catalog::{
         apply_upgrade, text_field, unique_ids, validate_stats, AbilityDefinition, ContentCatalog,
-        ContentError, ContentId, PassiveEffect, SkillDefinition, SkillUpgrade, MAX_MOVESET_SKILLS,
+        ContentError, ContentId, PassiveEffect, SkillDefinition, SkillUpgrade, MAX_BUILD_ABILITIES,
+        MAX_MOVESET_SKILLS,
     },
     status_definition, ActorKind, StatusKind, StatusTag,
 };
@@ -189,7 +190,7 @@ impl ContentCatalog {
         unique_ids(
             "build.abilities",
             &build.abilities.iter().collect::<Vec<_>>(),
-            MAX_MOVESET_SKILLS,
+            MAX_BUILD_ABILITIES,
         )?;
         let mut skills = Vec::<ResolvedSkill>::new();
         let mut abilities = Vec::<ResolvedAbility>::new();
@@ -355,7 +356,7 @@ fn add_ability(
         ability.grants.push(source);
         return Ok(());
     }
-    if abilities.len() >= MAX_MOVESET_SKILLS {
+    if abilities.len() >= MAX_BUILD_ABILITIES {
         return Err(ContentError::new(
             "build.abilities",
             "too many distinct granted Abilities (maximum 64)",

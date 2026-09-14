@@ -388,7 +388,13 @@ pub fn legacy_build(skills: &[crate::SkillId]) -> CharacterBuild {
     let digest = Sha256::digest(serde_json::to_vec(skills).expect("fixed skill IDs serialize"));
     CharacterBuild {
         weapon: Some(
-            ContentId::new(format!("legacy_{:x}", digest)[..63].to_owned()).expect("hex ID"),
+            ContentId::new(
+                format!("legacy_{:x}", digest)
+                    .chars()
+                    .take(63)
+                    .collect::<String>(),
+            )
+            .expect("hex ID"),
         ),
         ..Default::default()
     }
@@ -404,8 +410,28 @@ pub fn legacy_catalog<'a>(
         let skills = crate::LegacySkillLoadout::new(skills.iter().copied())
             .map_err(|e| ContentError::new("legacy.loadout", e.to_string()))?;
         let id = legacy_build(skills.as_slice()).weapon.expect("legacy item");
-        if definition.weapons.iter().any(|weapon| weapon.id == id) {
+        let granted = skills
+            .as_slice()
+            .iter()
+            .map(|skill| legacy_skill_id(*skill))
+            .collect::<Vec<_>>();
+        if let Some(existing) = definition.weapons.iter().find(|weapon| weapon.id == id) {
+            if existing.skills != granted
+                || !existing.abilities.is_empty()
+                || existing.kind.as_str() != "legacy"
+            {
+                return Err(ContentError::new(
+                    "legacy.loadout",
+                    "existing item conflicts with the exact legacy loadout",
+                ));
+            }
             continue;
+        }
+        if definition.weapons.len() >= crate::catalog::MAX_CATALOG_ENTRIES {
+            return Err(ContentError::new(
+                "legacy.loadout",
+                "too many equipment definitions",
+            ));
         }
         definition.weapons.push(crate::catalog::WeaponDefinition {
             id,
@@ -413,11 +439,7 @@ pub fn legacy_catalog<'a>(
             description: "Explicit equipment authored by the trusted legacy constructor.".into(),
             handedness: crate::catalog::Handedness::One,
             kind: ContentId::new("legacy")?,
-            skills: skills
-                .as_slice()
-                .iter()
-                .map(|skill| legacy_skill_id(*skill))
-                .collect(),
+            skills: granted,
             abilities: vec![],
         });
     }

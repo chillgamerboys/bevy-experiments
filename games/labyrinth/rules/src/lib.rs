@@ -165,3 +165,6 @@ pub fn rules_fingerprint() -> String {
 
 #[cfg(test)]
 mod catalog_tests;
+
+#[cfg(test)]
+mod build_contract_tests;
