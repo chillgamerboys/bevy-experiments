@@ -8,7 +8,7 @@ name = "Bevy Experiments"
 delivery_target = "merge"
 # Feature merges into dev are explicitly authorized after checks and review.
 # Main promotions require separate user authorization.
-delivery_base = "main"
+delivery_base = "dev"
 
 [creative]
 default_level = 2
