@@ -412,6 +412,230 @@ fn native_checkpoint_refuses_missing_identity_or_counters_instead_of_fabricating
     Ok(())
 }
 
+#[test]
+fn native_marks_transition_once_and_report_stage_and_exact_skill_set_totals() -> Test {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    let log = root.join("session.jsonl");
+    let log_text = log.to_string_lossy();
+    native_log(&log, "native-model", 100, 20, 40, "private baseline")?;
+    let start = call(
+        root,
+        &[
+            "mark",
+            "staged-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "implementation",
+            "--role",
+            "worker",
+            "--skill",
+            "gameskills:plan",
+        ],
+    )?;
+    assert_eq!(start["opened"], true);
+
+    native_log(&log, "native-model", 200, 40, 60, "private repeated")?;
+    let repeated = call(
+        root,
+        &[
+            "mark",
+            "staged-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "implementation",
+            "--role",
+            "worker",
+            "--skill",
+            "gameskills:plan",
+        ],
+    )?;
+    assert_eq!(repeated["duplicate"], true);
+
+    native_log(&log, "native-model", 300, 60, 80, "private verification")?;
+    call(
+        root,
+        &[
+            "mark",
+            "staged-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "verification",
+            "--role",
+            "worker",
+            "--skill",
+            "gameskills:test",
+        ],
+    )?;
+    native_log(&log, "native-model", 500, 100, 120, "private delivery")?;
+    call(
+        root,
+        &[
+            "mark",
+            "staged-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "delivery",
+            "--role",
+            "worker",
+            "--skill",
+            "gameskills:create-pr",
+            "--skill",
+            "gameskills:plan",
+        ],
+    )?;
+    native_log(&log, "native-model", 800, 160, 180, "PRIVATE FINISH")?;
+    let finish = call(root, &["finish", "staged-task", "--log", &log_text])?;
+    assert_eq!(finish["finished"], true);
+    let duplicate_finish = call(root, &["finish", "staged-task", "--log", &log_text])?;
+    assert_eq!(duplicate_finish["duplicate"], true);
+
+    let report = call(root, &["report", "staged-task", "--details"])?;
+    assert_eq!(report["total"]["totals"]["input_tokens"], 700);
+    assert_eq!(
+        report["stages"]["implementation"]["totals"]["input_tokens"],
+        200
+    );
+    assert_eq!(
+        report["stages"]["verification"]["totals"]["input_tokens"],
+        200
+    );
+    assert_eq!(report["stages"]["delivery"]["totals"]["input_tokens"], 300);
+    assert_eq!(
+        report["active_skill_sets"][0]["attribution"],
+        "mixed_active_set"
+    );
+    assert_eq!(
+        report["active_skill_sets"][0]["active_skills"],
+        json!(["gameskills:create-pr", "gameskills:plan"])
+    );
+    assert!(!report.to_string().contains("PRIVATE FINISH"));
+    Ok(())
+}
+
+#[test]
+fn failed_mark_transition_is_atomic_and_model_changes_remain_unavailable() -> Test {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    let log = root.join("session.jsonl");
+    let log_text = log.to_string_lossy();
+    native_log(&log, "model-a", 100, 20, 40, "private-a")?;
+    call(
+        root,
+        &[
+            "mark",
+            "atomic-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "implementation",
+            "--role",
+            "coordinator",
+        ],
+    )?;
+
+    native_log(&log, "model-b", 50, 10, 20, "private-invalid")?;
+    assert!(call(
+        root,
+        &[
+            "mark",
+            "atomic-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "verification",
+            "--role",
+            "coordinator",
+        ],
+    )
+    .expect_err("decreasing counters must not advance state")
+    .contains("decreased"));
+
+    native_log(&log, "model-b", 300, 60, 100, "private-valid")?;
+    call(
+        root,
+        &[
+            "mark",
+            "atomic-task",
+            "--log",
+            &log_text,
+            "--stage",
+            "verification",
+            "--role",
+            "coordinator",
+        ],
+    )?;
+    let report = call(root, &["report", "atomic-task", "--details"])?;
+    assert_eq!(report["total"]["totals"]["input_tokens"], 200);
+    assert_eq!(report["models"]["observed"]["unavailable_receipts"], 1);
+    assert!(report["receipts"][0]["observed"].get("model").is_none());
+    Ok(())
+}
+
+#[test]
+fn malformed_or_unavailable_first_mark_creates_no_state_and_historic_receipts_are_unclassified(
+) -> Test {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    let log = root.join("session.jsonl");
+    native_log(&log, "native-model", 100, 20, 40, "private")?;
+    let error = call(
+        root,
+        &[
+            "mark",
+            "malformed-task",
+            "--log",
+            &log.to_string_lossy(),
+            "--stage",
+            "implementation",
+            "--role",
+            "worker",
+            "--skill",
+            "bad skill",
+        ],
+    )
+    .expect_err("malformed skill must fail before state changes");
+    assert!(error.contains("skill identifier"));
+    assert!(!root.join(".gameskills/usage").exists());
+
+    fs::write(
+        &log,
+        json!({"type":"session_meta","payload":{"id":"thread-native","client":"codex"}})
+            .to_string()
+            + "\n",
+    )?;
+    assert!(call(
+        root,
+        &[
+            "mark",
+            "missing-task",
+            "--log",
+            &log.to_string_lossy(),
+            "--stage",
+            "implementation",
+            "--role",
+            "worker",
+        ],
+    )
+    .expect_err("missing native counters stay unavailable")
+    .contains("counters are unavailable"));
+    assert!(!root.join(".gameskills/usage").exists());
+
+    let path = write_json(root, "historic.json", &receipt("historic", "old", 10, 20))?;
+    call(root, &["import", "--file", &path])?;
+    let report = call(root, &["report", "historic"])?;
+    assert_eq!(report["stages"]["unclassified"]["receipt_count"], 1);
+    assert_eq!(
+        report["active_skill_sets"][0]["attribution"],
+        "unclassified"
+    );
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn protected_usage_state_refuses_symlink_redirection() -> Test {
