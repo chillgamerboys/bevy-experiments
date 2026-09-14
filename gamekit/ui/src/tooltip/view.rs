@@ -96,6 +96,13 @@ fn focus_inside(world: &World, root: Entity) -> bool {
         })
 }
 
+pub(super) fn has_focus(world: &World) -> bool {
+    world
+        .resource::<TooltipView>()
+        .root
+        .is_some_and(|root| focus_inside(world, root))
+}
+
 pub(super) fn render(world: &mut World) {
     // A game may open its modal after Resolve. Hide it in the same frame and
     // release ownership without waiting for the next input/lifecycle pass.
@@ -117,6 +124,7 @@ pub(super) fn render(world: &mut World) {
         .map_while(|key| content(world, state, key).map(|value| (key.clone(), value)))
         .collect::<Vec<_>>();
     world.resource_scope(|world, mut view: Mut<TooltipView>| {
+        let had_focus = view.root.is_some_and(|root| focus_inside(world, root));
         if view.host != host
             || view.rendered != wanted
             || view.pinned != pinned
@@ -313,7 +321,9 @@ pub(super) fn render(world: &mut World) {
                 world.entity_mut(root).remove::<TabGroup>();
             }
             let focus_inside = focus_inside(world, root);
-            if keyboard && (!view.keyboard || !focus_inside) {
+            // A pointer-opened chain can still own a focused close/link. When
+            // branch changes rebuild those controls, keep focus on its new leaf.
+            if (keyboard && (!view.keyboard || !focus_inside)) || (had_focus && !focus_inside) {
                 if let Some(entity) = view.focus {
                     world
                         .resource_mut::<InputFocus>()
