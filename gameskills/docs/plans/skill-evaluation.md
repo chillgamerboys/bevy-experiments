@@ -1,10 +1,29 @@
 # Labyrinth mechanics session and GameSkills evaluation
 
-Status: active; spatial preparation and broader planning/review refinements are implemented after two hands-on UI rejections. Original-pin ordinary Codex discovery is now observed after registration repair; final integrated delivery and human UI acceptance remain pending. Independent native behavioral trials remain unobserved.
+Status: active; current evaluation follows the September battle UI and character
+customization iteration. PR #39 is merged; earlier endpoints and observations below
+retain their original scope and do not authorize merging later PRs. Broader
+independent native behavioral and comparative cost trials remain unobserved.
 Owners: Labyrinth for mechanics/playability; GameSkills for workflow quality; Gamekit for reusable capability quality.
 Historical tracking: [HEX-98](https://linear.app/chillgamerboys/issue/HEX-98/strengthen-gameskills-delivery-and-add-optional-linear-workflows), merged PR #38. These are not the new implementation's delivery identities.
 
 ## Scope and priority
+
+### Current iteration: useful guidance and total usage
+
+The user reconfirmed ongoing evaluation and token efficiency on 2026-09-14. Use
+the current [UI implementation plan's evaluation section](../../../games/labyrinth/docs/plans/ui-and-character-builds.md#evaluate-gameskills-during-implementation)
+for the four batches, token checkpoints, quality observations and optimization
+recommendations. Read that compact current scope before retrieving historical
+sections below. This round has native per-thread token telemetry available; older
+unavailable-telemetry statements remain accurate for their original trials.
+
+Evaluate actual implementation without replaying every task or imposing a broader
+benchmark suite. Keep normal-1080 affected UI verification, focused logic/E2E checks,
+macOS Development/Testing and milestone-only developer sanity. Record combined
+coordinator/worker usage, cache counts, retries and outcomes without double-counting
+cumulative counters. Candidate promotion and cross-client efficacy claims still
+require their own evidence; this iteration does not establish those automatically.
 
 ### MCP delivery contradiction and verification handoff
 

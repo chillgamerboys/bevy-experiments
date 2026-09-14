@@ -1,10 +1,11 @@
 # Builder UI research and alternatives
 
-Status: active acceptance revision after hands-on rejection of the card-based preparation and player menus.
-Answers 9–10 are implemented as spatial construction and integrated player ownership; final integrated delivery and human usability acceptance remain outstanding. Reopens S6/S9 in the
+Status: active follow-up acceptance context; prior direction implemented in PR #39. The current
+[battle UI and character customization plan](ui-and-character-builds.md) carries
+the subsequent user feedback and supersedes this document's editor terminology
+and layout details. Answers 9–10 remain the spatial-construction and ownership
+foundation. Preserve separate S6/S9 package/evaluation acceptance in the
 [customization epic](../../../../docs/plans/labyrinth-customization-epic.md).
-The research/grill direction decision is settled; carry it into the scoped UI
-revision. Preserve all accepted customization, authority and inventory limits.
 
 ## Problem and player tasks
 
