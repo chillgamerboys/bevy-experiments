@@ -81,7 +81,28 @@ fn action_node() -> Node {
     }
 }
 
+fn focus_inside(world: &World, root: Entity) -> bool {
+    world
+        .resource::<InputFocus>()
+        .get()
+        .is_some_and(|mut entity| loop {
+            if entity == root {
+                return true;
+            }
+            let Some(parent) = world.get::<ChildOf>(entity) else {
+                return false;
+            };
+            entity = parent.parent();
+        })
+}
+
 pub(super) fn render(world: &mut World) {
+    // A game may open its modal after Resolve. Hide it in the same frame and
+    // release ownership without waiting for the next input/lifecycle pass.
+    let suspended = world.resource::<UiTooltipSuspension>().0;
+    world
+        .resource_mut::<UiTooltipState>()
+        .set_suspended(suspended);
     let host = world
         .query_filtered::<Entity, With<UiTooltipHost>>()
         .iter(world)
@@ -92,6 +113,7 @@ pub(super) fn render(world: &mut World) {
     let wanted = state
         .chain
         .iter()
+        .take_while(|_| !suspended)
         .map_while(|key| content(world, state, key).map(|value| (key.clone(), value)))
         .collect::<Vec<_>>();
     world.resource_scope(|world, mut view: Mut<TooltipView>| {
@@ -103,6 +125,9 @@ pub(super) fn render(world: &mut World) {
                 .is_some_and(|entity| world.get_entity(entity).is_err())
         {
             if let Some(root) = view.root.take() {
+                if suspended && focus_inside(world, root) {
+                    world.resource_mut::<InputFocus>().clear();
+                }
                 let _ = world.despawn(root);
             }
             view.cards.clear();
@@ -287,19 +312,7 @@ pub(super) fn render(world: &mut World) {
             } else {
                 world.entity_mut(root).remove::<TabGroup>();
             }
-            let focus_inside =
-                world
-                    .resource::<InputFocus>()
-                    .get()
-                    .is_some_and(|mut entity| loop {
-                        if entity == root {
-                            return true;
-                        }
-                        let Some(parent) = world.get::<ChildOf>(entity) else {
-                            return false;
-                        };
-                        entity = parent.parent();
-                    });
+            let focus_inside = focus_inside(world, root);
             if keyboard && (!view.keyboard || !focus_inside) {
                 if let Some(entity) = view.focus {
                     world

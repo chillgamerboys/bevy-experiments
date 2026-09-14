@@ -898,3 +898,293 @@ fn inspection_inherits_source_modal_scope_and_yields_to_a_higher_modal() {
         .subjects()
         .is_empty());
 }
+
+#[test]
+fn suspension_preserves_valid_pins_but_releases_modal_input_and_old_focus() {
+    let (mut app, anchor) = app();
+    let host = app.world().get::<ChildOf>(anchor).unwrap().parent();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(anchor, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::KeyT);
+    step(&mut app, 1);
+    let link = app
+        .world_mut()
+        .query::<(Entity, &view::TooltipAction)>()
+        .iter(app.world())
+        .find_map(|(entity, action)| {
+            matches!(action, view::TooltipAction::Link(_, _)).then_some(entity)
+        })
+        .expect("related term");
+    app.world_mut().write_message(UiActivated { entity: link });
+    step(&mut app, 1);
+    let close = close_action(&mut app, 0);
+    let modal = app
+        .world_mut()
+        .spawn((crate::modal("menu"), ChildOf(host)))
+        .insert(GlobalZIndex(100))
+        .id();
+    let menu_control = app
+        .world_mut()
+        .spawn((crate::button("menu action"), ChildOf(modal)))
+        .id();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(menu_control, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut().resource_mut::<UiTooltipSuspension>().0 = true;
+    app.world_mut().write_message(UiActivated { entity: close });
+    app.world_mut()
+        .write_message(UiTooltipRequest::Open(key("term")));
+    for code in [KeyCode::Escape, KeyCode::KeyT, KeyCode::PageDown] {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(code);
+    }
+    step(&mut app, 3000);
+    let state = app.world().resource::<UiTooltipState>();
+    assert!(state.is_suspended());
+    assert!(state.is_pinned());
+    assert!(!state.captures_keyboard());
+    assert_eq!(state.subjects(), &[key("root"), key("term")]);
+    assert_eq!(
+        app.world().resource::<InputFocus>().get(),
+        Some(menu_control)
+    );
+    assert_eq!(
+        app.world_mut()
+            .query_filtered::<Entity, Or<(With<view::TooltipSurface>, With<view::TooltipAction>)>>()
+            .iter(app.world())
+            .count(),
+        0,
+        "suspended cards have no rendered or actionable entities"
+    );
+
+    app.world_mut().despawn(anchor);
+    {
+        let mut catalog = app.world_mut().resource_mut::<UiTooltipCatalog>();
+        catalog.0.get_mut(&key("root")).unwrap().body = "Refreshed while hidden".to_owned();
+        catalog.0.remove(&key("term"));
+    }
+    step(&mut app, 1);
+    assert_eq!(
+        app.world().resource::<UiTooltipState>().subjects(),
+        &[key("root")]
+    );
+
+    app.world_mut().despawn(modal);
+    // Let the menu's own focus stack unwind before the game restores its target.
+    step(&mut app, 1);
+    let current = app
+        .world_mut()
+        .spawn((crate::button("current"), ChildOf(host)))
+        .id();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(current, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut().resource_mut::<UiTooltipSuspension>().0 = false;
+    step(&mut app, 1);
+    let state = app.world().resource::<UiTooltipState>();
+    assert!(!state.is_suspended());
+    assert!(state.is_pinned(), "resume does not replay the dwell timer");
+    assert!(!state.captures_keyboard());
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(current));
+    assert!(app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|text| text.0 == "Refreshed while hidden"));
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Escape);
+    step(&mut app, 1);
+    assert_eq!(
+        app.world().resource::<InputFocus>().get(),
+        Some(current),
+        "dismissal cannot restore the pre-menu focus"
+    );
+}
+
+#[test]
+fn suspension_set_after_resolve_hides_existing_cards_in_the_same_frame() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(anchor, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::KeyT);
+    step(&mut app, 1);
+    settle_fixture_cards(&mut app);
+    assert!(app.world().resource::<UiTooltipState>().captures_keyboard());
+    app.add_systems(
+        PostUpdate,
+        (|mut suspension: ResMut<UiTooltipSuspension>| suspension.0 = true)
+            .before(UiTooltipSystems::Render),
+    );
+    step(&mut app, 1);
+    let state = app.world().resource::<UiTooltipState>();
+    assert!(state.is_suspended());
+    assert!(state.is_pinned());
+    assert!(!state.captures_keyboard());
+    assert_eq!(app.world().resource::<InputFocus>().get(), None);
+    assert_eq!(
+        app.world_mut()
+            .query::<&view::TooltipSurface>()
+            .iter(app.world())
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn suspended_preview_and_open_requests_do_not_accumulate_hover_time() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert((Interaction::Hovered, UiTooltipOpen(key("root"))));
+    step(&mut app, 1);
+    step(&mut app, 600);
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    app.world_mut().resource_mut::<UiTooltipSuspension>().0 = true;
+    app.world_mut()
+        .write_message(UiTooltipRequest::Open(key("root")));
+    app.world_mut().write_message(UiTooltipRequest::Pin);
+    app.world_mut()
+        .write_message(UiActivated { entity: anchor });
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::KeyT);
+    step(&mut app, 5000);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    app.world_mut().resource_mut::<UiTooltipSuspension>().0 = false;
+    step(&mut app, 5000);
+    assert_eq!(
+        app.world().resource::<UiTooltipState>().subjects(),
+        &[key("root")]
+    );
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    step(&mut app, 999);
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
+    step(&mut app, 1);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+}
+
+#[test]
+fn suspended_pins_still_observe_disclosure_host_and_lifecycle_invalidation() {
+    for invalidation in [
+        "catalog",
+        "host removed",
+        "host replaced",
+        "dismiss",
+        "back",
+    ] {
+        let (mut app, anchor) = app();
+        let host = app.world().get::<ChildOf>(anchor).unwrap().parent();
+        app.world_mut()
+            .write_message(UiTooltipRequest::Open(key("root")));
+        step(&mut app, 1);
+        app.world_mut().resource_mut::<UiTooltipSuspension>().0 = true;
+        step(&mut app, 1);
+        match invalidation {
+            "catalog" => {
+                app.world_mut()
+                    .resource_mut::<UiTooltipCatalog>()
+                    .0
+                    .remove(&key("root"));
+            }
+            "host removed" => {
+                app.world_mut().despawn(host);
+            }
+            "host replaced" => {
+                app.world_mut().despawn(host);
+                app.world_mut()
+                    .spawn((crate::screen_root("new host"), UiTooltipHost));
+            }
+            "dismiss" => {
+                app.world_mut().write_message(UiTooltipRequest::Dismiss);
+            }
+            "back" => {
+                app.world_mut().write_message(UiTooltipRequest::Back);
+            }
+            _ => unreachable!(),
+        }
+        step(&mut app, 1);
+        assert!(
+            app.world()
+                .resource::<UiTooltipState>()
+                .subjects()
+                .is_empty(),
+            "{invalidation}"
+        );
+        assert!(
+            !app.world().resource::<UiTooltipState>().is_pinned(),
+            "{invalidation}"
+        );
+    }
+}
+
+#[test]
+fn suspended_transient_pin_retains_modal_covered_help_but_not_a_missing_source() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .remove::<UiTooltipSource>()
+        .insert((
+            UiContextHelp {
+                title: "Transient".to_owned(),
+                body: "Disclosed".to_owned(),
+            },
+            Interaction::Hovered,
+        ));
+    step(&mut app, 1);
+    app.world_mut().write_message(UiTooltipRequest::Pin);
+    step(&mut app, 1);
+    app.world_mut().resource_mut::<UiTooltipSuspension>().0 = true;
+    app.world_mut()
+        .spawn(crate::modal("cover"))
+        .insert(GlobalZIndex(100));
+    step(&mut app, 1);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    app.world_mut().despawn(anchor);
+    step(&mut app, 1);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+}
+
+#[test]
+fn adopter_can_disable_escape_dismissal_without_changing_the_default() {
+    for dismiss_key in [Some(KeyCode::Escape), None] {
+        let (mut app, _) = app();
+        assert_eq!(
+            app.world().resource::<UiTooltipSettings>().dismiss_key,
+            Some(KeyCode::Escape)
+        );
+        app.world_mut()
+            .resource_mut::<UiTooltipSettings>()
+            .dismiss_key = dismiss_key;
+        app.world_mut()
+            .write_message(UiTooltipRequest::Open(key("root")));
+        step(&mut app, 1);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Escape);
+        step(&mut app, 1);
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().is_pinned(),
+            dismiss_key.is_none()
+        );
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().captures_keyboard(),
+            dismiss_key.is_some()
+        );
+    }
+}
