@@ -208,15 +208,17 @@ not make every route above a manual gate.
 - Disconnect two players. Reconnecting one must not resume combat. Closing a local
   menu cannot dismiss a connection interruption; a rules fault has its own reason
   and persists after reconnection.
-- Expand history without disabling ability → target → Confirm. Expand an action
-  and open its ability tooltip without emitting gameplay. Scroll to old entries,
-  receive events, verify position/unread state, then activate Latest. Stable rows
-  survive snapshot updates and the dock/actor anchors never move.
-- Start with no log panel. Switch History → Compact → Hidden and reopen through
-  the toolbar. Compact contains only two outcome summaries, not action expansion
-  or Latest controls. Hidden has no focus/pointer surface; events remain retained
-  and new arrivals cannot reopen it. Portrait, character and effects cards replace
-  the old initiative/Inspect drawers without changing targeting or confirmation.
+- Open the compact combat log without disabling Skill → target → Confirm. Read
+  the complete current encounter beyond the recent 80-event snapshot. Inspect a
+  long-name row to reach its full text without emitting gameplay. Scroll to old
+  entries, load missing pages and receive events; verify the event-ID anchor and
+  unread state, then activate Latest. At most 32 rows are mounted and dock/actor
+  anchors never move. Rematch resets the archive and reading position.
+- Start with no log panel. Close with × and reopen through the toolbar; hidden
+  rows have no focus/pointer surface, retained reading state survives, and new
+  arrivals never reopen it. Revoking disclosure clears rows and inspection even
+  while hidden. Row inspection follows the existing immediate preview,
+  one-second pin, × dismissal and menu suspension lifecycle.
 - Review main menu, settings, leave and history at normal scale, with pointer,
   keyboard and resizing. Automated layout tests are not an interactive walk.
 

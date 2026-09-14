@@ -6,7 +6,9 @@ mod actors;
 mod dock;
 mod feedback;
 mod history;
-pub(super) use history::scroll as scroll_history;
+pub(super) use history::{
+    latest as latest_history, scroll as scroll_history, wrap_inspection as wrap_history_inspection,
+};
 mod inspection;
 mod layout;
 mod movement;

@@ -235,6 +235,19 @@ pub struct EncounterHistory {
 }
 
 impl EncounterHistory {
+    /// Seed a standalone presentation with a complete contiguous encounter log.
+    /// Live sessions use authenticated snapshots/pages; this does not create authority.
+    pub fn from_events(encounter: u64, events: &[PresentedEvent]) -> Result<Self, &'static str> {
+        let first = events.first().map_or(1, |event| event.id);
+        let next = events
+            .last()
+            .map_or(Some(first), |event| event.id.checked_add(1))
+            .ok_or("Encounter event ID overflow.")?;
+        let mut history = Self::default();
+        history.observe(encounter, HistoryBounds { first, next }, events)?;
+        Ok(history)
+    }
+
     /// Copy cached records in `[from, from + min(limit, 64))`, in event-ID order.
     /// Missing ranges stay missing; callers can request them through a history intent.
     pub fn page(&self, from: u64, limit: usize) -> Vec<PresentedEvent> {

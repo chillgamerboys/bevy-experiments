@@ -14,7 +14,9 @@ use bevy_gamekit::ui::{
 use labyrinth::{
     presentation::{ActorDisclosure, CombatDisclosure},
     ui::{LabyrinthAppearance, LabyrinthUiPlugin},
-    view::{CombatInterruption, LabyrinthView, PlayerView, PresentedEvent, ViewMode},
+    view::{
+        CombatInterruption, EncounterHistory, LabyrinthView, PlayerView, PresentedEvent, ViewMode,
+    },
 };
 use labyrinth_rules::{
     ActorId, Combat, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER, PARTY_SIZE,
@@ -163,6 +165,17 @@ fn main() {
                     .apply(actor, labyrinth_rules::CombatAction::Wait)
                     .expect("review wait"),
             );
+        }
+    }
+    if matches!(route.as_str(), "history-long" | "history-older") {
+        for step in 0..120 {
+            let actor = combat.snapshot().active_actor.expect("history decision");
+            let action = if step % 3 == 0 {
+                labyrinth_rules::CombatAction::Defend
+            } else {
+                labyrinth_rules::CombatAction::Wait
+            };
+            events.extend(combat.apply(actor, action).expect("history fixture action"));
         }
     }
     let mut snapshot = combat.snapshot();
@@ -411,6 +424,17 @@ fn main() {
         appearance.ink = Color::srgb(0.95, 0.96, 0.85);
         appearance.damage = Color::srgb(1.0, 0.65, 0.38);
     }
+    let history =
+        EncounterHistory::from_events(view.encounter, &view.events).expect("review history");
+    view.events = view
+        .events
+        .into_iter()
+        .rev()
+        .take(80)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -423,6 +447,7 @@ fn main() {
         }))
         .insert_resource(UiScalePreference(scale))
         .insert_resource(view)
+        .insert_resource(history)
         .insert_resource(disclosure)
         .insert_resource(appearance)
         .insert_resource(Capture {
@@ -523,6 +548,13 @@ fn capture(
     mut scrolls: Query<(&Name, &mut ScrollPosition)>,
 ) {
     capture.frame += 1;
+    if capture.frame == 8 && capture.route == "history-older" {
+        for (name, mut scroll) in &mut scrolls {
+            if name.as_str() == "History Scroll" {
+                scroll.y = 0.0;
+            }
+        }
+    }
     if capture.frame == 6
         && capture.scale == UiScaleMode::Percent200
         && capture.route == "construction-picker"
@@ -591,7 +623,9 @@ fn capture(
         ("leave", 7) => Some("Menu Leave"),
         ("settings", 4) => Some("Battle Settings"),
         ("settings", 7) => Some("Game Settings"),
-        ("history" | "history-actor", 4) => Some("Battle Log Toggle"),
+        ("history" | "history-actor" | "history-long" | "history-older", 4) => {
+            Some("Battle Log Toggle")
+        }
         ("combat" | "help", 4) => Some("Skill 0"),
         ("combat", 7) => Some("Actor 105"),
         ("unknown" | "alternate", 4) => Some("Skill 0"),
@@ -605,7 +639,6 @@ fn capture(
         ("movement-blocked", 7) => Some("Actor 103"),
         ("order", 4) => Some("Initiative Actor 4"),
         ("compact", 4) => Some("Battle Log Toggle"),
-        ("compact", 7) => Some("History Toggle"),
         _ => None,
     };
     if let Some(click) = click {

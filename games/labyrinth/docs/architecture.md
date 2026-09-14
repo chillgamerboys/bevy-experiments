@@ -293,15 +293,20 @@ checks its compatibility `paused` flag against the authoritative reason. One pla
 returning does not resume combat while another is missing, and reconnection does
 not clear a rules fault.
 
-Log mode is a local Hidden/Compact/History enum, initially Hidden. Hidden removes
-the entire input surface but retains authoritative events. Compact shows two
-outcome summaries without history navigation; History provides the non-modal
-scrollable overlay. It groups typed authoritative events by
-action and turn boundaries, handles a partially retained first action explicitly,
-and reuses unchanged rows by event identity. New encounters reset local expansion
-and reading state. Gamekit only supplies follow-latest scrolling; game-local code
-owns summaries, detail links, bounded retention and disclosure. As elsewhere,
-concealing a history panel does not remove facts already sent over the network.
+The combat log is one compact, translucent, non-modal overlay, initially hidden.
+Its close control removes pointer/focus eligibility while retaining local reading
+state and the complete current-encounter cache. Plain typed event rows use fixed
+slots keyed by event ID, with at most 32 mounted rows and spacers for the remaining
+archive. Missing visible records request bounded pages; replacing placeholders or
+receiving events preserves the reading anchor. Latest restores following and
+clears unread state. New encounters reset reading state. Full text remains available
+through row inspection, including long names, with the shared one-second pin,
+close and menu suspension policy. Only mounted rows and the bounded inspection
+chain need tooltip content. The exact `CombatDisclosure::has_unknown()` guard
+conceals rows and revokes their inspection keys, including while the panel is
+hidden. Game-owned code retains history and enforces disclosure; GameKit supplies
+scrolling and inspection lifecycle. Concealing the panel does not remove facts
+already sent over the network.
 
 Statuses use one stable effects control per actor, with priority derived from the
 effect definition. A compact name/potency/clock and overflow count are backed by
