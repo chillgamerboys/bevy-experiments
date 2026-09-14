@@ -1,7 +1,7 @@
 # Labyrinth
 
 An original up-to-six-player cooperative positional-combat prototype. Battles are configurable on both sides; maze exploration is future work. It has HP, per-round initiative,
-rank-constrained abilities, multi-rank creatures, bleed, death saves, rescue and corpses. There
+rank-constrained Skills, multi-rank creatures, bleed, death saves, rescue and corpses. There
 is no stress, PvP, campaign, loot, or host migration.
 
 ## Play
@@ -87,10 +87,10 @@ option explains its test purpose. **Lobby** contains co-op connection/invitation
 details. Select a character on either side and choose **Customize** for the same
 unified editor.
 
-The same character editor handles either team. Equipment, Innate, Learned,
-Parameters and Resulting moves organize one draft. Selecting a catalog entry only
+The same character editor handles either team. Equipment, Skills, Abilities,
+Parameters and Moveset organize one draft. Selecting a catalog entry only
 inspects it: read its effects, acting/target ranks, uses, prerequisites and proposed
-move changes before explicitly equipping or learning it. Resulting moves retains
+move changes before explicitly equipping an item or adding a selection. Moveset retains
 all grant and upgrade sources. Apply build submits the complete draft; Discard
 draft reloads the authoritative character. Leaving a changed draft requires an
 explicit discard decision. Sections and character navigation do not create another
@@ -112,7 +112,7 @@ controller policies and initial status source/duration for test harnesses; the U
 selects existing content rather than authoring new effect definitions.
 
 Content lives in [`rules/content/catalog.toml`](rules/content/catalog.toml): stable
-IDs define abilities, weapons, learned skills and actor presets. Add content using
+IDs define Skills, passive Abilities, weapons and actor presets. Add content using
 existing typed effects there; new effect semantics require tested Rust behavior.
 See [the content and scenario contracts](docs/architecture.md#content-builds-and-scenarios).
 
@@ -134,9 +134,10 @@ See [network diagnostics](../../gamekit/docs/multiplayer.md) for route and permi
 ### Controls and combat
 
 Pointer activation and Tab / Shift+Tab, Enter / Space work on native UI controls.
-Select an ability, inspect its source/target-rank requirements, select a target,
-then Confirm. Unavailable abilities remain inspectable; confirmation explains why
-the selected action cannot currently be submitted. Escape dismisses local overlays.
+Select an Skill, inspect its source/target-rank requirements, select a target,
+then Confirm. Unavailable Skills remain inspectable; confirmation explains why
+the selected action cannot currently be submitted. Escape opens the Game menu
+from combat and returns through its pages.
 
 The battlefield uses replaceable 2D sprites with a minimal native overlay. H1–H6
 and E1–E6 are stable actor labels, not ranks. Starred heroes are yours in co-op.
@@ -145,13 +146,13 @@ Click an initiative portrait to pin that character's card without changing the
 selected target; it includes this round's speed, d8 roll, total and turn state.
 Click a conditions badge for current effects and links to their definitions.
 There are no separate Inspect or initiative-details menus. These cards do not
-block combat confirmation; T enters keyboard reading and Escape closes the card.
+block combat confirmation; T enters keyboard reading and × closes the card.
 Every granted move remains inspectable off-turn; only Confirm commits. Number keys 1–8 are shortcuts for the first eight moves; Tab and scrolling reach the complete list.
 
 The log starts **hidden**. Its toolbar icon opens **History**, a non-blocking,
-scrollable list of retained actions with expandable outcomes and ability links.
+scrollable list of retained actions with expandable outcomes and Skill links.
 **Compact** switches to just two recent outcome summaries; its × control fully
-hides the log. **Hide** in history or Escape also removes the panel entirely.
+hides the log. **Hide** in history also removes the panel entirely.
 The toolbar reopens history, and incoming events never reopen a hidden log.
 In history, the wheel and Page Up/Down or Home/End browse older entries.
 New events do not pull you away while reading; **Latest** returns to the newest
@@ -159,26 +160,26 @@ entry. History is bounded to the session's recent 80 events, not a saved transcr
 
 The **Game menu** and its Settings page are local. They block your combat input,
 but the encounter and networking continue. Escape backs out of menus; outside a
-menu it dismisses active inspection/selection before opening the Game menu.
+menu it opens Game immediately, preserving selection and temporarily hiding pins.
 Leaving requires confirmation and explains whether it closes the hosted company,
 releases a lobby seat, or leaves a reserved combat hero waiting for reconnection.
-The command dock groups all resolved abilities and utility actions as glyph
-controls, with automatic rows for larger movesets. Hover or keyboard-focus an ability for its explanation; this never
+The command dock groups all resolved Skills and utility actions as glyph
+controls, with automatic rows for larger movesets. Hover or keyboard-focus an Skill for its explanation; this never
 changes the pending command. Descriptions float in the upper battlefield, outside
 the command dock's layout. Their clicks do not select characters behind them.
 Long descriptions scroll with the wheel or Page Up/Down and Home/End; the HP and
 status strips and Confirm stay clear. The dock and numeric labels retain their
-footprint when selecting abilities or targets. Initiative portraits open inspection without
+footprint when selecting Skills or targets. Initiative portraits open inspection without
 retargeting. The paired six-rank diagrams face the same direction as the formations.
 
-An ability shows authored base power before targeting. Selecting a valid target
+An Skill shows authored base power before targeting. Selecting a valid target
 adds an immediate HP forecast on that character's health bar and in the dock;
-The target's contextual card expands the immediate forecast; ability and condition
+The target's contextual card expands the immediate forecast; Skill and condition
 cards explain base effects and their rules.
 Forecasts do not advance combat or predict the next turn's damage. Bleed is shown
 as conditional ticks, not guaranteed future damage. The prototype palette and
 glyph strokes are game-owned `LabyrinthAppearance` tokens, not fixed Gamekit styling.
-At large text sizes, long ability rows scroll horizontally while the battlefield
+At large text sizes, long Skill rows scroll horizontally while the battlefield
 and confirmation remain in view. Opening an effects badge reveals all effects;
 for example `Ble2 / 3t+1` means Bleed potency 2, three bearer-turn boundaries left,
 plus one other effect. The inspector gives the exact trigger and duration wording.
@@ -196,13 +197,20 @@ Move swaps adjacent whole combatants, never half a large actor. Both teams roll
 effective Speed + d8 each round; the current
 round's order stays fixed when actors move or speed changes.
 
-Every actor freezes its resolved moves at encounter start. Innate grants, learned
-skills and the equipped weapon contribute moves; learned skills can also upgrade
-them. Inspection shows grant and upgrade provenance. The six starting weapons are
-dagger (stab/unlimited throw), greatsword (thrust/front-pair cleave), two-handed axe
-(overhead chop), spear (thrust/shove), bow (aimed/quick shots) and staff (blow/push).
-Stats are provisional. No inventory storage, ammunition, passive/reaction execution,
-progression tree or customizable hotbar is implemented.
+Every actor freezes its **Moveset** at encounter start. **Skills** are active
+commands; **Abilities** are passive effects or Skill upgrades. Characters and
+weapons can grant either. Optional weapon-kind or exact-item requirements determine
+whether a selected Skill enters Moveset and whether an Ability contributes. Personal
+selections remain inactive when requirements are missing; restoring the equipment
+reactivates them. Equipment-only grants cannot be added as personal selections.
+Inspection shows all grant sources and applied upgrades without multiplying an
+Ability granted through multiple sources.
+
+The catalog includes six comparison weapons and five exact starter variants that
+preserve the ten presets' existing actions. Resilient shortens finite negative
+status durations by one on application or refresh, with a minimum one tick. Saved
+remaining durations are not shortened again. Stats are provisional; inventory,
+ammunition, reactions, progression trees and hotbar customization remain future work.
 
 Bleed deals 2 damage at the affected actor's next three turn starts. Reapplying it
 refreshes duration without stacking damage. Brace reduces direct damage by 2 until
@@ -243,9 +251,11 @@ uses, initiative and status clocks do not advance. Stale commands are rejected e
 if the same hero was assigned away and back. A rules fault cannot be cleared this way.
 Host process restart ends the session; guest credentials cannot recover a lost world.
 
-The current Labyrinth protocol is **v6**, including frozen authored abilities,
+The current Labyrinth protocol is **v7**, including canonical Skills, passive
+Abilities, Moveset and equipment prerequisites,
 sparse lobby positions, rank reservations and separate setup/assignment revisions. It is
-incompatible with earlier builds. All participants need matching builds/catalogs
+incompatible with earlier builds; catalog and scenario schemas are version2.
+Old save formats are rejected without overwriting the originals. All participants need matching builds/catalogs
 and a new hosted company; existing credentials are not silently repurposed.
 
 ## Engineering boundaries
@@ -264,17 +274,17 @@ does not own combat layout, appearance, or disclosure policy.
 
 ### Ability inspection
 
-The automatic action rail shows glyphs and numbered shortcuts, not permanent ability
-descriptions. Select an ability, select a target, then Confirm. Formation numbers
+The automatic action rail shows glyphs and numbered shortcuts, not permanent Skill
+descriptions. Select an Skill, select a target, then Confirm. Formation numbers
 remain plain ranks. Emphasized footprints mark usable source positions and legal
 targets; a stronger selected-target highlight and actor emphasis distinguish the
-current selection. Exact source/target ranks are listed in ability tooltips;
+current selection. Exact source/target ranks are listed in Skill tooltips;
 HP forecast segments remain attached to the affected actor.
 
-Hover an ability or status to see its card immediately. Leaving before 1 second
+Hover an Skill or status to see its card immediately. Leaving before 1 second
 hides it immediately; continuous hover locks it with an accent border. Locked
 cards support related terms and stay open while hovering or clicking other
-characters and abilities. Each pinned card has a **×** control that closes that
+characters and Skills. Each pinned card has a **×** control that closes that
 card and its linked descendants; closing the root clears the chain. Outside clicks
 preserve pins. **Escape** opens the Game menu directly, including while inspecting
 a pin or selecting an action, and returns through its separate Settings and Party
@@ -283,7 +293,7 @@ Close the current card before inspecting another source. **T** explicitly
 opens keyboard inspection of the focused source; merely retaining clicked-button
 focus never reopens a preview. Game-menu and combat-log toggles have no tooltips.
 **K** toggles the equipped skillbook,
-which uses the same disclosed ability content. Neither inspection nor a skillbook
+which uses the same disclosed Skill content. Neither inspection nor a skillbook
 link spends a turn. The shared timing and key bindings can be changed independently
 of Labyrinth's rules and palette.
 

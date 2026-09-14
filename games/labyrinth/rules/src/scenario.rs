@@ -1,7 +1,7 @@
 //! Saved battle configuration shared by local play, co-op setup and simulations.
 
 use crate::{
-    build::{ActorBuild, CharacterBuild, InnateGrant},
+    build::{ActorBuild, CharacterBuild, SkillGrant},
     catalog::{text_field, ContentCatalog, ContentError, ContentId},
     status_definition, ActorId, ActorKind, EnemyKind, HeroClass, StatusKind, Team,
 };
@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 /// Scenario format revision; saved files carry configuration, never peer credentials.
-pub const SCENARIO_SCHEMA_VERSION: u32 = 1;
+pub const SCENARIO_SCHEMA_VERSION: u32 = 2;
 /// Maximum saved scenario input size before parsing.
 pub const MAX_SCENARIO_BYTES: usize = 131_072;
 /// Decision producer policy; every producer must still use legal actions and apply.
@@ -107,7 +107,7 @@ impl Scenario {
         if self.schema_version != SCENARIO_SCHEMA_VERSION {
             return Err(ContentError::new(
                 "scenario.schema_version",
-                "unsupported scenario schema",
+                "unsupported scenario schema; recreate the scenario using schema 2 Skills/Abilities",
             ));
         }
         text_field("scenario.name", &self.name, 128)?;
@@ -217,6 +217,20 @@ impl Scenario {
                 "encoded scenario exceeds byte limit",
             ));
         }
+        // Read only the bounded document version before interpreting new field shapes.
+        // The full second parse retains strict duplicate/unknown-field validation.
+        #[derive(Deserialize)]
+        struct SchemaHeader {
+            schema_version: u32,
+        }
+        let header: SchemaHeader = serde_json::from_str(source)
+            .map_err(|e| ContentError::new("scenario.json", e.to_string()))?;
+        if header.schema_version != SCENARIO_SCHEMA_VERSION {
+            return Err(ContentError::new(
+                "scenario.schema_version",
+                "unsupported scenario schema; recreate the scenario using schema 2 Skills/Abilities",
+            ));
+        }
         let scenario: Self = serde_json::from_str(source)
             .map_err(|e| ContentError::new("scenario.json", e.to_string()))?;
         scenario.validate(catalog)?;
@@ -299,10 +313,12 @@ impl Scenario {
                         ..Default::default()
                     };
                     if weapon == "dagger" {
-                        actor.actor.build.learned_skills = vec![
-                            ContentId::new("assassin_feint_training")?,
-                            ContentId::new("assassin_bleeding_dagger")?,
-                        ];
+                        actor.actor.build.skills.push(SkillGrant {
+                            skill: ContentId::new("assassin_feint")?,
+                            provenance: ContentId::new("assassin")?,
+                        });
+                        actor.actor.build.abilities =
+                            vec![ContentId::new("assassin_bleeding_dagger")?];
                     }
                     heroes.push(actor);
                 }
@@ -378,19 +394,70 @@ pub fn legacy_skill_id(skill: crate::SkillId) -> ContentId {
     }
     ContentId::new(key).expect("legacy identifiers are valid content keys")
 }
-/// Convert a trusted legacy loadout into a build with explicit innate provenance.
+/// Convert a trusted fixed-enum loadout to an explicit equipment grant.
+/// The caller must use `legacy_catalog` to author its exact bounded item first.
+/// Ordinary parsed scenarios never run this adapter or gain new grant sources.
 #[must_use]
 pub fn legacy_build(skills: &[crate::SkillId]) -> CharacterBuild {
+    let digest = Sha256::digest(serde_json::to_vec(skills).expect("fixed skill IDs serialize"));
     CharacterBuild {
-        innate: skills
-            .iter()
-            .map(|skill| InnateGrant {
-                ability: legacy_skill_id(*skill),
-                provenance: ContentId::new("legacy_preset").expect("static ID"),
-            })
-            .collect(),
+        weapon: Some(
+            ContentId::new(
+                format!("legacy_{:x}", digest)
+                    .chars()
+                    .take(63)
+                    .collect::<String>(),
+            )
+            .expect("hex ID"),
+        ),
         ..Default::default()
     }
+}
+/// Author bounded, exact equipment for old trusted constructors without weakening
+/// personal-selection validation. Items have the same ordered moves as the input.
+pub fn legacy_catalog<'a>(
+    catalog: &ContentCatalog,
+    loadouts: impl IntoIterator<Item = &'a [crate::SkillId]>,
+) -> Result<ContentCatalog, ContentError> {
+    let mut definition = catalog.definition().clone();
+    for skills in loadouts {
+        let skills = crate::LegacySkillLoadout::new(skills.iter().copied())
+            .map_err(|e| ContentError::new("legacy.loadout", e.to_string()))?;
+        let id = legacy_build(skills.as_slice()).weapon.expect("legacy item");
+        let granted = skills
+            .as_slice()
+            .iter()
+            .map(|skill| legacy_skill_id(*skill))
+            .collect::<Vec<_>>();
+        if let Some(existing) = definition.weapons.iter().find(|weapon| weapon.id == id) {
+            if existing.skills != granted
+                || !existing.abilities.is_empty()
+                || existing.kind.as_str() != "legacy"
+            {
+                return Err(ContentError::new(
+                    "legacy.loadout",
+                    "existing item conflicts with the exact legacy loadout",
+                ));
+            }
+            continue;
+        }
+        if definition.weapons.len() >= crate::catalog::MAX_CATALOG_ENTRIES {
+            return Err(ContentError::new(
+                "legacy.loadout",
+                "too many equipment definitions",
+            ));
+        }
+        definition.weapons.push(crate::catalog::WeaponDefinition {
+            id,
+            name: "Legacy loadout".into(),
+            description: "Explicit equipment authored by the trusted legacy constructor.".into(),
+            handedness: crate::catalog::Handedness::One,
+            kind: ContentId::new("legacy")?,
+            skills: granted,
+            abilities: vec![],
+        });
+    }
+    ContentCatalog::new(definition)
 }
 
 #[cfg(test)]

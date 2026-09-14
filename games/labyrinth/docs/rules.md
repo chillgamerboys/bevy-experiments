@@ -5,7 +5,7 @@ in the game-owned pure rules package; see [architecture](architecture.md).
 
 ## Formation
 
-One actor has one HP pool, initiative entry, equipped loadout and controller. Targeting
+One actor has one HP pool, initiative entry, Moveset, passive Abilities and controller. Targeting
 either occupied rank resolves to the same ID. Source and target reach use intersection
 with any occupied rank. Greatsword FrontPair cleave captures the distinct eligible
 occupants of target ranks 1–2 before effects. A two-rank actor is hit once; clearing
@@ -15,11 +15,34 @@ Exchange swaps whole occupants at any distance. Forced movement measures rank di
 and crosses only whole neighboring footprints within its distance budget. No wrap.
 Clearing remains compacts the formation; death alone does not.
 
+## Skills, Abilities and Moveset
+
+Skills are active actions; Abilities are passive contributions. Each can originate
+from a character or equipped item and can require a kind of equipment, an exact
+item or no equipment. Personally selected content remains selected while its
+requirements are unmet. Such Skills are absent from Moveset, and such Abilities
+have no effect. Equipment-only definitions cannot be personally selected through
+the editor or authored input. Removing equipment removes its own grants; restoring
+appropriate equipment reactivates retained personal selections.
+
+Moveset is the frozen collection of eligible active Skills with applicable passive
+upgrades. It excludes passive Abilities and universal actions. Rank, targets and
+remaining uses control legal actions without changing the Moveset during combat.
+All effects, previews, AI and player commands use the same effective definitions.
+Grant-source deduplication never multiplies a passive's contribution. See
+[content authoring](content.md) for deterministic ordering and preset source mapping.
+
+Resilient shortens newly applied/refreshed finite negative statuses by one tick of
+their own duration clock, minimum one. Bleed lasts two owner-turn starts; Weakened
+lasts one owner-turn end. Buffs are unchanged. Default starting conditions use the
+same calculation, but explicit starting remaining durations and restored live
+snapshots do not shorten again. This is a duration passive, not periodic cleansing.
+
 ## Life cycle
 
 Alive -> Dying (heroes only) -> Corpse -> Removed. Enemies skip Dying. Living HP remains
 zero on a corpse; corpse HP starts at ceil(max living HP / 4). Ordinary damage skills
-can hit opposing living/dying actors and corpses on either team, within ability reach.
+can hit opposing living/dying actors and corpses on either team, within Skill reach.
 Healing never heals a corpse. Rescue only accepts Dying and resets death-save failures.
 
 The provisional, deliberately small death-save policy rolls a seeded d20 at each dying
@@ -56,7 +79,8 @@ use their frontline attacks; Stalker and Archer occupy ranks 5 and 6.
 Both are balance fixtures, not balanced release content.
 
 Rules/content fingerprints change; all multiplayer participants must run matching builds.
-Existing saves/wire snapshots are not silently migrated to the new life-state schema.
+Catalog/scenario schema 2 and combat rules v5 reject old saved formats rather than
+silently migrating the changed Skills/Abilities contract. Original files stay intact.
 
 ## Decisions
 

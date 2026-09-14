@@ -52,7 +52,7 @@ fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "77e9ce8530575b8baa971a3aa83404898f55d4e2435b6dc027c90ca537e213ce"
+        "fe77d7a1266f58f0b5429e478f8b48689417abbdc69375d477a64c5d1f103aef"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }
@@ -167,7 +167,7 @@ fn rejected_actions_leave_state_rng_and_counters_unchanged() {
     assert!(combat
         .apply(
             active,
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: crate::SkillId::FrontStrike,
                 target: ActorId(999)
             }
@@ -209,7 +209,7 @@ fn all_authored_heroes_have_four_skills_and_displacement_has_legal_fallbacks() {
             }
         );
         for skill in class.skills() {
-            let definition = skill_definition(*skill);
+            let definition = legacy_skill_definition(*skill);
             assert!(definition.source_ranks > 0 && definition.source_ranks < 64);
             assert!(definition.target_ranks > 0 && definition.target_ranks < 64);
             assert!(!definition.effects.is_empty());
@@ -224,7 +224,7 @@ fn all_authored_heroes_have_four_skills_and_displacement_has_legal_fallbacks() {
     assert_eq!(
         combat.validate_action(
             ActorId(1),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: crate::SkillId::FrontStrike,
                 target: ActorId(101)
             }
@@ -686,7 +686,7 @@ fn killed_enemy_leaves_corpse_without_moving_statuses_or_resolving_later_skill_e
     combat
         .apply(
             ActorId(1),
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: crate::SkillId::DrivingBlow,
                 target: ActorId(101),
             },
@@ -752,7 +752,7 @@ fn limited_skills_reject_without_consuming_a_turn_and_healing_cannot_rescue() {
     assert_eq!(
         combat.apply(
             ActorId(1),
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: crate::SkillId::FieldDressing,
                 target: ActorId(1)
             }
@@ -860,8 +860,13 @@ fn scripted_party_and_ai_complete_identically_without_bevy() {
             left.legal_actions(actor)
                 .into_iter()
                 .filter_map(|action| match action {
-                    CombatAction::Skill { skill, target } => {
-                        let definition = skill_definition(skill);
+                    CombatAction::Skill { index, target } => {
+                        let definition = left
+                            .state
+                            .actor(actor)
+                            .expect("actor")
+                            .skill(index)
+                            .expect("skill");
                         let damage = definition
                             .effects
                             .iter()

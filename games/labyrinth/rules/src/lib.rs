@@ -18,9 +18,9 @@ pub mod scenario;
 mod status;
 
 pub use combat::Combat;
-pub use content::{skill_definition, skills_for, SkillDefinition, TargetRule};
+pub use content::{legacy_skill_definition, skills_for, LegacySkillDefinition, TargetRule};
 pub use life::{LifeState, CORPSE_ROUNDS, DEATH_SAVE_FAILURES, DEATH_SAVE_TARGET};
-pub use loadout::{AbilityLoadout, HeroSetup};
+pub use loadout::{HeroSetup, LegacySkillLoadout};
 pub use model::{
     ActorId, ActorKind, ActorSnapshot, CombatAction, CombatEvent, CombatEventKind, CombatOutcome,
     CombatPhase, CombatSnapshot, DamageKind, EnemyKind, HeroClass, InitiativeEntry, RuleError,
@@ -36,14 +36,14 @@ pub use status::{
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.
-pub const RULES_VERSION: &str = "labyrinth-combat-v4-frozen-builds-scenarios-cleave";
+pub const RULES_VERSION: &str = "labyrinth-combat-v5-skills-abilities-moveset-resilient";
 
 /// Maximum human seats and linear rank capacity per team (not a required roster length).
 pub const PARTY_SIZE: usize = 6;
 /// Maximum actors, including dead identities retained for event/source references.
 pub const MAX_ACTORS: usize = PARTY_SIZE * 2;
-/// Maximum distinct equipped abilities per actor; universal actions are separate.
-pub const MAX_EQUIPPED_ABILITIES: usize = 8;
+/// Maximum distinct equipped skills per actor; universal actions are separate.
+pub const MAX_LEGACY_SKILLS: usize = 8;
 /// Maximum live status instances per actor.
 pub const MAX_STATUSES: usize = 16;
 /// Bounded effect/automatic-phase work for one atomic command.
@@ -127,7 +127,10 @@ pub fn rules_fingerprint() -> String {
     .into_iter()
     .map(status_definition)
     .collect();
-    let catalog: Vec<_> = SkillId::ALL.into_iter().map(skill_definition).collect();
+    let catalog: Vec<_> = SkillId::ALL
+        .into_iter()
+        .map(legacy_skill_definition)
+        .collect();
     let rosters = (
         DEFAULT_HERO_ROSTER,
         DEFAULT_ENEMY_ROSTER,
@@ -138,7 +141,7 @@ pub fn rules_fingerprint() -> String {
     let limits = (
         PARTY_SIZE,
         MAX_ACTORS,
-        MAX_EQUIPPED_ABILITIES,
+        MAX_LEGACY_SKILLS,
         MAX_STATUSES,
         MAX_COMBAT_WORK,
         100_u16,
@@ -148,8 +151,8 @@ pub fn rules_fingerprint() -> String {
         DEATH_SAVE_FAILURES,
     );
     let configurable_limits = (
-        catalog::MAX_RESOLVED_ABILITIES,
-        catalog::MAX_ABILITY_EFFECTS,
+        catalog::MAX_MOVESET_SKILLS,
+        catalog::MAX_SKILL_EFFECTS,
         catalog::MAX_CONTENT_POWER,
         MAX_COMBAT_SNAPSHOT_BYTES,
         scenario::SCENARIO_SCHEMA_VERSION,
@@ -162,3 +165,6 @@ pub fn rules_fingerprint() -> String {
 
 #[cfg(test)]
 mod catalog_tests;
+
+#[cfg(test)]
+mod build_contract_tests;

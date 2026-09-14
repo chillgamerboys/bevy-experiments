@@ -98,7 +98,7 @@ fn compare(combat: &Combat, source: ActorId, action: CombatAction) -> ActionPrev
 fn off_turn_inspection_preserves_current_turn_commit_authority() {
     let combat = fixture(ActorId(1));
     let snapshot = combat.snapshot();
-    let action = CombatAction::Skill {
+    let action = CombatAction::LegacySkill {
         skill: SkillId::BackRankShot,
         target: ActorId(106),
     };
@@ -112,7 +112,7 @@ fn off_turn_inspection_preserves_current_turn_commit_authority() {
         .expect("off-turn forecast");
     assert_eq!(preview.damage.first().expect("hit").base, 7);
     assert_eq!(snapshot, combat.snapshot());
-    let invalid = CombatAction::Skill {
+    let invalid = CombatAction::LegacySkill {
         skill: SkillId::BackRankShot,
         target: ActorId(101),
     };
@@ -135,7 +135,7 @@ fn direct_hit_separates_base_modifiers_and_remaining_hp_cap() {
     let preview = compare(
         &combat,
         ActorId(1),
-        CombatAction::Skill {
+        CombatAction::LegacySkill {
             skill: SkillId::FrontStrike,
             target: ActorId(101),
         },
@@ -195,7 +195,7 @@ fn driving_blow_moves_whole_footprints_and_reports_the_actual_limit() {
         let preview = compare(
             &combat,
             ActorId(1),
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: SkillId::DrivingBlow,
                 target: ActorId(101),
             },
@@ -231,7 +231,7 @@ fn lethal_hits_suppress_status_and_movement_followups() {
         let preview = compare(
             &combat,
             source,
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill,
                 target: ActorId(101),
             },
@@ -262,7 +262,7 @@ fn healing_and_rescue_use_the_committed_caps_and_rounding() {
     let preview = compare(
         &combat,
         ActorId(5),
-        CombatAction::Skill {
+        CombatAction::LegacySkill {
             skill: SkillId::Mend,
             target: ActorId(1),
         },
@@ -290,7 +290,7 @@ fn healing_and_rescue_use_the_committed_caps_and_rounding() {
 #[test]
 fn status_application_refresh_cleanse_and_movement_share_resolution() {
     let mut combat = fixture(ActorId(2));
-    let action = CombatAction::Skill {
+    let action = CombatAction::LegacySkill {
         skill: SkillId::BleedingCut,
         target: ActorId(101),
     };
@@ -324,7 +324,7 @@ fn status_application_refresh_cleanse_and_movement_share_resolution() {
     let cleansed = compare(
         &combat,
         ActorId(2),
-        CombatAction::Skill {
+        CombatAction::LegacySkill {
             skill: SkillId::CleanBlade,
             target: ActorId(2),
         },

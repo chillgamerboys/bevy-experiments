@@ -28,7 +28,7 @@ pub enum TargetRule {
 
 /// Immutable skill content used by legality, AI, effects and UI inspection.
 #[derive(Debug, Clone, Copy, Serialize)]
-pub struct SkillDefinition {
+pub struct LegacySkillDefinition {
     /// Catalog identity.
     pub id: SkillId,
     /// Original display name.
@@ -47,7 +47,7 @@ pub struct SkillDefinition {
     pub effects: &'static [Effect],
 }
 
-impl SkillDefinition {
+impl LegacySkillDefinition {
     /// Whether a one-based source rank is in this skill's six-rank reach mask.
     #[must_use]
     pub fn allows_source_rank(&self, rank: u8) -> bool {
@@ -102,7 +102,7 @@ pub const fn skills_for(kind: ActorKind) -> &'static [SkillId] {
 
 /// Resolve a skill's complete typed definition.
 #[must_use]
-pub const fn skill_definition(id: SkillId) -> SkillDefinition {
+pub const fn legacy_skill_definition(id: SkillId) -> LegacySkillDefinition {
     let (name, description, source_ranks, target_ranks, target_rule, max_uses, effects): (
         _,
         _,
@@ -311,7 +311,7 @@ pub const fn skill_definition(id: SkillId) -> SkillDefinition {
             &[Effect::Damage(4)],
         ),
     };
-    SkillDefinition {
+    LegacySkillDefinition {
         id,
         name,
         description,

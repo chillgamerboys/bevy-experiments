@@ -1,8 +1,8 @@
 //! Character decisions are projected from the real build resolver, never a second rules model.
 use super::*;
 use labyrinth_rules::{
-    build::{CharacterBuild, GrantKind, ResolvedAbility, ResolvedBuild},
-    catalog::{AbilityDefinition, ContentError, TargetPattern},
+    build::{CharacterBuild, GrantKind, ResolvedBuild, ResolvedSkill},
+    catalog::{ContentError, SkillDefinition, TargetPattern},
     TargetRule, Team,
 };
 
@@ -40,19 +40,19 @@ pub(in crate::ui) fn ranks(mask: u8) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
-pub(super) fn move_summary(ability: &AbilityDefinition) -> String {
+pub(super) fn move_summary(skill: &SkillDefinition) -> String {
     format!(
         "{} · acting ranks {}",
-        crate::presentation::effects_description(&ability.effects),
-        ranks(ability.source_ranks)
+        crate::presentation::effects_description(&skill.effects),
+        ranks(skill.source_ranks)
     )
 }
 pub(in crate::ui) fn move_facts(
-    ability: &ResolvedAbility,
+    skill: &ResolvedSkill,
     span: (u8, u8),
     catalog: &ContentCatalog,
 ) -> Vec<String> {
-    let def = &ability.definition;
+    let def = &skill.definition;
     let target = match def.target_rule {
         TargetRule::EnemyStanding => "standing enemies",
         TargetRule::AllyStanding => "standing allies, including self",
@@ -93,24 +93,17 @@ pub(in crate::ui) fn move_facts(
             }
         }
     }
-    let sources = ability
+    let sources = skill
         .grants
         .iter()
         .map(|grant| match grant.kind {
-            GrantKind::Weapon => format!(
+            GrantKind::Equipment => format!(
                 "weapon: {}",
                 catalog
                     .weapon(&grant.definition)
                     .map_or(grant.definition.as_str(), |v| v.name.as_str())
             ),
-            GrantKind::Learned => format!(
-                "learned: {} ({})",
-                catalog
-                    .learned_skill(&grant.definition)
-                    .map_or(grant.definition.as_str(), |v| v.name.as_str()),
-                grant.provenance
-            ),
-            GrantKind::Innate => format!("innate ({})", grant.provenance),
+            GrantKind::Character => format!("character ({})", grant.provenance),
         })
         .collect::<Vec<_>>()
         .join("; ");
@@ -119,13 +112,15 @@ pub(in crate::ui) fn move_facts(
     } else {
         format!("Granted by {sources}.")
     });
-    for upgrade in &ability.upgrades {
+    for upgrade in &skill.upgrades {
         facts.push(format!(
             "Upgraded by {} ({}) · {}",
             catalog
-                .learned_skill(&upgrade.source.definition)
-                .map_or(upgrade.source.definition.as_str(), |v| v.name.as_str()),
-            upgrade.source.provenance,
+                .ability(&upgrade.ability)
+                .map_or(upgrade.ability.as_str(), |v| v.name.as_str()),
+            catalog
+                .ability(&upgrade.ability)
+                .map_or("", |a| a.provenance.as_str()),
             upgrade
                 .upgrade
                 .operations
@@ -156,21 +151,21 @@ pub(super) fn proposed(
     let mut build = editor.draft.actor.build.clone();
     match selection {
         Selection::Weapon(id) => build.weapon.clone_from(id),
-        Selection::Innate(id) => {
-            if build.innate.iter().any(|g| &g.ability == id) {
-                build.innate.retain(|g| &g.ability != id);
+        Selection::Skill(id) => {
+            if build.skills.iter().any(|g| &g.skill == id) {
+                build.skills.retain(|g| &g.skill != id);
             } else {
-                build.innate.push(InnateGrant {
-                    ability: id.clone(),
-                    provenance: ContentId::new("innate").expect("constant"),
+                build.skills.push(SkillGrant {
+                    skill: id.clone(),
+                    provenance: ContentId::new("skills").expect("constant"),
                 });
             }
         }
-        Selection::Learned(id) => {
-            if build.learned_skills.contains(id) {
-                build.learned_skills.retain(|v| v != id);
+        Selection::Ability(id) => {
+            if build.abilities.contains(id) {
+                build.abilities.retain(|v| v != id);
             } else {
-                build.learned_skills.push(id.clone());
+                build.abilities.push(id.clone());
             }
         }
         Selection::Preset(id) => {
@@ -184,9 +179,10 @@ pub(super) fn proposed(
 }
 pub(super) fn changes(before: &ResolvedBuild, after: &ResolvedBuild) -> Vec<String> {
     let mut lines = Vec::new();
-    for old in &before.abilities {
+    for old in &before.moveset.skills {
         match after
-            .abilities
+            .moveset
+            .skills
             .iter()
             .find(|new| new.definition.id == old.definition.id)
         {
@@ -243,9 +239,10 @@ pub(super) fn changes(before: &ResolvedBuild, after: &ResolvedBuild) -> Vec<Stri
             _ => {}
         }
     }
-    for new in &after.abilities {
+    for new in &after.moveset.skills {
         if !before
-            .abilities
+            .moveset
+            .skills
             .iter()
             .any(|old| old.definition.id == new.definition.id)
         {
@@ -256,8 +253,36 @@ pub(super) fn changes(before: &ResolvedBuild, after: &ResolvedBuild) -> Vec<Stri
             ));
         }
     }
+    for ability in &after.abilities {
+        match before
+            .abilities
+            .iter()
+            .find(|a| a.definition.id == ability.definition.id)
+        {
+            None => lines.push(format!(
+                "Added Ability · {} · {}",
+                ability.definition.name,
+                ability.inactive_reason.as_deref().unwrap_or("active")
+            )),
+            Some(old) if old.inactive_reason != ability.inactive_reason => lines.push(format!(
+                "Ability · {} · {}",
+                ability.definition.name,
+                ability.inactive_reason.as_deref().unwrap_or("active")
+            )),
+            _ => {}
+        }
+    }
+    for ability in &before.abilities {
+        if !after
+            .abilities
+            .iter()
+            .any(|a| a.definition.id == ability.definition.id)
+        {
+            lines.push(format!("Removed Ability · {}", ability.definition.name));
+        }
+    }
     if lines.is_empty() {
-        lines.push("No change to active moves.".into());
+        lines.push("No change to Moveset or Abilities.".into());
     }
     lines
 }
@@ -265,20 +290,20 @@ pub(super) struct Inspection {
     pub title: String,
     pub description: String,
     pub facts: Vec<String>,
-    pub moves: Vec<ResolvedAbility>,
+    pub moves: Vec<ResolvedSkill>,
     pub changes: Vec<String>,
     pub apply: Option<(String, bool)>,
 }
 
 /// Present the resolver's rejection without exposing authoring paths to players.
 fn build_error(error: &ContentError, catalog: &ContentCatalog) -> String {
-    if let Some(ability) = error
+    if let Some(skill) = error
         .message
-        .strip_prefix("upgrade requires granted ability ")
+        .strip_prefix("upgrade requires granted skill ")
         .and_then(|id| ContentId::new(id).ok())
-        .and_then(|id| catalog.ability(&id))
+        .and_then(|id| catalog.skill(&id))
     {
-        return format!("Requires {} in the resulting build.", ability.name);
+        return format!("Requires {} in the resulting build.", skill.name);
     }
     error.message.clone()
 }
@@ -297,7 +322,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
             if let Some(weapon) = id.as_ref().and_then(|id| catalog.weapon(id)) {
                 result.title = weapon.name.clone();
                 result.description = weapon.description.clone();
-                move_ids = weapon.grants.clone();
+                move_ids = weapon.skills.clone();
                 result.facts.push(
                     match weapon.handedness {
                         labyrinth_rules::catalog::Handedness::One => {
@@ -312,7 +337,7 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
             } else {
                 result.title = "Unarmed".into();
                 result.description =
-                    "Remove the equipped weapon. Innate and learned grants remain.".into();
+                    "Remove this equipment. Personal selections remain; equipment-dependent selections become inactive.".into();
             }
             let equipped = editor.draft.actor.build.weapon == *id;
             result.facts.push(
@@ -332,48 +357,53 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                 equipped,
             ));
         }
-        Selection::Innate(id) => {
-            if let Some(ability) = catalog.ability(id) {
-                result.title = ability.name.clone();
-                result.description = ability.description.clone();
+        Selection::Skill(id) => {
+            if let Some(skill) = catalog.skill(id) {
+                result.title = skill.name.clone();
+                result.description = skill.description.clone();
                 move_ids.push(id.clone());
                 let granted = editor
                     .draft
                     .actor
                     .build
-                    .innate
+                    .skills
                     .iter()
-                    .any(|g| g.ability == *id);
+                    .any(|g| g.skill == *id);
                 result
                     .facts
-                    .push("Innate grants do not require a weapon or learned technique.".into());
+                    .push("Personal Skill selection. Equipment requirements still apply.".into());
+                if let Some(reason) =
+                    catalog.unmet_requirements(&editor.draft.actor.build, &skill.requirements)
+                {
+                    result.facts.push(reason);
+                }
+                if !skill.personal_selectable {
+                    result
+                        .facts
+                        .push("From equipment only; change its source item in Equipment.".into());
+                }
                 result.apply = Some((
-                    if granted {
-                        "Remove innate grant"
-                    } else {
-                        "Add innate grant"
-                    }
-                    .into(),
-                    false,
+                    if granted { "Remove Skill" } else { "Add Skill" }.into(),
+                    !skill.personal_selectable,
                 ));
             }
         }
-        Selection::Learned(id) => {
-            if let Some(skill) = catalog.learned_skill(id) {
-                result.title = skill.name.clone();
-                result.description = skill.description.clone();
-                move_ids = skill.grants.clone();
+        Selection::Ability(id) => {
+            if let Some(ability) = catalog.ability(id) {
+                result.title = ability.name.clone();
+                result.description = ability.description.clone();
+
                 result.facts.push(format!(
-                    "Discipline: {}. Available to any character with the required move.",
-                    skill.provenance
+                    "Passive source: {}. Equipment and Skill prerequisites determine whether it is active.",
+                    ability.provenance
                 ));
-                for upgrade in &skill.upgrades {
-                    move_ids.push(upgrade.ability.clone());
+                for upgrade in &ability.upgrades {
+                    move_ids.push(upgrade.skill.clone());
                     result.facts.push(format!(
                         "Requires {} from any grant source. {}",
                         catalog
-                            .ability(&upgrade.ability)
-                            .map_or(upgrade.ability.as_str(), |a| a.name.as_str()),
+                            .skill(&upgrade.skill)
+                            .map_or(upgrade.skill.as_str(), |a| a.name.as_str()),
                         upgrade
                             .operations
                             .iter()
@@ -382,30 +412,53 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
                             .join("; ")
                     ));
                 }
-                if skill.upgrades.is_empty() {
-                    result.facts.push("No prerequisite move required.".into());
+                if ability.upgrades.is_empty() {
+                    result.facts.push("No prerequisite Skill required.".into());
+                }
+                if let Some(resolved) = next
+                    .as_ref()
+                    .ok()
+                    .and_then(|build| build.abilities.iter().find(|a| a.definition.id == *id))
+                {
+                    result
+                        .facts
+                        .push(resolved.inactive_reason.clone().map_or_else(
+                            || "Ability active.".into(),
+                            |reason| format!("Inactive: {reason}"),
+                        ));
+                }
+                for effect in &ability.effects {
+                    match effect {
+                    labyrinth_rules::catalog::PassiveEffect::ReduceNegativeStatusDuration { amount } => result.facts.push(format!("New or refreshed negative statuses last {amount} fewer ticks, minimum one. Existing remaining durations are preserved.")),
+                }
+                }
+                if !ability.personal_selectable {
+                    result
+                        .facts
+                        .push("From equipment only; change its source item in Equipment.".into());
                 }
                 result.apply = Some((
-                    if editor.draft.actor.build.learned_skills.contains(id) {
-                        "Forget technique"
+                    if editor.draft.actor.build.abilities.contains(id) {
+                        "Remove Ability"
                     } else {
-                        "Learn technique"
+                        "Add Ability"
                     }
                     .into(),
-                    false,
+                    !ability.personal_selectable,
                 ));
             }
         }
         Selection::Preset(id) => {
             if let Some(preset) = catalog.actor_preset(id) {
                 result.title = preset.name.clone();
-                result.description="Use this preset's appearance, equipment, innate moves and starting values in your draft.".into();
+                result.description="Use this preset's appearance, equipment, Skills, Abilities and starting values in your draft.".into();
                 result.facts.push(format!("Maximum HP {} → {} · speed {} → {} · formation spaces {} → {}. Starting HP resets to full.",editor.max_hp,preset.max_hp,editor.speed,preset.base_speed,editor.footprint,preset.footprint));
                 move_ids = catalog.resolve_build(&preset.build).map_or_else(
                     |_| vec![],
                     |build| {
                         build
-                            .abilities
+                            .moveset
+                            .skills
                             .iter()
                             .map(|a| a.definition.id.clone())
                             .collect()
@@ -416,21 +469,21 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
         }
         Selection::Move(id) => {
             move_ids.push(id.clone());
-            if let Some(ability) = catalog.ability(id) {
-                result.title = ability.name.clone();
-                result.description="Effective move in your current draft, including every grant and learned upgrade.".into();
+            if let Some(skill) = catalog.skill(id) {
+                result.title = skill.name.clone();
+                result.description="Effective Skill in your Moveset, including equipment sources and passive upgrades.".into();
             }
         }
     }
     let resolved = next.as_ref().ok().or_else(|| current.as_ref().ok());
     if let Some(build) = resolved {
         for id in move_ids {
-            if let Some(ability) = build.abilities.iter().find(|a| a.definition.id == id) {
+            if let Some(skill) = build.moveset.skills.iter().find(|a| a.definition.id == id) {
                 if !result.moves.iter().any(|a| a.definition.id == id) {
-                    result.moves.push(ability.clone());
+                    result.moves.push(skill.clone());
                 }
-            } else if let Some(def) = catalog.ability(&id) {
-                result.moves.push(ResolvedAbility {
+            } else if let Some(def) = catalog.skill(&id) {
+                result.moves.push(ResolvedSkill {
                     definition: def.clone(),
                     grants: vec![],
                     upgrades: vec![],

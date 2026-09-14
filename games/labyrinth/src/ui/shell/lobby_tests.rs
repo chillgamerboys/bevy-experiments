@@ -35,7 +35,7 @@ fn sized_app(width: u32, height: u32, scale: UiScaleMode, sparse: bool) -> App {
                 ActorKind::Hero(hero) => hero,
                 _ => unreachable!(),
             },
-            abilities: a.actor.resolve(&catalog).expect("build"),
+            resolved_build: a.actor.resolve(&catalog).expect("build"),
             owner: 0,
         })
         .collect();

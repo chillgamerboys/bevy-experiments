@@ -57,7 +57,7 @@ fn footprints_are_unique_and_reach_intersects_any_occupied_rank() {
         .state
         .validate_action_target(
             ActorId(3),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::BackRankShot,
                 target: ActorId(101)
             }
@@ -84,12 +84,12 @@ fn default_enemy_formation_gives_every_kind_an_in_range_attack() {
     {
         assert!(
             enemy
-                .skills()
+                .legacy_skills()
                 .iter()
                 .any(|skill| snapshot.hero_formation.iter().any(|target| snapshot
                     .validate_action_target(
                         enemy.id,
-                        &CombatAction::Skill {
+                        &CombatAction::LegacySkill {
                             skill: *skill,
                             target: *target,
                         }
@@ -252,7 +252,7 @@ fn saves_damage_rescue_and_permanent_death_are_distinct() {
         .state
         .validate_action_target(
             ActorId(3),
-            &CombatAction::Skill {
+            &CombatAction::LegacySkill {
                 skill: SkillId::SnapShot,
                 target: ActorId(5)
             }

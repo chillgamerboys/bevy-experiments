@@ -67,7 +67,7 @@ pub struct CompanyMember {
     /// Current visual and build preset.
     pub hero: HeroClass,
     /// Frozen active move selection for this character.
-    pub abilities: ResolvedBuild,
+    pub resolved_build: ResolvedBuild,
     /// Participant controller, independent of formation rank.
     pub owner: u8,
 }
@@ -289,7 +289,7 @@ impl SessionSnapshot {
                 .actor
                 .resolve(&self.catalog)
                 .map_err(|_| "Invalid character build.")?
-                != member.abilities
+                != member.resolved_build
             {
                 return Err("Derived company build does not match scenario.");
             }
@@ -352,7 +352,7 @@ impl SessionSnapshot {
             for member in &self.company {
                 if !combat
                     .actor(member.actor)
-                    .is_some_and(|actor| actor.abilities == member.abilities)
+                    .is_some_and(|actor| actor.resolved_build == member.resolved_build)
                 {
                     return Err("Combat actor does not match its configured build.");
                 }
@@ -464,7 +464,7 @@ impl SessionSnapshot {
                 .any(|(a, b)| a.slot != b.slot || a.peer != b.peer || a.occupied != b.occupied)
                 || self.company.len() != previous.company.len()
                 || self.company.iter().zip(&previous.company).any(|(a, b)| {
-                    a.actor != b.actor || a.hero != b.hero || a.abilities != b.abilities
+                    a.actor != b.actor || a.hero != b.hero || a.resolved_build != b.resolved_build
                 })
             {
                 return Err("Participant identities or builds changed during combat.");
@@ -596,7 +596,7 @@ impl PartyAuthority {
                         ActorKind::Hero(hero) => hero,
                         ActorKind::Enemy(_) => HeroClass::Gatekeeper,
                     },
-                    abilities: actor.actor.resolve(catalog).map_err(|e| e.to_string())?,
+                    resolved_build: actor.actor.resolve(catalog).map_err(|e| e.to_string())?,
                     owner: previous
                         .iter()
                         .find(|m| m.actor == actor.id)
