@@ -425,7 +425,12 @@ fn load_mark(state: &State, file: &str) -> Result<MarkRecord, String> {
 #[cfg(unix)]
 fn mark_receipts(state: &State) -> Result<Vec<Receipt>, String> {
     let mut receipts = Vec::new();
-    for file in state.marks.entries()? {
+    for file in state
+        .marks
+        .entries()?
+        .into_iter()
+        .filter(|file| file.ends_with(".json"))
+    {
         receipts.extend(load_mark(state, &file)?.receipts);
     }
     Ok(receipts)
@@ -434,7 +439,12 @@ fn mark_receipts(state: &State) -> Result<Vec<Receipt>, String> {
 #[cfg(unix)]
 fn open_intervals(state: &State, task: &str) -> Result<Vec<Value>, String> {
     let mut intervals = Vec::new();
-    for file in state.marks.entries()? {
+    for file in state
+        .marks
+        .entries()?
+        .into_iter()
+        .filter(|file| file.ends_with(".json"))
+    {
         let record = load_mark(state, &file)?;
         if record.task != task {
             continue;
@@ -1295,7 +1305,12 @@ fn reject_mark_overlap(state: &State, current_file: &str, receipt: &Receipt) -> 
             reject_overlap(&existing, receipt)?;
         }
     }
-    for file in state.marks.entries()? {
+    for file in state
+        .marks
+        .entries()?
+        .into_iter()
+        .filter(|file| file.ends_with(".json"))
+    {
         if file == current_file {
             continue;
         }
