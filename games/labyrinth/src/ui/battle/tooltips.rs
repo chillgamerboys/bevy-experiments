@@ -119,7 +119,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         .iter(world)
         .next();
     if let Some(host) = host {
-        let bottom = world
+        let bottoms = world
             .query::<&ActorTile>()
             .iter(world)
             .filter_map(|tile| {
@@ -131,14 +131,17 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 let actor = view.combat.as_ref()?.actor(tile.actor)?;
                 let area = node.size() * node.inverse_scale_factor;
                 let bottom = transform.translation.y * node.inverse_scale_factor + area.y * 0.46;
-                // Even before artwork loads, never place help over HP or Confirm.
-                Some(
-                    crate::scene::actor_art_size(world, actor.kind, area)
-                        .map_or(bottom, |art| bottom - art.y - 12.0),
-                )
+                // Reserve HP and commands, but allow help over the artwork.
+                // Sparse formations fit tall actors; restricting help above
+                // their heads can leave only enough height for its title.
+                let history = crate::scene::actor_art_size(world, actor.kind, area)
+                    .map_or(bottom, |art| bottom - art.y - 12.0);
+                Some((bottom - 12.0, history))
             })
-            .reduce(f32::min);
-        if let Some(bottom) = bottom {
+            .reduce(|(help, history), (other_help, other_history)| {
+                (help.min(other_help), history.min(other_history))
+            });
+        if let Some((bottom, history_bottom)) = bottoms {
             let width = world
                 .get::<ComputedNode>(host)
                 .map_or(0.0, |node| node.size().x * node.inverse_scale_factor);
@@ -149,6 +152,12 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 ));
                 if world.get::<bevy_gamekit::ui::UiTooltipBounds>(host) != Some(&bounds) {
                     world.entity_mut(host).insert(bounds);
+                }
+                let history = super::history::HistorySafeBottom(history_bottom);
+                if history_bottom > 100.0
+                    && world.get::<super::history::HistorySafeBottom>(host) != Some(&history)
+                {
+                    world.entity_mut(host).insert(history);
                 }
             }
         }

@@ -222,6 +222,10 @@ system, with encounter/actor-scoped subjects and disclosure-filtered content.
 Portrait activation pins a card without changing the selected target; there is no
 separate inspection/initiative drawer. The primary battlefield never scrolls;
 overflowing ability loadouts scroll horizontally and focus brings controls into view.
+Contextual cards reserve the character summaries, HP and command rail. They may
+cover artwork so sparse formations with tall fitted sprites still have room for
+effects, ranks and scrollable explanations; sprite size never limits help height.
+The log retains its height above artwork through a separate game-owned boundary.
 
 Local game/settings/leave pages compose Gamekit's `UiMenuStack` and menu templates.
 They never gate network schedules, pause Bevy time, or change host authority.

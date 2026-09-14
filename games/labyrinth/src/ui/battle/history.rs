@@ -2,6 +2,10 @@
 use super::*;
 use bevy_gamekit::ui::{UiFeedScroll, UiTooltipOpen};
 
+/// The log keeps its compact artwork-aware height independently of help cards.
+#[derive(Component, PartialEq)]
+pub(super) struct HistorySafeBottom(pub f32);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Entry {
     id: u64,
@@ -361,9 +365,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             .insert((UiFeedScroll::default(), ScrollPosition::default()));
         ui.expanded_log.clear();
     }
-    let safe_bottom = world
-        .get::<bevy_gamekit::ui::UiTooltipBounds>(root)
-        .map_or(330.0, |b| b.0.max.y);
+    let safe_bottom = world.get::<HistorySafeBottom>(root).map_or(330.0, |b| b.0);
     let max_height = (safe_bottom - 138.0).max(70.0);
     if let Some(mut node) = world.get_mut::<Node>(panel) {
         let height = if full {

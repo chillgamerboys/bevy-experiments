@@ -30,7 +30,7 @@ fn capture_combat_intents(
 
 /// Decode the real actor sheet synchronously so a background asset load cannot
 /// switch primitive/art render branches midway through a geometry assertion.
-fn scene_app(width: u32, height: u32, scale: UiScaleMode) -> App {
+pub(super) fn scene_app(width: u32, height: u32, scale: UiScaleMode) -> App {
     let mut app = app(width, height, scale);
     app.init_resource::<CapturedCombatIntents>().add_systems(
         Update,

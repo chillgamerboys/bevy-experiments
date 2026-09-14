@@ -138,6 +138,10 @@ route and build. Passing deterministic CI is not a substitute for these manual g
   before clipping with no hidden settling frame. Native pointer tests also check
   that a tall actor's own preview cannot intercept the target click. Static
   captures establish presentation only; desktop motion still needs visual review.
+- The fourteen-ability route loads the real atlas with one hero and two enemies
+  at Auto/200%. Effects and ranks must be visible in the first help fold, paging
+  must reach the authored explanation, and cards must leave HP, character
+  summaries and Confirm clear. A visible title alone does not establish usable help.
 - Open host and guest menus/settings during a live encounter: snapshots and peer
   lifecycle processing continue. Only the menu owner's gameplay input is blocked.
   The socket regression uses six real Apps with full UI stacks on host and one
