@@ -106,7 +106,8 @@ pub(super) fn update(world: &mut World, editor: &ActorEditor, view: &LabyrinthVi
         .as_ref()
         .and_then(|id| view.catalog.as_ref()?.weapon(id))
         .map_or("Unarmed", |item| item.name.as_str());
-    let owner: String = if details::rank_span(view, editor).0 == labyrinth_rules::Team::Enemies {
+    let (team, start, end) = details::rank_span(view, editor);
+    let owner: String = if team == labyrinth_rules::Team::Enemies {
         "Enemy · host controlled".into()
     } else if view.local {
         "Local character".into()
@@ -124,7 +125,7 @@ pub(super) fn update(world: &mut World, editor: &ActorEditor, view: &LabyrinthVi
         text.0 = match kind {
             PreviewText::Name => editor.name.clone(),
             PreviewText::Stats => format!(
-                "{} maximum HP\nSpeed {} · {} rank spaces",
+                "{} maximum HP\nSpeed {} · {} rank spaces\nRanks {start}–{end}",
                 editor.max_hp, editor.speed, editor.footprint
             ),
             PreviewText::Equipment => weapon.to_owned(),

@@ -479,7 +479,7 @@ fn queued_type_or_rank_changes_cannot_commit_a_candidate_the_player_has_not_seen
 }
 #[test]
 fn a_two_rank_character_can_move_into_its_own_second_rank_with_explicit_confirmation() {
-    let mut app = app(UiScaleMode::Auto, false);
+    let mut app = sized_app(1920, 1080, UiScaleMode::Auto, false);
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
         view.scenario
@@ -549,8 +549,9 @@ fn a_two_rank_character_can_move_into_its_own_second_rank_with_explicit_confirma
     assert!(find_named(app.world_mut(), "Placement Error").is_none());
     assert!(!disabled(&mut app, "Edit Actor 5"));
     activate(&mut app, "Edit Actor 5");
-    assert_eq!(text(&mut app, "Build Title"), "Lantern Wagon");
-    assert!(text(&mut app, "Character Context").contains("ranks 5–6"));
+    assert_eq!(text(&mut app, "Build Title"), "Customize character");
+    assert_eq!(text(&mut app, "Character Preview Name"), "Lantern Wagon");
+    assert!(text(&mut app, "Character Preview Stats").contains("Ranks 5–6"));
     apply_action(app.world_mut(), Action::Setup(setup::SetupAction::Close));
     run_frames(&mut app, 4);
     activate(&mut app, "Move Actor 5");
