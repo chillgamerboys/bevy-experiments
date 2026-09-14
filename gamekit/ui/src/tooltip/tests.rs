@@ -251,7 +251,7 @@ fn preview_is_pointer_transparent_and_pin_exposes_accessible_corner_close() {
         0
     );
     assert!(!app.world().resource::<UiTooltipState>().is_pinned());
-    step(&mut app, 999);
+    step(&mut app, 1_999);
     assert!(!app.world().resource::<UiTooltipState>().is_pinned());
     step(&mut app, 1);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
@@ -1076,7 +1076,7 @@ fn suspended_preview_and_open_requests_do_not_accumulate_hover_time() {
         &[key("root")]
     );
     assert!(!app.world().resource::<UiTooltipState>().is_pinned());
-    step(&mut app, 999);
+    step(&mut app, 1_999);
     assert!(!app.world().resource::<UiTooltipState>().is_pinned());
     step(&mut app, 1);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
