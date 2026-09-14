@@ -1016,3 +1016,33 @@ fn changed_repository_test_targets_execute_or_require_classification() -> TestRe
     }));
     Ok(())
 }
+
+#[test]
+fn unknown_scope_and_compiled_markdown_keep_owner_regressions() -> TestResult {
+    for paths in [
+        Vec::new(),
+        vec![
+            "devtools/src/ci/checks.rs",
+            "devtools/tests/fixtures/contract.md",
+        ],
+    ] {
+        let value = configured("development", &["repo-devtools"], &paths);
+        let commands = checks::commands(&value, Job::Rust)?;
+        assert!(commands.iter().any(|command| {
+            command.get(1).is_some_and(|arg| arg == "test")
+                && command.contains(&"repo-devtools".into())
+                && !command.contains(&"--test".into())
+        }));
+    }
+    let value = configured(
+        "development",
+        &["bevy-gamekit-ui", "labyrinth"],
+        &[
+            "gamekit/ui/src/tooltip.rs",
+            "gamekit/ui/tests/fixtures/layout.md",
+        ],
+    );
+    assert!(!value.suites.contains(&"gamekit-ui-tooltip".into()));
+    assert!(value.suites.contains(&"labyrinth-ui-normal".into()));
+    Ok(())
+}

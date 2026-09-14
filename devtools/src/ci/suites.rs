@@ -121,7 +121,7 @@ pub fn select(selection: &Selection) -> Vec<String> {
     let behavioral_paths: Vec<_> = selection
         .paths
         .iter()
-        .filter(|path| !path.ends_with(".md"))
+        .filter(|path| !verification::narrative_doc(path))
         .collect();
     let narrow_tooltip = !behavioral_paths.is_empty()
         && behavioral_paths.iter().all(|path| {

@@ -100,20 +100,26 @@ pub fn runners(selection: &Selection) -> Vec<String> {
         .collect()
 }
 
+/// Known narrative guides; arbitrary Markdown can be compiled input or skill source.
+pub(super) fn narrative_doc(path: &str) -> bool {
+    path == "README.md"
+        || path == "devtools/docs/ci.md"
+        || ["docs/", "gamekit/docs/", "gameskills/docs/"]
+            .iter()
+            .any(|prefix| path.starts_with(prefix) && path.ends_with(".md"))
+        || (["games/", "gamekit/"]
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
+            && path.ends_with("/README.md")
+            && path.split('/').count() == 3)
+}
+
 /// Add receiving-project rigor to the existing committed impact selection.
 pub fn apply(root: &Path, selection: &mut Selection, policy: Value) -> Result<(), String> {
     validate(&policy)?;
     selection.verification = Some(policy);
     let Some(level) = level(selection).map(str::to_owned) else {
         return Ok(());
-    };
-    let narrative_doc = |path: &str| {
-        path == "README.md"
-            || path == "devtools/docs/ci.md"
-            || ["docs/", "gamekit/docs/", "gameskills/docs/"]
-                .iter()
-                .any(|prefix| path.starts_with(prefix) && path.ends_with(".md"))
-            || (path.starts_with("games/") && path.ends_with("/README.md"))
     };
     let development_ci_only = level == "development"
         && selection.full

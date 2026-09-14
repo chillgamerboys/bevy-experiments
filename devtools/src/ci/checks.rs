@@ -219,17 +219,21 @@ fn repository_tests(selection: &Selection) -> Result<Vec<&'static str>, String> 
 }
 
 fn repository_ci_only(selection: &Selection) -> bool {
-    selection.paths.iter().all(|path| {
-        path.ends_with(".md")
-            || path == ".github/workflows/gamekit.yml"
-            || path.starts_with("devtools/src/ci/")
-            || matches!(
-                path.as_str(),
-                "devtools/tests/ci_routing.rs"
-                    | "devtools/tests/ci_checks.rs"
-                    | "devtools/tests/ci_cli.rs"
-            )
-    })
+    selection
+        .paths
+        .iter()
+        .any(|path| !verification::narrative_doc(path))
+        && selection.paths.iter().all(|path| {
+            verification::narrative_doc(path)
+                || path == ".github/workflows/gamekit.yml"
+                || path.starts_with("devtools/src/ci/")
+                || matches!(
+                    path.as_str(),
+                    "devtools/tests/ci_routing.rs"
+                        | "devtools/tests/ci_checks.rs"
+                        | "devtools/tests/ci_cli.rs"
+                )
+        })
 }
 
 fn documentation_packages(selection: &Selection) -> Vec<String> {
