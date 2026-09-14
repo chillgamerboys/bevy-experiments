@@ -45,6 +45,34 @@ escalates; exceeding the configured attempt limit fails explicitly. A `--tier`
 override requires a reason. Unsupported model/effort choices fail without a silent
 fallback. The host still receives the returned settings explicitly at worker launch.
 
+## Mark workflow stages
+
+CLI 0.1.0-dev.6 adds atomic stage transitions. Call the first mark before work,
+then transition at meaningful boundaries instead of assembling receipts by hand:
+
+```sh
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage implementation --role coordinator --skill gameskills:plan
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage verification --role coordinator --skill gameskills:test
+./target/ci/gameskills usage mark TASK --log SESSION.jsonl --stage delivery --role coordinator --skill gameskills:create-pr --skill gameskills:audit-pr
+./target/ci/gameskills usage finish TASK --log SESSION.jsonl
+./target/ci/gameskills usage report TASK
+```
+
+Each transition uses one observed counter snapshot to close the previous interval
+and open the next. Identical marks and repeated finishes are idempotent. `--attempt`
+distinguishes attempts on a thread; finish infers the active role. Allowed stages
+are implementation, verification and delivery; repeat `--skill` for the active set.
+These are caller-marked boundaries, not automatic detection of skill invocation.
+The first mark is an observed baseline, not a zero baseline: earlier work is outside
+its measurement. Capture fresh workers from their verified first native counters
+when their initial request must be included. Unsupported telemetry remains unavailable.
+
+Reports group closed intervals by stage and exact active skill set. Mixed sets are
+not split into invented per-skill costs. Open intervals remain pending until closed;
+the report identifies them and excludes them from totals. Historical imports and
+checkpoints remain supported and appear as unclassified unless tagged. A model
+boundary cannot be priced as one known model. Keep historical receipts unchanged.
+
 ## Record actual usage
 
 Capture a task baseline before its work, then capture the end counter for the same
