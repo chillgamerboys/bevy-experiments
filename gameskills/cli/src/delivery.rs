@@ -563,7 +563,10 @@ mod posix {
                 if !git_ancestor(root, merge, local_head)
                     || !git_ancestor(root, local_head, target_sha)
                 {
-                    return Err("local HEAD is not an integrated revision of the current remote target".into());
+                    return Err(
+                        "local HEAD is not an integrated revision of the current remote target"
+                            .into(),
+                    );
                 }
             }
             v.as_object_mut()

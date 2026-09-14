@@ -5,7 +5,7 @@
 )]
 
 use gameskills_cli::usage;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::{error::Error, ffi::OsString, fs, path::Path};
 
 type Test = Result<(), Box<dyn Error>>;
@@ -64,18 +64,14 @@ fn duplicate_import_is_idempotent_but_conflicts_and_thread_overlap_are_rejected(
     let mut conflict = receipt("task", "attempt-1", 10, 20);
     conflict["evidence_reference"] = json!("host:different");
     let path = write_json(root, "conflict.json", &conflict)?;
-    assert!(
-        call(root, &["import", "--file", &path])
-            .expect_err("same identity must conflict")
-            .contains("conflicting")
-    );
+    assert!(call(root, &["import", "--file", &path])
+        .expect_err("same identity must conflict")
+        .contains("conflicting"));
 
     let path = write_json(root, "overlap.json", &receipt("task", "attempt-2", 19, 30))?;
-    assert!(
-        call(root, &["import", "--file", &path])
-            .expect_err("same thread ranges must not overlap")
-            .contains("overlaps")
-    );
+    assert!(call(root, &["import", "--file", &path])
+        .expect_err("same thread ranges must not overlap")
+        .contains("overlaps"));
     let report = call(root, &["report", "task"])?;
     assert_eq!(report["total"]["receipt_count"], 1);
     Ok(())
@@ -88,11 +84,9 @@ fn decreasing_and_invalid_subset_counters_are_rejected() -> Test {
     let mut decreasing = receipt("task", "attempt-1", 10, 20);
     decreasing["end"]["input_tokens"] = json!(99);
     let path = write_json(root, "decreasing.json", &decreasing)?;
-    assert!(
-        call(root, &["import", "--file", &path])
-            .expect_err("decrease must fail")
-            .contains("decreased")
-    );
+    assert!(call(root, &["import", "--file", &path])
+        .expect_err("decrease must fail")
+        .contains("decreased"));
 
     for (name, pointer, value, expected) in [
         (
@@ -111,11 +105,9 @@ fn decreasing_and_invalid_subset_counters_are_rejected() -> Test {
         let mut invalid = receipt("task", name, 10, 20);
         *invalid.pointer_mut(pointer).ok_or("fixture pointer")? = json!(value);
         let path = write_json(root, name, &invalid)?;
-        assert!(
-            call(root, &["import", "--file", &path])
-                .expect_err("subset must fail")
-                .contains(expected)
-        );
+        assert!(call(root, &["import", "--file", &path])
+            .expect_err("subset must fail")
+            .contains(expected));
     }
     Ok(())
 }
@@ -299,16 +291,14 @@ fn native_checkpoint_refuses_missing_identity_or_counters_instead_of_fabricating
     )
     .expect_err("missing counters must fail");
     assert!(error.contains("counters are unavailable"));
-    assert!(
-        !root
-            .join(".gameskills/usage/checkpoints")
-            .read_dir()?
-            .any(|entry| {
-                entry
-                    .ok()
-                    .is_some_and(|entry| entry.file_name().to_string_lossy().ends_with(".json"))
-            })
-    );
+    assert!(!root
+        .join(".gameskills/usage/checkpoints")
+        .read_dir()?
+        .any(|entry| {
+            entry
+                .ok()
+                .is_some_and(|entry| entry.file_name().to_string_lossy().ends_with(".json"))
+        }));
     Ok(())
 }
 

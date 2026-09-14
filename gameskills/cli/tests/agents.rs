@@ -1,5 +1,6 @@
+//! Model routing respects configured bounds and actual host capabilities.
 use gameskills_cli::agents::{execute, validate_configuration};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::ffi::OsString;
 use std::fs;
 
@@ -75,14 +76,12 @@ fn escalation_and_exhaustion_are_bounded() {
     )
     .unwrap();
     assert_eq!(result["selection"]["tier"], "standard");
-    assert!(
-        execute(
-            dir.path(),
-            &config(),
-            &args(&["resolve", "--host", "host.json", "--attempt", "2"])
-        )
-        .is_err()
-    );
+    assert!(execute(
+        dir.path(),
+        &config(),
+        &args(&["resolve", "--host", "host.json", "--attempt", "2"])
+    )
+    .is_err());
 }
 
 #[test]
@@ -98,29 +97,30 @@ fn complex_starts_strong_and_capability_mismatch_fails() {
     assert_eq!(result["selection"]["tier"], "strong");
     let bad = json!({"version":1,"client":"codex","models":[{"id":"m-small","efforts":["low"]}]});
     fs::write(dir.path().join("bad.json"), bad.to_string()).unwrap();
-    assert!(
-        execute(
-            dir.path(),
-            &config(),
-            &args(&["resolve", "--host", "bad.json", "--kind", "complex"])
-        )
-        .is_err()
-    );
+    assert!(execute(
+        dir.path(),
+        &config(),
+        &args(&["resolve", "--host", "bad.json", "--kind", "complex"])
+    )
+    .is_err());
 }
 
 #[test]
 fn invalid_configuration_and_legacy_config_are_handled() {
-    let legacy: toml::Value = "[agents]\nlegacy = true\n".parse().unwrap();
+    let legacy: toml::Value = "[agents]\nlegacy = true\n"
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .unwrap();
     validate_configuration(&legacy).unwrap();
-    let invalid: toml::Value = "[agents.routing]\ndefault_tier='small'\nescalation_after_failures=1\nmax_attempts=0\n[agents.routing.clients.codex.small]\nmodel=''\neffort='low'\n".parse().unwrap();
+    let invalid: toml::Value = "[agents.routing]\ndefault_tier='small'\nescalation_after_failures=1\nmax_attempts=0\n[agents.routing.clients.codex.small]\nmodel=''\neffort='low'\n".parse::<toml::Table>().map(toml::Value::Table).unwrap();
     assert!(validate_configuration(&invalid).is_err());
 }
 
 #[test]
 fn invalid_types_and_unknown_keys_are_rejected() {
-    let wrong_type: toml::Value = "[agents.routing]\nmax_attempts='2'\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse().unwrap();
+    let wrong_type: toml::Value = "[agents.routing]\nmax_attempts='2'\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse::<toml::Table>().map(toml::Value::Table).unwrap();
     assert!(validate_configuration(&wrong_type).is_err());
-    let unknown: toml::Value = "[agents.routing]\nmax_atempts=2\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse().unwrap();
+    let unknown: toml::Value = "[agents.routing]\nmax_atempts=2\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse::<toml::Table>().map(toml::Value::Table).unwrap();
     assert!(validate_configuration(&unknown).is_err());
 }
 
@@ -128,14 +128,12 @@ fn invalid_types_and_unknown_keys_are_rejected() {
 fn explicit_tier_override_requires_reason() {
     let dir = tempfile::tempdir().unwrap();
     host(dir.path());
-    assert!(
-        execute(
-            dir.path(),
-            &config(),
-            &args(&["resolve", "--host", "host.json", "--tier", "strong"])
-        )
-        .is_err()
-    );
+    assert!(execute(
+        dir.path(),
+        &config(),
+        &args(&["resolve", "--host", "host.json", "--tier", "strong"])
+    )
+    .is_err());
 }
 
 #[test]

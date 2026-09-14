@@ -104,10 +104,21 @@ pub fn validate(config: &Value, recorded: &Value) -> Result<(), String> {
         .and_then(Value::as_bool)
         .ok_or("missing verification gameplay classification")?;
     let has_promotion = recorded.get("promotion").is_some();
-    let promotion = recorded.get("promotion").and_then(Value::as_bool).unwrap_or(false);
+    let promotion = recorded
+        .get("promotion")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     // Records written before explicit promotion retain their historical
     // manual-sanity classification and digest shape.
-    let current = resolve_impl(config, Some(base), Some(level), &scope, gameplay, promotion, has_promotion)?;
+    let current = resolve_impl(
+        config,
+        Some(base),
+        Some(level),
+        &scope,
+        gameplay,
+        promotion,
+        has_promotion,
+    )?;
     for key in [
         "schema_version",
         "configured",

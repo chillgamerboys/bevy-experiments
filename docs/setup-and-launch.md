@@ -126,17 +126,19 @@ that new identity and update this guide during the pin rollout.
 
 ## Current rollout state
 
-PR #40 merged the rigor implementation. The remote default and configured delivery
-base remain **`main`**, which resolves Testing on macOS. **`dev` does not yet exist**;
-its Development branch mapping describes the pending rollout, not completed setup.
-Continue targeting `main` until that transition is explicitly completed.
+PR #40 merged the rigor implementation; PRs #41–45 merged the launch and game UI
+updates. `dev` now exists from accepted main `e58c73a`. Feature delivery in this
+candidate targets `dev` at Development rigor; `main` remains the milestone branch.
+The remote default changes only after real Development CI and framework integration
+are observed. The [efficient workflow plan](../gameskills/docs/plans/efficient-workflow.md)
+records rollout progress and the separate tooltip-delay pilot.
 
-The current source CLI and embedded instructions are `0.1.0-dev.4`. The committed
-project lock still retains the earlier `0.1.0-dev.3` instruction content. This is a
-pending adoption step, not a corrupted installation; rebuilding the CLI alone does
-not repin or reload the session. Observe the actual versions and content hashes
-with `status` rather than assuming they match.
+The source CLI and candidate instructions are `0.1.0-dev.5`. Installation is an
+explicit immutable-bundle update; rebuilding the CLI does not repin or reload the
+current host session. The committed lock and `gameskills status` own the actual
+installed version/hash. Preserve existing overlays and historical evidence.
 
-The [active rigor plan](../gameskills/docs/plans/development-rigor.md) owns the
-remaining branch/default and installation rollout. Update this section, the lock,
-workspace registration and delivery guidance together when that work is completed.
+The [rigor plan](../gameskills/docs/plans/development-rigor.md) retains remaining
+branch/default and installation acceptance. Update the lock, registration and
+current rollout observations together; do not infer native activation from source
+or package validation alone.

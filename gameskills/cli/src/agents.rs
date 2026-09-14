@@ -3,7 +3,7 @@
 //! This module only resolves a requested model against capabilities supplied by
 //! the host. It does not launch a client or claim which model was observed.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
@@ -230,7 +230,7 @@ fn validate_host(host: &Value, client: &str) -> Result<(), String> {
     if host.get("client").and_then(Value::as_str) != Some(client) {
         return Err("host capabilities client does not match --client".into());
     }
-    if !host.get("models").and_then(Value::as_array).is_some() {
+    if host.get("models").and_then(Value::as_array).is_none() {
         return Err("host capabilities models must be an array".into());
     }
     Ok(())

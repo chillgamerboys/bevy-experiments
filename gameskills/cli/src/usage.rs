@@ -4,7 +4,7 @@
 //! telemetry remains missing; this module never estimates token counts.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -291,7 +291,7 @@ struct State {
 
 #[cfg(unix)]
 fn state(root: &Path) -> Result<State, String> {
-    use crate::runner::state::{Directory, lock};
+    use crate::runner::state::{lock, Directory};
     let root = Directory::root(root)?;
     let metadata = root.child(".gameskills", true, false)?;
     let usage = metadata.child("usage", true, false)?;

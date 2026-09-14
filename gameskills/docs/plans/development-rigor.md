@@ -1,14 +1,16 @@
 # Development rigor and milestone promotion
 
 Status: active
-Phase: implementation merged; branch and installation rollout pending
+Phase: rigor implementation merged; rollout continues in efficient-workflow.md
 Owner: GameSkills, with repository CI and game test-suite owners.
 Implementation: PR #40 merged into `main` as `ebc77b73584f3e1f2a6cefcd036fcffb985ddd1a`.
 Remaining endpoint: branch/default and installation rollout described below.
 Tracking: [HEX-110](https://linear.app/chillgamerboys/issue/HEX-110/add-scoped-development-testing-and-release-rigor-to-gameskills).
 Branch/default changes follow accepted integration and observed Development routing.
-Development and Testing probes passed on the accepted implementation; a real
-`dev` receiving branch and current-session candidate activation remain unobserved.
+Development and Testing probes passed on the accepted implementation. `dev` was
+created from accepted main e58c73a; the [efficient workflow plan](efficient-workflow.md)
+owns observed real Development routing, default-branch transition and dev.5 adoption.
+Current-session candidate activation is not inferred from rebuilding the CLI.
 
 ## Outcome and accepted decisions
 
