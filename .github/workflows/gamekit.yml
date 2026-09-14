@@ -3,7 +3,7 @@ name: Gamekit
 on:
   pull_request: {}
   push:
-    branches: [dev, main]
+    branches: [main]
   workflow_dispatch:
     inputs:
       level:
@@ -51,8 +51,6 @@ jobs:
         with:
           key: repository-validation
       - run: cargo run --locked -p repo-devtools --profile ci -- check
-      - name: Verify CI routing, selected commands and final-gate failure contracts
-        run: cargo test --locked -p repo-devtools --profile ci --test ci_routing --test ci_checks --test ci_cli
       - name: Resolve receiving-project verification policy
         env:
           RECEIVING_BRANCH: ${{ github.base_ref || github.ref_name }}
@@ -74,6 +72,9 @@ jobs:
           if [[ -n "$COMPARISON_BASE" ]]; then args+=(--base "$COMPARISON_BASE"); fi
           if [[ "$FULL_SCOPE" == true ]]; then args+=(--full); fi
           cargo run --locked -p repo-devtools --profile ci -- "${args[@]}"
+      - name: Verify changed CI routing and final-gate contracts
+        if: fromJSON(steps.scope.outputs.selection).full || contains(fromJSON(steps.scope.outputs.selection).packages, 'repo-devtools') || fromJSON(steps.scope.outputs.selection).verification.level != 'development'
+        run: cargo test --locked -p repo-devtools --profile ci --test ci_routing --test ci_checks --test ci_cli
 
   skills:
     needs: classify
@@ -119,19 +120,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes libudev-dev libwayland-dev libxkbcommon-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
       - name: Verify migration accounting against the accepted source
-        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'repo-devtools')
+        if: fromJSON(needs.classify.outputs.selection).verification.level == 'release' && (fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'repo-devtools'))
         run: cargo run --locked -p repo-devtools --profile ci -- contracts check --verify-reference --cutover
       - name: Verify the standalone CLI Cargo package
-        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
+        if: fromJSON(needs.classify.outputs.selection).verification.level == 'release' && (fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli'))
         run: cargo package --locked -p gameskills-cli
       - name: Inspect the CLI archive's instruction payload
-        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli')
+        if: fromJSON(needs.classify.outputs.selection).verification.level == 'release' && (fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-cli'))
         run: cargo run --locked -p repo-devtools --profile ci -- bundle verify-package
       - name: Verify the optional Linear helper Cargo package
-        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-linear')
+        if: fromJSON(needs.classify.outputs.selection).verification.level == 'release' && (fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'gameskills-linear'))
         run: cargo package --locked -p gameskills-linear
       - name: Verify the repository tool Cargo package
-        if: fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'repo-devtools')
+        if: fromJSON(needs.classify.outputs.selection).verification.level == 'release' && (fromJSON(needs.classify.outputs.selection).full || contains(fromJSON(needs.classify.outputs.selection).packages, 'repo-devtools'))
         run: cargo package --locked -p repo-devtools
       - run: cargo run --locked -p repo-devtools --profile ci --target-dir target/ci-controller -- ci run rust
 

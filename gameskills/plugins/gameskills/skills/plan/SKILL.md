@@ -5,6 +5,11 @@ description: Start or substantially revise a Bevy game, GameKit or GameSkills ta
 
 # Plan and carry the task
 
+For a settled small edit, use the lean path in
+[efficient delivery](../../references/efficient-delivery.md#match-the-workflow-to-the-change):
+one delivery record, focused implementation/checks, concise review and publication.
+A separate plan document, queue or worker is optional, not a prerequisite.
+
 Read [project context](../../references/project-context.md). Recover the user's
 outcome, requested endpoint, accepted choices and current task before planning.
 Read the affected owners' current architecture and Decisions sections; inspect

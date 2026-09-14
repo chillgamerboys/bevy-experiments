@@ -19,6 +19,10 @@ host choices before launching, use a bounded brief instead of full conversation
 history, and capture coordinator/worker usage at task boundaries. A cheap worker
 followed by duplicated expensive work is not a measured saving.
 
+Trivial solo changes do not need a queue or worker; route back to the plan's lean
+path when coordination would exceed the independent work. Include coordinator
+model/effort and context overhead in the decision, not only worker pricing.
+
 Inspect live queue revision, source/base, ownership and resources before each
 start or resume. Dispatch only settled work whose start blockers are satisfied.
 Human streams reserve territory and integration order without using agent slots.

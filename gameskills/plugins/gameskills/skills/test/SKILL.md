@@ -26,7 +26,10 @@ other owners. A started, interrupted, timed-out or skipped check is not a pass.
 Select suites and end-to-end journeys by the affected behavior at the resolved
 rigor. Logic-only work does not require agent visual checks. UI changes need the
 changed flow at the configured display target, not an automatic resolution sweep.
-Use focused checks during iteration and only applicable gates at the final revision. Reuse unchanged evidence only after validation;
+Use focused checks during iteration and only applicable gates at the final revision.
+Reuse the task's affected-check selection rather than rebuilding it at each skill
+boundary. Compile through selected tests when sufficient; add distinct build/feature
+checks only for claims those tests do not cover or the receiving policy requires. Reuse unchanged evidence only after validation;
 a skill invocation or another review lens is not itself a reason to rerun a suite.
 Stop once those checks pass unless changed inputs, failures or unresolved concerns
 justify more. Adding a test and running one are separate choices. Check that filtered

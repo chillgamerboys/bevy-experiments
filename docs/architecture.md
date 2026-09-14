@@ -25,3 +25,9 @@ A split is not necessary to develop or verify release artifacts. See
 Documentation follows the same ownership. Current guides explain supported behavior;
 important rationale lives in their Decisions sections. Active plans describe changes.
 See [documentation conventions](development.md#documentation-and-skills).
+
+Feature PRs target `dev` with mandatory affected regression checks and an up-to-date
+base. Broader compile/lint and combined interactions are milestone Testing work;
+platform/artifact matrices are Release work. With required PR checks active, dev
+push workflows would duplicate acceptance and are omitted. Main promotion remains
+an explicit user decision.
