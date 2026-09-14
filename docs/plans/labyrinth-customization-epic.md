@@ -3,9 +3,9 @@
 Status: active acceptance revision; hands-on feedback rejected the card-based preparation/player menus. Spatial construction and integrated ownership are implemented, with one unified editor; final integrated delivery and human acceptance remain outstanding.
 Keep this plan active through remaining human/CI acceptance.
 Owners: Labyrinth, Gamekit and GameSkills, with equal-priority acceptance.
-Current endpoint: the user requested a fresh-agent handoff to verify the environment
-and merge PR #39 after acceptance. The preparing session resolves MCP tracking and
-publishes that handoff; the receiving agent owns verification and authorized merge.
+Current endpoint: the user authorized the fresh verification session to audit the
+environment and PR #39, resolve blockers, and merge after acceptance and required
+checks pass. Verification is underway; integration has not been observed.
 Release remains outside scope. This supersedes older endpoint notes below.
 
 ## Integrated outcome
@@ -83,10 +83,13 @@ The user also identified native installation readiness as a serious package gap.
 The original pin was staged correctly and discovered with generated launch flags,
 but ordinary host registration was absent. The added runtime scope is persistent
 Codex project registration, preservation/recovery, explicit readiness and ordinary
-discovery without injected enabling settings. Current-session exposure and native
-behavior must remain separate observations. Preserve the original pin and earlier
-negative evidence; final source-bound validation and actual registration outcome
-belong in the evaluation ledger and PR delivery record.
+discovery without injected enabling settings. The fresh verification session now
+exposes all 23 selected skills, and its ordinary `codex app-server --stdio` probe
+passes for the preserved original pin. This closes the observed registration and
+fresh-session catalog gap; it does not establish activation or behavioral efficacy
+of the revised instruction candidate. Preserve the original pin and earlier
+negative evidence; final source-bound validation and the observed environment
+identities belong in the evaluation ledger and PR delivery record.
 
 ## Agreed contract
 
@@ -528,7 +531,7 @@ Part of the Labyrinth customization epic. Follow repository GameSkills workflow,
 
 Deliver the final scoped outcome through reviewable PRs against main. Plan foundations/gameplay, co-op/session, UI and package fixes as review slices when each leaves a coherent build; adjust boundaries to avoid landing an unusable intermediate state. Do not require one giant PR or create empty PRs just for the issue layout.
 
-Collect requirement-linked evidence for Labyrinth, Gamekit and GameSkills equally. Track every actual PR/source/base and adopted issue/project UUID. Update PR bodies for final scope, link both directions, inspect remote publication and CI/reviews, and run delivery observation on the actual record. Connector observation and the standalone API-key observer are separate capabilities.
+Collect requirement-linked evidence for Labyrinth, Gamekit and GameSkills equally. Track every actual PR/source/base and adopted issue/project UUID. Update PR bodies for final scope, link both directions, inspect remote publication and CI/reviews, and run delivery observation on the actual record. Required tracking uses a fresh connected MCP issue lookup and task/source-bound snapshot; the command observer is an optional route for deliberately configured automation.
 
 Preserve outstanding work when retiring completed plans and repair links. Carry package findings into current documentation and the behavioral recommendation. No merge/release permission is implied by PR creation.
 
@@ -550,7 +553,10 @@ Completion dependencies: S1, S8, S9.
 
 #### Verification
 
-Review judgment, required CI, current command evidence validation, MCP issue/PR reads and delivery check; report standalone observer mismatch if unresolved.
+Review judgment, required CI, current command evidence validation, and fresh MCP
+issue/PR reads with exact two-way links. Pass each task's fresh normalized snapshot
+to its delivery check. Check PR acceptance before the authorized merge, then observe
+integration through the separate merge task from the unchanged source checkout.
 
 #### Outside this slice
 
@@ -574,8 +580,10 @@ routing, dependency edges and local references have been verified in Linear.
 Gameplay/PR completion is not claimed by that result. The later epic cannot be
 marked Done from tests or an open PR; all required authorized integrations and
 acceptance must be observed. Preserve deferred work and repair links when retiring
-plans. The standalone Linear observer mismatch remains a separate follow-up;
-connected MCP tracking does not prove that observer is fixed.
+plans. The earlier requirement for a standalone Linear observer is resolved by the
+adopted MCP delivery contract. Preserve the actual connector response and check a
+fresh task/source-bound snapshot against the live GitHub backlink; no standalone
+helper or separate API key is required for this route.
 
 ## Exclusions
 

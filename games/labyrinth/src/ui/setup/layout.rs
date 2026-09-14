@@ -8,6 +8,12 @@ struct EditorRoot;
 struct EditorNotice;
 #[derive(Component)]
 struct EditorSave;
+/// Local editing controls keep their entities while authority changes.
+#[derive(Component, Clone, Copy, Default)]
+struct EditorEdit {
+    host_only: bool,
+    unavailable: bool,
+}
 #[derive(Component)]
 struct EditorDirty;
 #[derive(Component)]
@@ -176,6 +182,18 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             world,
             entity,
             !can_edit || conflict || editor.pending_save || editor.pending_exit.is_some(),
+        );
+    }
+    let edits = world
+        .query::<(Entity, &EditorEdit)>()
+        .iter(world)
+        .map(|(entity, edit)| (entity, *edit))
+        .collect::<Vec<_>>();
+    for (entity, edit) in edits {
+        set_disabled(
+            world,
+            entity,
+            !can_edit || (edit.host_only && !view.host) || edit.unavailable,
         );
     }
     if editor.mounted == Some(editor.generation) {
@@ -686,6 +704,10 @@ fn mount_browser(
                         bundle,
                         UiSkin::Field,
                         Field::Build(field),
+                        EditorEdit {
+                            host_only: matches!(field, BuildField::Footprint),
+                            unavailable: false,
+                        },
                         UiFocusId::new("labyrinth-build", format!("{}:{field:?}", editor.id.0)),
                         ChildOf(parent),
                     ))
@@ -712,7 +734,7 @@ fn mount_browser(
                     .starting_statuses
                     .iter()
                     .any(|s| s.kind == kind);
-                button(
+                let control = button(
                     world,
                     parent,
                     format!("Starting {kind:?}"),
@@ -724,6 +746,7 @@ fn mount_browser(
                     SetupAction::Status(kind),
                     !can_edit,
                 );
+                world.entity_mut(control).insert(EditorEdit::default());
                 paragraph(
                     world,
                     parent,
@@ -778,7 +801,7 @@ fn mount_inspector(
         );
     }
     if let Some((title, disabled)) = &info.apply {
-        button(
+        let control = button(
             world,
             top,
             "Apply Inspected Choice",
@@ -789,6 +812,10 @@ fn mount_inspector(
             ),
             *disabled || !can_edit,
         );
+        world.entity_mut(control).insert(EditorEdit {
+            host_only: false,
+            unavailable: *disabled,
+        });
     }
     paragraph(
         world,

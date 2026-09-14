@@ -182,7 +182,25 @@ fn learned_prerequisites_upgrades_and_redundant_grant_removal_use_resolver() {
         .facts
         .iter()
         .any(|s| s.contains("Requires Dagger Stab from any grant source")));
+    assert_eq!(
+        info.changes,
+        vec!["Cannot apply this choice: Requires Dagger Stab in the resulting build."]
+    );
     assert!(info.apply.expect("action").1);
+    let mut renamed = catalog.definition().clone();
+    renamed
+        .abilities
+        .iter_mut()
+        .find(|a| a.id == id("dagger_stab"))
+        .expect("required move")
+        .name = "Needle Jab".into();
+    let renamed = ContentCatalog::new(renamed).expect("renamed catalog");
+    let renamed_info = details::inspection(ui.editor.as_ref().expect("editor"), &renamed);
+    assert_eq!(
+        renamed_info.changes,
+        vec!["Cannot apply this choice: Requires Needle Jab in the resulting build."]
+    );
+    assert!(renamed_info.apply.expect("still unavailable").1);
     apply(&view, &mut ui);
     assert!(ui
         .editor

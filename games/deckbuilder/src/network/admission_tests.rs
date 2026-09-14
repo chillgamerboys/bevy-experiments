@@ -1,5 +1,7 @@
 //! Actual adapter regressions for persist-before-ACK admission and attempt isolation.
 
+mod delivery_order;
+
 use super::tests::pump_until;
 use super::*;
 use bevy::ecs::system::RunSystemOnce as _;
@@ -89,11 +91,12 @@ fn stage(world: &World) -> String {
             })
     });
     format!(
-        "client={:?}, connection={}, socket={socket_open}, hello_sent={}, persisted={}, admitted={}, snapshot={}, host_attempts={}, reserved={}, connected={connected}, authorized={authorized}",
+        "client={:?}, connection={}, socket={socket_open}, hello_sent={}, persisted={}, snapshot_pending={}, admitted={}, snapshot={}, host_attempts={}, reserved={}, connected={connected}, authorized={authorized}",
         world.resource::<State<ClientState>>().get(),
         guest.is_some(),
         world.get_resource::<PendingHello>().is_some_and(|hello| hello.sent),
         world.get_resource::<GuestAttempt>().is_some_and(|attempt| attempt.persisted.is_some()),
+        world.get_resource::<GuestAttempt>().is_some_and(|attempt| attempt.pending_snapshot.is_some()),
         state.admitted,
         state.latest.is_some(),
         host.map_or(0, |host| host.attempts.len()),

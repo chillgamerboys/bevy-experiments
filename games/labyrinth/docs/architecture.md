@@ -126,6 +126,13 @@ acknowledged admission authority, but retains its own two-seat policy, handshake
 composition, and game-specific snapshots; Labyrinth's six-seat rules do not leak
 into that adopter.
 
+Admission and snapshots use separate ordered Replicon channels; their delivery
+order across message types is unspecified. Each guest retains at most one snapshot
+for its current connection attempt until admission arrives. That snapshot stays
+unpublished until the normal peer/recipient validation succeeds, and disconnect,
+refusal, closure or a replacement attempt clears it. An idle host need not change
+its revision merely to repair an initial snapshot that arrived before admission.
+
 Every guest request has a per-reservation sequence, encounter, decision boundary and assignment revision.
 An ordered bounded result cache supports recent idempotent replies; an independent
 live-session high watermark rejects old commands even after cache eviction. Rematch
@@ -137,7 +144,9 @@ enemy setup. Guests start as spectators. Only character controllers gate readine
 or disconnect suspension; dying heroes retain ownership until permanent death.
 Host assignment pause/reassign/resume is explicit and never advances combat resources.
 Setup revision guards drafts, while unchanged actor editor fields retain native
-entities/focus/caret across unrelated participant projections.
+entities/focus/caret across unrelated participant projections. Mounted edit controls
+refresh ownership eligibility without recreating fields or discarding drafts;
+host-only footprint and choice prerequisites remain separate restrictions.
 
 Preparation uses one facing six-rank board for both teams, with a separate
 `LobbyFormation` recording stable actor positions and hero-rank reservations.
@@ -154,6 +163,15 @@ moving/removing, enemy setup and rank assignment; guests may choose a type in th
 reserved hero places. A multi-rank character must have one owner across its span.
 Moving adopts the destination reservation; removing leaves the reservation intact.
 An empty reservation alone does not make a spectator gate readiness or suspension.
+Pending type/movement proposals retain their revision guards. Inspection instead
+renders the current authoritative place and holds no placement draft: returning
+there after submission does not produce a stale-draft warning. Starting another
+placement or movement captures the current revision; this is not a command receipt.
+
+Valid Scenario submissions clear obsolete local validation feedback so subsequent
+authority errors and save results remain visible. A successful host-only load
+reports its source only after parsing, validation and synchronous authority apply;
+failed loads preserve the current scenario, formation and setup revision.
 
 Portable save remains playable Scenario JSON, with no participant or sparse-draft
 schema. Loading a stock or portable scenario restores compact placement and retains
@@ -167,7 +185,9 @@ customization uses one game-owned editor with category-local
 browsing and a single actor draft, source revision and apply/discard lifecycle.
 Inspection is distinct from mutation. Effective comparisons come from the catalog
 resolver, preserving duplicate grants and learned contributions rather than
-recalculating combat behavior in widgets. Character presentation and draft policy
+recalculating combat behavior in widgets. Prerequisite rejection text names the
+required catalog move and omits authoring paths; the resolver still determines
+eligibility. Character presentation and draft policy
 stay local; the same screen is intended to support later in-game inspection without
 authorizing combat-time editing. Existing prototype battle parameters do not define
 a future attribute/progression system.

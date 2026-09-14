@@ -131,6 +131,11 @@ fn preview_error(view: &LabyrinthView, state: &ConstructorState) -> Option<Strin
             "Reconnect to choose or change characters. Inspection stays available.".into(),
         );
     }
+    // Inspection renders the current authority and holds no placement draft.
+    // A submitted placement returns here; only pending choices can become stale.
+    if state.mode == ConstructorMode::Inspect {
+        return None;
+    }
     if state.revision != view.setup_revision {
         return Some(
             "The formation changed. Select the place again to review the new lineup.".into(),

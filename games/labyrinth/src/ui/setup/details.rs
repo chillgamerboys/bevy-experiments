@@ -2,7 +2,7 @@
 use super::*;
 use labyrinth_rules::{
     build::{CharacterBuild, GrantKind, ResolvedAbility, ResolvedBuild},
-    catalog::{AbilityDefinition, TargetPattern},
+    catalog::{AbilityDefinition, ContentError, TargetPattern},
     TargetRule, Team,
 };
 
@@ -269,6 +269,20 @@ pub(super) struct Inspection {
     pub changes: Vec<String>,
     pub apply: Option<(String, bool)>,
 }
+
+/// Present the resolver's rejection without exposing authoring paths to players.
+fn build_error(error: &ContentError, catalog: &ContentCatalog) -> String {
+    if let Some(ability) = error
+        .message
+        .strip_prefix("upgrade requires granted ability ")
+        .and_then(|id| ContentId::new(id).ok())
+        .and_then(|id| catalog.ability(&id))
+    {
+        return format!("Requires {} in the resulting build.", ability.name);
+    }
+    error.message.clone()
+}
+
 pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Inspection {
     let mut result=Inspection {title:"Battle parameters".into(),description:"Set health, initiative speed, occupied ranks and starting conditions for this encounter.".into(),facts:vec![],moves:vec![],changes:vec![],apply:None};
     let Some(selected) = editor.selection() else {
@@ -428,16 +442,18 @@ pub(super) fn inspection(editor: &ActorEditor, catalog: &ContentCatalog) -> Insp
         match (&current, &next) {
             (Ok(before), Ok(after)) => result.changes = changes(before, after),
             (_, Err(error)) => {
-                result
-                    .changes
-                    .push(format!("Cannot apply this choice: {error}"));
+                result.changes.push(format!(
+                    "Cannot apply this choice: {}",
+                    build_error(error, catalog)
+                ));
                 if let Some((_, disabled)) = &mut result.apply {
                     *disabled = true;
                 }
             }
-            (Err(error), _) => result
-                .changes
-                .push(format!("Current draft needs correction: {error}")),
+            (Err(error), _) => result.changes.push(format!(
+                "Current draft needs correction: {}",
+                build_error(error, catalog)
+            )),
         }
     }
     result

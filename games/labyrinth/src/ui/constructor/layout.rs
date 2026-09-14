@@ -293,13 +293,26 @@ pub(super) fn board(
                     .get_mut::<UiSkinOverrides>(button)
                     .expect("rank skin")
                     .background = Some(Color::NONE);
-                world
-                    .entity_mut(button)
-                    .insert(AccessibleLabel::new(format!(
+                let accessible = if matches!(state.mode, ConstructorMode::Move(_)) {
+                    let occupancy = occupant.and_then(|id| actor(view, id)).map_or_else(
+                        || "empty".to_owned(),
+                        |a| format!("occupied by {}", a.actor.name),
+                    );
+                    format!(
+                        "{} rank {rank}, {occupancy}{}. Choose this movement destination.",
+                        team_name(team),
+                        if blocked_gap { ", deployment gap" } else { "" }
+                    )
+                } else {
+                    format!(
                         "{} rank {rank}, empty{}. Select a character type before placing.",
                         team_name(team),
                         if blocked_gap { ", deployment gap" } else { "" }
-                    )));
+                    )
+                };
+                world
+                    .entity_mut(button)
+                    .insert(AccessibleLabel::new(accessible));
                 if team == Team::Heroes && !view.local && !mini {
                     let owner = formation.owner(rank).unwrap_or(0);
                     let owner_label = label(
@@ -730,8 +743,30 @@ pub(super) fn context(
             let Some(actor) = actor(view, id) else {
                 return;
             };
-            label(world,tray,"Movement Instruction",format!("Move {} · select a destination rank on the board. The complete {}-rank creature moves together.",actor.actor.name,actor.actor.footprint),UiTextRole::Body);
-            label(world,tray,"Movement Consequence",format!("Preview: {} → {}. Other characters stay in their places; the old position becomes empty.",formation(view).rank(id).map_or_else(||"Previous place".into(),|r|span(r,actor.actor.footprint)),span(rank,actor.actor.footprint)),UiTextRole::Supporting);
+            label(
+                world,
+                tray,
+                "Movement Instruction",
+                format!(
+                    "Move {} · select a destination rank on the board. The complete {}-rank creature moves together.",
+                    actor.actor.name, actor.actor.footprint
+                ),
+                UiTextRole::Body,
+            );
+            label(
+                world,
+                tray,
+                "Movement Consequence",
+                format!(
+                    "Preview: {} → {}. Other characters stay in their places; the old position becomes empty.",
+                    formation(view).rank(id).map_or_else(
+                        || "Previous place".into(),
+                        |r| span(r, actor.actor.footprint)
+                    ),
+                    span(rank, actor.actor.footprint)
+                ),
+                UiTextRole::Supporting,
+            );
         }
     }
 }
@@ -874,7 +909,16 @@ fn picker(
         UiTextRole::Body,
     );
     if let Some(replaced) = selected(view, state).and_then(|id| actor(view, id)) {
-        label(world,parent,"Replacement Consequence",format!("Replaces {} and its build. Player ownership stays with this place. Other characters will not move.",replaced.actor.name),UiTextRole::Supporting);
+        label(
+            world,
+            parent,
+            "Replacement Consequence",
+            format!(
+                "Replaces {} and its build. Player ownership stays with this place. Other characters will not move.",
+                replaced.actor.name
+            ),
+            UiTextRole::Supporting,
+        );
     }
     if let Ok(build) = catalog.resolve_build(&preset.build) {
         let moves = column(

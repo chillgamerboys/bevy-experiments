@@ -32,6 +32,15 @@ cargo test --locked -p gameskills-cli --profile ci
 | Native rendered frames | Static composition at the captured logical sizes | Interactive behavior or six-player correctness |
 | Manual network routes | Behavior on the recorded machines/interfaces/firewalls | Arbitrary networks or future Steam integration |
 
+The delivery-order regressions capture actual host admission/snapshot messages
+after encrypted offer and persistence ACK, then deliver the snapshot first at
+separate receive boundaries. They verify delayed publication, stale-attempt
+isolation and peer validation without waiting for another host revision.
+
+The Scenario UI route covers invalid seed correction and visibility of subsequent
+save/load feedback. The encrypted custom-build/save-load route checks that invalid
+JSON preserves setup and a corrected load replaces its earlier error with success.
+
 Do not call a saved-credential round trip a reconnect test. Recovery tests must
 re-establish the encrypted connection, retain the same peer/hero, compare exact
 initiative/status state, and accept a subsequent legal command. Likewise, a fake
@@ -152,9 +161,12 @@ route and build. Passing deterministic CI is not a substitute for these manual g
   keyboard and resizing. Automated layout tests are not an interactive walk.
 
 The menu pass has static captures under `target/review/menus-*.png`. Native desktop
-inspection currently returns `cgWindowNotFound`, including for the review app
-bundle; a completed interactive walk is not claimed. Cross-machine network routes
-also remain separate manual evidence.
+automation must verify that the target process is active and its window is on
+screen before attributing missing clicks to the game. A cached window-ID capture
+or a successful activation request alone does not establish foreground input. On
+macOS, a normal binary launched through an app wrapper can provide the native
+activation/Accessibility route when an unbundled CLI launch cannot. Record the
+actual binary and observed route; cross-machine network evidence remains separate.
 
 ## Forecast verification
 
@@ -209,8 +221,15 @@ Both teams use the same editor. Do not infer understandable choices from unclipp
 buttons alone; record what is visible separately from observed player comprehension.
 
 `ui::shell::lobby::tests` covers preparation navigation, retained seed drafts and
-the footer at Auto/200%. Editor lifecycle coverage remains in `ui/setup_tests.rs`
-and decision coverage in `ui/setup/tests.rs`. The queued-hotbar regression sends a
+the footer at Auto/200%. Its real-atlas pointer fixture selects an occupied actor
+through window cursor and mouse-button events without forced focus or direct
+`UiActivated` injection. The movement regression checks live inspection after an
+accepted projection, then rejection of a newly stale movement proposal.
+Editor lifecycle coverage in `ui/setup_tests.rs` includes permission loss/return
+without remounting fields, retained drafts/carets, and independent footprint/choice
+restrictions. Decision coverage in `ui/setup/tests.rs` verifies that prerequisite
+rejections use catalog move names while resolution still controls eligibility.
+These checks do not replace the native walk. The queued-hotbar regression sends a
 synthetic `UiActivated` batch through production translation before Present, with
 an unchanged positive control and a replaced valid build. It tests source binding,
 not a desktop pointer reproduction. Preserve the baseline wrong-action failure

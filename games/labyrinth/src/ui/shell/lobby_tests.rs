@@ -102,6 +102,63 @@ fn full_control(app: &mut App, name: &str) {
 }
 
 #[test]
+fn occupied_constructor_art_selects_through_native_pointer_input_without_forced_focus() {
+    use bevy::input::{mouse::MouseButtonInput, ButtonState};
+    for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
+        let mut app = app(scale, false);
+        // Mount the real atlas dimensions/regions; an assetless fixture only
+        // exercises the otherwise empty parent button's hit region.
+        let atlas = Image::from_buffer(
+            include_bytes!("../../scene/assets/actors.png"),
+            bevy::image::ImageType::Extension("png"),
+            bevy::image::CompressedImageFormats::NONE,
+            true,
+            default(),
+            default(),
+        )
+        .expect("embedded actor atlas");
+        let image = app.world_mut().resource_mut::<Assets<Image>>().add(atlas);
+        let mut appearance = app
+            .world_mut()
+            .resource_mut::<crate::scene::SceneAppearance>();
+        appearance.actor_sheet = Some(image.clone());
+        appearance.wagon = Some(image.clone());
+        appearance.hauler = Some(image);
+        run_frames(&mut app, 5);
+        let art = find_named(app.world_mut(), "Actor 1 Constructor Art").expect("mounted art");
+        let position = visible_control_rect(
+            app.world(),
+            art,
+            Rect::from_corners(Vec2::ZERO, Vec2::new(1280.0, 720.0)),
+        )
+        .expect("visible art")
+        .center();
+        let (window_id, mut window) = app
+            .world_mut()
+            .query::<(Entity, &mut Window)>()
+            .single_mut(app.world_mut())
+            .expect("window");
+        window.set_cursor_position(Some(position));
+        run_frames(&mut app, 2);
+        for state in [ButtonState::Pressed, ButtonState::Released] {
+            app.world_mut().write_message(MouseButtonInput {
+                button: MouseButton::Left,
+                state,
+                window: window_id,
+            });
+            app.update();
+        }
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<UiState>().constructor.selection,
+            Some((Team::Heroes, 1)),
+            "native pointer at {position:?}, {scale:?}"
+        );
+        assert!(find_named(app.world_mut(), "Edit Actor 1").is_some());
+    }
+}
+
+#[test]
 fn spatial_rank_selection_inspects_type_before_explicit_revision_bound_placement() {
     let mut app = app(UiScaleMode::Auto, true);
     let original = app.world().resource::<LabyrinthView>().scenario.clone();
@@ -237,6 +294,58 @@ fn constructor_preserves_one_editor_and_secondary_seed_draft() {
         })
     ));
 }
+
+#[test]
+fn scenario_submission_replaces_local_validation_feedback() {
+    fn seed(app: &mut App, value: &str) {
+        let field = find_named(app.world_mut(), "Scenario seed").expect("seed");
+        let mut edit = app
+            .world_mut()
+            .get_mut::<bevy::text::EditableText>(field)
+            .expect("editable");
+        edit.queue_edit(bevy::text::TextEdit::SelectAll);
+        edit.queue_edit(bevy::text::TextEdit::Insert(value.into()));
+        run_frames(app, 3);
+        activate(app, "Apply Scenario Seed");
+    }
+
+    let mut app = app(UiScaleMode::Auto, false);
+    activate(&mut app, "Preparation Scenario");
+    seed(&mut app, "42a1337");
+    assert!(text(&mut app, "Session Notice").contains("Seed must be a whole number"));
+    assert!(app.world().resource::<Captured>().0.is_empty());
+
+    seed(&mut app, "1337");
+    assert!(text(&mut app, "Session Notice").is_empty());
+    assert!(matches!(
+        app.world().resource::<Captured>().0.last(),
+        Some(LabyrinthIntent::SetScenarioSeed {
+            seed: 1337,
+            expected_revision: 8
+        })
+    ));
+
+    seed(&mut app, "bad seed");
+    activate(&mut app, "Save Scenario");
+    assert!(app.world().resource::<UiState>().local_notice.is_none());
+    app.world_mut().resource_mut::<LabyrinthView>().notice =
+        Some("Saved battle configuration to battle.json.".into());
+    run_frames(&mut app, 3);
+    assert_eq!(
+        text(&mut app, "Session Notice"),
+        "Saved battle configuration to battle.json."
+    );
+
+    seed(&mut app, "bad seed");
+    activate(&mut app, "Load Scenario");
+    app.world_mut().resource_mut::<LabyrinthView>().notice =
+        Some("Cannot open scenario: file does not exist.".into());
+    run_frames(&mut app, 3);
+    assert_eq!(
+        text(&mut app, "Session Notice"),
+        "Cannot open scenario: file does not exist."
+    );
+}
 #[test]
 fn footer_and_inspection_are_reachable_at_auto_and_two_hundred_percent() {
     for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
@@ -331,6 +440,21 @@ fn a_two_rank_character_can_move_into_its_own_second_rank_with_explicit_confirma
     run_frames(&mut app, 4);
     activate(&mut app, "Select Heroes Rank 4");
     activate(&mut app, "Move Actor 5");
+    for (rank, occupancy) in [(5, "occupied by Lantern Wagon"), (6, "empty")] {
+        let destination = find_named(app.world_mut(), &format!("Select Heroes Rank {rank}"))
+            .expect("movement destination");
+        let label = &app
+            .world()
+            .get::<AccessibleLabel>(destination)
+            .expect("label")
+            .0;
+        assert!(label.contains(occupancy), "{label}");
+        assert!(
+            label.contains("Choose this movement destination."),
+            "{label}"
+        );
+        assert!(!label.contains("Select a character type"), "{label}");
+    }
     activate(&mut app, "Select Heroes Rank 5");
     assert!(!disabled(&mut app, "Commit Placement"));
     activate(&mut app, "Commit Placement");
@@ -342,6 +466,41 @@ fn a_two_rank_character_can_move_into_its_own_second_rank_with_explicit_confirma
             expected_revision: 8
         })
     ));
+    // The accepted projection keeps the moved subject in live inspection. There
+    // is no pending draft to invalidate after our own confirmed movement.
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.formation
+            .as_mut()
+            .expect("formation")
+            .heroes
+            .iter_mut()
+            .find(|p| p.actor == ActorId(5))
+            .expect("wagon")
+            .rank = 5;
+        view.setup_revision += 1;
+        view.assignment_revision += 1;
+        view.revision += 1;
+    }
+    run_frames(&mut app, 4);
+    assert_eq!(
+        text(&mut app, "Selected Place"),
+        "Party · Lantern Wagon · Ranks 5–6"
+    );
+    assert!(find_named(app.world_mut(), "Placement Error").is_none());
+    assert!(!disabled(&mut app, "Edit Actor 5"));
+    activate(&mut app, "Edit Actor 5");
+    assert_eq!(text(&mut app, "Build Title"), "Lantern Wagon");
+    assert!(text(&mut app, "Character Context").contains("ranks 5–6"));
+    apply_action(app.world_mut(), Action::Setup(setup::SetupAction::Close));
+    run_frames(&mut app, 4);
+    activate(&mut app, "Move Actor 5");
+    app.world_mut()
+        .resource_mut::<LabyrinthView>()
+        .setup_revision += 1;
+    run_frames(&mut app, 4);
+    assert!(disabled(&mut app, "Commit Placement"));
+    assert!(text(&mut app, "Placement Error").contains("formation changed"));
 }
 #[test]
 fn queued_owner_assignment_does_not_follow_a_different_selected_place() {

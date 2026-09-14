@@ -42,6 +42,11 @@ after one hour. Pending admission does not authorize gameplay: persist the offer
 credential, acknowledge it, then accept the matching welcome. A storage failure
 cancels joining rather than admitting a guest that cannot recover after restart.
 
+The welcome and private snapshot use separate ordered channels. If the snapshot
+arrives first, the guest holds one matching-attempt snapshot until the persisted
+offer's welcome is accepted. It does not expose that hand before admission, and a
+replacement attempt cannot inherit it.
+
 An established disconnected guest retains its seat/private state; the listing remains
 occupied. A lost initial offer expires and frees the pending reservation. Restart the
 guest and use its saved credential against the still-running host. Do not manually

@@ -537,15 +537,21 @@ pub(super) fn action(
             editor.error = None;
             editor.pending_save = false;
         }
-        SetupAction::Stock(index) => return Some(LabyrinthIntent::StockScenario(index)),
+        SetupAction::Stock(index) => {
+            ui.local_notice = None;
+            return Some(LabyrinthIntent::StockScenario(index));
+        }
         SetupAction::SaveFile => {
-            return Some(LabyrinthIntent::SaveScenario(ui.scenario_path.clone()))
+            ui.local_notice = None;
+            return Some(LabyrinthIntent::SaveScenario(ui.scenario_path.clone()));
         }
         SetupAction::LoadFile => {
-            return Some(LabyrinthIntent::LoadScenario(ui.scenario_path.clone()))
+            ui.local_notice = None;
+            return Some(LabyrinthIntent::LoadScenario(ui.scenario_path.clone()));
         }
         SetupAction::ApplySeed => match ui.scenario_seed.parse::<u64>() {
             Ok(seed) => {
+                ui.local_notice = None;
                 return Some(LabyrinthIntent::SetScenarioSeed {
                     seed,
                     expected_revision: view.setup_revision,

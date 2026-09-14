@@ -151,6 +151,7 @@ struct Runtime {
     connecting_since: Option<Instant>,
     player: Option<u8>,
     credential: Option<Credential>,
+    pending_snapshot: Option<SnapshotEnvelope>,
     latest: Option<SessionSnapshot>,
     sequence: u64,
     admitted: bool,
@@ -170,6 +171,7 @@ impl Default for Runtime {
             connecting_since: None,
             player: None,
             credential: None,
+            pending_snapshot: None,
             latest: None,
             sequence: 1,
             admitted: false,
@@ -381,13 +383,26 @@ fn receive(world: &mut World) {
             notice(world, rejection);
         }
     }
-    for envelope in drain::<SnapshotEnvelope>(world) {
+    let pending = {
+        let mut runtime = world.resource_mut::<Runtime>();
+        runtime
+            .admitted
+            .then(|| runtime.pending_snapshot.take())
+            .flatten()
+    };
+    for envelope in pending.into_iter().chain(drain::<SnapshotEnvelope>(world)) {
         let runtime = world.resource::<Runtime>();
         if runtime.role != Role::Guest
-            || !runtime.admitted
             || runtime.connection.is_none()
             || runtime.attempt != Some(envelope.attempt)
         {
+            continue;
+        }
+        if !runtime.admitted {
+            // Message types use independent ordered channels, so the initial
+            // snapshot may arrive before Admitted. Hold at most one snapshot
+            // for this attempt; validate and expose it only after admission.
+            world.resource_mut::<Runtime>().pending_snapshot = Some(envelope);
             continue;
         }
         let snapshot = envelope.snapshot;
@@ -675,6 +690,7 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
                     expected_revision: snapshot.setup_revision,
                 },
             )?;
+            notice(world, format!("Loaded battle configuration from {path}."));
         }
         LabyrinthIntent::Ready(ready) => submit(world, SessionCommand::Ready(ready))?,
         LabyrinthIntent::StartEncounter => submit(world, SessionCommand::Start)?,

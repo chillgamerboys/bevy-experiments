@@ -71,6 +71,131 @@ fn id(value: &str) -> ContentId {
 }
 
 #[test]
+fn ownership_changes_refresh_mounted_parameter_controls_without_losing_draft_or_caret() {
+    let mut app = editor_app();
+    app.world_mut().resource_mut::<LabyrinthView>().host = false;
+    run_frames(&mut app, 2);
+    let field = name_field(app.world_mut());
+    let status = find_named(app.world_mut(), "Starting Bleed").expect("status toggle");
+    let footprint = app
+        .world_mut()
+        .query::<(Entity, &Field)>()
+        .iter(app.world())
+        .find_map(|(entity, field)| {
+            matches!(field, Field::Build(BuildField::Footprint)).then_some(entity)
+        })
+        .expect("footprint field");
+    assert!(app.world().get::<UiDisabled>(footprint).is_some());
+    assert!(focus_action(app.world_mut(), field));
+    {
+        let mut text = app
+            .world_mut()
+            .get_mut::<EditableText>(field)
+            .expect("text");
+        text.queue_edit(TextEdit::TextEnd(false));
+        text.queue_edit(TextEdit::Insert(" retained".into()));
+        text.queue_edit(TextEdit::Left(false));
+    }
+    run_frames(&mut app, 3);
+    let draft = field_text(app.world(), field);
+    let caret = app
+        .world()
+        .get::<EditableText>(field)
+        .expect("text")
+        .editor()
+        .raw_selection()
+        .focus()
+        .index();
+    for owner in [1, 0] {
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            view.company.first_mut().expect("character").owner = owner;
+            view.setup_revision += 1;
+            view.assignment_revision += 1;
+        }
+        run_frames(&mut app, 3);
+        assert_eq!(name_field(app.world_mut()), field, "field remains mounted");
+        assert_eq!(find_named(app.world_mut(), "Starting Bleed"), Some(status));
+        assert_eq!(field_text(app.world(), field), draft);
+        assert_eq!(
+            app.world()
+                .resource::<UiState>()
+                .editor
+                .as_ref()
+                .expect("draft")
+                .name,
+            draft
+        );
+        assert_eq!(
+            app.world()
+                .get::<EditableText>(field)
+                .expect("text")
+                .editor()
+                .raw_selection()
+                .focus()
+                .index(),
+            caret
+        );
+        for entity in [field, status] {
+            assert_eq!(app.world().get::<UiDisabled>(entity).is_some(), owner != 0);
+        }
+        assert!(
+            app.world().get::<UiDisabled>(footprint).is_some(),
+            "guest footprint stays host-only"
+        );
+        assert_eq!(focus_action(app.world_mut(), field), owner == 0);
+        let save = find_named(app.world_mut(), "Apply Build").expect("save");
+        assert!(
+            app.world().get::<UiDisabled>(save).is_some(),
+            "stale draft still needs reload"
+        );
+    }
+}
+
+#[test]
+fn ownership_changes_refresh_inspected_choices_without_enabling_unavailable_choices() {
+    let mut app = editor_app();
+    app.world_mut().resource_mut::<LabyrinthView>().host = false;
+    let actor = first_actor(app.world().resource::<LabyrinthView>()).id;
+    super::super::apply_action(
+        app.world_mut(),
+        Action::Setup(SetupAction::Category(Category::Equipment)),
+    );
+    for (weapon, unavailable) in [("dagger", false), ("greatsword", true)] {
+        super::super::apply_action(
+            app.world_mut(),
+            Action::Setup(SetupAction::Inspect(
+                actor,
+                Selection::Weapon(Some(id(weapon))),
+            )),
+        );
+        run_frames(&mut app, 3);
+        let choice = find_named(app.world_mut(), "Apply Inspected Choice").expect("choice");
+        for owner in [1, 0] {
+            {
+                let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+                view.company.first_mut().expect("character").owner = owner;
+                view.setup_revision += 1;
+                view.assignment_revision += 1;
+            }
+            run_frames(&mut app, 3);
+            assert_eq!(
+                find_named(app.world_mut(), "Apply Inspected Choice"),
+                Some(choice)
+            );
+            assert_eq!(
+                app.world().get::<UiDisabled>(choice).is_some(),
+                owner != 0 || unavailable
+            );
+            assert_eq!(
+                focus_action(app.world_mut(), choice),
+                owner == 0 && !unavailable
+            );
+        }
+    }
+}
+
+#[test]
 fn invalid_draft_numbers_do_not_submit_or_mutate_authoritative_scenario() {
     let view = fixture();
     let authoritative = view.scenario.clone();

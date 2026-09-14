@@ -215,6 +215,7 @@ fn begin_guest(world: &mut World, entity: Entity, session: SessionId, credential
     runtime.attempt = Some(SessionId::generate());
     runtime.connecting_since = Some(Instant::now());
     runtime.latest = None;
+    runtime.pending_snapshot = None;
     runtime.sequence = 1;
     runtime.player = None;
     runtime.admitted = false;
@@ -308,6 +309,7 @@ pub(super) fn disconnect_guest(world: &mut World) {
         runtime.credential = None;
         runtime.admitted = false;
         runtime.attempt = None;
+        runtime.pending_snapshot = None;
         runtime.connecting_since = None;
         runtime.connection.take()
     };
@@ -343,6 +345,7 @@ pub(super) fn close(world: &mut World) {
     runtime.role = Role::None;
     runtime.admitted = false;
     runtime.latest = None;
+    runtime.pending_snapshot = None;
     runtime.player = None;
     runtime.credential = None;
     runtime.published = 0;

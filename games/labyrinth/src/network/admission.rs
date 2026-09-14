@@ -15,6 +15,7 @@ pub(super) fn host_messages(world: &mut World) {
             runtime.admitted = false;
             runtime.credential = None;
             runtime.attempt = None;
+            runtime.pending_snapshot = None;
             runtime.connecting_since = None;
             notice(
                 world,

@@ -11,6 +11,7 @@ use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, HeroClass, 
 use super::*;
 
 mod budgets;
+mod delivery_order;
 mod process;
 mod spatial;
 
@@ -234,10 +235,12 @@ fn admission_diagnostics(apps: &[App]) -> String {
                 )
             });
             format!(
-                "app {index}: client={:?}, socket_open={socket_open}, credential_pending={}, admitted={}, notice_present={}, host(listening,observed,seen,offered,rejected)={host:?}",
+                "app {index}: client={:?}, socket_open={socket_open}, credential_pending={}, snapshot_pending={}, admitted={}, snapshot_present={}, notice_present={}, host(listening,observed,seen,offered,rejected)={host:?}",
                 world.resource::<State<ClientState>>().get(),
                 runtime.credential.is_some(),
+                runtime.pending_snapshot.is_some(),
                 runtime.admitted,
+                runtime.latest.is_some(),
                 world.resource::<LabyrinthView>().notice.is_some(),
             )
         })
@@ -1389,11 +1392,15 @@ fn real_handshake_offer_and_ack_loss_recover_one_peer_from_code_then_profile() {
     *app(&mut apps, 1) = socket_app(Some(&path));
     start::reconnect(app(&mut apps, 1).world_mut())
         .expect("fresh process-style App uses persisted pending credential");
-    assert!(pump_until(
-        &mut apps,
-        Duration::from_secs(10),
-        |apps| all_admitted(apps) && converged(apps)
-    ));
+    assert!(
+        pump_until(&mut apps, Duration::from_secs(10), |apps| all_admitted(
+            apps
+        ) && converged(
+            apps
+        )),
+        "fresh pending-credential retry did not converge: {}",
+        admission_diagnostics(&apps)
+    );
     assert_eq!(stored(app(&mut apps, 1)).peer_id, peer);
     assert_eq!(
         app(&mut apps, 0)
@@ -1904,6 +1911,26 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
         Duration::from_secs(5),
         |apps| host_snapshot(apps).scenario.seed == 123456 && converged(apps)
     ));
+    let before_invalid = host_snapshot(&mut apps);
+    let invalid_path = directory.path().join("invalid.json");
+    std::fs::write(&invalid_path, "{ invalid").expect("invalid scenario fixture");
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::LoadScenario(
+            invalid_path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        app(apps, 0)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .as_ref()
+            .is_some_and(|notice| notice.starts_with("scenario.json:"))
+    }));
+    let after_invalid = host_snapshot(&mut apps);
+    assert_eq!(after_invalid.scenario, before_invalid.scenario);
+    assert_eq!(after_invalid.formation, before_invalid.formation);
+    assert_eq!(after_invalid.setup_revision, before_invalid.setup_revision);
     app(&mut apps, 0)
         .world_mut()
         .write_message(LabyrinthIntent::LoadScenario(
@@ -1914,6 +1941,14 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
         Duration::from_secs(5),
         |apps| host_snapshot(apps).scenario == saved && converged(apps)
     ));
+    assert_eq!(
+        app(&mut apps, 0)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .as_deref(),
+        Some(format!("Loaded battle configuration from {}.", path.display()).as_str())
+    );
     for app in &mut apps {
         app.world_mut().write_message(LabyrinthIntent::Ready(true));
     }
