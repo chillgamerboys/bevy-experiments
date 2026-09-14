@@ -224,6 +224,29 @@ and password verifier are never sent in them. Recent typed outcomes have monoton
 session IDs, letting UI effects deduplicate while a reconnect establishes a fresh
 baseline. A cosmetic effect is never gameplay evidence or a scheduling dependency.
 
+The host/local session retains every typed outcome for the displayed encounter,
+including construction's initial round, turn and status outcomes. It discards that
+archive only when the encounter is replaced or the session closes. Session snapshots
+retain at most 80 recent events and advertise the complete half-open event-ID range.
+Protocol v8 adds game-owned history requests over the existing acknowledged,
+encrypted transport; only an admitted connection can read its current encounter.
+Each page contains at most 64 events and 32 KiB of encoded data. Per-connection
+queues hold at most eight requests and serve one page per connection per tick,
+independently of gameplay sequences, decisions, revisions and turn advancement.
+
+`EncounterHistory` is a separate incremental presentation cache. Ordered IDs
+identify overlaps; equal records deduplicate and conflicting records fail validation.
+Snapshots announce new ranges, and the client fills missing ranges one bounded page
+at a time, including after a missed recent window or reconnect. Responses must match
+the active connection attempt, requested range and encounter. Same-session disconnect
+keeps cached records while cancelling pending reads; a different session or encounter
+clears them. Local/host reads use the same archive page method. UI range queries copy
+at most 64 records and do not clone the full cache; `LabyrinthView.events` remains the
+recent animation input. The current cooperative wire state is public: older pages
+have the same disclosure policy as live records, and the presentation's existing
+unknown-information guard still applies. No past-encounter export or host-restart
+archive is promised.
+
 ## Stage and overlay presentation
 
 The battle is a native 2D scene beneath a transparent Bevy UI. Twelve art-only

@@ -76,6 +76,20 @@ re-establish the encrypted connection, retain the same peer/hero, compare exact
 initiative/status state, and accept a subsequent legal command. Likewise, a fake
 service endpoint is not evidence that a Steam transport adapter exists.
 
+### Complete encounter history backend
+
+`history_tests::` in `labyrinth-rules` checks initial round/turn/status outcomes and
+constructor-state parity. `session::tests::history::` checks retention beyond 80
+events, bounded snapshot/page decoding, request admission/ranges, ordered overlap,
+conflict and stale-encounter rejection, incremental gap recovery and rematch reset.
+`network::tests::history::` uses one host and one guest over encrypted loopback:
+missing recent windows, a destroyed/recreated guest App with persisted reconnect
+credentials, exact recovered archive, stale attempt/encounter replies and unchanged
+combat/sequences while reading. Queue overflow and unadmitted requests also exercise
+the production host history handler. This is same-machine multi-App evidence, not
+OS-process death, discovery or cross-machine coverage. Select these filters for
+history work; rendered scrolling and disclosure guard acceptance remain UI checks.
+
 ## Static frame review
 
 ```sh

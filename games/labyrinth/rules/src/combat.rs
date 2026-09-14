@@ -3,16 +3,16 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction, CombatEvent,
-    CombatEventKind, CombatPhase, CombatSnapshot, Effect, HeroClass, HeroSetup, InitiativeEntry,
-    RemovalReason, RuleError, Team, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, MAX_ACTORS,
-    MAX_COMBAT_WORK, PARTY_SIZE,
+    ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction, CombatEvent, CombatEventKind,
+    CombatPhase, CombatSnapshot, DEFAULT_ENEMY_IDS, DEFAULT_ENEMY_ROSTER, Effect, HeroClass,
+    HeroSetup, InitiativeEntry, MAX_ACTORS, MAX_COMBAT_WORK, PARTY_SIZE, RemovalReason, RuleError,
+    Team, status_definition,
 };
 
 #[cfg(test)]
 use crate::{
-    legacy_skill_definition, CombatOutcome, DamageKind, LegacySkillLoadout, Stat, StatusInstance,
-    StatusKind, StatusTag,
+    CombatOutcome, DamageKind, LegacySkillLoadout, Stat, StatusInstance, StatusKind, StatusTag,
+    legacy_skill_definition,
 };
 
 const MAX_WORK: usize = MAX_COMBAT_WORK;
@@ -200,6 +200,15 @@ impl Combat {
         catalog: &crate::catalog::ContentCatalog,
         scenario: &crate::scenario::Scenario,
     ) -> Result<Self, crate::catalog::ContentError> {
+        Self::from_scenario_with_events(catalog, scenario).map(|(combat, _)| combat)
+    }
+
+    /// Begin an encounter and return every committed initial round/turn outcome.
+    /// Session owners retain these alongside subsequent [`Self::apply`] outcomes.
+    pub fn from_scenario_with_events(
+        catalog: &crate::catalog::ContentCatalog,
+        scenario: &crate::scenario::Scenario,
+    ) -> Result<(Self, Vec<CombatEvent>), crate::catalog::ContentError> {
         scenario.validate(catalog)?;
         let scenario_fingerprint = scenario.fingerprint(catalog)?;
         let mut next_status = 1_u64;
@@ -284,7 +293,7 @@ impl Combat {
             .seek_decision(&mut events, &mut work)
             .map_err(setup_error)?;
         combat.state.validate().map_err(setup_error)?;
-        Ok(combat)
+        Ok((combat, events))
     }
 
     /// Public full snapshot containing committed phases, rolls and status lifetimes.

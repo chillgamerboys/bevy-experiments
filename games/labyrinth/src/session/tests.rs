@@ -1,7 +1,9 @@
 //! Game-owned policy tests. These do not claim transport or process-restart evidence.
 
 use super::*;
-use labyrinth_rules::{CombatOutcome, Team, DEFAULT_HERO_ROSTER};
+
+mod history;
+use labyrinth_rules::{CombatOutcome, DEFAULT_HERO_ROSTER, Team};
 
 #[test]
 fn formation_size_never_shrinks_participant_capacity_or_evicts_reservations() {
@@ -14,11 +16,13 @@ fn formation_size_never_shrinks_participant_capacity_or_evicts_reservations() {
         authority.connected(identity, true);
     }
     let original = authority.snapshot(0);
-    assert!(original
-        .player_views()
-        .iter()
-        .skip(1)
-        .all(|p| p.actors.is_empty()));
+    assert!(
+        original
+            .player_views()
+            .iter()
+            .skip(1)
+            .all(|p| p.actors.is_empty())
+    );
     assert_eq!(
         request(
             &mut authority,
@@ -84,9 +88,11 @@ fn local_prototype_has_four_ordinary_heroes_and_one_weak_wagon() {
         a.company.iter().map(|p| p.hero).collect::<Vec<_>>(),
         labyrinth_rules::PROTOTYPE_HERO_ROSTER
     );
-    assert!(request(&mut a, 0, SessionCommand::Start)
-        .rejection
-        .is_none());
+    assert!(
+        request(&mut a, 0, SessionCommand::Start)
+            .rejection
+            .is_none()
+    );
     let snapshot = a.snapshot(0);
     snapshot.validate().expect("local prototype");
     let combat = snapshot.combat.expect("combat");
@@ -243,12 +249,14 @@ fn six_unique_reservations_count_pending_and_disconnected_capacity() {
     assert_eq!(authority.occupied(), PLAYER_CAPACITY);
     assert!(!authority.has_space());
     assert!(authority.reserve(peer(PLAYER_CAPACITY)).is_err());
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .filter(|player| player.slot != 0)
-        .all(|player| !player.connected));
+    assert!(
+        authority
+            .snapshot(0)
+            .players
+            .iter()
+            .filter(|player| player.slot != 0)
+            .all(|player| !player.connected)
+    );
     authority.connected(peer(1), true);
     authority.connected(peer(1), false);
     assert_eq!(
@@ -267,9 +275,11 @@ fn all_six_players_must_be_ready_and_only_host_can_start() {
             None
         );
     }
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_some());
+    assert!(
+        request(&mut authority, 0, SessionCommand::Start)
+            .rejection
+            .is_some()
+    );
     assert!(authority.in_lobby());
     assert_eq!(
         request(
@@ -280,9 +290,11 @@ fn all_six_players_must_be_ready_and_only_host_can_start() {
         .rejection,
         None
     );
-    assert!(request(&mut authority, 1, SessionCommand::Start)
-        .rejection
-        .is_some());
+    assert!(
+        request(&mut authority, 1, SessionCommand::Start)
+            .rejection
+            .is_some()
+    );
     assert!(authority.in_lobby());
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
@@ -339,27 +351,31 @@ fn character_ownership_is_seat_identity_not_current_formation_rank() {
         actor.id = ActorId(500 + index as u16 * 37);
     }
     let revision = authority.setup_revision;
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::ConfigureBattle {
-            scenario,
-            expected_revision: revision
-        }
-    )
-    .rejection
-    .is_none());
-    for slot in 0..PLAYER_CAPACITY {
-        assert!(request(
+    assert!(
+        request(
             &mut authority,
             0,
-            SessionCommand::Assign {
-                actor: ActorId(500 + u16::from(slot) * 37),
-                owner: slot
+            SessionCommand::ConfigureBattle {
+                scenario,
+                expected_revision: revision
             }
         )
         .rejection
-        .is_none());
+        .is_none()
+    );
+    for slot in 0..PLAYER_CAPACITY {
+        assert!(
+            request(
+                &mut authority,
+                0,
+                SessionCommand::Assign {
+                    actor: ActorId(500 + u16::from(slot) * 37),
+                    owner: slot
+                }
+            )
+            .rejection
+            .is_none()
+        );
     }
     for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
@@ -404,16 +420,18 @@ fn character_ownership_is_seat_identity_not_current_formation_rank() {
         .find(|player| player.actor == ally)
         .expect("ally owner")
         .owner;
-    assert!(request(
-        &mut authority,
-        wrong_owner,
-        SessionCommand::Act {
-            actor,
-            action: CombatAction::Wait
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            wrong_owner,
+            SessionCommand::Act {
+                actor,
+                action: CombatAction::Wait
+            }
+        )
+        .rejection
+        .is_some()
+    );
     assert_eq!(authority.snapshot(slot).combat, Some(before.clone()));
     assert_eq!(
         request(
@@ -502,16 +520,18 @@ fn disconnected_guest_pauses_rules_and_reconnect_restores_same_phase_without_tic
     authority.connected(missing, false);
     assert!(authority.paused());
     assert!(!authority.advance_enemy());
-    assert!(request(
-        &mut authority,
-        slot,
-        SessionCommand::Act {
-            actor,
-            action: CombatAction::Wait
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            slot,
+            SessionCommand::Act {
+                actor,
+                action: CombatAction::Wait
+            }
+        )
+        .rejection
+        .is_some()
+    );
     assert_eq!(authority.snapshot(0).combat, before);
     authority.release(missing);
     assert_eq!(
@@ -573,9 +593,11 @@ fn lobby_release_clears_only_departing_identity_history_and_allows_replacement()
 fn rematch_preserves_identities_watermarks_and_invalidates_prior_encounter_commands() {
     let (mut authority, peers) = started_party();
     let previous = authority.snapshot(0);
-    assert!(request(&mut authority, 1, SessionCommand::Rematch)
-        .rejection
-        .is_some());
+    assert!(
+        request(&mut authority, 1, SessionCommand::Rematch)
+            .rejection
+            .is_some()
+    );
     let guest_next = authority.next_sequence(1);
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Rematch).rejection,
@@ -584,10 +606,12 @@ fn rematch_preserves_identities_watermarks_and_invalidates_prior_encounter_comma
     let lobby = authority.snapshot(0);
     assert!(lobby.combat.is_none());
     assert_ne!(lobby.encounter, previous.encounter);
-    assert!(lobby
-        .players
-        .iter()
-        .all(|player| !player.ready && player.occupied && player.connected));
+    assert!(
+        lobby
+            .players
+            .iter()
+            .all(|player| !player.ready && player.occupied && player.connected)
+    );
     assert_eq!(authority.next_sequence(1), guest_next);
     for identity in peers {
         assert!(authority.slot_for(identity).is_some());
@@ -766,9 +790,11 @@ fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readi
             .count()
             >= 3
     );
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_some());
+    assert!(
+        request(&mut authority, 0, SessionCommand::Start)
+            .rejection
+            .is_some()
+    );
 }
 
 #[test]
@@ -783,26 +809,30 @@ fn sixth_player_reconnect_preserves_nondefault_actor_loadout_and_live_state() {
         ..Default::default()
     };
     let revision = authority.setup_revision;
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::ConfigureBattle {
-            scenario,
-            expected_revision: revision
-        }
-    )
-    .rejection
-    .is_none());
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::Assign {
-            actor: ActorId(909),
-            owner: 5
-        }
-    )
-    .rejection
-    .is_none());
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ConfigureBattle {
+                scenario,
+                expected_revision: revision
+            }
+        )
+        .rejection
+        .is_none()
+    );
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::Assign {
+                actor: ActorId(909),
+                owner: 5
+            }
+        )
+        .rejection
+        .is_none()
+    );
     for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
             request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
@@ -929,11 +959,13 @@ fn local_rematch_class_change_redeploys_without_a_readiness_step() {
         .rejection,
         None
     );
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .all(|player| !player.ready));
+    assert!(
+        authority
+            .snapshot(0)
+            .players
+            .iter()
+            .all(|player| !player.ready)
+    );
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
         None
@@ -980,33 +1012,39 @@ fn admitted_spectators_and_multiple_owned_heroes_follow_explicit_assignment() {
             .len(),
         5
     );
-    assert!(initial
-        .player_views()
-        .iter()
-        .find(|p| p.slot == 1)
-        .expect("guest")
-        .actors
-        .is_empty());
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::ChooseHero {
-            actor: ActorId(1),
-            hero: HeroClass::FieldMedic
-        }
-    )
-    .rejection
-    .is_some());
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::Assign {
-            actor: ActorId(1),
-            owner: 1
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        initial
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 1)
+            .expect("guest")
+            .actors
+            .is_empty()
+    );
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::ChooseHero {
+                actor: ActorId(1),
+                hero: HeroClass::FieldMedic
+            }
+        )
+        .rejection
+        .is_some()
+    );
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::Assign {
+                actor: ActorId(1),
+                owner: 1
+            }
+        )
+        .rejection
+        .is_some()
+    );
     for actor in [ActorId(1), ActorId(2)] {
         assert_eq!(
             request(
@@ -1054,11 +1092,13 @@ fn admitted_spectators_and_multiple_owned_heroes_follow_explicit_assignment() {
         .validate()
         .expect("multiple characters per participant");
     authority.release(peer(1));
-    assert!(authority
-        .snapshot(0)
-        .company
-        .iter()
-        .all(|member| member.owner == 0));
+    assert!(
+        authority
+            .snapshot(0)
+            .company
+            .iter()
+            .all(|member| member.owner == 0)
+    );
     assert_eq!(authority.reserve(peer(2)), Ok(1));
     authority.connected(peer(2), true);
     assert!(
@@ -1209,30 +1249,34 @@ fn deliberate_reassignment_resumes_a_missing_controller_but_never_clears_a_rules
     );
     assert_eq!(authority.snapshot(0).combat, before);
     authority.connected(peer(1), true);
-    assert!(authority
-        .snapshot(1)
-        .player_views()
-        .iter()
-        .find(|p| p.slot == 1)
-        .expect("reconnected player")
-        .actors
-        .is_empty());
+    assert!(
+        authority
+            .snapshot(1)
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 1)
+            .expect("reconnected player")
+            .actors
+            .is_empty()
+    );
     authority.faulted = true;
     assert!(
         request(&mut authority, 0, SessionCommand::AssignmentPause(false))
             .rejection
             .is_some()
     );
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::Assign {
-            actor: ActorId(2),
-            owner: 1
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::Assign {
+                actor: ActorId(2),
+                owner: 1
+            }
+        )
+        .rejection
+        .is_some()
+    );
     assert_eq!(
         authority.snapshot(0).interruption,
         CombatInterruption::Halted
@@ -1338,23 +1382,29 @@ fn configured_both_teams_freeze_stats_builds_and_repeat_the_exact_seed() {
     enemy.actor.max_hp = 211;
     enemy.actor.base_speed = 2;
     let revision = authority.setup_revision;
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::ConfigureBattle {
-            scenario: scenario.clone(),
-            expected_revision: revision
-        }
-    )
-    .rejection
-    .is_none());
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ConfigureBattle {
+                scenario: scenario.clone(),
+                expected_revision: revision
+            }
+        )
+        .rejection
+        .is_none()
+    );
     assert!(authority.players.iter().all(|p| !p.ready));
-    assert!(request(&mut authority, 0, SessionCommand::Ready(true))
-        .rejection
-        .is_none());
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_none());
+    assert!(
+        request(&mut authority, 0, SessionCommand::Ready(true))
+            .rejection
+            .is_none()
+    );
+    assert!(
+        request(&mut authority, 0, SessionCommand::Start)
+            .rejection
+            .is_none()
+    );
     let before = authority.snapshot(0);
     before.validate().expect("configured snapshot");
     let combat = before.combat.as_ref().expect("combat");
@@ -1364,18 +1414,24 @@ fn configured_both_teams_freeze_stats_builds_and_repeat_the_exact_seed() {
     );
     assert_eq!(combat.actor(ActorId(1)).expect("hero").max_hp, 117);
     assert_eq!(combat.actor(ActorId(106)).expect("enemy").max_hp, 211);
-    assert!(combat
-        .actor(ActorId(1))
-        .expect("hero")
-        .resolved_skills()
-        .iter()
-        .any(|a| a.definition.id.as_str() == "greatsword_cleave"));
-    assert!(request(&mut authority, 0, SessionCommand::Rematch)
-        .rejection
-        .is_none());
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_none());
+    assert!(
+        combat
+            .actor(ActorId(1))
+            .expect("hero")
+            .resolved_skills()
+            .iter()
+            .any(|a| a.definition.id.as_str() == "greatsword_cleave")
+    );
+    assert!(
+        request(&mut authority, 0, SessionCommand::Rematch)
+            .rejection
+            .is_none()
+    );
+    assert!(
+        request(&mut authority, 0, SessionCommand::Start)
+            .rejection
+            .is_none()
+    );
     let restarted = authority.snapshot(0);
     assert_eq!(
         restarted.combat, before.combat,
@@ -1393,16 +1449,18 @@ fn owned_build_edits_cannot_change_enemy_roster_formation_or_a_newer_draft() {
     hero.actor.build.weapon = Some(labyrinth_rules::catalog::ContentId::new("dagger").expect("ID"));
     hero.actor.build.abilities =
         vec![labyrinth_rules::catalog::ContentId::new("duelist_dagger_power").expect("ID")];
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::CustomizeActor {
-            actor: hero.clone(),
-            expected_revision: original.setup_revision
-        }
-    )
-    .rejection
-    .is_none());
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::CustomizeActor {
+                actor: hero.clone(),
+                expected_revision: original.setup_revision
+            }
+        )
+        .rejection
+        .is_none()
+    );
     assert_eq!(authority.scenario.heroes.get(1), Some(&hero));
     let changed = authority.snapshot(1);
     // The retained preset adapter obeys the same authority as authored edits.
@@ -1441,50 +1499,58 @@ fn owned_build_edits_cannot_change_enemy_roster_formation_or_a_newer_draft() {
     );
     let mut stale = hero.clone();
     stale.actor.max_hp = 99;
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::CustomizeActor {
-            actor: stale,
-            expected_revision: original.setup_revision
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::CustomizeActor {
+                actor: stale,
+                expected_revision: original.setup_revision
+            }
+        )
+        .rejection
+        .is_some()
+    );
     let mut wider = hero.clone();
     wider.actor.footprint = 2;
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::CustomizeActor {
-            actor: wider,
-            expected_revision: changed.setup_revision
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::CustomizeActor {
+                actor: wider,
+                expected_revision: changed.setup_revision
+            }
+        )
+        .rejection
+        .is_some()
+    );
     let mut enemy = changed.scenario.enemies.first().expect("enemy").clone();
     enemy.actor.max_hp = 1;
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::CustomizeActor {
-            actor: enemy,
-            expected_revision: changed.setup_revision
-        }
-    )
-    .rejection
-    .is_some());
-    assert!(request(
-        &mut authority,
-        1,
-        SessionCommand::ConfigureBattle {
-            scenario: changed.scenario.clone(),
-            expected_revision: changed.setup_revision
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::CustomizeActor {
+                actor: enemy,
+                expected_revision: changed.setup_revision
+            }
+        )
+        .rejection
+        .is_some()
+    );
+    assert!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::ConfigureBattle {
+                scenario: changed.scenario.clone(),
+                expected_revision: changed.setup_revision
+            }
+        )
+        .rejection
+        .is_some()
+    );
     assert_eq!(authority.scenario, changed.scenario);
     assert_eq!(authority.company, changed.company);
     assert_eq!(authority.setup_revision, changed.setup_revision);
@@ -1496,16 +1562,18 @@ fn invalid_scenario_is_rejected_before_ready_without_partial_setup_mutation() {
     let before = authority.snapshot(0);
     let mut invalid = before.scenario.clone();
     invalid.enemies.first_mut().expect("enemy").actor.max_hp = 0;
-    assert!(request(
-        &mut authority,
-        0,
-        SessionCommand::ConfigureBattle {
-            scenario: invalid,
-            expected_revision: before.setup_revision
-        }
-    )
-    .rejection
-    .is_some());
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ConfigureBattle {
+                scenario: invalid,
+                expected_revision: before.setup_revision
+            }
+        )
+        .rejection
+        .is_some()
+    );
     assert_eq!(authority.scenario, before.scenario);
     assert_eq!(authority.players, before.players);
     assert_eq!(authority.company, before.company);
@@ -1528,37 +1596,47 @@ fn spectators_do_not_gate_ready_or_start_even_if_the_host_spectates() {
         .map(|m| m.actor)
         .collect::<Vec<_>>();
     for actor in ids {
-        assert!(request(
-            &mut authority,
-            0,
-            SessionCommand::Assign { actor, owner: 1 }
-        )
-        .rejection
-        .is_none());
+        assert!(
+            request(
+                &mut authority,
+                0,
+                SessionCommand::Assign { actor, owner: 1 }
+            )
+            .rejection
+            .is_none()
+        );
     }
-    assert!(request(&mut authority, 1, SessionCommand::Ready(true))
-        .rejection
-        .is_none());
-    assert!(authority
-        .players
-        .iter()
-        .filter(|p| p.slot != 1)
-        .all(|p| !p.ready));
+    assert!(
+        request(&mut authority, 1, SessionCommand::Ready(true))
+            .rejection
+            .is_none()
+    );
+    assert!(
+        authority
+            .players
+            .iter()
+            .filter(|p| p.slot != 1)
+            .all(|p| !p.ready)
+    );
     authority.connected(spectator, false);
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_none());
+    assert!(
+        request(&mut authority, 0, SessionCommand::Start)
+            .rejection
+            .is_none()
+    );
     let snapshot = authority.snapshot(0);
     snapshot
         .validate()
         .expect("host and guest spectators do not pause");
     assert!(!snapshot.paused);
-    assert!(snapshot
-        .player_views()
-        .first()
-        .expect("host")
-        .actors
-        .is_empty());
+    assert!(
+        snapshot
+            .player_views()
+            .first()
+            .expect("host")
+            .actors
+            .is_empty()
+    );
 }
 
 mod spatial;

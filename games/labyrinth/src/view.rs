@@ -6,6 +6,8 @@ use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroCl
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
+pub use crate::session::history::{EncounterHistory, HISTORY_PAGE_EVENTS, HistoryBounds};
+
 pub use crate::session::{CompanyMember, FormationPlacement, LobbyFormation};
 
 /// Owned UI input which redacts diagnostics and clears its allocation on drop.
@@ -184,6 +186,13 @@ pub enum LabyrinthIntent {
         session: SessionId,
         /// Temporary passphrase.
         password: SecretText,
+    },
+    /// Prioritize loading a bounded range of the displayed encounter's history.
+    HistoryPage {
+        /// Encounter being read; stale UI requests cannot cross encounters.
+        encounter: u64,
+        /// First desired event ID. Each response contains at most 64 events.
+        from: u64,
     },
     /// Recover the profile's stored reserved identity.
     Reconnect,

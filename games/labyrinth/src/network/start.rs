@@ -46,6 +46,7 @@ pub(super) fn host(world: &mut World, mut settings: HostSettings) -> Result<(), 
     let permit = WorkerPermit::acquire(&world.resource::<HostPreparationBudget>().0, 1)
         .ok_or("The previous host preparation is still finishing. Please retry shortly.")?;
     disconnect_guest(world);
+    history::clear(world);
     world.remove_resource::<discovery::Browser>();
     world.remove_resource::<PartyAuthority>();
     {
@@ -163,6 +164,7 @@ pub(super) fn finish_host(world: &mut World) {
     let password_jobs = Arc::clone(&world.resource::<PasswordWorkBudget>().0);
     world.insert_resource(Hosted {
         requests: requests::RequestQueues::default(),
+        history: history::HistoryQueues::default(),
         security: prepared.security,
         server: entity,
         template: code,
@@ -205,6 +207,9 @@ fn is_loopback(host: &str) -> bool {
 }
 
 fn begin_guest(world: &mut World, entity: Entity, session: SessionId, credential: Credential) {
+    if world.resource::<Runtime>().session != Some(session) {
+        history::clear(world);
+    }
     world.remove_resource::<discovery::Browser>();
     world.remove_resource::<PartyAuthority>();
     let mut runtime = world.resource_mut::<Runtime>();
@@ -316,16 +321,20 @@ pub(super) fn disconnect_guest(world: &mut World) {
     if let Some(entity) = connection {
         world.trigger(Disconnect::new(entity, "new connection attempt"));
     }
+    history::cancel(world);
     // Messages from a previous physical connection cannot authorize its successor.
     drain::<Offer>(world);
     drain::<Admitted>(world);
     drain::<SnapshotEnvelope>(world);
+    drain::<HistoryReply>(world);
+    drain::<HistoryRequest>(world);
     drain::<Refusal>(world);
     drain::<Closed>(world);
     drain::<RequestResult>(world);
 }
 
 pub(super) fn close(world: &mut World) {
+    history::clear(world);
     world.remove_resource::<Preparing>();
     world.remove_resource::<discovery::Browser>();
     if let Some(mut hosted) = world.remove_resource::<Hosted>() {

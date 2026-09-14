@@ -2,6 +2,7 @@
 
 mod admission;
 mod discovery;
+mod history;
 mod protocol;
 mod requests;
 mod start;
@@ -22,14 +23,15 @@ use bevy_replicon::prelude::*;
 use sha2::{Digest as _, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::{mpsc, Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use crate::session::history::HistoryRequest;
 use crate::{
     session::{
-        GameRequest, PartyAuthority, RequestResult, SessionCommand, SessionSnapshot,
-        PLAYER_CAPACITY,
+        GameRequest, PLAYER_CAPACITY, PartyAuthority, RequestResult, SessionCommand,
+        SessionSnapshot,
     },
     view::*,
 };
@@ -80,6 +82,8 @@ impl Plugin for LabyrinthNetworkPlugin {
             ));
         }
         app.init_resource::<LabyrinthView>()
+            .init_resource::<EncounterHistory>()
+            .init_resource::<history::HistoryTransfer>()
             .add_message::<LabyrinthIntent>()
             .add_plugins((
                 GameMultiplayerPlugin,
@@ -118,6 +122,9 @@ impl Plugin for LabyrinthNetworkPlugin {
             .add_client_message::<Persisted>(Channel::Ordered)
             .add_client_message::<LeaveSession>(Channel::Ordered)
             .add_client_message::<GameRequest>(Channel::Ordered)
+            .add_client_message::<HistoryRequest>(Channel::Ordered)
+            .add_server_message::<HistoryReply>(Channel::Ordered)
+            .make_message_independent::<HistoryReply>()
             .add_server_message::<Offer>(Channel::Ordered)
             .make_message_independent::<Offer>()
             .add_server_message::<Admitted>(Channel::Ordered)
@@ -193,6 +200,7 @@ struct ListenerClosedQueue(Vec<Entity>);
 #[derive(Resource)]
 struct Hosted {
     requests: requests::RequestQueues,
+    history: history::HistoryQueues,
     security: SessionAdmissionAuthority,
     server: Entity,
     template: DirectConnectionCode,
@@ -261,6 +269,7 @@ fn network_tick(world: &mut World) {
     }
     start::finish_host(world);
     receive(world);
+    history::receive(world);
     admission::host_messages(world);
     for intent in drain::<LabyrinthIntent>(world).into_iter().take(64) {
         if let Err(error) = handle_intent(world, intent) {
@@ -275,6 +284,7 @@ fn network_tick(world: &mut World) {
         world.insert_resource(authority);
     }
     publish(world);
+    history::tick(world);
     finish_close(world);
     if world
         .resource::<Runtime>()
@@ -427,6 +437,17 @@ fn receive(world: &mut World) {
             );
             continue;
         }
+        if world
+            .resource::<Runtime>()
+            .latest
+            .as_ref()
+            .is_none_or(|previous| snapshot.revision >= previous.revision)
+            && history::observe_snapshot(world, &snapshot).is_err()
+        {
+            start::disconnect_guest(world);
+            notice(world, "The host sent conflicting encounter history.");
+            continue;
+        }
         let mut runtime = world.resource_mut::<Runtime>();
         runtime.sequence = runtime.sequence.max(snapshot.next_sequence);
         if runtime
@@ -475,6 +496,9 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             session,
             mut password,
         } => start::join_discovered(world, session, std::mem::take(&mut password.0))?,
+        LabyrinthIntent::HistoryPage { encounter, from } => {
+            history::prioritize(world, encounter, from)
+        }
         LabyrinthIntent::Reconnect => start::reconnect(world)?,
         LabyrinthIntent::Leave => start::close(world),
         LabyrinthIntent::SelectHero { actor, hero } => {
@@ -798,6 +822,8 @@ fn publish(world: &mut World) {
                     to_client(world, entity, SnapshotEnvelope { attempt, snapshot });
                 }
             }
+            history::observe_snapshot(world, &snapshot)
+                .expect("authoritative history is consistent");
             let mut runtime = world.resource_mut::<Runtime>();
             runtime.published = snapshot.revision;
             runtime.latest = Some(snapshot);
