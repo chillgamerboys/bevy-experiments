@@ -4,6 +4,16 @@ fn key(value: &str) -> UiTooltipSubject {
     UiTooltipSubject(value.to_owned())
 }
 
+fn close_action(app: &mut App, depth: usize) -> Entity {
+    app.world_mut()
+        .query::<(Entity, &view::TooltipAction)>()
+        .iter(app.world())
+        .find_map(|(entity, action)| {
+            matches!(action, view::TooltipAction::Close(index) if *index == depth).then_some(entity)
+        })
+        .expect("card close control")
+}
+
 #[test]
 fn immediate_preview_locks_only_after_continuous_hover_and_stays_until_dismissed() {
     let settings = UiTooltipSettings::default();
@@ -213,7 +223,7 @@ fn using_a_control_preserves_deliberately_pinned_inspection() {
 }
 
 #[test]
-fn preview_is_pointer_transparent_and_pin_has_links_without_close_controls() {
+fn preview_is_pointer_transparent_and_pin_exposes_accessible_corner_close() {
     let (mut app, anchor) = app();
     app.world_mut()
         .entity_mut(anchor)
@@ -258,15 +268,34 @@ fn preview_is_pointer_transparent_and_pin_has_links_without_close_controls() {
         .query::<&view::TooltipAction>()
         .iter(app.world())
         .collect::<Vec<_>>();
-    assert_eq!(actions.len(), 1, "only the related term is actionable");
-    assert!(
-        matches!(actions.first(), Some(view::TooltipAction::Link(0, subject)) if subject == &key("term"))
-    );
+    assert_eq!(actions.len(), 2, "related term and close are actionable");
+    assert!(actions.iter().any(
+        |action| matches!(action, view::TooltipAction::Link(0, subject) if subject == &key("term"))
+    ));
     assert!(!app
         .world_mut()
         .query::<&Text>()
         .iter(app.world())
-        .any(|text| matches!(text.0.as_str(), "Pin" | "Unpin" | "Close" | "Pin · T" | "x")));
+        .any(|text| matches!(text.0.as_str(), "Pin" | "Unpin" | "Close" | "Pin · T")));
+    assert!(app
+        .world_mut()
+        .query::<&Text>()
+        .iter(app.world())
+        .any(|text| text.0 == "x"));
+    let close = close_action(&mut app, 0);
+    assert_eq!(
+        app.world()
+            .get::<AccessibleLabel>(close)
+            .expect("close label")
+            .0,
+        "Close Card tooltip"
+    );
+    let node = app.world().get::<Node>(close).expect("close geometry");
+    assert_eq!(node.position_type, PositionType::Absolute);
+    assert_eq!(node.right, Val::Px(0.0));
+    assert_eq!(node.top, Val::Px(0.0));
+    assert_eq!(node.width, Val::Px(44.0));
+    assert_eq!(node.height, Val::Px(44.0));
     let title = app
         .world_mut()
         .query::<(Entity, &Name)>()
@@ -279,11 +308,12 @@ fn preview_is_pointer_transparent_and_pin_has_links_without_close_controls() {
             .get::<Node>(heading)
             .expect("heading layout")
             .padding,
-        UiRect::default()
+        UiRect::right(Val::Px(44.0))
     );
+    settle_fixture_cards(&mut app);
     app.world_mut()
-        .resource_mut::<ButtonInput<KeyCode>>()
-        .press(KeyCode::Escape);
+        .entity_mut(close)
+        .insert(Interaction::Pressed);
     step(&mut app, 1);
     step(&mut app, 1000);
     assert!(app
@@ -291,6 +321,144 @@ fn preview_is_pointer_transparent_and_pin_has_links_without_close_controls() {
         .resource::<UiTooltipState>()
         .subjects()
         .is_empty());
+}
+
+#[test]
+fn pointer_and_keyboard_close_remove_the_selected_branch_and_restore_focus() {
+    for keyboard in [false, true] {
+        let (mut app, anchor) = app();
+        app.world_mut().resource_mut::<UiTooltipCatalog>().0.insert(
+            key("detail"),
+            UiTooltipContent {
+                title: "Detail".to_owned(),
+                ..default()
+            },
+        );
+        app.world_mut()
+            .resource_mut::<UiTooltipCatalog>()
+            .0
+            .get_mut(&key("term"))
+            .expect("term")
+            .links
+            .push(UiTooltipLink {
+                label: "Detail".to_owned(),
+                subject: key("detail"),
+            });
+        if keyboard {
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(anchor, bevy::input_focus::FocusCause::Navigated);
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::KeyT);
+            step(&mut app, 1);
+        } else {
+            app.world_mut()
+                .entity_mut(anchor)
+                .insert(Interaction::Hovered);
+            step(&mut app, 1);
+            app.world_mut().write_message(UiTooltipRequest::Pin);
+            step(&mut app, 1);
+        }
+        for depth in [0, 1] {
+            let link = app
+                .world_mut()
+                .query::<(Entity, &view::TooltipAction)>()
+                .iter(app.world())
+                .find_map(|(entity, action)| {
+                    matches!(action, view::TooltipAction::Link(index, _) if *index == depth)
+                        .then_some(entity)
+                })
+                .expect("related term");
+            app.world_mut().write_message(UiActivated { entity: link });
+            step(&mut app, 1);
+        }
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().subjects(),
+            &[key("root"), key("term"), key("detail")]
+        );
+        for (depth, code, expected) in [
+            (1, KeyCode::Enter, vec![key("root")]),
+            (0, KeyCode::Space, vec![]),
+        ] {
+            settle_fixture_cards(&mut app);
+            let close = close_action(&mut app, depth);
+            if keyboard {
+                app.world_mut()
+                    .resource_mut::<InputFocus>()
+                    .set(close, bevy::input_focus::FocusCause::Navigated);
+                app.world_mut()
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(code);
+            } else {
+                app.world_mut()
+                    .entity_mut(close)
+                    .insert(Interaction::Pressed);
+            }
+            step(&mut app, 1);
+            assert_eq!(
+                app.world().resource::<UiTooltipState>().subjects(),
+                expected
+            );
+            assert_eq!(
+                app.world().resource::<UiTooltipState>().is_pinned(),
+                depth != 0
+            );
+            if keyboard {
+                assert!(
+                    app.world().resource::<UiTooltipState>().captures_keyboard(),
+                    "closing key cannot reach game shortcuts"
+                );
+            }
+        }
+        if keyboard {
+            assert_eq!(app.world().resource::<InputFocus>().get(), Some(anchor));
+        }
+        step(&mut app, 1);
+        assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
+    }
+}
+
+#[test]
+fn closing_a_card_does_not_preview_an_exposed_source_until_the_pointer_moves() {
+    let (mut app, anchor) = app();
+    let mut window = Window::default();
+    window.set_cursor_position(Some(Vec2::new(100.0, 100.0)));
+    let window = app.world_mut().spawn(window).id();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Interaction::Hovered);
+    step(&mut app, 1);
+    app.world_mut().write_message(UiTooltipRequest::Pin);
+    step(&mut app, 1);
+    settle_fixture_cards(&mut app);
+    let close = close_action(&mut app, 0);
+    app.world_mut().entity_mut(anchor).insert(Interaction::None);
+    app.world_mut()
+        .entity_mut(close)
+        .insert(Interaction::Pressed);
+    step(&mut app, 1);
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert((UiTooltipSource(key("term")), Interaction::Hovered));
+    step(&mut app, 2000);
+    assert!(
+        app.world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty(),
+        "revealed geometry is not fresh hover intent"
+    );
+    app.world_mut()
+        .get_mut::<Window>(window)
+        .expect("window")
+        .set_cursor_position(Some(Vec2::new(101.0, 100.0)));
+    step(&mut app, 1);
+    assert_eq!(
+        app.world().resource::<UiTooltipState>().subjects(),
+        &[key("term")]
+    );
+    assert!(!app.world().resource::<UiTooltipState>().is_pinned());
 }
 
 #[test]
@@ -376,8 +544,11 @@ fn pinned_chain_ignores_other_hover_and_explicit_open_routes() {
     step(&mut app, 1000);
     let link = app
         .world_mut()
-        .query_filtered::<Entity, With<view::TooltipAction>>()
-        .single(app.world())
+        .query::<(Entity, &view::TooltipAction)>()
+        .iter(app.world())
+        .find_map(|(entity, action)| {
+            matches!(action, view::TooltipAction::Link(_, _)).then_some(entity)
+        })
         .expect("related term");
     app.world_mut().write_message(UiActivated { entity: link });
     step(&mut app, 1);
@@ -615,16 +786,12 @@ fn native_link_activation_and_escape_restore_focus_without_gameplay_actions() {
         .resource::<InputFocus>()
         .get()
         .expect("leaf focus");
-    assert_eq!(
-        app.world()
-            .get::<Name>(focused)
-            .expect("leaf card")
-            .as_str(),
-        "Tooltip Card 1"
-    );
     assert!(
-        app.world().get::<crate::UiAction>(focused).is_none(),
-        "a card cannot activate gameplay"
+        matches!(
+            app.world().get::<view::TooltipAction>(focused),
+            Some(view::TooltipAction::Close(1))
+        ),
+        "a leaf focuses its close control"
     );
     app.world_mut()
         .resource_mut::<ButtonInput<KeyCode>>()

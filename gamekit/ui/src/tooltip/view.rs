@@ -6,6 +6,7 @@ use bevy::input_focus::{tab_navigation::TabGroup, FocusCause};
 
 #[derive(Component, Clone)]
 pub(super) enum TooltipAction {
+    Close(usize),
     Link(usize, UiTooltipSubject),
 }
 
@@ -42,6 +43,11 @@ fn label(world: &mut World, parent: Entity, name: &str, value: String, role: UiT
 }
 
 fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction) -> Entity {
+    let role = if matches!(action, TooltipAction::Close(_)) {
+        UiTextRole::Title
+    } else {
+        UiTextRole::Body
+    };
     let entity = world
         .spawn((
             crate::button(format!("Tooltip {title}")),
@@ -56,7 +62,7 @@ fn action(world: &mut World, parent: Entity, title: &str, action: TooltipAction)
         entity,
         "Tooltip Control Label",
         title.to_owned(),
-        UiTextRole::Body,
+        role,
     );
     entity
 }
@@ -164,6 +170,7 @@ pub(super) fn render(world: &mut World) {
                         .spawn((
                             Node {
                                 min_height: Val::Px(44.0),
+                                padding: UiRect::right(Val::Px(44.0)),
                                 flex_shrink: 0.0,
                                 align_items: AlignItems::Center,
                                 ..default()
@@ -180,9 +187,42 @@ pub(super) fn render(world: &mut World) {
                         content.title.clone(),
                         UiTextRole::Title,
                     );
-                    // Keyboard inspection stays inside the deepest card even
-                    // when it has no links. Cards have no activation behavior.
                     view.focus = Some(card);
+                    if pinned {
+                        // ASCII also works with Bevy's fallback font. The
+                        // accessible name describes the close action in full.
+                        let close = action(world, heading, "x", TooltipAction::Close(depth));
+                        world.entity_mut(close).insert((
+                            Name::new("Tooltip Close"),
+                            AccessibleLabel::new(format!("Close {} tooltip", content.title)),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                right: Val::Px(0.0),
+                                top: Val::Px(0.0),
+                                width: Val::Px(44.0),
+                                height: Val::Px(44.0),
+                                min_width: Val::Px(44.0),
+                                min_height: Val::Px(44.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            crate::UiSkinOverrides {
+                                background: Some(Color::NONE),
+                                border: Some(Color::NONE),
+                                ..default()
+                            },
+                        ));
+                        if let Some(children) = world.get::<Children>(close) {
+                            let labels = children.to_vec();
+                            for child in labels {
+                                world.entity_mut(child).insert(Node::default());
+                            }
+                        }
+                        // A leaf without related terms still has a keyboard
+                        // dismissal target inside its reading scope.
+                        view.focus = Some(close);
+                    }
                     let mut first_link = None;
                     for fact in &content.facts {
                         label(world, card, "Tooltip Fact", fact.clone(), UiTextRole::Body);

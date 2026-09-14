@@ -441,6 +441,9 @@ fn resolve(
             || commands
                 .iter()
                 .any(|command| matches!(command, UiTooltipRequest::Dismiss))
+            || clicked
+                .iter()
+                .any(|action| matches!(action, view::TooltipAction::Close(0)))
             || (escape && !editing && state.chain.len() == 1);
         let host_changed = state.host.is_some() && state.host != host;
         state.host = host;
@@ -516,9 +519,24 @@ fn resolve(
             }
         }
         for action in clicked {
-            let view::TooltipAction::Link(depth, subject) = action;
-            if state.pinned && content(world, &state, &subject).is_some() {
-                state.follow(depth, subject, settings.max_depth);
+            match action {
+                view::TooltipAction::Close(depth) if state.pinned => {
+                    // Enter/Space closing keyboard inspection must not also
+                    // activate game shortcuts after focus has been restored.
+                    state.consumed |= state.keyboard;
+                    if depth == 0 {
+                        state.dismiss();
+                    } else {
+                        state.chain.truncate(depth);
+                        state.suppressed = state.candidate.clone();
+                    }
+                }
+                view::TooltipAction::Link(depth, subject) => {
+                    if state.pinned && content(world, &state, &subject).is_some() {
+                        state.follow(depth, subject, settings.max_depth);
+                    }
+                }
+                view::TooltipAction::Close(_) => {}
             }
         }
         if inspect && !editing {
