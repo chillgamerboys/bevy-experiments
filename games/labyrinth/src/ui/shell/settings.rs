@@ -2,6 +2,10 @@
 use super::*;
 
 pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
+    // A confirmed host recovery also retires this combat-only page on guests.
+    if view.mode != ViewMode::Combat && ui.menus.current() == Some(&MenuPage::Party) {
+        ui.menus.close();
+    }
     let key = format!(
         "{:?}:{}:{}:{:?}:{:?}:{:?}:{:?}",
         ui.menus,
@@ -308,7 +312,11 @@ fn party(world: &mut World, panel: Entity, view: &LabyrinthView) {
                 UiTextRole::Body,
             );
         }
-        if view.host && view.admitted && view.interruption != CombatInterruption::Halted {
+        if view.mode == ViewMode::Combat
+            && view.host
+            && view.admitted
+            && view.interruption != CombatInterruption::Halted
+        {
             control(
                 world,
                 panel,
