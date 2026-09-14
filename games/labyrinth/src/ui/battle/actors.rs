@@ -1179,11 +1179,23 @@ mod tests {
 
     #[test]
     fn overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes() {
-        for scale in [UiScaleMode::Auto, UiScaleMode::Percent200] {
+        assert_overlay_footprint(&[(1920, 1080, UiScaleMode::Auto)]);
+    }
+
+    #[test]
+    fn overlay_footprint_survives_forecasts_hp_ownership_and_disclosure_changes_compatibility() {
+        assert_overlay_footprint(&[
+            (1280, 720, UiScaleMode::Auto),
+            (1280, 720, UiScaleMode::Percent200),
+        ]);
+    }
+
+    fn assert_overlay_footprint(cases: &[(u32, u32, UiScaleMode)]) {
+        for &(width, height, scale) in cases {
             // Isolate actor-owned geometry from the command dock so this test
             // identifies accidental text-driven motion in the numeric footer.
             let mut app = App::new();
-            app.add_plugins(HeadlessUiPlugin::new(1280, 720))
+            app.add_plugins(HeadlessUiPlugin::new(width, height))
                 .insert_resource(UiScalePreference(scale))
                 .init_resource::<LabyrinthAppearance>()
                 .init_resource::<CombatDisclosure>()
@@ -1207,14 +1219,15 @@ mod tests {
             let root = app
                 .world_mut()
                 .spawn(Node {
-                    width: Val::Px(180.0),
+                    width: Val::Px(width as f32),
                     height: Val::Px(440.0),
                     flex_direction: FlexDirection::Row,
                     ..default()
                 })
                 .id();
-            for id in [ActorId(1), ActorId(101)] {
-                mount_actor(app.world_mut(), root, snapshot.actor(id).expect("actor"));
+            for (id, side) in [(ActorId(1), Team::Heroes), (ActorId(101), Team::Enemies)] {
+                let ranks = formation(app.world_mut(), root, &format!("{side:?}"), side);
+                mount_actor(app.world_mut(), ranks, snapshot.actor(id).expect("actor"));
             }
             let mut view = LabyrinthView {
                 local: true,

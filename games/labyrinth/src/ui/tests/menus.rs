@@ -1,6 +1,116 @@
 use super::*;
 
 #[test]
+fn escape_opens_menu_with_selected_action_and_pinned_help_normal_1080() {
+    use bevy_gamekit::ui::UiTooltipState;
+    let mut app = app(1920, 1080, UiScaleMode::Auto);
+    let source = find_named(app.world_mut(), "Skill 0").expect("skill source");
+    assert!(focus_action(app.world_mut(), source));
+    tap_key(&mut app, KeyCode::KeyT);
+    run_frames(&mut app, 3);
+    let pins = app.world().resource::<UiTooltipState>().subjects().to_vec();
+    assert!(!pins.is_empty());
+    assert!(app.world().resource::<UiTooltipState>().captures_keyboard());
+    apply_action(app.world_mut(), Action::Choice(Choice::Wait));
+    app.world_mut().resource_mut::<UiState>().log_mode = LogMode::Compact;
+    tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world().resource::<UiState>().menus.current(),
+        Some(&MenuPage::Game)
+    );
+    assert_eq!(app.world().resource::<UiTooltipState>().subjects(), pins);
+    assert!(find_named(app.world_mut(), "Tooltip Card 0").is_none());
+    assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
+    let settings = find_named(app.world_mut(), "Game Settings").expect("settings");
+    assert!(click_action(&mut app, settings));
+    tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world().resource::<UiState>().menus.current(),
+        Some(&MenuPage::Game)
+    );
+    tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 3);
+    assert!(!app.world().resource::<UiState>().menus.is_open());
+    assert_eq!(
+        app.world().resource::<UiState>().selected,
+        Some(Choice::Wait)
+    );
+    assert_eq!(app.world().resource::<UiTooltipState>().subjects(), pins);
+    assert!(find_named(app.world_mut(), "Tooltip Card 0").is_some());
+}
+
+#[test]
+fn party_page_requires_explicit_host_pause_and_back_does_not_resume_normal_1080() {
+    use crate::view::CombatInterruption;
+    let mut app = app(1920, 1080, UiScaleMode::Auto);
+    network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
+    apply_action(app.world_mut(), Action::GameMenu);
+    run_frames(&mut app, 3);
+    let title = find_named(app.world_mut(), "Game Menu Title").expect("title first");
+    let party = find_named(app.world_mut(), "Manage Assignments").expect("party page");
+    let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1920., 1080.));
+    assert!(
+        visible_control_rect(app.world(), title, viewport)
+            .unwrap()
+            .max
+            .y
+            <= visible_control_rect(app.world(), party, viewport)
+                .unwrap()
+                .min
+                .y
+    );
+    app.world_mut()
+        .resource_mut::<Messages<LabyrinthIntent>>()
+        .clear();
+    assert!(click_action(&mut app, party));
+    run_frames(&mut app, 3);
+    assert!(find_named(app.world_mut(), "Party Management Title").is_some());
+    assert!(find_named(app.world_mut(), "Game Menu Title").is_none());
+    assert!(!app.world().resource::<LabyrinthView>().paused);
+    assert_eq!(
+        app.world_mut()
+            .resource_mut::<Messages<LabyrinthIntent>>()
+            .drain()
+            .count(),
+        0
+    );
+    let pause = find_named(app.world_mut(), "Pause For Assignments").expect("explicit pause");
+    assert!(click_action(&mut app, pause));
+    assert!(app
+        .world_mut()
+        .resource_mut::<Messages<LabyrinthIntent>>()
+        .drain()
+        .any(|intent| matches!(intent, LabyrinthIntent::AssignmentPause(true))));
+    {
+        let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+        view.paused = true;
+        view.interruption = CombatInterruption::Assignments;
+    }
+    run_frames(&mut app, 3);
+    assert!(find_named(app.world_mut(), "Resume After Assignment").is_some());
+    let back = find_named(app.world_mut(), "Party Back").expect("party back");
+    assert!(click_action(&mut app, back));
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world().resource::<UiState>().menus.current(),
+        Some(&MenuPage::Game)
+    );
+    assert!(app.world().resource::<LabyrinthView>().paused);
+    assert!(!app
+        .world_mut()
+        .resource_mut::<Messages<LabyrinthIntent>>()
+        .drain()
+        .any(|intent| matches!(intent, LabyrinthIntent::AssignmentPause(false))));
+    app.world_mut().resource_mut::<LabyrinthView>().host = false;
+    apply_action(app.world_mut(), Action::PartyManagement);
+    run_frames(&mut app, 3);
+    assert!(find_named(app.world_mut(), "Resume After Assignment").is_none());
+    assert!(find_named(app.world_mut(), "Pause For Assignments").is_none());
+}
+
+#[test]
 fn main_menu_wrapped_footer_fits_inside_its_surface_normal_1080() {
     main_menu_wrapped_footer_fits_inside_its_surface(1920, 1080, UiScaleMode::Auto);
 }
