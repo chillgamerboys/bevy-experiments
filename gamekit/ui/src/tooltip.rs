@@ -174,6 +174,14 @@ impl UiTooltipState {
         !self.suspended && (self.keyboard || self.consumed)
     }
 
+    fn remember_focus(&mut self, world: &World) {
+        self.return_focus = world.resource::<InputFocus>().get();
+        self.return_identity = self
+            .return_focus
+            .and_then(|entity| world.get::<crate::UiFocusId>(entity))
+            .cloned();
+    }
+
     fn set_suspended(&mut self, suspended: bool) {
         self.suspended = suspended;
         if suspended {
@@ -457,6 +465,8 @@ fn resolve(
     let inspect = settings
         .inspect_key
         .is_some_and(|key| keys.just_pressed(key));
+    let close_key = keys.any_just_pressed([KeyCode::Enter, KeyCode::NumpadEnter, KeyCode::Space]);
+    let tooltip_focused = view::has_focus(world);
     let editing = world
         .resource::<InputFocus>()
         .get()
@@ -474,7 +484,18 @@ fn resolve(
     };
     world.resource_scope(|world, mut state: Mut<UiTooltipState>| {
         let was_keyboard = state.keyboard;
+        let was_pinned = state.pinned;
         state.set_suspended(suspended);
+        // Pointer pins and activation-opened cards can later receive keyboard
+        // focus too. Keep their latest outside target until focus enters a card.
+        // A temporarily missing source can still return by its stable identity.
+        if !suspended
+            && !was_keyboard
+            && !tooltip_focused
+            && (!was_pinned || world.resource::<InputFocus>().get().is_some())
+        {
+            state.remember_focus(world);
+        }
         let explicit_dismissal = !suspended
             && ((outside_click && !state.pinned)
                 || commands
@@ -575,7 +596,7 @@ fn resolve(
                     view::TooltipAction::Close(depth) if state.pinned => {
                         // Enter/Space closing keyboard inspection must not also
                         // activate game shortcuts after focus has been restored.
-                        state.consumed |= state.keyboard;
+                        state.consumed |= state.keyboard || close_key;
                         if depth == 0 {
                             state.dismiss();
                         } else {
@@ -607,12 +628,8 @@ fn resolve(
                     state.pinned = true;
                     state.keyboard = true;
                     state.consumed = true;
-                    if !was_keyboard {
-                        state.return_focus = world.resource::<InputFocus>().get();
-                        state.return_identity = state
-                            .return_focus
-                            .and_then(|entity| world.get::<crate::UiFocusId>(entity))
-                            .cloned();
+                    if !was_keyboard && !tooltip_focused {
+                        state.remember_focus(world);
                     }
                 }
             }
@@ -662,7 +679,10 @@ fn resolve(
                 state.dismissed_pointer = Some(cursors.clone());
             }
         }
-        if was_keyboard && !state.keyboard && !suspended {
+        if !suspended
+            && ((was_keyboard && !state.keyboard)
+                || (tooltip_focused && was_pinned && state.chain.is_empty()))
+        {
             let target = state
                 .return_focus
                 .filter(|entity| crate::activation_eligible(world, *entity))

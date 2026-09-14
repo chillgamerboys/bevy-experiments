@@ -134,7 +134,13 @@ fn timeline_pointer_and_keyboard_inspection_never_replace_the_selected_target(
             &[battle::actor_subject(1, ActorId(2))]
         );
         no_combat_intent(&mut app);
-        tap_key(&mut app, KeyCode::Escape);
+        let close = find_named(app.world_mut(), "Tooltip Close").expect("close inspection");
+        if keyboard {
+            assert!(focus_action(app.world_mut(), close));
+            tap_key(&mut app, KeyCode::Enter);
+        } else {
+            assert!(click_action(&mut app, close));
+        }
         run_frames(&mut app, 3);
         assert_eq!(
             app.world().resource::<InputFocus>().get(),

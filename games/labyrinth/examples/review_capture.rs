@@ -259,15 +259,20 @@ fn main() {
             }
             _ => ViewMode::Combat,
         },
-        local: !matches!(route.as_str(), "lobby" | "paused" | "construction-owners"),
+        local: !matches!(
+            route.as_str(),
+            "lobby" | "paused" | "party-menu" | "party-assignments" | "construction-owners"
+        ),
         host: true,
         admitted: true,
         player: Some(0),
         encounter: 1,
         session_name: "The Lantern Company".to_owned(),
         combat: Some(snapshot),
-        paused: route == "paused",
-        interruption: if route == "paused" {
+        paused: matches!(route.as_str(), "paused" | "party-assignments"),
+        interruption: if route == "party-assignments" {
+            CombatInterruption::Assignments
+        } else if route == "paused" {
             CombatInterruption::WaitingForPlayers
         } else {
             CombatInterruption::None
@@ -579,6 +584,9 @@ fn capture(
         ("host", 4) => Some("Multiplayer"),
         ("host", 7) => Some("Host Company"),
         ("game-menu", 4) => Some("Battle Settings"),
+        ("party-menu", 4) => Some("Battle Settings"),
+        ("party-menu", 7) => Some("Manage Assignments"),
+        ("party-assignments", 4) => Some("Manage Assignments"),
         ("leave", 4) => Some("Battle Settings"),
         ("leave", 7) => Some("Menu Leave"),
         ("settings", 4) => Some("Battle Settings"),

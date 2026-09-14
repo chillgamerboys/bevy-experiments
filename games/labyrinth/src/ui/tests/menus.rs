@@ -53,11 +53,11 @@ fn party_page_requires_explicit_host_pause_and_back_does_not_resume_normal_1080(
     let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1920., 1080.));
     assert!(
         visible_control_rect(app.world(), title, viewport)
-            .unwrap()
+            .expect("visible menu content")
             .max
             .y
             <= visible_control_rect(app.world(), party, viewport)
-                .unwrap()
+                .expect("visible menu content")
                 .min
                 .y
     );
@@ -108,6 +108,83 @@ fn party_page_requires_explicit_host_pause_and_back_does_not_resume_normal_1080(
     run_frames(&mut app, 3);
     assert!(find_named(app.world_mut(), "Resume After Assignment").is_none());
     assert!(find_named(app.world_mut(), "Pause For Assignments").is_none());
+}
+
+#[test]
+fn interruptions_remain_visible_with_recovery_inside_open_pages_normal_1080() {
+    use crate::view::CombatInterruption;
+    for page in [Action::GameMenu, Action::Settings, Action::PartyManagement] {
+        let mut app = app(1920, 1080, UiScaleMode::Auto);
+        network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
+        apply_action(app.world_mut(), page);
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            view.paused = true;
+            view.interruption = CombatInterruption::Halted;
+        }
+        run_frames(&mut app, 3);
+        assert!(app.world().resource::<UiState>().menus.is_open());
+        assert!(find_named(app.world_mut(), "Menu Interruption Notice").is_some());
+        assert!(find_named(app.world_mut(), "Abort To Lobby").is_some());
+        assert!(find_named(app.world_mut(), "Pause For Assignments").is_none());
+        if let Some(advice) = find_named(app.world_mut(), "Settings Advice") {
+            assert!(!app
+                .world()
+                .get::<Text>(advice)
+                .expect("visible menu content")
+                .0
+                .contains("continues"));
+        }
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            view.host = false;
+            view.admitted = false;
+            view.interruption = CombatInterruption::Reconnecting;
+        }
+        run_frames(&mut app, 3);
+        assert!(find_named(app.world_mut(), "Menu Interruption Notice").is_some());
+        assert!(find_named(app.world_mut(), "Overlay Reconnect").is_some());
+        assert!(find_named(app.world_mut(), "Abort To Lobby").is_none());
+    }
+}
+
+#[test]
+fn party_page_retires_after_host_or_guest_observes_return_to_lobby_normal_1080() {
+    use crate::view::CombatInterruption;
+    for host in [true, false] {
+        let mut app = app(1920, 1080, UiScaleMode::Auto);
+        network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            view.host = host;
+            view.paused = true;
+            view.interruption = CombatInterruption::Halted;
+        }
+        apply_action(app.world_mut(), Action::PartyManagement);
+        run_frames(&mut app, 3);
+        if host {
+            let recover = find_named(app.world_mut(), "Abort To Lobby").expect("host recovery");
+            assert!(click_action(&mut app, recover));
+            assert!(app
+                .world_mut()
+                .resource_mut::<Messages<LabyrinthIntent>>()
+                .drain()
+                .any(|intent| matches!(intent, LabyrinthIntent::Rematch)));
+        }
+        assert!(find_named(app.world_mut(), "Party Management Title").is_some());
+        {
+            let mut view = app.world_mut().resource_mut::<LabyrinthView>();
+            view.mode = ViewMode::Lobby;
+            view.combat = None;
+            view.paused = false;
+            view.interruption = CombatInterruption::None;
+        }
+        run_frames(&mut app, 3);
+        assert!(!app.world().resource::<UiState>().menus.is_open());
+        assert!(find_named(app.world_mut(), "Party Management Title").is_none());
+        assert!(find_named(app.world_mut(), "Pause For Assignments").is_none());
+        assert!(find_named(app.world_mut(), "Resume After Assignment").is_none());
+    }
 }
 
 #[test]

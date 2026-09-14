@@ -61,16 +61,16 @@ fn log_toggle_has_no_tooltip_before_or_after_pointer_and_keyboard_activation(
 }
 
 #[test]
-fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection_normal_1080() {
-    game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(1920, 1080, UiScaleMode::Auto);
+fn game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection_normal_1080() {
+    game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection(1920, 1080, UiScaleMode::Auto);
 }
 
 #[test]
-fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection_compatibility() {
-    game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(1280, 720, UiScaleMode::Auto);
+fn game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection_compatibility() {
+    game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection(1280, 720, UiScaleMode::Auto);
 }
 
-fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(
+fn game_menu_has_no_tooltip_and_temporarily_hides_locked_inspection(
     width: u32,
     height: u32,
     scale: UiScaleMode,
@@ -94,7 +94,7 @@ fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(
             .0
             .clone();
         app.world_mut()
-            .write_message(UiTooltipRequest::Open(subject));
+            .write_message(UiTooltipRequest::Open(subject.clone()));
         run_frames(&mut app, 1);
         if keyboard {
             assert!(focus_action(app.world_mut(), toolbar));
@@ -108,12 +108,19 @@ fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(
         }
         run_frames(&mut app, 8);
         assert!(find_named(app.world_mut(), "Game Menu Title").is_some());
-        assert!(app
-            .world()
-            .resource::<UiTooltipState>()
-            .subjects()
-            .is_empty());
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().subjects(),
+            std::slice::from_ref(&subject)
+        );
+        assert!(app.world().resource::<UiTooltipState>().is_suspended());
         assert!(find_named(app.world_mut(), "Tooltip Card 0").is_none());
+        tap_key(&mut app, KeyCode::Escape);
+        run_frames(&mut app, 3);
+        assert_eq!(
+            app.world().resource::<UiTooltipState>().subjects(),
+            &[subject]
+        );
+        assert!(find_named(app.world_mut(), "Tooltip Card 0").is_some());
     }
 }
 

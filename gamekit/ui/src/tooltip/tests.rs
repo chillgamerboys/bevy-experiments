@@ -344,10 +344,10 @@ fn pointer_and_keyboard_close_remove_the_selected_branch_and_restore_focus() {
                 label: "Detail".to_owned(),
                 subject: key("detail"),
             });
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(anchor, bevy::input_focus::FocusCause::Navigated);
         if keyboard {
-            app.world_mut()
-                .resource_mut::<InputFocus>()
-                .set(anchor, bevy::input_focus::FocusCause::Navigated);
             app.world_mut()
                 .resource_mut::<ButtonInput<KeyCode>>()
                 .press(KeyCode::KeyT);
@@ -383,10 +383,10 @@ fn pointer_and_keyboard_close_remove_the_selected_branch_and_restore_focus() {
         ] {
             settle_fixture_cards(&mut app);
             let close = close_action(&mut app, depth);
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(close, bevy::input_focus::FocusCause::Navigated);
             if keyboard {
-                app.world_mut()
-                    .resource_mut::<InputFocus>()
-                    .set(close, bevy::input_focus::FocusCause::Navigated);
                 app.world_mut()
                     .resource_mut::<ButtonInput<KeyCode>>()
                     .press(code);
@@ -411,9 +411,7 @@ fn pointer_and_keyboard_close_remove_the_selected_branch_and_restore_focus() {
                 );
             }
         }
-        if keyboard {
-            assert_eq!(app.world().resource::<InputFocus>().get(), Some(anchor));
-        }
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(anchor));
         step(&mut app, 1);
         assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
     }
@@ -902,7 +900,11 @@ fn inspection_inherits_source_modal_scope_and_yields_to_a_higher_modal() {
 #[test]
 fn suspension_preserves_valid_pins_but_releases_modal_input_and_old_focus() {
     let (mut app, anchor) = app();
-    let host = app.world().get::<ChildOf>(anchor).unwrap().parent();
+    let host = app
+        .world()
+        .get::<ChildOf>(anchor)
+        .expect("source host")
+        .parent();
     app.world_mut()
         .resource_mut::<InputFocus>()
         .set(anchor, bevy::input_focus::FocusCause::Navigated);
@@ -964,7 +966,8 @@ fn suspension_preserves_valid_pins_but_releases_modal_input_and_old_focus() {
     app.world_mut().despawn(anchor);
     {
         let mut catalog = app.world_mut().resource_mut::<UiTooltipCatalog>();
-        catalog.0.get_mut(&key("root")).unwrap().body = "Refreshed while hidden".to_owned();
+        catalog.0.get_mut(&key("root")).expect("root content").body =
+            "Refreshed while hidden".to_owned();
         catalog.0.remove(&key("term"));
     }
     step(&mut app, 1);
@@ -1085,7 +1088,11 @@ fn suspended_pins_still_observe_disclosure_host_and_lifecycle_invalidation() {
         "back",
     ] {
         let (mut app, anchor) = app();
-        let host = app.world().get::<ChildOf>(anchor).unwrap().parent();
+        let host = app
+            .world()
+            .get::<ChildOf>(anchor)
+            .expect("source host")
+            .parent();
         app.world_mut()
             .write_message(UiTooltipRequest::Open(key("root")));
         step(&mut app, 1);
@@ -1187,4 +1194,117 @@ fn adopter_can_disable_escape_dismissal_without_changing_the_default() {
             dismiss_key.is_some()
         );
     }
+}
+
+#[test]
+fn activation_opened_pin_returns_focus_after_keyboard_close_without_t_inspection() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(UiTooltipOpen(key("root")));
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(anchor, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Enter);
+    step(&mut app, 1);
+    assert!(app.world().resource::<UiTooltipState>().is_pinned());
+    assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
+    settle_fixture_cards(&mut app);
+    let close = close_action(&mut app, 0);
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(close, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(KeyCode::Enter);
+    step(&mut app, 1);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    assert_eq!(app.world().resource::<InputFocus>().get(), Some(anchor));
+    assert!(
+        app.world().resource::<UiTooltipState>().captures_keyboard(),
+        "closing Enter stays consumed after returning focus"
+    );
+    step(&mut app, 1);
+    assert!(!app.world().resource::<UiTooltipState>().captures_keyboard());
+}
+
+#[test]
+fn pointer_pin_close_returns_latest_outside_focus_only_when_the_card_had_focus() {
+    for focus_close in [false, true] {
+        let (mut app, anchor) = app();
+        let host = app
+            .world()
+            .get::<ChildOf>(anchor)
+            .expect("source host")
+            .parent();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(anchor, bevy::input_focus::FocusCause::Navigated);
+        app.world_mut()
+            .entity_mut(anchor)
+            .insert(Interaction::Hovered);
+        step(&mut app, 1);
+        app.world_mut().write_message(UiTooltipRequest::Pin);
+        step(&mut app, 1);
+        let latest = app
+            .world_mut()
+            .spawn((crate::button("latest focus"), ChildOf(host)))
+            .id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(latest, bevy::input_focus::FocusCause::Navigated);
+        step(&mut app, 1);
+        settle_fixture_cards(&mut app);
+        let close = close_action(&mut app, 0);
+        if focus_close {
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(close, bevy::input_focus::FocusCause::Navigated);
+        }
+        app.world_mut()
+            .entity_mut(close)
+            .insert(Interaction::Pressed);
+        step(&mut app, 1);
+        assert!(app
+            .world()
+            .resource::<UiTooltipState>()
+            .subjects()
+            .is_empty());
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(latest));
+    }
+}
+
+#[test]
+fn focused_pin_close_never_restores_a_hidden_outside_control() {
+    let (mut app, anchor) = app();
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(anchor, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .write_message(UiTooltipRequest::Open(key("root")));
+    step(&mut app, 1);
+    settle_fixture_cards(&mut app);
+    let close = close_action(&mut app, 0);
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(close, bevy::input_focus::FocusCause::Navigated);
+    app.world_mut()
+        .entity_mut(anchor)
+        .insert(Visibility::Hidden);
+    app.world_mut()
+        .entity_mut(close)
+        .insert(Interaction::Pressed);
+    step(&mut app, 1);
+    assert!(app
+        .world()
+        .resource::<UiTooltipState>()
+        .subjects()
+        .is_empty());
+    assert_eq!(app.world().resource::<InputFocus>().get(), None);
 }

@@ -177,7 +177,8 @@ fn medic_commands_refresh_text_help_and_selection_after_scout_commits(scale: UiS
                 Some(&next)
             );
             assert!(app.world().resource::<CombatCommands>().0.is_empty());
-            tap_key(&mut app, KeyCode::Escape);
+            let close = find_named(app.world_mut(), "Tooltip Close").expect("close inspection");
+            activate(&mut app, close, keyboard);
             run_frames(&mut app, 2);
         }
     }

@@ -2,6 +2,10 @@
 use super::*;
 
 pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState) {
+    // A confirmed host recovery also retires this combat-only page on guests.
+    if view.mode != ViewMode::Combat && ui.menus.current() == Some(&MenuPage::Party) {
+        ui.menus.close();
+    }
     let key = format!(
         "{:?}:{}:{}:{:?}:{:?}:{:?}:{:?}",
         ui.menus,
@@ -40,6 +44,7 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Leave the company?",
             UiTextRole::Title,
         );
+        interruption_notice(world, panel, view);
         label(
             world,
             panel,
@@ -148,11 +153,18 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Settings",
             UiTextRole::Title,
         );
+        interruption_notice(world, panel, view);
         label(
             world,
             panel,
             "Settings Advice",
-            "Local preferences only. The shared encounter continues.",
+            if view.paused {
+                "Local preferences only. Combat is paused."
+            } else if view.local {
+                "Local preferences only."
+            } else {
+                "Local preferences only. The shared encounter continues."
+            },
             UiTextRole::Supporting,
         );
         control(
@@ -195,6 +207,7 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
             "Game menu",
             UiTextRole::Title,
         );
+        interruption_notice(world, panel, view);
         if !view.local && !view.paused {
             label(
                 world,
@@ -259,6 +272,7 @@ fn party(world: &mut World, panel: Entity, view: &LabyrinthView) {
         "Party management",
         UiTextRole::Title,
     );
+    interruption_notice(world, panel, view);
     let editing =
         view.host && view.admitted && view.interruption == CombatInterruption::Assignments;
     if editing {
@@ -298,7 +312,11 @@ fn party(world: &mut World, panel: Entity, view: &LabyrinthView) {
                 UiTextRole::Body,
             );
         }
-        if view.host && view.admitted && view.interruption != CombatInterruption::Halted {
+        if view.mode == ViewMode::Combat
+            && view.host
+            && view.admitted
+            && view.interruption != CombatInterruption::Halted
+        {
             control(
                 world,
                 panel,
@@ -318,4 +336,45 @@ fn party(world: &mut World, panel: Entity, view: &LabyrinthView) {
         }
     }
     control(world, panel, "Party Back", "Back", Action::Cancel, false);
+}
+
+/// Local navigation must never hide an authoritative interruption or its recovery.
+fn interruption_notice(world: &mut World, panel: Entity, view: &LabyrinthView) {
+    use crate::view::CombatInterruption;
+    if !view.paused {
+        return;
+    }
+    let detail = match view.interruption {
+        CombatInterruption::Assignments => "Combat is paused for character assignments.",
+        CombatInterruption::Halted => "A rules error halted the encounter. The host can return the party to the lobby.",
+        CombatInterruption::Reconnecting => "Your connection is not admitted. Reconnect to recover the current encounter.",
+        _ => "The company is waiting for disconnected players. Reconnect or ask the host to reassign their characters.",
+    };
+    label(
+        world,
+        panel,
+        "Menu Interruption Notice",
+        detail,
+        UiTextRole::Body,
+    );
+    if !view.admitted {
+        control(
+            world,
+            panel,
+            "Overlay Reconnect",
+            "Reconnect reserved hero",
+            Action::Reconnect,
+            false,
+        );
+    }
+    if view.host && view.interruption == CombatInterruption::Halted {
+        control(
+            world,
+            panel,
+            "Abort To Lobby",
+            "Return party to lobby",
+            Action::Rematch,
+            false,
+        );
+    }
 }

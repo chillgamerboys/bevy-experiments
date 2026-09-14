@@ -229,8 +229,9 @@ reservation. Established reconnection does not use the password.
 
 Leaving the lobby explicitly releases the reservation and returns owned heroes to
 the host. Leaving during combat keeps the participant reserved for reconnect.
-The host can open Game menu → Pause and assign, reassign surviving characters to
-connected participants, then explicitly resume. This changes control only: HP,
+The host can open Game menu → Party management → Pause and edit assignments,
+reassign surviving characters to connected participants, then explicitly resume.
+Opening or returning from a menu never resumes a paused encounter. This changes control only: HP,
 uses, initiative and status clocks do not advance. Stale commands are rejected even
 if the same hero was assigned away and back. A rules fault cannot be cleared this way.
 Host process restart ends the session; guest credentials cannot recover a lost world.
@@ -266,9 +267,12 @@ HP forecast segments remain attached to the affected actor.
 Hover an ability or status to see its card immediately. Leaving before 1 second
 hides it immediately; continuous hover locks it with an accent border. Locked
 cards support related terms and stay open while hovering or clicking other
-characters and abilities. **Escape** is their only dismissal control (deepest
-card first); there is no close button or outside-click dismissal. Close the
-current card before inspecting another source. **T** explicitly
+characters and abilities. Each pinned card has a **×** control that closes that
+card and its linked descendants; closing the root clears the chain. Outside clicks
+preserve pins. **Escape** opens the Game menu directly, including while inspecting
+a pin or selecting an action, and returns through its separate Settings and Party
+management pages. Menus hide all tooltips and restore still-valid pins on return.
+Close the current card before inspecting another source. **T** explicitly
 opens keyboard inspection of the focused source; merely retaining clicked-button
 focus never reopens a preview. Game-menu and combat-log toggles have no tooltips.
 **K** toggles the equipped skillbook,

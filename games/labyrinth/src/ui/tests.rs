@@ -1128,7 +1128,8 @@ fn all_twelve_art_hit_regions_are_initially_visible_and_detail_does_not_reflow_s
             Some(before)
         );
     }
-    tap_key(&mut app, KeyCode::Escape);
+    let close = find_named(app.world_mut(), "Tooltip Close").expect("close actor inspection");
+    assert!(click_action(&mut app, close));
     assert!(app
         .world()
         .resource::<bevy_gamekit::ui::UiTooltipState>()
@@ -1339,6 +1340,12 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
             > 100.0
     );
     assert!(focus_action(app.world_mut(), actor));
+    tap_key(&mut app, KeyCode::Escape);
+    run_frames(&mut app, 3);
+    assert_eq!(
+        app.world().resource::<UiState>().menus.current(),
+        Some(&MenuPage::Game)
+    );
     tap_key(&mut app, KeyCode::Escape);
     run_frames(&mut app, 3);
     assert!(activation_eligible(app.world_mut(), actor));
