@@ -57,6 +57,7 @@ path = "gamekit"
 packages = ["gameskills-maintainer"]
 
 [commands.repo-check]
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
@@ -216,6 +217,7 @@ timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
 
 [commands.bundle-check]
+git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "bundle", "check"]
 timeout_seconds = 600
 resources = ["project:cargo-target"]
