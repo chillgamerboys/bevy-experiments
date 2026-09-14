@@ -311,5 +311,5 @@ and [verification](docs/testing.md). The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.
 
-Active plan: [battle UI corrections and character customization](docs/plans/ui-and-character-builds.md).
+Battle UI and character customization landed in PRs #42–45. Current behavior is documented above and in [architecture](docs/architecture.md).
 Earlier foundation and separate acceptance context: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).

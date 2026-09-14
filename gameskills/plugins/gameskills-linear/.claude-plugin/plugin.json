@@ -1,6 +1,6 @@
 {
   "name": "gameskills-linear",
-  "version": "0.1.0-dev.4",
+  "version": "0.1.0-dev.5",
   "description": "Optional Linear issue tracking and manually invoked retention cleanup.",
   "author": {
     "name": "GameKit contributors"

@@ -5,9 +5,10 @@ clients = ["codex", "claude"]
 
 [project]
 name = "Bevy Experiments"
-delivery_target = "pr"
-# Bootstrap remains on main until the validated dev branch is adopted.
-delivery_base = "main"
+delivery_target = "merge"
+# Feature merges into dev are explicitly authorized after checks and review.
+# Main promotions require separate user authorization.
+delivery_base = "dev"
 
 [creative]
 default_level = 2
@@ -489,3 +490,27 @@ git_refs = []
 argv = ["cargo", "run", "--locked", "-p", "labyrinth", "--example", "labyrinth_review", "--profile", "ci", "--", "target/review/labyrinth-party-assignments-1920.png", "1920", "1080", "auto", "party-assignments"]
 timeout_seconds = 600
 resources = ["project:cargo-target", "gpu", "window"]
+
+# Opted-in host mappings. Resolve against actual available host capabilities.
+[agents.routing]
+default_tier = "small"
+escalation_after_failures = 1
+max_attempts = 2
+
+[agents.routing.clients.codex.small]
+model = "gpt-5.6-luna"
+effort = "medium"
+
+[agents.routing.clients.codex.standard]
+model = "gpt-5.6-sol"
+effort = "medium"
+
+[agents.routing.clients.codex.strong]
+model = "gpt-6-astra"
+effort = "high"
+
+[commands.workflow-efficiency-test]
+git_refs = []
+argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", "--test", "agents", "--test", "usage", "--test", "delivery", "--test", "verification_context", "--test", "configuration", "--test", "help"]
+timeout_seconds = 600
+resources = ["project:cargo-target"]
