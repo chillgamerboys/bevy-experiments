@@ -5,7 +5,7 @@
 )]
 use super::*;
 use crate::{
-    build::{ActorBuild, CharacterBuild, InnateGrant},
+    build::{ActorBuild, CharacterBuild, SkillGrant},
     catalog::{ContentCatalog, ContentId},
     scenario::{ControllerPolicy, Scenario, ScenarioActor, StockScenario, SCENARIO_SCHEMA_VERSION},
     LifeState, SkillId,
@@ -62,9 +62,9 @@ fn ability_action(combat: &Combat, key: &str, target: u16) -> CombatAction {
         .state
         .actor(ActorId(1))
         .unwrap()
-        .ability_index(&id(key))
+        .skill_index(&id(key))
         .unwrap();
-    CombatAction::Ability {
+    CombatAction::Skill {
         index,
         target: ActorId(target),
     }
@@ -103,8 +103,8 @@ fn all_stock_scenarios_roundtrip_and_replay_identical_actions() {
 fn every_weapon_move_executes_and_uses_shared_preview() {
     let catalog = ContentCatalog::builtin().unwrap();
     for weapon in &catalog.definition().weapons {
-        for key in &weapon.grants {
-            let definition = catalog.ability(key).unwrap();
+        for key in &weapon.skills {
+            let definition = catalog.skill(key).unwrap();
             let (catalog, mut scenario) = fixture(weapon.id.as_str(), &[1, 1, 1, 1, 1, 1]);
             let source_rank = (1..=6).find(|r| definition.allows_source_rank(*r)).unwrap();
             for n in 1..source_rank {
@@ -239,13 +239,14 @@ fn cleave_does_not_retarget_after_corpse_compaction_or_drop_terminal_targets() {
     );
 }
 #[test]
-fn learned_additions_upgrades_and_legacy_alias_share_effects_and_one_use_counter() {
+fn personal_skills_passive_upgrades_and_legacy_alias_share_one_use_counter() {
     let (catalog, mut scenario) = fixture("dagger", &[1]);
-    scenario.heroes[0].actor.build.learned_skills = vec![
-        id("assassin_bleeding_dagger"),
-        id("duelist_dagger_power"),
-        id("assassin_feint_training"),
-    ];
+    scenario.heroes[0].actor.build.skills.push(SkillGrant {
+        skill: id("assassin_feint"),
+        provenance: id("assassin"),
+    });
+    scenario.heroes[0].actor.build.abilities =
+        vec![id("assassin_bleeding_dagger"), id("duelist_dagger_power")];
     let mut combat = Combat::from_scenario(&catalog, &scenario).unwrap();
     let action = ability_action(&combat, "dagger_stab", 101);
     assert_eq!(
@@ -253,7 +254,7 @@ fn learned_additions_upgrades_and_legacy_alias_share_effects_and_one_use_counter
             .state
             .actor(ActorId(1))
             .unwrap()
-            .resolved_abilities()
+            .resolved_skills()
             .len(),
         3
     );
@@ -278,35 +279,37 @@ fn learned_additions_upgrades_and_legacy_alias_share_effects_and_one_use_counter
         .is_empty());
 
     let mut raw = catalog.definition().clone();
-    raw.learned_skills
-        .push(crate::catalog::LearnedSkillDefinition {
-            id: id("legacy_training"),
-            name: "Legacy training".into(),
-            description: "Adds damage to the granted legacy move.".into(),
-            provenance: id("test"),
-            grants: vec![],
-            upgrades: vec![crate::catalog::AbilityUpgrade {
-                ability: id("front_strike"),
-                operations: vec![crate::catalog::UpgradeOperation::AddDamage {
-                    effect_index: 0,
-                    amount: 3,
-                }],
+    raw.abilities.push(crate::catalog::AbilityDefinition {
+        id: id("legacy_training"),
+        name: "Legacy training".into(),
+        description: "Adds damage to the granted legacy move.".into(),
+        provenance: id("test"),
+        personal_selectable: true,
+        requirements: vec![],
+        effects: vec![],
+        upgrades: vec![crate::catalog::SkillUpgrade {
+            skill: id("front_strike"),
+            operations: vec![crate::catalog::UpgradeOperation::AddDamage {
+                effect_index: 0,
+                amount: 3,
             }],
-        });
-    raw.abilities
+        }],
+    });
+    raw.skills
         .iter_mut()
         .find(|a| a.id == id("front_strike"))
         .unwrap()
         .max_uses = Some(2);
     let catalog = ContentCatalog::new(raw).unwrap();
+    let catalog = crate::scenario::legacy_catalog(&catalog, [&[SkillId::FrontStrike][..]]).unwrap();
     scenario.heroes[0].actor.build = crate::scenario::legacy_build(&[SkillId::FrontStrike]);
-    scenario.heroes[0].actor.build.learned_skills = vec![id("legacy_training")];
+    scenario.heroes[0].actor.build.abilities = vec![id("legacy_training")];
     let mut alias = Combat::from_scenario(&catalog, &scenario).unwrap();
     let mut indexed = alias.clone();
     alias
         .apply(
             ActorId(1),
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: SkillId::FrontStrike,
                 target: ActorId(101),
             },
@@ -315,7 +318,7 @@ fn learned_additions_upgrades_and_legacy_alias_share_effects_and_one_use_counter
     indexed
         .apply(
             ActorId(1),
-            CombatAction::Ability {
+            CombatAction::Skill {
                 index: 0,
                 target: ActorId(101),
             },
@@ -337,18 +340,20 @@ fn arbitrary_authored_ids_beyond_eight_execute_and_external_policy_uses_same_sea
     let (catalog, mut scenario) = fixture("dagger", &[1]);
     let mut raw = catalog.definition().clone();
     for n in 0..12 {
-        let mut definition = catalog.ability(&id("dagger_stab")).unwrap().clone();
+        let mut definition = catalog.skill(&id("dagger_stab")).unwrap().clone();
         definition.id = id(&format!("new_move_{n}"));
+        definition.personal_selectable = true;
+        definition.requirements.clear();
         definition.source_ranks = 63;
         definition.target_ranks = 63;
         definition.effects = vec![Effect::Damage(n + 1)];
-        raw.abilities.push(definition);
+        raw.skills.push(definition);
     }
     let catalog = ContentCatalog::new(raw).unwrap();
     scenario.heroes[0].actor.build = CharacterBuild {
-        innate: (0..12)
-            .map(|n| InnateGrant {
-                ability: id(&format!("new_move_{n}")),
+        skills: (0..12)
+            .map(|n| SkillGrant {
+                skill: id(&format!("new_move_{n}")),
                 provenance: id("test"),
             })
             .collect(),
@@ -360,7 +365,7 @@ fn arbitrary_authored_ids_beyond_eight_execute_and_external_policy_uses_same_sea
     for index in 0..12 {
         assert!(combat
             .legal_actions(ActorId(1))
-            .contains(&CombatAction::Ability {
+            .contains(&CombatAction::Skill {
                 index,
                 target: ActorId(101)
             }));
@@ -368,7 +373,7 @@ fn arbitrary_authored_ids_beyond_eight_execute_and_external_policy_uses_same_sea
     combat
         .apply(
             ActorId(1),
-            CombatAction::Ability {
+            CombatAction::Skill {
                 index: 11,
                 target: ActorId(101),
             },
@@ -403,15 +408,15 @@ fn scenario_rejections_and_invalid_ability_commands_leave_authority_unchanged() 
     let mut combat = Combat::from_scenario(&catalog, &scenario).unwrap();
     let previous = combat.clone();
     for command in [
-        CombatAction::Ability {
+        CombatAction::Skill {
             index: 63,
             target: ActorId(101),
         },
-        CombatAction::Ability {
+        CombatAction::Skill {
             index: 0,
             target: ActorId(1),
         },
-        CombatAction::Ability {
+        CombatAction::Skill {
             index: 0,
             target: ActorId(999),
         },
@@ -426,7 +431,7 @@ fn scenario_rejections_and_invalid_ability_commands_leave_authority_unchanged() 
     );
     assert_eq!(combat, previous);
     let mut wire = serde_json::to_value(combat.snapshot()).unwrap();
-    wire["actors"][0]["abilities"]["abilities"][0]["definition"]["effects"] =
+    wire["actors"][0]["resolved_build"]["moveset"]["skills"][0]["definition"]["effects"] =
         serde_json::json!([{"Damage":999}]);
     assert!(serde_json::from_value::<CombatSnapshot>(wire).is_err());
 }
@@ -441,18 +446,20 @@ fn stock_snapshot_sizes_are_measured_and_catalog_freezing_ignores_later_edits() 
         sizes.push((format!("{choice:?}"), bytes.len()));
     }
     let mut raw = catalog.definition().clone();
-    let template = catalog.ability(&id("dagger_stab")).unwrap();
+    let template = catalog.skill(&id("dagger_stab")).unwrap();
     for n in 0..64 {
-        let mut ability = template.clone();
-        ability.id = id(&format!("capacity_{n}"));
-        raw.abilities.push(ability);
+        let mut skill = template.clone();
+        skill.id = id(&format!("capacity_{n}"));
+        skill.personal_selectable = true;
+        skill.requirements.clear();
+        raw.skills.push(skill);
     }
     let full_catalog = ContentCatalog::new(raw).unwrap();
     let mut full = Scenario::stock(StockScenario::WeaponComparison, 42, &full_catalog).unwrap();
     let build = CharacterBuild {
-        innate: (0..64)
-            .map(|n| InnateGrant {
-                ability: id(&format!("capacity_{n}")),
+        skills: (0..64)
+            .map(|n| SkillGrant {
+                skill: id(&format!("capacity_{n}")),
                 provenance: id("test"),
             })
             .collect(),
@@ -468,12 +475,12 @@ fn stock_snapshot_sizes_are_measured_and_catalog_freezing_ignores_later_edits() 
         .state
         .actors
         .iter()
-        .all(|a| a.resolved_abilities().len() == 64));
+        .all(|a| a.resolved_skills().len() == 64));
     sizes.push(("TwelveActorsSixtyFourMoves".into(), full_size));
     let mut oversized = full_catalog.definition().clone();
-    for ability in &mut oversized.abilities {
-        if ability.id.as_str().starts_with("capacity_") {
-            ability.description = "x".repeat(2048);
+    for skill in &mut oversized.skills {
+        if skill.id.as_str().starts_with("capacity_") {
+            skill.description = "x".repeat(2048);
         }
     }
     let oversized = ContentCatalog::new(oversized).unwrap();
@@ -492,7 +499,7 @@ fn stock_snapshot_sizes_are_measured_and_catalog_freezing_ignores_later_edits() 
     let (catalog, scenario) = fixture("greatsword", &[1]);
     let mut combat = Combat::from_scenario(&catalog, &scenario).unwrap();
     let mut raw = catalog.definition().clone();
-    raw.abilities
+    raw.skills
         .iter_mut()
         .find(|a| a.id == id("greatsword_cleave"))
         .unwrap()

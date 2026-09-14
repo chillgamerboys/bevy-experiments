@@ -11,8 +11,8 @@ use crate::{
 
 #[cfg(test)]
 use crate::{
-    skill_definition, AbilityLoadout, CombatOutcome, DamageKind, Stat, StatusInstance, StatusKind,
-    StatusTag,
+    legacy_skill_definition, CombatOutcome, DamageKind, LegacySkillLoadout, Stat, StatusInstance,
+    StatusKind, StatusTag,
 };
 
 const MAX_WORK: usize = MAX_COMBAT_WORK;
@@ -138,6 +138,13 @@ impl Combat {
         }
         let catalog =
             crate::catalog::ContentCatalog::builtin().map_err(|_| RuleError::InvalidState)?;
+        let loadouts = heroes.iter().map(|h| h.skills.as_slice()).chain(
+            enemies
+                .iter()
+                .map(|(_, kind)| crate::skills_for(ActorKind::Enemy(*kind))),
+        );
+        let catalog = crate::scenario::legacy_catalog(&catalog, loadouts)
+            .map_err(|_| RuleError::InvalidState)?;
         let actor_input = |id, kind: ActorKind, build| {
             let (max_hp, base_speed) = kind.stats();
             crate::scenario::ScenarioActor {
@@ -169,7 +176,7 @@ impl Combat {
                     actor_input(
                         h.id,
                         ActorKind::Hero(h.class),
-                        crate::scenario::legacy_build(h.abilities.as_slice()),
+                        crate::scenario::legacy_build(h.skills.as_slice()),
                     )
                 })
                 .collect(),
@@ -204,6 +211,7 @@ impl Combat {
             for input in roster {
                 let config = &input.actor;
                 let hp = input.starting_hp.unwrap_or(config.max_hp);
+                let resolved_build = config.resolve(catalog)?;
                 let mut statuses = Vec::new();
                 for initial in &input.starting_statuses {
                     let definition = status_definition(initial.kind);
@@ -213,7 +221,9 @@ impl Combat {
                         bearer: input.id,
                         source: initial.source.unwrap_or(input.id),
                         potency: definition.potency,
-                        remaining: initial.remaining.unwrap_or(definition.duration.ticks),
+                        remaining: initial.remaining.unwrap_or_else(|| {
+                            resolved_build.status_duration(initial.kind, definition.duration.ticks)
+                        }),
                         eligible_boundary: 1,
                     });
                     next_status += 1;
@@ -233,7 +243,7 @@ impl Combat {
                     },
                     max_hp: config.max_hp,
                     base_speed: config.base_speed,
-                    abilities: config.resolve(catalog)?,
+                    resolved_build,
                     build: config.build.clone(),
                     statuses,
                     skill_uses: BTreeMap::new(),
@@ -339,9 +349,9 @@ impl Combat {
         legal
             .iter()
             .filter_map(|action| {
-                let (index, target) = self.state.action_ability(actor, *action).ok()??;
+                let (index, target) = self.state.action_skill(actor, *action).ok()??;
                 if !source
-                    .ability(index)?
+                    .skill(index)?
                     .effects
                     .iter()
                     .any(|effect| matches!(effect, Effect::Damage(_)))

@@ -1,86 +1,144 @@
-//! Pure build composition: immutable definitions and inspectable provenance.
-
+//! Pure character/equipment composition and a frozen, inspectable active Moveset.
 use crate::{
     catalog::{
-        apply_upgrade, text_field, unique_ids, validate_stats, AbilityDefinition, AbilityUpgrade,
-        ContentCatalog, ContentError, ContentId, MAX_RESOLVED_ABILITIES,
+        apply_upgrade, text_field, unique_ids, validate_stats, AbilityDefinition, ContentCatalog,
+        ContentError, ContentId, PassiveEffect, SkillDefinition, SkillUpgrade, MAX_MOVESET_SKILLS,
     },
-    ActorKind,
+    status_definition, ActorKind, StatusKind, StatusTag,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-/// An innate grant can carry a named origin without defining classes or trees.
+/// A personally selected active Skill and its descriptive origin.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct InnateGrant {
-    /// Granted active ability.
-    pub ability: ContentId,
-    /// Source identity, e.g. innate, bulwark or pyromancy.
+pub struct SkillGrant {
+    /// Active Skill identity.
+    pub skill: ContentId,
+    /// Descriptive source identity, never an equipment authorization.
     pub provenance: ContentId,
 }
-/// Encounter build selections. This is equipment configuration, not an inventory.
+/// Encounter selections; this is one weapon slot, not an inventory.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CharacterBuild {
-    /// Ordered innate grants (different sources may grant the same ability).
+    /// Ordered personal active selections, including temporarily inactive Skills.
     #[serde(default)]
-    pub innate: Vec<InnateGrant>,
-    /// Selected learned skills. Resolver sorts by stable ID for deterministic upgrades.
+    pub skills: Vec<SkillGrant>,
+    /// Personal passive selections, including temporarily inactive Abilities.
     #[serde(default)]
-    pub learned_skills: Vec<ContentId>,
-    /// Exactly one optional equipped weapon.
+    pub abilities: Vec<ContentId>,
+    /// Optional equipped weapon.
     pub weapon: Option<ContentId>,
 }
-/// Grant category independent of active/passive behavior.
+/// Ownership source, independent of active/passive behavior or requirements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GrantKind {
-    /// Direct actor grant.
-    Innate,
-    /// Equipped weapon grant.
-    Weapon,
-    /// Selected learned-skill grant or upgrade.
-    Learned,
+    /// A personal selection.
+    Character,
+    /// An equipped item.
+    Equipment,
 }
-/// A retained grant path. Multiple paths never duplicate an active move.
+/// One retained grant path; duplicate sources never multiply an effect.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GrantSource {
-    /// Direct, weapon or learned grant.
+    /// Character or equipment grant.
     pub kind: GrantKind,
-    /// Granting definition identity (ability identity for direct innate grants).
+    /// Granting Skill/Ability or item identity.
     pub definition: ContentId,
-    /// Named source/discipline used for inspection.
+    /// Descriptive origin.
     pub provenance: ContentId,
 }
-/// An applied upgrade retained separately from base grant sources.
+/// One applied passive contribution, with all provenance retained by its Ability.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpgradeContribution {
-    /// Learned skill and its descriptive provenance.
-    pub source: GrantSource,
-    /// Exact operations used to derive the effective ability.
-    pub upgrade: AbilityUpgrade,
+    /// The Ability identity, independent of how many sources granted it.
+    pub ability: ContentId,
+    /// The exact additive contribution.
+    pub upgrade: SkillUpgrade,
 }
-/// One effective ability with every grant and upgrade source, without mutable uses.
+/// A frozen effective active Skill; uses remain on its runtime actor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResolvedSkill {
+    /// Effective definition after passive contributions.
+    pub definition: SkillDefinition,
+    /// All distinct grants, in deterministic order.
+    pub grants: Vec<GrantSource>,
+    /// Passive contributions in stable Ability-ID order.
+    pub upgrades: Vec<UpgradeContribution>,
+}
+/// The canonical collection of eligible active Skills. Never contains passives.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Moveset {
+    /// Actor-local order, frozen at encounter start.
+    pub skills: Vec<ResolvedSkill>,
+}
+/// A selected Skill whose equipment requirements are currently unmet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InactiveSkill {
+    /// Unmodified active definition.
+    pub definition: SkillDefinition,
+    /// Its retained grant paths.
+    pub grants: Vec<GrantSource>,
+    /// Player-facing unmet prerequisite.
+    pub reason: String,
+}
+/// One passive Ability, applied at most once even with multiple sources.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResolvedAbility {
-    /// Owned effective definition, frozen for the encounter.
+    /// Frozen passive definition.
     pub definition: AbilityDefinition,
-    /// Distinct grant paths in deterministic order.
+    /// Every retained grant source.
     pub grants: Vec<GrantSource>,
-    /// Applied learned contributions in stable skill-ID order.
-    pub upgrades: Vec<UpgradeContribution>,
+    /// Absent when active; otherwise this Ability contributes no effects.
+    pub inactive_reason: Option<String>,
 }
-/// Derived build view; untrusted deserialization needs `catalog.validate_resolved`.
+impl ResolvedAbility {
+    /// Whether this passive currently contributes to its actor.
+    #[must_use]
+    pub fn active(&self) -> bool {
+        self.inactive_reason.is_none()
+    }
+}
+/// Complete derived build; validate untrusted input with `catalog.validate_resolved`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResolvedBuild {
-    /// Catalog/rules identity used for this resolution.
+    /// Catalog/rules compatibility identity.
     pub catalog_fingerprint: String,
-    /// Every granted active move, ordered innate → weapon → learned stable IDs.
+    /// Eligible active Skills with effective values.
+    pub moveset: Moveset,
+    /// Selected/equipped passives, including explicit inactive reasons.
     pub abilities: Vec<ResolvedAbility>,
+    /// Selected active Skills retained outside the Moveset while ineligible.
+    pub inactive_skills: Vec<InactiveSkill>,
+}
+impl ResolvedBuild {
+    /// Duration for a newly applied/refreshed status. Restored remaining clocks
+    /// must bypass this calculation, so snapshot reads never shorten them again.
+    #[must_use]
+    pub fn status_duration(&self, kind: StatusKind, ticks: u8) -> u8 {
+        if !status_definition(kind).tags.contains(&StatusTag::Debuff) {
+            return ticks;
+        }
+        let reduction = self
+            .abilities
+            .iter()
+            .filter(|a| a.active())
+            .flat_map(|a| &a.definition.effects)
+            .fold(0u8, |total, effect| match effect {
+                PassiveEffect::ReduceNegativeStatusDuration { amount } => {
+                    total.saturating_add(*amount)
+                }
+            });
+        ticks.saturating_sub(reduction).max(1)
+    }
 }
 /// Fully explicit actor setup; appearance supplies no hidden stat/build authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,41 +179,66 @@ impl ActorBuild {
         catalog.resolve_build(&self.build)
     }
 }
+
 impl ContentCatalog {
-    /// Resolve once at preparation time, never mutating input or catalog.
-    ///
-    /// All grants are collected before upgrades, so a learned skill may upgrade a
-    /// weapon move or one granted by another selected skill. Skills cannot grant
-    /// skills, hence cycles are structurally unavailable. Missing prerequisite
-    /// moves fail instead of silently ignoring upgrades. Re-resolution after source
-    /// removal removes only that source's grants/contributions; resources belong
-    /// to runtime actors and must not be reset by resolving a presentation view.
+    /// Resolve selections once without mutating source content or runtime resources.
     pub fn resolve_build(&self, build: &CharacterBuild) -> Result<ResolvedBuild, ContentError> {
-        if build.innate.len() > MAX_RESOLVED_ABILITIES {
-            return Err(ContentError::new("build.innate", "too many innate grants"));
+        if build.skills.len() > MAX_MOVESET_SKILLS {
+            return Err(ContentError::new("build.skills", "too many Skill grants"));
         }
         unique_ids(
-            "build.learned_skills",
-            &build.learned_skills.iter().collect::<Vec<_>>(),
-            MAX_RESOLVED_ABILITIES,
+            "build.abilities",
+            &build.abilities.iter().collect::<Vec<_>>(),
+            MAX_MOVESET_SKILLS,
         )?;
+        let mut skills = Vec::<ResolvedSkill>::new();
         let mut abilities = Vec::<ResolvedAbility>::new();
-        let mut innate_paths = BTreeSet::new();
-        for innate in &build.innate {
-            if !innate_paths.insert((&innate.ability, &innate.provenance)) {
+        let mut paths = BTreeSet::new();
+        for grant in &build.skills {
+            if !paths.insert((&grant.skill, &grant.provenance)) {
                 return Err(ContentError::new(
-                    "build.innate",
-                    "duplicate ability/provenance grant",
+                    "build.skills",
+                    "duplicate Skill/provenance grant",
                 ));
             }
-            add_grant(
+            let definition = self.skill(&grant.skill).ok_or_else(|| {
+                ContentError::new("build.skills", format!("missing Skill {}", grant.skill))
+            })?;
+            if !definition.personal_selectable {
+                return Err(ContentError::new(
+                    "build.skills",
+                    format!("{} is equipment-only", grant.skill),
+                ));
+            }
+            add_skill(
+                self,
+                &mut skills,
+                &grant.skill,
+                GrantSource {
+                    kind: GrantKind::Character,
+                    definition: grant.skill.clone(),
+                    provenance: grant.provenance.clone(),
+                },
+            )?;
+        }
+        for id in &build.abilities {
+            let definition = self.ability(id).ok_or_else(|| {
+                ContentError::new("build.abilities", format!("missing Ability {id}"))
+            })?;
+            if !definition.personal_selectable {
+                return Err(ContentError::new(
+                    "build.abilities",
+                    format!("{id} is equipment-only"),
+                ));
+            }
+            add_ability(
                 self,
                 &mut abilities,
-                &innate.ability,
+                id,
                 GrantSource {
-                    kind: GrantKind::Innate,
-                    definition: innate.ability.clone(),
-                    provenance: innate.provenance.clone(),
+                    kind: GrantKind::Character,
+                    definition: id.clone(),
+                    provenance: definition.provenance.clone(),
                 },
             )?;
         }
@@ -163,103 +246,129 @@ impl ContentCatalog {
             let weapon = self
                 .weapon(id)
                 .ok_or_else(|| ContentError::new("build.weapon", format!("missing weapon {id}")))?;
-            for ability in &weapon.grants {
-                add_grant(
-                    self,
-                    &mut abilities,
-                    ability,
-                    GrantSource {
-                        kind: GrantKind::Weapon,
-                        definition: id.clone(),
-                        provenance: id.clone(),
-                    },
-                )?;
+            let source = GrantSource {
+                kind: GrantKind::Equipment,
+                definition: id.clone(),
+                provenance: id.clone(),
+            };
+            for id in &weapon.skills {
+                add_skill(self, &mut skills, id, source.clone())?;
+            }
+            for id in &weapon.abilities {
+                add_ability(self, &mut abilities, id, source.clone())?;
             }
         }
-        let mut learned = build.learned_skills.iter().collect::<Vec<_>>();
-        learned.sort();
-        for id in &learned {
-            let skill = self.learned_skill(id).ok_or_else(|| {
-                ContentError::new(
-                    "build.learned_skills",
-                    format!("missing learned skill {id}"),
-                )
-            })?;
-            for ability in &skill.grants {
-                add_grant(
-                    self,
-                    &mut abilities,
-                    ability,
-                    GrantSource {
-                        kind: GrantKind::Learned,
-                        definition: skill.id.clone(),
-                        provenance: skill.provenance.clone(),
-                    },
-                )?;
+        let mut inactive_skills = Vec::new();
+        let mut eligible = Vec::new();
+        for skill in skills {
+            if let Some(reason) = self.unmet_requirements(build, &skill.definition.requirements) {
+                inactive_skills.push(InactiveSkill {
+                    definition: skill.definition,
+                    grants: skill.grants,
+                    reason,
+                });
+            } else {
+                eligible.push(skill);
             }
         }
-        for id in learned {
-            let skill = self.learned_skill(id).ok_or_else(|| {
-                ContentError::new(
-                    "build.learned_skills",
-                    format!("missing learned skill {id}"),
-                )
-            })?;
-            for upgrade in &skill.upgrades {
-                let path = format!("build.learned_skills.{}", skill.id);
-                let resolved = abilities
+        abilities.sort_by(|a, b| a.definition.id.cmp(&b.definition.id));
+        for ability in &mut abilities {
+            ability.inactive_reason = self
+                .unmet_requirements(build, &ability.definition.requirements)
+                .or_else(|| {
+                    ability
+                        .definition
+                        .upgrades
+                        .iter()
+                        .find(|upgrade| {
+                            !eligible
+                                .iter()
+                                .any(|skill| skill.definition.id == upgrade.skill)
+                        })
+                        .map(|upgrade| format!("Requires eligible Skill {}", upgrade.skill))
+                });
+            if !ability.active() {
+                continue;
+            }
+            for upgrade in &ability.definition.upgrades {
+                let skill = eligible
                     .iter_mut()
-                    .find(|a| a.definition.id == upgrade.ability)
-                    .ok_or_else(|| {
-                        ContentError::new(
-                            &path,
-                            format!("upgrade requires granted ability {}", upgrade.ability),
-                        )
-                    })?;
+                    .find(|skill| skill.definition.id == upgrade.skill)
+                    .expect("validated eligible upgrade target");
                 let base = self
-                    .ability(&upgrade.ability)
-                    .ok_or_else(|| ContentError::new(&path, "missing base ability"))?;
-                apply_upgrade(base, &mut resolved.definition, upgrade, &path)?;
-                resolved.upgrades.push(UpgradeContribution {
-                    source: GrantSource {
-                        kind: GrantKind::Learned,
-                        definition: skill.id.clone(),
-                        provenance: skill.provenance.clone(),
-                    },
+                    .skill(&upgrade.skill)
+                    .expect("catalog validated upgrade target");
+                apply_upgrade(
+                    base,
+                    &mut skill.definition,
+                    upgrade,
+                    &format!("build.abilities.{}", ability.definition.id),
+                )?;
+                skill.upgrades.push(UpgradeContribution {
+                    ability: ability.definition.id.clone(),
                     upgrade: upgrade.clone(),
                 });
             }
         }
         Ok(ResolvedBuild {
             catalog_fingerprint: self.fingerprint(),
+            moveset: Moveset { skills: eligible },
             abilities,
+            inactive_skills,
         })
     }
 }
-fn add_grant(
+fn add_skill(
+    catalog: &ContentCatalog,
+    skills: &mut Vec<ResolvedSkill>,
+    id: &ContentId,
+    source: GrantSource,
+) -> Result<(), ContentError> {
+    if let Some(skill) = skills.iter_mut().find(|s| &s.definition.id == id) {
+        skill.grants.push(source);
+        return Ok(());
+    }
+    if skills.len() >= MAX_MOVESET_SKILLS {
+        return Err(ContentError::new(
+            "build.skills",
+            "too many distinct granted Skills (maximum 64)",
+        ));
+    }
+    let definition = catalog
+        .skill(id)
+        .ok_or_else(|| ContentError::new("build.skills", format!("missing Skill {id}")))?
+        .clone();
+    skills.push(ResolvedSkill {
+        definition,
+        grants: vec![source],
+        upgrades: vec![],
+    });
+    Ok(())
+}
+fn add_ability(
     catalog: &ContentCatalog,
     abilities: &mut Vec<ResolvedAbility>,
     id: &ContentId,
     source: GrantSource,
 ) -> Result<(), ContentError> {
-    if let Some(existing) = abilities.iter_mut().find(|a| &a.definition.id == id) {
-        existing.grants.push(source);
+    if let Some(ability) = abilities.iter_mut().find(|a| &a.definition.id == id) {
+        ability.grants.push(source);
         return Ok(());
     }
-    if abilities.len() == MAX_RESOLVED_ABILITIES {
+    if abilities.len() >= MAX_MOVESET_SKILLS {
         return Err(ContentError::new(
             "build.abilities",
-            "too many distinct granted abilities (maximum 64)",
+            "too many distinct granted Abilities (maximum 64)",
         ));
     }
     let definition = catalog
         .ability(id)
-        .ok_or_else(|| ContentError::new("build.grants", format!("missing ability {id}")))?
+        .ok_or_else(|| ContentError::new("build.abilities", format!("missing Ability {id}")))?
         .clone();
     abilities.push(ResolvedAbility {
         definition,
         grants: vec![source],
-        upgrades: Vec::new(),
+        inactive_reason: None,
     });
     Ok(())
 }
