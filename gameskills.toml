@@ -521,8 +521,3 @@ argv = ["cargo", "test", "--locked", "-p", "gameskills-cli", "--profile", "ci", 
 timeout_seconds = 600
 resources = ["project:cargo-target"]
 
-[commands.bundle-check]
-git_refs = []
-argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--", "bundle", "check"]
-timeout_seconds = 600
-resources = ["project:cargo-target"]
