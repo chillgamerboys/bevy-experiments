@@ -61,6 +61,7 @@ impl Plugin for LabyrinthUiPlugin {
         })
         .insert_resource(ClearColor(Color::srgb(0.025, 0.034, 0.038)))
         .init_resource::<UiState>()
+        .init_resource::<crate::view::EncounterHistory>()
         .init_resource::<LabyrinthAppearance>()
         .init_resource::<crate::presentation::CombatDisclosure>()
         .init_resource::<LabyrinthUiConfig>()
@@ -110,7 +111,13 @@ impl Plugin for LabyrinthUiPlugin {
             Update,
             LabyrinthUiSystems::Present.after(bevy_gamekit::ui::UiContextHelpSystems::Resolve),
         )
-        .add_systems(Update, present.in_set(LabyrinthUiSystems::Present));
+        .add_systems(Update, present.in_set(LabyrinthUiSystems::Present))
+        .add_systems(
+            PostUpdate,
+            battle::wrap_history_inspection
+                .after(bevy_gamekit::ui::UiTooltipSystems::Render)
+                .before(bevy::ui::UiSystems::Prepare),
+        );
     }
 }
 
@@ -155,14 +162,6 @@ enum Choice {
     Wait,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-enum LogMode {
-    #[default]
-    Hidden,
-    Compact,
-    History,
-}
-
 #[derive(Resource, Default)]
 struct UiState {
     form: Form,
@@ -171,8 +170,7 @@ struct UiState {
     decision: Option<(u64, ActorId)>,
     encounter: Option<u64>,
     menus: bevy_gamekit::ui::UiMenuStack<MenuPage>,
-    log_mode: LogMode,
-    expanded_log: std::collections::BTreeSet<u64>,
+    log_visible: bool,
     show_skillbook: bool,
     session_name: String,
     address: String,
@@ -230,9 +228,8 @@ enum Action {
     ReducedMotion,
     Scale,
     ToggleLog,
-    ExpandLog(u64),
     LatestLog,
-    SetLogMode(LogMode),
+    HideLog,
     ToggleSkillbook,
     ScrollDetails(i8),
 }
@@ -586,8 +583,8 @@ fn apply_action(world: &mut World, action: Action) {
                         && matches!(ui.form, Form::Browser | Form::Password);
                     if ui.menus.is_open() {
                         ui.menus.back();
-                    } else if ui.log_mode != LogMode::Hidden {
-                        ui.log_mode = LogMode::Hidden;
+                    } else if ui.log_visible {
+                        ui.log_visible = false;
                     } else if ui.selected.is_some() {
                         ui.selected = None;
                         ui.target = None;
@@ -623,28 +620,15 @@ fn apply_action(world: &mut World, action: Action) {
                     None
                 }
                 Action::ToggleLog => {
-                    ui.log_mode = if ui.log_mode == LogMode::History {
-                        LogMode::Hidden
-                    } else {
-                        LogMode::History
-                    };
-                    None
-                }
-                Action::ExpandLog(id) => {
-                    if !ui.expanded_log.remove(&id) {
-                        ui.expanded_log.insert(id);
-                    }
+                    ui.log_visible = !ui.log_visible;
                     None
                 }
                 Action::LatestLog => {
-                    let mut query = world.query::<&mut bevy_gamekit::ui::UiFeedScroll>();
-                    for mut feed in query.iter_mut(world) {
-                        feed.jump_to_latest();
-                    }
+                    battle::latest_history(world);
                     None
                 }
-                Action::SetLogMode(mode) => {
-                    ui.log_mode = mode;
+                Action::HideLog => {
+                    ui.log_visible = false;
                     if let Some(entity) = world.query::<(Entity, &Action)>().iter(world).find_map(
                         |(entity, action)| matches!(action, Action::ToggleLog).then_some(entity),
                     ) {
@@ -658,7 +642,7 @@ fn apply_action(world: &mut World, action: Action) {
                     if view.mode == ViewMode::Lobby {
                         constructor::scroll_details(world, direction, ui.lobby_page == 0);
                     }
-                    if ui.log_mode == LogMode::History {
+                    if ui.log_visible {
                         battle::scroll_history(world, direction);
                     }
                     None

@@ -560,7 +560,7 @@ pub fn status_description(status: &StatusInstance, life: LifeState) -> String {
     text
 }
 
-/// Effective authored effects for the acting character, including learned upgrades.
+/// Effective authored effects for the acting character, including passive Ability upgrades.
 #[must_use]
 pub fn effective_description(actor: &ActorSnapshot, action: &CombatAction) -> String {
     let index = match *action {

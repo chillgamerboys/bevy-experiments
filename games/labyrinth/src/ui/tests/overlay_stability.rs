@@ -411,7 +411,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
             let button = find_named(app.world_mut(), toggle).expect("drawer toggle");
             pointer_control(&mut app, button, Vec2::new(width as f32, height as f32));
             let ui = app.world().resource::<UiState>();
-            assert_eq!(ui.log_mode, LogMode::History);
+            assert!(ui.log_visible);
             unchanged(&mut app, &expected, &snapshot, toggle);
             let hide = find_named(app.world_mut(), "History Hide").expect("hide log");
             assert!(click_action(&mut app, hide));
@@ -424,7 +424,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
             let ui = app.world().resource::<UiState>();
             assert_eq!(ui.selected, selection);
             assert_eq!(ui.target, target);
-            assert_eq!(ui.log_mode, LogMode::Hidden);
+            assert!(!ui.log_visible);
         }
         keyboard_control(&mut app, "Cancel Combat Selection");
         assert!(app.world().resource::<UiState>().selected.is_none());

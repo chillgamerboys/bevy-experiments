@@ -1252,10 +1252,11 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
             })
             .collect();
     }
+    history::seed_recent(&mut app);
     apply_action(app.world_mut(), Action::ToggleLog);
     run_frames(&mut app, 4);
     assert!(activation_eligible(app.world_mut(), actor));
-    let close = find_named(app.world_mut(), "History Toggle").expect("collapse");
+    let close = find_named(app.world_mut(), "History Hide").expect("hide");
     assert!(activation_eligible(app.world_mut(), close));
     apply_action(app.world_mut(), Action::Choice(Choice::Wait));
     assert!(battle::selected_action(
@@ -1303,6 +1304,16 @@ fn history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries(
                 },
             },
         });
+    let recent = app.world().resource::<LabyrinthView>().events.clone();
+    let encounter = app.world().resource::<LabyrinthView>().encounter;
+    app.world_mut()
+        .resource_mut::<crate::view::EncounterHistory>()
+        .observe(
+            encounter,
+            crate::view::HistoryBounds { first: 1, next: 26 },
+            &recent,
+        )
+        .expect("arrival");
     run_frames(&mut app, 3);
     assert_eq!(
         find_named(app.world_mut(), "History Entry 1"),

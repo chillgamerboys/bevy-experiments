@@ -30,6 +30,11 @@ pub fn get(name: &str) -> Result<Suite, String> {
         "carterfight-all" => ("carterfight", &[""], false, false),
         "labyrinth-ui-model" => ("labyrinth", &["ui::battle::actors::tests::", "ui::battle::history::tests::"], false, false),
         "labyrinth-session" => ("labyrinth", &["session::tests::"], false, false),
+        "labyrinth-history" => ("labyrinth", &["session::tests::history::", "network::tests::history::"], false, false),
+        "labyrinth-history-ui-normal" => ("labyrinth", &[
+            "ui::battle::history::tests::", "ui::tests::history::",
+            "ui::tests::history_is_non_modal_and_keyboard_can_reach_older_and_latest_entries_normal_1080",
+        ], false, false),
         "labyrinth-profile" => ("labyrinth", &["profile::tests::"], false, false),
         "labyrinth-presentation" => ("labyrinth", &["presentation::tests::", "ui::tests::skills::effective_multi_target_forecast_names_every_target_and_conceals_secondary_unknowns"], false, false),
         "labyrinth-scene" => ("labyrinth", &["scene::tests::"], false, false),
@@ -115,6 +120,11 @@ pub fn select(selection: &Selection) -> Vec<String> {
             "labyrinth" => {
                 // This baseline is pure authority/projection evidence, with no socket or UI App.
                 add("labyrinth-session");
+                if changed("games/labyrinth/src/session/history")
+                    || changed("games/labyrinth/src/session/tests/history")
+                {
+                    add("labyrinth-history");
+                }
                 if release_full
                     || changed("games/labyrinth/src/profile")
                     || changed("games/labyrinth/src/network/admission")
@@ -151,6 +161,13 @@ pub fn select(selection: &Selection) -> Vec<String> {
                     release_full || changed("games/labyrinth/src/network") || shared_network;
                 if network {
                     add("labyrinth-admission");
+                    if release_full
+                        || changed("games/labyrinth/src/network/history")
+                        || changed("games/labyrinth/src/network/tests/history")
+                        || exact("games/labyrinth/src/network/protocol.rs")
+                    {
+                        add("labyrinth-history");
+                    }
                     if release_full
                         || changed("games/labyrinth/src/network/worker")
                         || exact("games/labyrinth/src/network/start.rs")
@@ -452,10 +469,12 @@ pub fn validate_changes(root: &Path, selection: &Selection) -> Result<(), String
                             | "src/network/admission.rs"
                             | "src/network/protocol.rs"
                             | "src/network/requests.rs"
+                            | "src/network/history.rs"
                             | "src/network/discovery.rs"
                             | "src/network/worker_tests.rs"
                             | "src/network/tests.rs"
                             | "src/network/tests/budgets.rs"
+                            | "src/network/tests/history.rs"
                             | "src/network/tests/delivery_order.rs"
                             | "src/network/tests/process.rs"
                             | "src/network/tests/spatial.rs"
@@ -549,6 +568,9 @@ pub fn run(root: &Path, name: &str) -> Result<usize, String> {
         }
         if matches!(name, "labyrinth-editor" | "labyrinth-lobby") {
             args.extend(["--skip", "compatibility", "--skip", "normal_1080"]);
+        }
+        if name == "labyrinth-history-ui-normal" {
+            args.extend(["--skip", "compatibility"]);
         }
         let listed = Command::new("cargo")
             .args(&args)

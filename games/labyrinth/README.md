@@ -154,14 +154,18 @@ There are no separate Inspect or initiative-details menus. These cards do not
 block combat confirmation; T enters keyboard reading and × closes the card.
 Every granted move remains inspectable off-turn; only Confirm commits. Number keys 1–8 are shortcuts for the first eight moves; Tab and scrolling reach the complete list.
 
-The log starts **hidden**. Its toolbar icon opens **History**, a non-blocking,
-scrollable list of retained actions with expandable outcomes and Skill links.
-**Compact** switches to just two recent outcome summaries; its × control fully
-hides the log. **Hide** in history also removes the panel entirely.
-The toolbar reopens history, and incoming events never reopen a hidden log.
-In history, the wheel and Page Up/Down or Home/End browse older entries.
-New events do not pull you away while reading; **Latest** returns to the newest
-entry. History is bounded to the session's recent 80 events, not a saved transcript.
+The combat log starts **hidden**. Its toolbar icon opens one compact, translucent,
+non-blocking view of the complete **current encounter**, including after reconnect.
+The wheel and Page Up/Down or Home/End browse older events. New events and arriving
+pages preserve your reading position; **Latest** returns to the newest entry.
+**×** hides the panel and retains your place; incoming events never reopen it.
+Hover or focus a row to inspect its full text, including long names. The usual
+one-second pin, keyboard reading, × dismissal and menu suspension apply.
+
+History uses a complete encounter archive and bounded authenticated pages. Combat
+snapshots still carry only the recent 80 events, while the log mounts at most 32
+rows at once. Starting a new encounter resets history; past-game persistence is
+outside this feature. History inspection and paging never execute combat actions.
 
 The **Game menu** and its Settings page are local. They block your combat input,
 but the encounter and networking continue. Escape backs out of menus; outside a
@@ -256,7 +260,7 @@ uses, initiative and status clocks do not advance. Stale commands are rejected e
 if the same hero was assigned away and back. A rules fault cannot be cleared this way.
 Host process restart ends the session; guest credentials cannot recover a lost world.
 
-The current Labyrinth protocol is **v7**, including canonical Skills, passive
+The current Labyrinth protocol is **v8**, adding bounded authenticated encounter-history pages to canonical Skills, passive
 Abilities, Moveset and equipment prerequisites,
 sparse lobby positions, rank reservations and separate setup/assignment revisions. It is
 incompatible with earlier builds; catalog and scenario schemas are version2.

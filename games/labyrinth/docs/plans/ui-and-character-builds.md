@@ -44,18 +44,26 @@ Observed on 2026-09-14:
   checks and actual normal-1080 frames. No hardware walkthrough is claimed.
 - Batch2 is published as [PR #43](https://github.com/chillgamerboys/bevy-experiments/pull/43).
   Canonical rules/app migration and Resilient are complete; 84 rules tests, one
-  Rustdoc and focused editor/session/network/presentation checks pass. Its initial
-  CI selector missed changed protocol/reconnect tests; `4c3971c` repairs the exact
-  suite membership without adding a discovery sweep. Updated CI is running.
-- Batch3 implements Parameters-first customization, actual sprite/draft summary,
-  personal versus equipment rows, current passive contributions, explicit Unequip
-  and the fixed save/discard footer. Review caught stale cached equipment/Moveset
-  inspection after item changes; validation and regression coverage are added.
-  Three actual 1920×1080 Auto frames show Parameters, Equipment and Abilities.
-  Focused final verification and PR publication are pending.
-- Batch4's bounded encounter archive/protocol-v8 backend is committed in isolated
-  work. Focused rules/session/network checks pass; its single compact virtualized
-  history presentation is in progress. Integration and PR delivery remain required.
+  Rustdoc and focused application checks pass. All required CI checks pass at
+  `4c3971c`, after correcting exact test membership for four migrated network tests.
+- Batch3 is published as [PR #44](https://github.com/chillgamerboys/bevy-experiments/pull/44).
+  Parameters-first customization, sprite/draft/rank summary, personal versus
+  equipment rows, current passive contributions and the fixed save/discard footer
+  are implemented. Review fixed stale cached equipment/Moveset inspection.
+  Three actual normal-1080 pages were inspected. CI found an old lobby→editor
+  header assertion; `0a2f96c` corrects it and preserves the moved character's rank
+  span. The exact normal-1080 route and final configured local checks pass.
+- Batch4 is published as [PR #45](https://github.com/chillgamerboys/bevy-experiments/pull/45).
+  Its complete encounter archive, bounded protocol-v8 paging and single compact
+  log are integrated. It mounts at most 32 rows; full-text inspection remains
+  readable for long unbroken names and survives virtualization. Independent review
+  resolved clipped text; focused cache/network/UI checks and two normal-1080 frames
+  support the implementation. Publication is tracked by `encounter-history` and
+  [HEX-115](https://linear.app/chillgamerboys/issue/HEX-115/show-compact-complete-encounter-history-with-bounded-reconnect).
+- The implementation scope below is fulfilled in the four delivery batches. This
+  document retains acceptance context while review/CI and the separate explicit
+  milestone policy rollout remain; it is not a new implementation queue. Retire it
+  after delivery reconciliation, preserving outstanding milestone/package work.
 - [PR #41](https://github.com/chillgamerboys/bevy-experiments/pull/41), the separate
   setup/launch audit, remains open. Its normal-window defaults and `--window-size`
   option are absent from this branch. Do not document that option here as available.
@@ -285,12 +293,12 @@ menu ordering, log modes/retention, launch instructions and render route names.
 Keep old contracts marked as superseded in active plans; retire completed plans
 only after carrying their useful facts into current docs and preserving other work.
 
-For future implementation, resume `formation-tooltip` delivery bound to PR #42
-and HEX-112 for Batch 1; use separate reviewable PR batches for the model, editor
-and history work, with the actual configured receiving branch observed at that
-time. Establish adopted tracking then, not during this plan-only turn. Rewrite
-each PR around its final scope and bind acceptance to its actual head and inputs.
-Do not merge or create/change the default `dev` branch as part of planning.
+Delivery tasks `formation-tooltip`, `character-build-model`, `character-editor`
+and `encounter-history` preserve the separate PR endpoints and bind HEX-112 through
+HEX-115. Observe their current source/check/tracker records before acceptance.
+Earlier PR batches remain frozen when later batches are published; the local
+workspace branch name stays unchanged. No merge or default-branch change is
+currently authorized. Separate setup/launch PR #41 remains outside these batches.
 
 Known tooling discrepancy: the local delivery observer applies a developer-sanity
 requirement to every main/Testing gameplay PR, but the user requires it only for

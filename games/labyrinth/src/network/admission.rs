@@ -27,6 +27,9 @@ pub(super) fn host_messages(world: &mut World) {
         world
             .resource_mut::<Messages<FromClient<GameRequest>>>()
             .clear();
+        world
+            .resource_mut::<Messages<FromClient<HistoryRequest>>>()
+            .clear();
         return;
     };
     let at = now(world);
@@ -239,6 +242,7 @@ pub(super) fn host_messages(world: &mut World) {
         }
     }
     requests::dispatch(world, &mut hosted);
+    history::dispatch(world, &mut hosted);
     cleanup(world, hosted.security.expire(at));
     let overdue = hosted
         .observed
