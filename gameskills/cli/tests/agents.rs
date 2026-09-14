@@ -39,6 +39,24 @@ fn small_default_and_reason_are_returned() {
 }
 
 #[test]
+fn configured_routing_defaults_to_bounded_small() {
+    let dir = tempfile::tempdir().unwrap();
+    host(dir.path());
+    let mut value = config();
+    let routing = value["agents"]["routing"].as_object_mut().unwrap();
+    routing.remove("default_tier");
+    routing.remove("escalation_after_failures");
+    routing.remove("max_attempts");
+    let result = execute(
+        dir.path(),
+        &value,
+        &args(&["resolve", "--host", "host.json"]),
+    )
+    .unwrap();
+    assert_eq!(result["selection"]["tier"], "small");
+}
+
+#[test]
 fn escalation_and_exhaustion_are_bounded() {
     let dir = tempfile::tempdir().unwrap();
     host(dir.path());
@@ -96,6 +114,28 @@ fn invalid_configuration_and_legacy_config_are_handled() {
     validate_configuration(&legacy).unwrap();
     let invalid: toml::Value = "[agents.routing]\ndefault_tier='small'\nescalation_after_failures=1\nmax_attempts=0\n[agents.routing.clients.codex.small]\nmodel=''\neffort='low'\n".parse().unwrap();
     assert!(validate_configuration(&invalid).is_err());
+}
+
+#[test]
+fn invalid_types_and_unknown_keys_are_rejected() {
+    let wrong_type: toml::Value = "[agents.routing]\nmax_attempts='2'\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse().unwrap();
+    assert!(validate_configuration(&wrong_type).is_err());
+    let unknown: toml::Value = "[agents.routing]\nmax_atempts=2\n[agents.routing.clients.codex.small]\nmodel='m'\neffort='low'\n".parse().unwrap();
+    assert!(validate_configuration(&unknown).is_err());
+}
+
+#[test]
+fn explicit_tier_override_requires_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    host(dir.path());
+    assert!(
+        execute(
+            dir.path(),
+            &config(),
+            &args(&["resolve", "--host", "host.json", "--tier", "strong"])
+        )
+        .is_err()
+    );
 }
 
 #[test]

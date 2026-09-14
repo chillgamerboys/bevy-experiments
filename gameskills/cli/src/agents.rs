@@ -34,6 +34,9 @@ pub fn execute(root: &Path, config: &Value, args: &[OsString]) -> Result<Value, 
     let reason = parsed
         .reason
         .unwrap_or_else(|| "caller did not provide a reason".into());
+    if parsed.override_tier.is_some() && reason == "caller did not provide a reason" {
+        return Err("--tier requires --reason".into());
+    }
     let Some(routing) = routing else {
         return Ok(json!({
             "schema_version": 1,
@@ -45,7 +48,7 @@ pub fn execute(root: &Path, config: &Value, args: &[OsString]) -> Result<Value, 
         }));
     };
     let policy = parse_policy(routing, client)?;
-    let requested = parsed.kind.as_deref().unwrap_or("standard");
+    let requested = parsed.kind.as_deref().unwrap_or("bounded");
     if !matches!(requested, "bounded" | "standard" | "complex") {
         return Err(format!(
             "invalid --kind {requested:?}; expected bounded, standard, or complex"
@@ -126,35 +129,72 @@ struct Policy {
 }
 
 fn parse_policy(value: &Value, client: &str) -> Result<Policy, String> {
-    let default_tier = value
-        .get("default_tier")
-        .and_then(Value::as_str)
-        .unwrap_or("small");
+    let allowed = [
+        "default_tier",
+        "escalation_after_failures",
+        "max_attempts",
+        "clients",
+    ];
+    if let Some(object) = value.as_object() {
+        for key in object.keys() {
+            if !allowed.contains(&key.as_str()) {
+                return Err(format!("unknown routing key {key:?}"));
+            }
+        }
+    }
+    let default_tier = match value.get("default_tier") {
+        None => "small",
+        Some(value) => value
+            .as_str()
+            .ok_or("routing.default_tier must be a string")?,
+    };
     if !TIERS.contains(&default_tier) {
         return Err(format!("invalid default_tier {default_tier:?}"));
     }
-    let failures = value
-        .get("escalation_after_failures")
-        .and_then(Value::as_u64)
-        .unwrap_or(1) as usize;
-    let max = value
-        .get("max_attempts")
-        .and_then(Value::as_u64)
-        .unwrap_or(2) as usize;
+    let failures = match value.get("escalation_after_failures") {
+        None => 1,
+        Some(value) => value
+            .as_u64()
+            .ok_or("routing.escalation_after_failures must be a nonnegative integer")?
+            as usize,
+    };
+    let max = match value.get("max_attempts") {
+        None => 2,
+        Some(value) => value
+            .as_u64()
+            .ok_or("routing.max_attempts must be a nonnegative integer")?
+            as usize,
+    };
     if max == 0 || max > 100 {
         return Err("routing.max_attempts must be between 1 and 100".into());
     }
-    if failures > max {
-        return Err("routing.escalation_after_failures must not exceed max_attempts".into());
+    if failures == 0 || failures > max {
+        return Err("routing.escalation_after_failures must be between 1 and max_attempts".into());
     }
     let client_value = value
         .pointer(&format!("/clients/{client}"))
         .ok_or_else(|| format!("routing client {client:?} is not configured"))?;
+    let client_object = client_value
+        .as_object()
+        .ok_or_else(|| format!("routing client {client:?} must be a table"))?;
+    for key in client_object.keys() {
+        if !TIERS.contains(&key.as_str()) {
+            return Err(format!("unknown tier {client}.{key}"));
+        }
+    }
     let mut tiers = std::collections::HashMap::new();
     for tier in TIERS {
         let item = client_value
             .get(tier)
             .ok_or_else(|| format!("routing client {client:?} missing tier {tier}"))?;
+        let item_object = item
+            .as_object()
+            .ok_or_else(|| format!("{client}.{tier} must be a table"))?;
+        for key in item_object.keys() {
+            if key != "model" && key != "effort" {
+                return Err(format!("unknown key {client}.{tier}.{key}"));
+            }
+        }
         let model = item
             .get("model")
             .and_then(Value::as_str)
