@@ -1,6 +1,6 @@
 # Model routing and task usage
 
-These opt-in commands require CLI 0.1.0-dev.5. They are independent of native
+These opt-in commands require CLI 0.1.0-dev.6. They are independent of native
 installation: policy resolution does not launch a worker or attest to its model.
 Use the host's actual supported models and effort settings when launching.
 

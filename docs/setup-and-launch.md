@@ -105,7 +105,7 @@ a fresh host/session after verified registration, not merely a rebuilt game.
 
 ## Hydrate this repository's retained pin
 
-The committed lock matches the checked-in immutable dev.5 archive. After building
+The committed lock matches the checked-in immutable dev.6 archive. After building
 the CLI, inspect and apply the matching installation:
 
 ```sh
@@ -115,8 +115,8 @@ the CLI, inspect and apply the matching installation:
 ./target/ci/gameskills native codex --verify-project
 ```
 
-The expected content SHA-256 is
-`6ab13e01c1e39f189f74fce2041684fe502336cf973434cd37d13099291e68c3`.
+The expected content SHA-256 is recorded in `gameskills.lock.json` and must match
+`gameskills/cli/bundle/bundle.json`; read those identities instead of a copied digest.
 `lock_change` should be false for this checkout's unchanged lock. This restores the
 pin and local registration. Native discovery is checked separately; open a fresh
 host session to use newly registered instructions. Preserve previous bundles and
@@ -132,7 +132,7 @@ synced merged checkout also passed focused workflow verification and delivery
 observation. The [agent workflow guide](../gameskills/docs/agent-workflow.md) owns
 model routing, usage accounting and prompt feature integration.
 
-The source CLI and committed instruction pin are `0.1.0-dev.5`. Supported setup
+The source CLI and committed instruction pin are `0.1.0-dev.6`. Supported setup
 preserved adopter configuration and local overlays, and an ordinary Codex process
 discovered all selected packages. This does not reload an existing Conductor
 conversation: start a fresh host session to load the revised instructions. Claude
