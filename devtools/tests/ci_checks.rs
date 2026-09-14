@@ -661,6 +661,137 @@ fn configured_logic_runs_positive_authority_without_ui_or_sockets() -> TestResul
 }
 
 #[test]
+fn development_compiles_and_tests_affected_scope_without_batch_lint_or_feature_sweeps() -> TestResult
+{
+    let value = configured(
+        "development",
+        &["bevy-gamekit-ui", "deckbuilder"],
+        &["gamekit/ui/src/lib.rs"],
+    );
+    let rust = checks::commands(&value, Job::Rust)?;
+    assert!(rust.iter().any(|command| command
+        == &argv(&[
+            "cargo",
+            "check",
+            "-p",
+            "deckbuilder",
+            "--locked",
+            "--profile",
+            "ci",
+        ])));
+    assert!(rust.iter().any(|command| {
+        command.get(1).is_some_and(|arg| arg == "test")
+            && command.contains(&"bevy-gamekit-ui".into())
+            && !command.contains(&"--doc".into())
+    }));
+    assert!(!rust
+        .iter()
+        .flatten()
+        .any(|argument| matches!(argument.as_str(), "--all-targets" | "--all-features")));
+
+    let policy = checks::commands(&value, Job::Policy)?;
+    assert_eq!(policy.len(), 2);
+    assert!(!policy.iter().flatten().any(|argument| argument == "clippy"));
+    Ok(())
+}
+
+#[test]
+fn testing_retains_affected_batch_compile_lint_and_feature_coverage() -> TestResult {
+    let value = configured("testing", &["bevy-gamekit-ui"], &["gamekit/ui/src/lib.rs"]);
+    let rust = checks::commands(&value, Job::Rust)?;
+    assert!(rust
+        .first()
+        .is_some_and(|command| command.contains(&"--all-targets".into())
+            && command.contains(&"--all-features".into())));
+    assert!(rust.iter().any(|command| {
+        command.get(1).is_some_and(|arg| arg == "test")
+            && command.contains(&"bevy-gamekit-ui".into())
+            && command.contains(&"--all-features".into())
+            && !command.contains(&"--doc".into())
+    }));
+    let policy = checks::commands(&value, Job::Policy)?;
+    assert!(policy
+        .iter()
+        .any(|command| command.get(1).is_some_and(|arg| arg == "clippy")
+            && command.contains(&"--all-targets".into())
+            && command.contains(&"--all-features".into())));
+    Ok(())
+}
+
+#[test]
+fn configured_non_release_cannot_restore_artifact_or_distribution_checks() {
+    for level in ["development", "testing"] {
+        for flag in ["distribution", "minimal", "wasm", "deny"] {
+            let mut value = serde_json::to_value(configured(level, &["bevy-gamekit-ui"], &[]))
+                .expect("selection value");
+            value[flag] = json!(true);
+            let value = serde_json::from_value(value).expect("typed selection");
+            assert!(checks::validate(&value).is_err(), "{level} {flag}");
+        }
+    }
+}
+
+#[test]
+fn release_retains_artifact_distribution_and_cross_target_checks() -> TestResult {
+    let mut value = configured("release", &["bevy-gamekit-ui"], &["gamekit/ui/src/lib.rs"]);
+    value.distribution = true;
+    value.minimal = true;
+    value.wasm = true;
+    value.deny = true;
+    checks::validate(&value)?;
+    let rust = checks::commands(&value, Job::Rust)?;
+    for action in ["check", "archives"] {
+        assert!(rust.iter().any(|command| {
+            command
+                .windows(2)
+                .any(|pair| pair == ["distribution", action])
+        }));
+    }
+    let policy = checks::commands(&value, Job::Policy)?;
+    assert!(policy.iter().flatten().any(|argument| argument == "clippy"));
+    assert!(policy
+        .iter()
+        .any(|command| command.contains(&"wasm32-unknown-unknown".into())));
+    Ok(())
+}
+
+#[test]
+fn tooltip_owner_change_runs_owner_and_relevant_consumer_regressions() -> TestResult {
+    let value = configured(
+        "development",
+        &["bevy-gamekit-ui", "carterfight", "deckbuilder", "labyrinth"],
+        &["gamekit/ui/src/tooltip/view.rs"],
+    );
+    assert_eq!(
+        value.suites,
+        [
+            "deckbuilder-tooltip-consumers",
+            "gamekit-ui-tooltip",
+            "labyrinth-tooltip-consumers",
+        ]
+    );
+    let commands = checks::commands(&value, Job::Rust)?;
+    for suite in &value.suites {
+        assert!(commands
+            .iter()
+            .any(|command| command == &argv(&["repo-devtools", "ci", "suite", suite])));
+    }
+    assert!(!commands.iter().any(|command| {
+        command.get(1).is_some_and(|arg| arg == "test")
+            && command.contains(&"bevy-gamekit-ui".into())
+            && !command.contains(&"--doc".into())
+    }));
+    assert!(commands.iter().any(|command| {
+        command.contains(&"bevy-gamekit-ui".into()) && command.contains(&"--doc".into())
+    }));
+    assert!(!value
+        .suites
+        .iter()
+        .any(|suite| suite.starts_with("carterfight")));
+    Ok(())
+}
+
+#[test]
 fn admission_and_process_are_distinct_affected_journeys() -> TestResult {
     let admission = configured(
         "development",
@@ -872,5 +1003,16 @@ fn changed_repository_test_targets_execute_or_require_classification() -> TestRe
     assert!(checks::commands(&value, Job::Rust)
         .expect_err("unmapped target")
         .contains("new_contract"));
+    let value = configured(
+        "development",
+        &["repo-devtools"],
+        &["devtools/src/new_internal_boundary.rs"],
+    );
+    let commands = checks::commands(&value, Job::Rust)?;
+    assert!(commands.iter().any(|command| {
+        command.get(1).is_some_and(|arg| arg == "test")
+            && command.contains(&"repo-devtools".into())
+            && !command.contains(&"--test".into())
+    }));
     Ok(())
 }
