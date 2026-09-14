@@ -273,3 +273,35 @@ fn legacy_equipment_is_explicit_and_cannot_override_an_existing_conflicting_item
     let conflict = ContentCatalog::new(raw).unwrap();
     assert!(legacy_catalog(&conflict, [loadout]).is_err());
 }
+
+#[test]
+fn old_field_shapes_receive_actionable_schema_diagnostics_before_new_model_parsing() {
+    let catalog = catalog();
+    let scenario = Scenario::stock(StockScenario::Prototype, 42, &catalog).unwrap();
+    let mut old = serde_json::to_value(&scenario).unwrap();
+    old["schema_version"] = serde_json::json!(1);
+    for team in ["heroes", "enemies"] {
+        for actor in old[team].as_array_mut().unwrap() {
+            let build = actor["actor"]["build"].as_object_mut().unwrap();
+            let skills = build.remove("skills").unwrap();
+            let abilities = build.remove("abilities").unwrap();
+            build.insert("innate".into(), skills);
+            build.insert("learned_skills".into(), abilities);
+        }
+    }
+    let error = Scenario::from_json(&serde_json::to_string(&old).unwrap(), &catalog).unwrap_err();
+    assert!(error
+        .message
+        .contains("recreate the scenario using schema 2"));
+    let old = r#"schema_version = 1
+revision = "legacy"
+abilities = []
+learned_skills = []
+weapons = []
+actor_presets = []
+"#;
+    let error = ContentCatalog::from_toml(old).unwrap_err();
+    assert!(error
+        .message
+        .contains("recreate this catalog using schema 2"));
+}
