@@ -1,6 +1,8 @@
 //! Game-owned policy tests. These do not claim transport or process-restart evidence.
 
 use super::*;
+
+mod history;
 use labyrinth_rules::{CombatOutcome, Team, DEFAULT_HERO_ROSTER};
 
 #[test]

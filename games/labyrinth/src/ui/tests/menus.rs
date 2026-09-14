@@ -12,7 +12,7 @@ fn escape_opens_menu_with_selected_action_and_pinned_help_normal_1080() {
     assert!(!pins.is_empty());
     assert!(app.world().resource::<UiTooltipState>().captures_keyboard());
     apply_action(app.world_mut(), Action::Choice(Choice::Wait));
-    app.world_mut().resource_mut::<UiState>().log_mode = LogMode::Compact;
+    app.world_mut().resource_mut::<UiState>().log_visible = true;
     tap_key(&mut app, KeyCode::Escape);
     run_frames(&mut app, 3);
     assert_eq!(

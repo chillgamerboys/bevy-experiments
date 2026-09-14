@@ -17,6 +17,9 @@ use labyrinth_rules::scenario::{ControllerPolicy, Scenario, ScenarioActor, Stock
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod history;
+use history::HistoryBounds;
+
 mod formation;
 pub use formation::{FormationPlacement, LobbyFormation};
 
@@ -155,6 +158,7 @@ pub(crate) struct SessionSnapshot {
     pub combat: Option<CombatSnapshot>,
     pub log: Vec<String>,
     pub events: Vec<PresentedEvent>,
+    pub history: HistoryBounds,
     pub paused: bool,
     pub interruption: CombatInterruption,
 }
@@ -174,6 +178,7 @@ struct UncheckedSessionSnapshot {
     combat: Option<CombatSnapshot>,
     log: Vec<String>,
     events: Vec<PresentedEvent>,
+    history: HistoryBounds,
     paused: bool,
     interruption: CombatInterruption,
 }
@@ -196,6 +201,7 @@ impl TryFrom<UncheckedSessionSnapshot> for SessionSnapshot {
             combat: value.combat,
             log: value.log,
             events: value.events,
+            history: value.history,
             paused: value.paused,
             interruption: value.interruption,
         };
@@ -364,10 +370,17 @@ impl SessionSnapshot {
         {
             return Err("Suspension does not match required controllers.");
         }
-        if self.events.iter().any(|e| e.id == 0)
-            || self.events.array_windows::<2>().any(|[a, b]| a.id >= b.id)
+        self.history.validate()?;
+        let recent = (self.history.next - self.history.first).min(LOG_LIMIT as u64);
+        if self.events.len() as u64 != recent
+            || self
+                .events
+                .iter()
+                .enumerate()
+                .any(|(offset, event)| event.id != self.history.next - recent + offset as u64)
+            || (self.combat.is_none() && !self.history.is_empty())
         {
-            return Err("Invalid session event order.");
+            return Err("Invalid session event window.");
         }
         Ok(())
     }
@@ -428,6 +441,15 @@ impl SessionSnapshot {
     }
 
     pub fn validate_successor(&self, previous: &Self) -> Result<(), &'static str> {
+        if self.encounter < previous.encounter {
+            return Err("Encounter moved backwards.");
+        }
+        if self.encounter == previous.encounter
+            && (self.history.first != previous.history.first
+                || self.history.next < previous.history.next)
+        {
+            return Err("Encounter history moved backwards.");
+        }
         if self.setup_revision < previous.setup_revision {
             return Err("Setup revision moved backwards.");
         }
@@ -735,7 +757,12 @@ impl PartyAuthority {
             catalog: self.catalog.clone(),
             combat: self.combat.as_ref().map(Combat::snapshot),
             log: self.log.iter().cloned().collect(),
-            events: self.events.iter().cloned().collect(),
+            events: self
+                .events
+                .range(self.events.len().saturating_sub(LOG_LIMIT)..)
+                .cloned()
+                .collect(),
+            history: self.history_bounds(),
             paused: self.paused(),
             interruption: self.interruption(),
         }
@@ -1046,22 +1073,25 @@ impl PartyAuthority {
                 {
                     return Err("Every character controller must be connected and ready.".into());
                 }
-                self.combat = Some(
-                    Combat::from_scenario(&self.catalog, &self.scenario)
-                        .map_err(|e| e.to_string())?,
-                );
+                let (combat, initial_events) =
+                    Combat::from_scenario_with_events(&self.catalog, &self.scenario)
+                        .map_err(|e| e.to_string())?;
+                self.combat = Some(combat);
                 self.encounter += 1;
                 self.log.clear();
                 self.events.clear();
                 self.faulted = false;
                 self.assignment_pause = false;
                 self.log.push_back("The party enters the Labyrinth.".into());
+                self.record(initial_events);
             }
             SessionCommand::Rematch => {
                 if slot != 0 {
                     return Err("Only the host can return the party to the lobby.".into());
                 }
                 self.combat = None;
+                self.events.clear();
+                self.log.clear();
                 self.faulted = false;
                 self.assignment_pause = false;
                 self.encounter += 1;
@@ -1139,9 +1169,6 @@ impl PartyAuthority {
         }
         while self.log.len() > LOG_LIMIT {
             self.log.pop_front();
-        }
-        while self.events.len() > LOG_LIMIT {
-            self.events.pop_front();
         }
     }
 }

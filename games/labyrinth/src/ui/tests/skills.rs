@@ -444,6 +444,7 @@ fn skill_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_names
             },
         }];
     }
+    super::history::seed_recent(&mut app);
     run_frames(&mut app, 5);
     let captain = find_named(app.world_mut(), "Skill 0").expect("captain move");
     let captain_key = app

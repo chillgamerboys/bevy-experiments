@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
 pub(super) const GAME_ID: &str = "gamekit-labyrinth";
-pub(super) const PROTOCOL: &str = "7";
-pub(super) const SCHEMA: &str = "labyrinth/v7;scenario-v2;catalog-v2;active-skills;passive-abilities;resolved-moveset;equipment-prerequisites;sparse-preparation-v1;reserved-rank-owners;typed-preset-placement;frozen-authored-skills;actor-local-skill-index;custom-stats;front-pair-cleave;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
+pub(super) const PROTOCOL: &str = "8";
+pub(super) const SCHEMA: &str = "labyrinth/v8;encounter-history-pages-v1;scenario-v2;catalog-v2;active-skills;passive-abilities;resolved-moveset;equipment-prerequisites;sparse-preparation-v1;reserved-rank-owners;typed-preset-placement;frozen-authored-skills;actor-local-skill-index;custom-stats;front-pair-cleave;independent-participants;multi-character-controllers;assignment-revision;six-spaces;variable-roster;explicit-footprints;life-states;corpse-health;death-saves;explicit-actor-ownership;instance-loadouts;repeated-classes;validated-session-snapshots;attempt-scoped-persisted-admission-ack;encounter-turn-watermark;typed-outcomes";
 
 #[derive(Serialize)]
 pub(super) struct WirePassword(pub String);
@@ -118,3 +118,11 @@ pub(super) struct Closed {
 }
 #[derive(Message, Debug, Clone, Copy, Serialize, Deserialize)]
 pub(super) struct LeaveSession;
+
+/// Read-only history response, bound to the acknowledged physical attempt.
+#[derive(Message, Debug, Clone, Serialize, Deserialize)]
+pub(super) struct HistoryReply {
+    pub attempt: SessionId,
+    pub request: crate::session::history::HistoryRequest,
+    pub result: Result<crate::session::history::HistoryPage, crate::session::history::HistoryError>,
+}

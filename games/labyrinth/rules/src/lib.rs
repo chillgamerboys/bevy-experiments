@@ -168,3 +168,6 @@ mod catalog_tests;
 
 #[cfg(test)]
 mod build_contract_tests;
+
+#[cfg(test)]
+mod history_tests;

@@ -376,6 +376,18 @@ timeout_seconds = 1200
 resources = ["project:cargo-target"]
 git_refs = []
 
+[commands.labyrinth-history]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-history"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
+[commands.labyrinth-history-ui-normal]
+argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-history-ui-normal"]
+timeout_seconds = 1200
+resources = ["project:cargo-target"]
+git_refs = []
+
 [commands.labyrinth-lobby]
 argv = ["cargo", "run", "--locked", "-p", "repo-devtools", "--profile", "ci", "--target-dir", "target/ci-controller", "--", "ci", "suite", "labyrinth-lobby"]
 timeout_seconds = 1200
