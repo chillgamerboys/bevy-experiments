@@ -44,6 +44,12 @@ struct Receipt {
     client: String,
     role: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    stage: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    active_skills: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    segment: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     requested: Option<Selection>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     observed: Option<Selection>,
@@ -74,6 +80,31 @@ struct Checkpoint {
     evidence_reference: String,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ActiveInterval {
+    stage: String,
+    active_skills: Vec<String>,
+    segment: u64,
+    observed: Selection,
+    snapshot: CounterSnapshot,
+    evidence_reference: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct MarkRecord {
+    schema_version: u64,
+    task: String,
+    thread: String,
+    attempt: String,
+    client: String,
+    role: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active: Option<ActiveInterval>,
+    receipts: Vec<Receipt>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Rates {
@@ -102,7 +133,11 @@ struct Delta {
     reasoning: Option<u64>,
 }
 
-/// Execute `usage import`, `usage report`, or `usage checkpoint`.
+/// Execute a usage ledger subcommand.
+///
+/// `import` and `checkpoint` preserve the receipt-oriented compatibility
+/// contract. `mark` records native stage transitions, and `report` summarizes
+/// both forms without reading transcript content.
 pub fn execute(root: &Path, args: &[OsString]) -> Result<Value, String> {
     #[cfg(unix)]
     {
@@ -119,12 +154,14 @@ pub fn execute(root: &Path, args: &[OsString]) -> Result<Value, String> {
 fn execute_unix(root: &Path, args: &[OsString]) -> Result<Value, String> {
     let (command, rest) = args
         .split_first()
-        .ok_or("usage requires import, report, or checkpoint")?;
+        .ok_or("usage requires import, report, checkpoint, mark, or finish")?;
     match text(command)? {
         "import" => import(root, rest),
         "report" => report(root, rest),
         "checkpoint" => checkpoint(root, rest),
-        _ => Err("usage requires import, report, or checkpoint".into()),
+        "mark" => mark(root, rest),
+        "finish" => finish(root, rest),
+        _ => Err("usage requires import, report, checkpoint, mark, or finish".into()),
     }
 }
 
@@ -161,6 +198,37 @@ fn validate_selection(kind: &str, selection: &Selection) -> Result<(), String> {
         {
             return Err(format!("invalid {kind} {field}"));
         }
+    }
+    Ok(())
+}
+
+fn validate_stage(stage: &str) -> Result<(), String> {
+    if matches!(stage, "implementation" | "verification" | "delivery") {
+        Ok(())
+    } else {
+        Err("usage stage must be implementation, verification, or delivery".into())
+    }
+}
+
+fn validate_skills(skills: &[String]) -> Result<(), String> {
+    let mut previous: Option<&str> = None;
+    for skill in skills {
+        if skill.is_empty()
+            || skill.len() > 256
+            || !skill
+                .bytes()
+                .next()
+                .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            || !skill.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b':')
+            })
+        {
+            return Err("invalid usage skill identifier".into());
+        }
+        if previous.is_some_and(|value| value >= skill.as_str()) {
+            return Err("usage active_skills must be a sorted set".into());
+        }
+        previous = Some(skill);
     }
     Ok(())
 }
@@ -208,6 +276,10 @@ fn validate_receipt(receipt: &Receipt) -> Result<Delta, String> {
     if !matches!(receipt.role.as_str(), "coordinator" | "worker") {
         return Err("usage role must be coordinator or worker".into());
     }
+    if let Some(stage) = &receipt.stage {
+        validate_stage(stage)?;
+    }
+    validate_skills(&receipt.active_skills)?;
     if receipt.evidence_reference.is_empty()
         || receipt.evidence_reference.len() > 4096
         || receipt.evidence_reference.contains('\0')
@@ -287,6 +359,7 @@ struct State {
     _lock: std::fs::File,
     tasks: crate::runner::state::Directory,
     checkpoints: crate::runner::state::Directory,
+    marks: crate::runner::state::Directory,
 }
 
 #[cfg(unix)]
@@ -303,11 +376,84 @@ fn state(root: &Path) -> Result<State, String> {
         _lock: lock_file,
         tasks: usage.child("tasks", true, false)?,
         checkpoints: usage.child("checkpoints", true, false)?,
+        marks: usage.child("marks", true, false)?,
     })
 }
 
 fn task_file(task: &str) -> String {
     format!("{task}.json")
+}
+
+#[cfg(unix)]
+fn load_mark(state: &State, file: &str) -> Result<MarkRecord, String> {
+    let record: MarkRecord = serde_json::from_slice(&state.marks.read(file)?)
+        .map_err(|error| format!("invalid usage mark state {file}: {error}"))?;
+    if record.schema_version != 1 {
+        return Err(format!("invalid usage mark state schema in {file}"));
+    }
+    for value in [
+        ("task", record.task.as_str()),
+        ("thread", record.thread.as_str()),
+        ("attempt", record.attempt.as_str()),
+        ("client", record.client.as_str()),
+    ] {
+        identifier(value.0, value.1)?;
+    }
+    if !matches!(record.role.as_str(), "coordinator" | "worker") {
+        return Err(format!("invalid usage mark role in {file}"));
+    }
+    for receipt in &record.receipts {
+        validate_receipt(receipt)?;
+        if receipt.task != record.task
+            || receipt.thread != record.thread
+            || receipt.attempt != record.attempt
+            || receipt.client != record.client
+            || receipt.role != record.role
+        {
+            return Err(format!("invalid usage mark receipt identity in {file}"));
+        }
+    }
+    if let Some(active) = &record.active {
+        validate_stage(&active.stage)?;
+        validate_skills(&active.active_skills)?;
+        validate_selection("active observed", &active.observed)?;
+        validate_snapshot("active", &active.snapshot)?;
+    }
+    Ok(record)
+}
+
+#[cfg(unix)]
+fn mark_receipts(state: &State) -> Result<Vec<Receipt>, String> {
+    let mut receipts = Vec::new();
+    for file in state.marks.entries()? {
+        receipts.extend(load_mark(state, &file)?.receipts);
+    }
+    Ok(receipts)
+}
+
+#[cfg(unix)]
+fn open_intervals(state: &State, task: &str) -> Result<Vec<Value>, String> {
+    let mut intervals = Vec::new();
+    for file in state.marks.entries()? {
+        let record = load_mark(state, &file)?;
+        if record.task != task {
+            continue;
+        }
+        if let Some(active) = record.active {
+            intervals.push((active.stage, record.thread, record.attempt));
+        }
+    }
+    intervals.sort();
+    Ok(intervals
+        .into_iter()
+        .map(|(stage, thread, attempt)| {
+            json!({
+                "stage": stage,
+                "thread": thread,
+                "attempt": attempt,
+            })
+        })
+        .collect())
 }
 
 #[cfg(unix)]
@@ -339,6 +485,7 @@ fn same_identity(left: &Receipt, right: &Receipt) -> bool {
         && left.thread == right.thread
         && left.attempt == right.attempt
         && left.client == right.client
+        && left.segment == right.segment
 }
 
 fn overlaps(left: &Receipt, right: &Receipt) -> bool {
@@ -406,6 +553,17 @@ fn add_receipt(state: &State, receipt: Receipt) -> Result<bool, String> {
         for existing in load_task(state, other_task)?.receipts {
             reject_overlap(&existing, &receipt)?;
         }
+    }
+    for existing in mark_receipts(state)? {
+        if same_identity(&existing, &receipt) {
+            if existing == receipt {
+                return Ok(false);
+            }
+            return Err(
+                "conflicting usage receipt for the same task/thread/attempt/client identity".into(),
+            );
+        }
+        reject_overlap(&existing, &receipt)?;
     }
     record.receipts.push(receipt);
     record.receipts.sort_by(|left, right| {
@@ -557,6 +715,47 @@ fn model_summary(receipts: &[Receipt], requested: bool) -> Value {
     json!({"models":models,"unavailable_receipts":unavailable})
 }
 
+fn classified_summaries(receipts: &[Receipt]) -> Result<(Value, Value), String> {
+    let mut stages: std::collections::BTreeMap<String, Vec<&Receipt>> =
+        std::collections::BTreeMap::new();
+    let mut skill_sets: std::collections::BTreeMap<(bool, Vec<String>), Vec<&Receipt>> =
+        std::collections::BTreeMap::new();
+    for receipt in receipts {
+        stages
+            .entry(receipt.stage.as_deref().unwrap_or("unclassified").into())
+            .or_default()
+            .push(receipt);
+        skill_sets
+            .entry((receipt.stage.is_some(), receipt.active_skills.clone()))
+            .or_default()
+            .push(receipt);
+    }
+    let stages = stages
+        .into_iter()
+        .map(|(stage, members)| summarize(members.into_iter()).map(|summary| (stage, summary)))
+        .collect::<Result<std::collections::BTreeMap<_, _>, _>>()?;
+    let skill_sets = skill_sets
+        .into_iter()
+        .map(|((classified, skills), members)| {
+            let attribution = if !classified {
+                "unclassified"
+            } else if skills.is_empty() {
+                "empty_active_set"
+            } else if skills.len() == 1 {
+                "active_set"
+            } else {
+                "mixed_active_set"
+            };
+            Ok(json!({
+                "active_skills": skills,
+                "attribution": attribution,
+                "usage": summarize(members.into_iter())?,
+            }))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok((json!(stages), json!(skill_sets)))
+}
+
 fn parse_rates(path: &Path) -> Result<Rates, String> {
     let bytes = read_bounded(path, MAX_INPUT_BYTES, "usage rates")?;
     let rates: Rates =
@@ -641,35 +840,46 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
     let rates_path = rates_path.map(|path| caller_path(root, path));
     let rates = rates_path.as_deref().map(parse_rates).transpose()?;
     let state = state(root)?;
-    let record = load_task(&state, task)?;
-    if record.receipts.is_empty() {
+    let mut receipts = load_task(&state, task)?.receipts;
+    receipts.extend(
+        mark_receipts(&state)?
+            .into_iter()
+            .filter(|receipt| receipt.task == task),
+    );
+    receipts.sort_by(|left, right| {
+        (left.start.at, &left.thread, &left.attempt, left.segment).cmp(&(
+            right.start.at,
+            &right.thread,
+            &right.attempt,
+            right.segment,
+        ))
+    });
+    if receipts.is_empty() {
         return Err(format!("no usage receipts recorded for task {task}"));
     }
-    let coordinator = summarize(record.receipts.iter().filter(|r| r.role == "coordinator"))?;
-    let workers = summarize(record.receipts.iter().filter(|r| r.role == "worker"))?;
-    let total = summarize(record.receipts.iter())?;
-    let estimate = cost(&record.receipts, rates.as_ref())?;
-    let first = record
-        .receipts
+    let coordinator = summarize(receipts.iter().filter(|r| r.role == "coordinator"))?;
+    let workers = summarize(receipts.iter().filter(|r| r.role == "worker"))?;
+    let total = summarize(receipts.iter())?;
+    let estimate = cost(&receipts, rates.as_ref())?;
+    let (stages, active_skill_sets) = classified_summaries(&receipts)?;
+    let open_intervals = open_intervals(&state, task)?;
+    let first = receipts
         .iter()
         .map(|receipt| receipt.start.at)
         .min()
         .ok_or("usage report has no receipt start")?;
-    let last = record
-        .receipts
+    let last = receipts
         .iter()
         .map(|receipt| receipt.end.at)
         .max()
         .ok_or("usage report has no receipt end")?;
-    let thread_seconds = record
-        .receipts
+    let thread_seconds = receipts
         .iter()
         .try_fold(0_u64, |total, receipt| {
             total.checked_add(receipt.end.at - receipt.start.at)
         })
         .ok_or("summed usage thread seconds exceeds u64")?;
-    let attempts: std::collections::BTreeSet<_> = record
-        .receipts
+    let attempts: std::collections::BTreeSet<_> = receipts
         .iter()
         .map(|receipt| (&receipt.client, &receipt.thread, &receipt.attempt))
         .collect();
@@ -677,14 +887,19 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
         "schema_version": 1,
         "task": task,
         "contributions": {"coordinator": coordinator, "workers": workers},
+        "stages": stages,
+        "active_skill_sets": active_skill_sets,
+        "skill_attribution": "tokens are attributed to the exact active skill set; mixed sets are not split into invented per-skill causation",
+        "open_intervals": open_intervals,
+        "totals_scope": "completed intervals only; open intervals are excluded",
         "total": total,
-        "receipt_count": record.receipts.len(),
+        "receipt_count": receipts.len(),
         "attempt_count": attempts.len(),
         "observed_span_seconds": last - first,
         "summed_thread_seconds": thread_seconds,
         "models": {
-            "requested": model_summary(&record.receipts, true),
-            "observed": model_summary(&record.receipts, false)
+            "requested": model_summary(&receipts, true),
+            "observed": model_summary(&receipts, false)
         },
         "cost_estimate": estimate,
         "claim": "known deltas from cumulative counters; missing telemetry is reported as unavailable"
@@ -695,7 +910,7 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
             .ok_or("usage report must be an object")?
             .insert(
                 "receipts".into(),
-                serde_json::to_value(record.receipts).map_err(|error| error.to_string())?,
+                serde_json::to_value(receipts).map_err(|error| error.to_string())?,
             );
     }
     Ok(result)
@@ -717,6 +932,7 @@ fn checkpoint_args(args: &[OsString]) -> Result<CheckpointArgs, String> {
         ..CheckpointArgs::default()
     };
     identifier("task", &parsed.task)?;
+    let mut attempt_seen = false;
     let mut index = 1;
     while index < args.len() {
         let option = text(args.get(index).ok_or("missing checkpoint option")?)?;
@@ -727,7 +943,10 @@ fn checkpoint_args(args: &[OsString]) -> Result<CheckpointArgs, String> {
             "--log" if parsed.log.is_none() => parsed.log = Some(PathBuf::from(value)),
             "--phase" if parsed.phase.is_none() => parsed.phase = Some(text(value)?.into()),
             "--role" if parsed.role.is_none() => parsed.role = Some(text(value)?.into()),
-            "--attempt" if parsed.attempt == "default" => parsed.attempt = text(value)?.into(),
+            "--attempt" if !attempt_seen => {
+                parsed.attempt = text(value)?.into();
+                attempt_seen = true;
+            }
             _ => return Err(format!("unknown or repeated checkpoint option {option}")),
         }
         index += 2;
@@ -966,6 +1185,9 @@ fn checkpoint(root: &Path, args: &[OsString]) -> Result<Value, String> {
         attempt: args.attempt.clone(),
         client: observation.client,
         role: role.into(),
+        stage: None,
+        active_skills: Vec::new(),
+        segment: None,
         requested: None,
         observed,
         start: start.snapshot,
@@ -1004,6 +1226,293 @@ fn checkpoint(root: &Path, args: &[OsString]) -> Result<Value, String> {
         "phase": "end",
         "imported": imported,
         "duplicate": !imported,
+        "counters_available": true
+    }))
+}
+
+#[derive(Default)]
+struct MarkArgs {
+    task: String,
+    log: Option<PathBuf>,
+    stage: Option<String>,
+    role: Option<String>,
+    attempt: String,
+    skills: Vec<String>,
+}
+
+fn mark_args(args: &[OsString]) -> Result<MarkArgs, String> {
+    let mut parsed = MarkArgs {
+        task: text(args.first().ok_or("usage mark requires TASK")?)?.into(),
+        attempt: "default".into(),
+        ..MarkArgs::default()
+    };
+    identifier("task", &parsed.task)?;
+    let mut attempt_seen = false;
+    let mut index = 1;
+    while index < args.len() {
+        let option = text(args.get(index).ok_or("missing mark option")?)?;
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for {option}"))?;
+        match option {
+            "--log" if parsed.log.is_none() => parsed.log = Some(PathBuf::from(value)),
+            "--stage" if parsed.stage.is_none() => parsed.stage = Some(text(value)?.into()),
+            "--role" if parsed.role.is_none() => parsed.role = Some(text(value)?.into()),
+            "--attempt" if !attempt_seen => {
+                parsed.attempt = text(value)?.into();
+                attempt_seen = true;
+            }
+            "--skill" => parsed.skills.push(text(value)?.into()),
+            _ => return Err(format!("unknown or repeated mark option {option}")),
+        }
+        index += 2;
+    }
+    identifier("attempt", &parsed.attempt)?;
+    if !matches!(parsed.role.as_deref(), Some("coordinator" | "worker")) {
+        return Err("usage mark --role must be coordinator or worker".into());
+    }
+    match parsed.stage.as_deref() {
+        Some(stage) => validate_stage(stage)?,
+        None => return Err("usage mark requires --stage".into()),
+    }
+    parsed.skills.sort();
+    parsed.skills.dedup();
+    validate_skills(&parsed.skills)?;
+    if parsed.log.is_none() {
+        return Err("usage mark requires --log PATH".into());
+    }
+    Ok(parsed)
+}
+
+#[cfg(unix)]
+fn reject_mark_overlap(state: &State, current_file: &str, receipt: &Receipt) -> Result<(), String> {
+    for entry in state.tasks.entries()? {
+        let Some(task) = entry.strip_suffix(".json") else {
+            continue;
+        };
+        identifier("stored task", task)?;
+        for existing in load_task(state, task)?.receipts {
+            reject_overlap(&existing, receipt)?;
+        }
+    }
+    for file in state.marks.entries()? {
+        if file == current_file {
+            continue;
+        }
+        for existing in load_mark(state, &file)?.receipts {
+            reject_overlap(&existing, receipt)?;
+        }
+    }
+    Ok(())
+}
+
+fn receipt_from_active(
+    record: &MarkRecord,
+    active: &ActiveInterval,
+    observation: &NativeObservation,
+) -> Receipt {
+    Receipt {
+        schema_version: 1,
+        task: record.task.clone(),
+        thread: record.thread.clone(),
+        attempt: record.attempt.clone(),
+        client: record.client.clone(),
+        role: record.role.clone(),
+        stage: Some(active.stage.clone()),
+        active_skills: active.active_skills.clone(),
+        segment: Some(active.segment),
+        requested: None,
+        observed: interval_selection(&active.observed, &observation.observed),
+        start: active.snapshot.clone(),
+        end: observation.counters.clone(),
+        evidence_reference: active.evidence_reference.clone(),
+    }
+}
+
+#[cfg(unix)]
+fn mark(root: &Path, args: &[OsString]) -> Result<Value, String> {
+    let args = mark_args(args)?;
+    let log = caller_path(root, args.log.ok_or("usage mark requires --log")?);
+    let stage = args.stage.as_deref().ok_or("usage mark requires --stage")?;
+    let role = args.role.as_deref().ok_or("usage mark requires --role")?;
+    let observation = native_observation(&log)?;
+    let file = checkpoint_file(&args.task, &observation.thread, &args.attempt);
+    let state = state(root)?;
+    let exists = state.marks.entries()?.iter().any(|entry| entry == &file);
+    if !exists {
+        let record = MarkRecord {
+            schema_version: 1,
+            task: args.task.clone(),
+            thread: observation.thread.clone(),
+            attempt: args.attempt.clone(),
+            client: observation.client.clone(),
+            role: role.into(),
+            active: Some(ActiveInterval {
+                stage: stage.into(),
+                active_skills: args.skills,
+                segment: 0,
+                observed: observation.observed,
+                snapshot: observation.counters,
+                evidence_reference: log.display().to_string(),
+            }),
+            receipts: Vec::new(),
+        };
+        state.marks.write_json(&file, &record)?;
+        return Ok(json!({
+            "schema_version": 1,
+            "task": args.task,
+            "thread": observation.thread,
+            "attempt": args.attempt,
+            "stage": stage,
+            "opened": true,
+            "closed": false,
+            "duplicate": false,
+            "counters_available": true,
+            "claim": "observed cumulative baseline; usage before this mark is not measured"
+        }));
+    }
+
+    let mut record = load_mark(&state, &file)?;
+    if record.task != args.task
+        || record.thread != observation.thread
+        || record.attempt != args.attempt
+        || record.client != observation.client
+        || record.role != role
+    {
+        return Err("usage mark does not match its active identity".into());
+    }
+    let Some(active) = record.active.clone() else {
+        return Err("usage mark attempt is already finished".into());
+    };
+    let receipt = receipt_from_active(&record, &active, &observation);
+    validate_receipt(&receipt)?;
+    if active.stage == stage && active.active_skills == args.skills {
+        return Ok(json!({
+            "schema_version": 1,
+            "task": args.task,
+            "thread": observation.thread,
+            "attempt": args.attempt,
+            "stage": stage,
+            "opened": false,
+            "closed": false,
+            "duplicate": true,
+            "counters_available": true
+        }));
+    }
+
+    for existing in &record.receipts {
+        reject_overlap(existing, &receipt)?;
+    }
+    reject_mark_overlap(&state, &file, &receipt)?;
+    record.receipts.push(receipt);
+    record.active = Some(ActiveInterval {
+        stage: stage.into(),
+        active_skills: args.skills,
+        segment: active
+            .segment
+            .checked_add(1)
+            .ok_or("usage mark segment exceeds u64")?,
+        observed: observation.observed,
+        snapshot: observation.counters,
+        evidence_reference: log.display().to_string(),
+    });
+    state.marks.write_json(&file, &record)?;
+    Ok(json!({
+        "schema_version": 1,
+        "task": args.task,
+        "thread": observation.thread,
+        "attempt": args.attempt,
+        "stage": stage,
+        "opened": true,
+        "closed": true,
+        "duplicate": false,
+        "counters_available": true
+    }))
+}
+
+#[derive(Default)]
+struct FinishArgs {
+    task: String,
+    log: Option<PathBuf>,
+    attempt: String,
+}
+
+fn finish_args(args: &[OsString]) -> Result<FinishArgs, String> {
+    let mut parsed = FinishArgs {
+        task: text(args.first().ok_or("usage finish requires TASK")?)?.into(),
+        attempt: "default".into(),
+        ..FinishArgs::default()
+    };
+    identifier("task", &parsed.task)?;
+    let mut attempt_seen = false;
+    let mut index = 1;
+    while index < args.len() {
+        let option = text(args.get(index).ok_or("missing finish option")?)?;
+        let value = args
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for {option}"))?;
+        match option {
+            "--log" if parsed.log.is_none() => parsed.log = Some(PathBuf::from(value)),
+            "--attempt" if !attempt_seen => {
+                parsed.attempt = text(value)?.into();
+                attempt_seen = true;
+            }
+            _ => return Err(format!("unknown or repeated finish option {option}")),
+        }
+        index += 2;
+    }
+    identifier("attempt", &parsed.attempt)?;
+    if parsed.log.is_none() {
+        return Err("usage finish requires --log PATH".into());
+    }
+    Ok(parsed)
+}
+
+#[cfg(unix)]
+fn finish(root: &Path, args: &[OsString]) -> Result<Value, String> {
+    let args = finish_args(args)?;
+    let log = caller_path(root, args.log.ok_or("usage finish requires --log")?);
+    let observation = native_observation(&log)?;
+    let file = checkpoint_file(&args.task, &observation.thread, &args.attempt);
+    let state = state(root)?;
+    if !state.marks.entries()?.iter().any(|entry| entry == &file) {
+        return Err("usage finish has no marked attempt".into());
+    }
+    let mut record = load_mark(&state, &file)?;
+    if record.task != args.task
+        || record.thread != observation.thread
+        || record.attempt != args.attempt
+        || record.client != observation.client
+    {
+        return Err("usage finish does not match its marked attempt".into());
+    }
+    let Some(active) = record.active.clone() else {
+        return Ok(json!({
+            "schema_version": 1,
+            "task": args.task,
+            "thread": observation.thread,
+            "attempt": args.attempt,
+            "finished": false,
+            "duplicate": true,
+            "counters_available": true
+        }));
+    };
+    let receipt = receipt_from_active(&record, &active, &observation);
+    validate_receipt(&receipt)?;
+    for existing in &record.receipts {
+        reject_overlap(existing, &receipt)?;
+    }
+    reject_mark_overlap(&state, &file, &receipt)?;
+    record.receipts.push(receipt);
+    record.active = None;
+    state.marks.write_json(&file, &record)?;
+    Ok(json!({
+        "schema_version": 1,
+        "task": args.task,
+        "thread": observation.thread,
+        "attempt": args.attempt,
+        "finished": true,
+        "duplicate": false,
         "counters_available": true
     }))
 }
