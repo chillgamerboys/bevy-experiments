@@ -290,7 +290,7 @@ targets; a stronger selected-target highlight and actor emphasis distinguish the
 current selection. Exact source/target ranks are listed in Skill tooltips;
 HP forecast segments remain attached to the affected actor.
 
-Hover an Skill or status to see its card immediately. Leaving before 1 second
+Hover an Skill or status to see its card immediately. Leaving before 2 seconds
 hides it immediately; continuous hover locks it with an accent border. Locked
 cards support related terms and stay open while hovering or clicking other
 characters and Skills. Each pinned card has a **×** control that closes that
