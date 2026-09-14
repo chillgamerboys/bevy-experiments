@@ -53,7 +53,8 @@ Observed on 2026-09-14:
   Three actual normal-1080 pages were inspected. CI found an old lobby→editor
   header assertion; `0a2f96c` corrects it and preserves the moved character's rank
   span. The exact normal-1080 route and final configured local checks pass.
-- Batch4's complete encounter archive, bounded protocol-v8 paging and single compact
+- Batch4 is published as [PR #45](https://github.com/chillgamerboys/bevy-experiments/pull/45).
+  Its complete encounter archive, bounded protocol-v8 paging and single compact
   log are integrated. It mounts at most 32 rows; full-text inspection remains
   readable for long unbroken names and survives virtualization. Independent review
   resolved clipped text; focused cache/network/UI checks and two normal-1080 frames

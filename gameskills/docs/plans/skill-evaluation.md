@@ -83,6 +83,12 @@ controlled token-savings comparison.
   preserving changed-test coverage checks. Do not describe the CI run as narrow or
   claim that cached token counts establish causal performance savings.
 
+- Final history classification caught an additional explicit boundary registry:
+  new network history source/tests needed entries there as well as suite selection.
+  The initial PR push began before that failed preflight was inspected; that was a
+  coordination mistake. Gate publication on the actual preflight result and consider
+  one owner/suite declaration instead of duplicated path and filter registries.
+
 ### MCP delivery contradiction and verification handoff
 
 The user challenged the extra standalone Linear check despite working connected
