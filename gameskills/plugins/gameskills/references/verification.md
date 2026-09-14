@@ -5,6 +5,44 @@ Use the installed runtime through its actual path, shown here as
 Git and a committed Git worktree. Prebuilt execution requires neither Cargo nor an interpreter. Readiness/configuration
 is a separate operation; reading evidence does not perform setup.
 
+## Rigor and affected scope
+
+When the project opts into `[verification]`, resolve its policy before selecting
+checks: `gameskills verification resolve --base BRANCH [--level LEVEL]`. Use the
+actual receiving branch, including a milestone's combined batch. Carry the
+resolved policy, affected behavior, selected commands and reasons through the
+plan, work orders, runner and delivery record. Without this configuration, preserve
+the adopter's existing requirements; do not invent a branch, platform or level.
+
+Rigor (`development`, `testing`, `release`) controls depth independently of creative
+involvement. The project owns each level's platforms, display target and human gate.
+An explicit level can increase verification; it cannot lower a receiving branch's
+requirement. Release rigor grants no publication authority. Unknown impact calls
+for investigation or broader affected-component coverage within that level, not
+an automatic platform, resolution or end-to-end sweep.
+
+Select by changed behavior and its consumers. Rules fixes normally need focused
+logic tests, not agent screenshots or UI walks. Presentation or interaction changes
+need relevant state/input coverage and inspection of the changed route at the
+project's display target. End-to-end tests follow affected journeys and boundaries;
+a network edit does not automatically require process death, every provider or
+cross-machine testing. Broaden when the changed contract actually needs it.
+
+Adding tests, running retained tests and manual inspection are separate decisions.
+Do not add redundant harnesses for small reversible fixes. Inspect prerequisites
+and tests with embedded display/scenario loops so a focused command does not conceal
+an unrelated sweep; preserve compatibility tests as separately selectable coverage.
+Check that filtered commands executed the intended tests: a zero-match exit is not
+suite evidence. Stop once applicable checks pass unless changed inputs, a failure
+or an unresolved concern warrants more work. Coverage outside the selected scope
+is not unfinished acceptance for this task.
+
+A configured milestone sanity gate applies to affected game behavior in the batch,
+not ordinary feature delivery or documentation/tooling-only work without game effects.
+Keep the developer's actual candidate-bound response separate from agent inspection
+and command results; see [delivery](delivery.md#milestone-sanity). Never infer a
+human pass from CI, a previous feature or an agent-authored observation.
+
 ## Commands and dependencies
 
 The project owns `gameskills.toml`. A command names an argument vector, an
@@ -175,3 +213,13 @@ binaries that ignore `git_refs` remain conservative and may invalidate on any re
 Setup coordinates
 with run registration and refuses updates while active run locks are held; an
 abrupt coordinator exit does not release a supervisor's command locks early.
+
+
+For configured rigor, `run` accepts `--base BRANCH`, `--level LEVEL`, and repeated
+`--scope LABEL` arguments. Carry the same scope labels as the delivery task; its
+required commands must be covered at the same receiving base/policy and at least
+its required level. The record retains that selection separately from execution.
+The runner adds the actual receiving branch to declared command Git inputs. An
+explicit existing dependency on another ref remains a dependency; do not remove it
+unless the command no longer consumes that ref. Missing receiving refs require a
+fetch or deliberate branch creation, not fabricated evidence.

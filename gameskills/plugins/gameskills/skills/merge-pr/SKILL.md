@@ -12,7 +12,9 @@ for any missing final authorization; do not ask again when it already exists.
 
 Immediately before merging, refresh the actual repository/PR, source HEAD,
 target/base, mergeability, required CI/reviews and unresolved findings. Compare
-these inputs with the accepted audit. Changed inputs require affected checks and
+these inputs and the receiving branch's verification policy with the accepted audit.
+For a milestone requiring developer sanity, confirm the actual response still
+applies to the affected batch; command success cannot supply that response. Changed inputs require affected checks and
 judgment, even when the PR's title and number are unchanged.
 
 Resolve authorized conflicts in the owning branch/worktree and reassess their

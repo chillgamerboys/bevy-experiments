@@ -10,6 +10,8 @@ outcome, requested endpoint, accepted choices and current task before planning.
 Read the affected owners' current architecture and Decisions sections; inspect
 source/callers when a constraint or claimed behavior matters. Use
 [creative levels](../../references/creative-levels.md), defaulting to level 2.
+Resolve the independent [verification rigor and affected scope](../../references/verification.md#rigor-and-affected-scope)
+from the project and actual receiving branch before selecting acceptance checks.
 
 Use `grill` for material unresolved choices; routine implementation choices need
 no interview. Record the bounded change, preserved/changed constraints, owners,

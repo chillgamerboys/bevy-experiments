@@ -25,6 +25,13 @@ substitute a source checkout for an installed candidate. Continue useful work
 that does not depend on them. The selected creative level is inherited from the
 task: 1 implement, 2 refine (default), 3 co-design, 4 bounded exploration. It does
 not change engineering rigor, permit new agents or grant publication authority.
+When the adopter configures verification levels, inherit the task's resolved rigor,
+receiving branch, affected scope and selected checks. Otherwise preserve its current
+requirements. Logic-only work needs no automatic agent UI walk; UI changes use the
+configured display target and end-to-end checks follow affected journeys. A milestone
+human sanity gate does not apply to ordinary development delivery or tooling/docs
+without game effects. Stop after applicable checks pass unless a concrete concern
+remains; out-of-scope coverage is not unfinished acceptance.
 Share required checks/evidence with an active core audit instead of rerunning
 the same graph for each skill. Results remain tied to actual source and inputs.
 

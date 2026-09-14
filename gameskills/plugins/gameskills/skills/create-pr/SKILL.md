@@ -12,7 +12,8 @@ remote for an existing PR for this work before creating a duplicate.
 
 Prepare logical commits containing only the authorized change and relevant docs.
 Preserve other contributors' work. Verify applicable checks and identify missing
-manual/CI evidence honestly. Use the receiving project's PR template when present;
+manual/CI evidence honestly within the receiving branch's rigor and affected scope.
+A milestone human gate does not hold ordinary development PRs open. Use the receiving project's PR template when present;
 describe the final problem, resulting behavior, important tradeoffs and validation
 for a reviewer who has not seen the conversation. Rewrite stale scope/history.
 

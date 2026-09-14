@@ -14,6 +14,8 @@ resumes and into work orders; do not repeatedly ask for the same preference.
 A precisely specified fix can reasonably use level 1. A worker may implement a
 settled subdecision at level 1 within a co-design task. Higher levels do not change
 engineering rigor, authorize more agents, expand a budget, or permit publication.
+Resolve the independent [verification level and affected scope](verification.md#rigor-and-affected-scope)
+from project policy; co-design can use Development verification.
 Proceed on routine choices already covered by the brief. Surface a material
 product-direction choice with its evidence and concrete alternatives; continue
 independent work while that choice is unresolved.

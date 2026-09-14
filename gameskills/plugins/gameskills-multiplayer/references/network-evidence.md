@@ -1,6 +1,10 @@
 # Network scenario evidence
 
-Choose scenarios from promised modes and the changed boundary. Record source,
+Choose scenarios from promised modes, the changed boundary and resolved project
+rigor. End-to-end coverage follows affected journeys; do not select all rows for
+every networking edit. Admission, process recovery and cross-machine operation
+are separate suites. Retain existing regressions without making all of them gates
+for every task. Record source,
 features/configuration, host/client binary identities, process count, actual
 machines/OSes, transport/provider and network topology. Never upgrade a simulated
 or localhost result to a cross-machine claim.
@@ -29,5 +33,7 @@ and fixed CLI contract rather than inventing ad hoc routing or shell output.
 Coordinate native windows, reserved ports and CPU/memory with active workers. Use
 one core command/evidence graph where configured, and attach manual topology walks
 as separate observations. Rerun affected checks after source/config/environment
-changes. Report missing machines/providers as unavailable evidence while completing
-useful deterministic and local transport work.
+changes. Report missing required machines/providers as unavailable while completing
+useful deterministic and local transport work. Modes outside the selected scope
+are not pending acceptance. Keep any configured milestone developer sanity response
+separate from agent topology observations; ordinary development has no such gate.

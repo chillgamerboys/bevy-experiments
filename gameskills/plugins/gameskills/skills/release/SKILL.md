@@ -9,7 +9,10 @@ Read [project context](../../references/project-context.md) and
 [delivery](../../references/delivery.md). Establish the requested product/version,
 players or consumers, platform/features, distribution channel and endpoint.
 Separate a private playable candidate from a supported public release; use the
-project's actual compatibility and approval requirements.
+project's actual compatibility and approval requirements. Resolve configured
+[Release rigor](../../references/verification.md#rigor-and-affected-scope), covering
+promised platforms/displays and affected journeys. Release depth does not select
+unrelated end-to-end routes or invent additional display commitments.
 
 Build from known source/dependency identities and record artifact identity and
 checksums where useful. Verify the packaged artifact from a clean consumer/run

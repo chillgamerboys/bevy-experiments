@@ -17,7 +17,8 @@ On an ambiguous mutation result, query the actual remote state before retrying.
 An audit is an acceptance record, not merely a successful command. Associate each
 planned requirement with review judgment, command evidence, documentation checks,
 and applicable manual/playtest evidence. Name skipped, pending, failed and
-unavailable checks. Evidence reuse follows [verification](verification.md): changed
+unavailable checks within the resolved rigor and affected scope. Coverage outside
+that scope is not a missing gate. Evidence reuse follows [verification](verification.md): changed
 inputs invalidate affected records; never rewrite old records for a new HEAD.
 Where a dependency is uncertain, rerun the check.
 
@@ -58,8 +59,8 @@ gameskills delivery bind TASK --pr https://github.com/OWNER/REPO/pull/NUMBER
 gameskills delivery check TASK --evidence RUN_ID
 ```
 
-`start` defaults to `project.delivery_target` and refuses to overwrite an existing
-task. Explicit narrower user scope takes precedence. Records under
+`start` defaults to `project.delivery_target` and `project.delivery_base` (or
+`main` when absent), and refuses to overwrite an existing task. Explicit narrower user scope takes precedence. Records under
 `.gameskills/delivery/` retain intent across interruption; `show` is historical,
 `check` rereads source and providers.
 Use `delivery note TASK --remaining TEXT --authorization TEXT` to preserve a
@@ -73,6 +74,22 @@ agent that never invokes them to finish delivery.
 repository, remote source and base; merge additionally requires observed remote
 integration. Release acceptance remains with the release skill. Commands and
 external observations do not replace source review or gameplay acceptance.
+
+## Milestone sanity
+
+Resolve the receiving branch's verification policy and review the combined batch's
+affected journeys. When its manual-sanity policy requires a milestone game check,
+record the developer's explicit response, actual source/reference, candidate identity
+and covered journey. An agent walk, CI success or a previous feature acceptance is
+not this observation. Do not fabricate a human response or treat caller-supplied
+metadata as independently authenticated testimony.
+
+Relevant game changes invalidate that observation. Carry unchanged coverage forward
+only with its applicability reason; do not relabel historical evidence. Ordinary
+development PRs have no milestone gate. Documentation or tooling changes without
+game effects need no gameplay sanity check. Automated CI and manual acceptance have
+separate statuses; a missing required human observation leaves the promotion pending,
+while coverage outside the selected scope is not unfinished work.
 
 ## Tracking observations
 
@@ -132,3 +149,20 @@ When the user extends an existing PR task to merge, retain its record and create
 separate `--endpoint merge` task with the same bindings. Check PR acceptance before
 merging, then check the merge task after integration from the source checkout. A
 premerge merge check correctly reports that integration has not happened yet.
+
+
+Configured tasks accept `delivery start ... --base BRANCH --level LEVEL --scope LABEL
+--gameplay`; repeat scope labels as needed. `--gameplay` is the caller's explicit
+classification of game effects. `delivery scope TASK --scope LABEL [--gameplay]`
+binds updated scope/policy while preserving the original task/base and history.
+Omitting `--level` retains the recorded level. Repeated `--check COMMAND` options
+replace the required check list with its previous value retained in history. Missing
+flags do not infer a game's effects; inspect the actual change when classifying.
+
+For a gameplay milestone, `delivery check ... --manual-observation FILE` accepts
+schema 1 JSON with `task_id`, `source_head`, `verification_digest` (the task's
+`verification.selection_digest`), `result: "passed"`, `observer`, `journey`, and
+`evidence_reference` to the developer's actual response. Paths are relative to the
+adopter root. The checker binds the supplied observation to task, candidate and
+selected scope; it does not authenticate the person or gameplay result. Never
+manufacture that response. Ordinary Development and tooling-only tasks need none.
