@@ -186,7 +186,8 @@ fn changed_policy_and_tampered_context_do_not_validate_as_current() -> Result<()
         ("/policy/platforms", json!(["linux"])),
         ("/scope", json!(["session"])),
         ("/gameplay", json!(false)),
-        ("/manual_sanity_required", json!(false)),
+        ("/manual_sanity_required", json!(true)),
+        ("/promotion", json!(true)),
         ("/selection_digest", json!("other-selection")),
     ] {
         let mut altered = recorded.clone();

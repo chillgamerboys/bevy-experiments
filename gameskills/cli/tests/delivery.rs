@@ -111,18 +111,25 @@ esac
 "#,
         )?;
         let mut pr = remote(root)?;
-        pr["headRefOid"] = json!(source);
-        pr["state"] = json!("MERGED");
-        pr["mergeCommit"] = json!({"oid":merged});
+        set(&mut pr, "/headRefOid", json!(source));
+        set(&mut pr, "/state", json!("MERGED"));
+        set(&mut pr, "/mergeCommit", json!({"oid":merged}));
         std::fs::write(root.join("pr.json"), pr.to_string())?;
         let synced = cli(root, &["delivery", "check", "merged"])?;
-        assert_eq!(synced["ok"], true, "synced (squash={squash}): {synced}");
+        assert_eq!(
+            at(&synced, "/ok"),
+            true,
+            "synced (squash={squash}): {synced}"
+        );
         std::fs::write(root.join("uncommitted.txt"), "local edit")?;
-        assert_eq!(cli(root, &["delivery", "check", "merged"])?["ok"], false);
+        assert_eq!(
+            at(&cli(root, &["delivery", "check", "merged"])?, "/ok"),
+            false
+        );
         std::fs::remove_file(root.join("uncommitted.txt"))?;
         git(root, &["checkout", "--detach", &base])?;
         let old = cli(root, &["delivery", "check", "merged"])?;
-        assert_eq!(old["ok"], false, "pre-merge checkout: {old}");
+        assert_eq!(at(&old, "/ok"), false, "pre-merge checkout: {old}");
         git(
             root,
             &[
@@ -132,10 +139,17 @@ esac
                 "unpublished divergent change",
             ],
         )?;
-        assert_eq!(cli(root, &["delivery", "check", "merged"])?["ok"], false);
+        assert_eq!(
+            at(&cli(root, &["delivery", "check", "merged"])?, "/ok"),
+            false
+        );
         git(root, &["checkout", "--detach", &source])?;
         let exact = cli(root, &["delivery", "check", "merged"])?;
-        assert_eq!(exact["ok"], true, "exact source (squash={squash}): {exact}");
+        assert_eq!(
+            at(&exact, "/ok"),
+            true,
+            "exact source (squash={squash}): {exact}"
+        );
     }
     Ok(())
 }

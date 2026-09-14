@@ -59,6 +59,10 @@ counter records; they do not copy conversation content to the report.
 ./target/ci/gameskills usage report tooltip-delay
 ```
 
+Default reports are compact; `--details` adds raw receipts. `observed_span_seconds`
+is the covered wall-clock span, while `summed_thread_seconds` includes concurrent
+thread time and must not be presented as elapsed wall time.
+
 Generic imports carry source-backed cumulative start/end counters and exact task,
 thread and attempt identities. Native checkpoints and imports share an idempotent
 ledger under `.gameskills/usage/`; conflicting or overlapping thread intervals
@@ -75,3 +79,20 @@ sourced model rates. It reports estimated cost only for known matching data; no
 prices are embedded or fetched implicitly. Measure total cost per accepted change,
 with token/time/retry and quality context. The first tooltip pilot establishes a
 baseline and exercises the workflow; it cannot by itself prove percentage savings.
+
+## Receipt and rate shapes
+
+A receipt has `schema_version: 1`, `task`, `thread`, `attempt`, `client`, `role`
+(`coordinator` or `worker`), `start`, `end`, and `evidence_reference`. Optional
+`requested` and `observed` objects contain `model` and `effort`. Each counter snapshot
+has `at` (Unix seconds) and optional cumulative `input_tokens`,
+`cached_input_tokens`, `output_tokens`, `reasoning_output_tokens`. Omitted values
+are unavailable. Counter decreases, invalid subsets and overlapping time or known
+input/output intervals for a client/thread across tasks are rejected. Adjacent
+intervals are allowed. A native interval spanning a model change has no priced
+observed model; split work at the change if per-model cost is required.
+
+A rates file has `schema_version: 1`, `as_of`, `source`, `currency` and a `rates`
+array. Each entry has `client`, `model`, `uncached_input_per_million`,
+`cached_input_per_million` and `output_per_million`. These are caller-supplied
+nonnegative rates; the ledger neither authenticates them nor claims billed cost.

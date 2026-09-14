@@ -219,7 +219,10 @@ fn parse_policy(value: &Value, client: &str) -> Result<Policy, String> {
 
 fn escalate(tier: &str, count: usize) -> &str {
     let index = TIERS.iter().position(|x| *x == tier).unwrap_or(1);
-    TIERS[(index + count).min(TIERS.len() - 1)]
+    TIERS
+        .get(index.saturating_add(count))
+        .copied()
+        .unwrap_or("strong")
 }
 
 fn validate_host(host: &Value, client: &str) -> Result<(), String> {
@@ -242,14 +245,19 @@ fn require_capability(
     model: &str,
     effort: &str,
 ) -> Result<(), String> {
-    let supported = host["models"].as_array().unwrap().iter().any(|entry| {
-        entry.get("id").and_then(Value::as_str) == Some(model)
-            && entry
-                .get("efforts")
-                .and_then(Value::as_array)
-                .map(|a| a.iter().any(|e| e.as_str() == Some(effort)))
-                .unwrap_or(false)
-    });
+    let supported = host
+        .get("models")
+        .and_then(Value::as_array)
+        .ok_or("host models must be an array")?
+        .iter()
+        .any(|entry| {
+            entry.get("id").and_then(Value::as_str) == Some(model)
+                && entry
+                    .get("efforts")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().any(|e| e.as_str() == Some(effort)))
+                    .unwrap_or(false)
+        });
     if supported {
         Ok(())
     } else {
@@ -278,14 +286,18 @@ fn parse_args(args: &[OsString]) -> Result<Parsed, String> {
     };
     let mut i = 0;
     while i < args.len() {
-        let key = args[i].to_string_lossy();
+        let key = args
+            .get(i)
+            .ok_or("missing agents argument")?
+            .to_str()
+            .ok_or("agents arguments must be UTF-8")?;
         let take = |i: &mut usize, key: &str, args: &[OsString]| -> Result<String, String> {
             *i += 1;
             args.get(*i)
                 .map(|x| x.to_string_lossy().into_owned())
                 .ok_or_else(|| format!("{key} requires a value"))
         };
-        match key.as_ref() {
+        match key {
             "resolve" => {}
             "--client" => p.client = Some(take(&mut i, "--client", args)?),
             "--host" => p.host = Some(take(&mut i, "--host", args)?.into()),

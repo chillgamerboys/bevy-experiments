@@ -559,15 +559,13 @@ mod posix {
             ) {
                 return Err("merge is not contained in the current remote target".into());
             }
-            if pr_head != local_head {
-                if !git_ancestor(root, merge, local_head)
-                    || !git_ancestor(root, local_head, target_sha)
-                {
-                    return Err(
-                        "local HEAD is not an integrated revision of the current remote target"
-                            .into(),
-                    );
-                }
+            if pr_head != local_head
+                && (!git_ancestor(root, merge, local_head)
+                    || !git_ancestor(root, local_head, target_sha))
+            {
+                return Err(
+                    "local HEAD is not an integrated revision of the current remote target".into(),
+                );
             }
             v.as_object_mut()
                 .ok_or("invalid delivery object")?
