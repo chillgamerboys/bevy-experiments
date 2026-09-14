@@ -4,6 +4,8 @@
 //! identities or rendering. Commands are transactional and public snapshots are
 //! validated on deserialization. A snapshot deliberately contains no host RNG.
 
+pub mod build;
+pub mod catalog;
 mod combat;
 mod content;
 mod formation;
@@ -12,6 +14,7 @@ mod loadout;
 mod model;
 mod preview;
 mod resolve;
+pub mod scenario;
 mod status;
 
 pub use combat::Combat;
@@ -33,7 +36,7 @@ pub use status::{
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.
-pub const RULES_VERSION: &str = "labyrinth-combat-v3-footprints-corpses-death-saves";
+pub const RULES_VERSION: &str = "labyrinth-combat-v4-frozen-builds-scenarios-cleave";
 
 /// Maximum human seats and linear rank capacity per team (not a required roster length).
 pub const PARTY_SIZE: usize = 6;
@@ -45,6 +48,8 @@ pub const MAX_EQUIPPED_ABILITIES: usize = 8;
 pub const MAX_STATUSES: usize = 16;
 /// Bounded effect/automatic-phase work for one atomic command.
 pub const MAX_COMBAT_WORK: usize = 1024;
+/// Maximum JSON combat snapshot bytes; session transport reserves additional envelope space.
+pub const MAX_COMBAT_SNAPSHOT_BYTES: usize = 1_048_576;
 /// Default playable company: four original roles and one two-rank supply wagon.
 pub const PROTOTYPE_HERO_ROSTER: [HeroClass; 5] = [
     HeroClass::Gatekeeper,
@@ -142,7 +147,18 @@ pub fn rules_fingerprint() -> String {
         DEATH_SAVE_TARGET,
         DEATH_SAVE_FAILURES,
     );
-    let bytes = serde_json::to_vec(&(RULES_VERSION, heroes, enemies, statuses, catalog, rosters, limits, "formation:ordered-unique-occupants;width:Wagon+Hauler=2,others=1;reach:any-occupied-rank;move:whole-footprints-within-rank-budget;loadout:0..8-unique-catalog-ids;rescue:25%-ceil-dying-only;reposition:adjacent-whole-swap;defend:brace;wait:consume-turn;death:corpse-quarter-hp-ceil;corpse:round-end-ticks-before-expiry,creation-round-excluded;dying:d20-success-holds,damage-one-failure;terminal:no-standing-heroes-defeat,no-standing-enemies-victory"))
+    let configurable_limits = (
+        catalog::MAX_RESOLVED_ABILITIES,
+        catalog::MAX_ABILITY_EFFECTS,
+        catalog::MAX_CONTENT_POWER,
+        MAX_COMBAT_SNAPSHOT_BYTES,
+        scenario::SCENARIO_SCHEMA_VERSION,
+        scenario::MAX_SCENARIO_BYTES,
+    );
+    let bytes = serde_json::to_vec(&(RULES_VERSION, heroes, enemies, statuses, catalog, rosters, limits, configurable_limits, "formation:ordered-unique-occupants;width:Wagon+Hauler=2,others=1;reach:any-occupied-rank;move:whole-footprints-within-rank-budget;loadout:0..8-unique-catalog-ids;rescue:25%-ceil-dying-only;reposition:adjacent-whole-swap;defend:brace;wait:consume-turn;death:corpse-quarter-hp-ceil;corpse:round-end-ticks-before-expiry,creation-round-excluded;dying:d20-success-holds,damage-one-failure;terminal:no-standing-heroes-defeat,no-standing-enemies-victory"))
         .expect("fixed typed catalogs contain only JSON-serializable values");
     format!("{:x}", Sha256::digest(bytes))
 }
+
+#[cfg(test)]
+mod catalog_tests;

@@ -3,6 +3,7 @@ mod archive;
 mod files;
 mod legacy;
 mod native;
+mod registration;
 mod setup;
 
 use serde_json::{json, Value};
@@ -12,7 +13,7 @@ use std::{
 };
 
 pub use archive::{verify_archive, InstructionBundle};
-pub use native::{activate_codex, native_argv};
+pub use native::{activate_codex, native_argv, verify_project_codex};
 
 #[cfg(unix)]
 use std::collections::BTreeMap;
@@ -119,9 +120,22 @@ fn installed(root: &Path) -> Result<(InstructionBundle, Value, PathBuf), String>
 
 fn status(root: &Path) -> Result<Value, String> {
     let (bundle, config, path) = installed(root)?;
-    Ok(
-        json!({"ok":true,"schema_version":2,"runtime":"rust","cli_version":env!("CARGO_PKG_VERSION"),"content_sha256":bundle.identity(),"source_commit":bundle.manifest.get("source_commit"),"version":bundle.manifest.get("catalog_version"),"packages":bundle.selected,"clients":config.get("clients"),"creative_level":config.pointer("/creative/default_level"),"max_workers":config.pointer("/dispatch/max_workers"),"bundle":path,"native_activation":"not inferred from local package staging"}),
-    )
+    let mut result = json!({"ok":true,"schema_version":2,"runtime":"rust","cli_version":env!("CARGO_PKG_VERSION"),"content_sha256":bundle.identity(),"source_commit":bundle.manifest.get("source_commit"),"version":bundle.manifest.get("catalog_version"),"packages":bundle.selected,"clients":config.get("clients"),"creative_level":config.pointer("/creative/default_level"),"max_workers":config.pointer("/dispatch/max_workers"),"bundle":path,"native_activation":"not inferred from local package staging"});
+    result
+        .as_object_mut()
+        .ok_or("invalid installation status")?
+        .insert(
+            "scope".into(),
+            json!("installed bundle and project registration; not current session readiness"),
+        );
+    result
+        .as_object_mut()
+        .ok_or("invalid installation status")?
+        .insert(
+            "native_clients".into(),
+            registration::status(root, &bundle, &path, &strings(&config, "clients")?),
+        );
+    Ok(result)
 }
 
 fn exact_keys(value: &Value, keys: &[&str]) -> Result<(), String> {
@@ -164,4 +178,39 @@ fn package_files(bundle: &InstructionBundle, package: &str) -> BTreeMap<String, 
 /// setup from changing the installation while a supervisor is alive.
 pub fn lifecycle_guard(root: &Path) -> Result<std::fs::File, String> {
     files::Directory::open(root)?.lock(".gameskills/setup.lock")
+}
+
+/// Include ignored host settings and interrupted registration in command evidence.
+pub(crate) fn native_settings_identity(
+    root: &Path,
+    config: &Value,
+) -> Result<std::collections::BTreeMap<&'static str, Value>, String> {
+    let directory = files::Directory::open(root)?;
+    let record = directory.read_optional(registration::RECORD)?;
+    let journal = directory.read_optional(registration::JOURNAL)?;
+    let selected = config
+        .get("clients")
+        .and_then(Value::as_array)
+        .is_some_and(|clients| clients.iter().any(|client| client == "codex"));
+    if !selected && record.is_none() && journal.is_none() {
+        return Ok(std::collections::BTreeMap::new());
+    }
+    [
+        (
+            registration::CONFIG,
+            directory.read_optional(registration::CONFIG)?,
+        ),
+        (registration::RECORD, record),
+        (registration::JOURNAL, journal),
+    ]
+    .into_iter()
+    .map(|(name, bytes)| {
+        Ok((
+            name,
+            bytes
+                .map(|bytes| json!(hash(&bytes)))
+                .unwrap_or(Value::Null),
+        ))
+    })
+    .collect()
 }

@@ -178,6 +178,7 @@ fn timeline_absent_actor_keeps_parentage_and_identity_until_battle_teardown() {
 #[test]
 fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
     let mut app = app(1920, 1080, UiScaleMode::Auto);
+    network_ownership(&mut app.world_mut().resource_mut::<LabyrinthView>());
     let snapshot = app
         .world()
         .resource::<LabyrinthView>()
@@ -187,7 +188,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
     let (slot, source, index, skill, target) = app
         .world()
         .resource::<LabyrinthView>()
-        .players
+        .company
         .iter()
         .filter(|player| Some(player.actor) != snapshot.active_actor)
         .find_map(|player| {
@@ -210,14 +211,14 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
                                 .preview_action(actor.id, &action)
                                 .ok()
                                 .filter(|preview| !preview.damage.is_empty())
-                                .map(|_| (player.slot, actor.id, index, *skill, target.id))
+                                .map(|_| (player.owner, actor.id, index, *skill, target.id))
                         })
                 })
         })
         .expect("off-turn damage preview");
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-        view.local = false;
+        network_ownership(&mut view);
         view.player = Some(slot);
     }
     run_frames(&mut app, 3);
@@ -230,7 +231,7 @@ fn off_turn_owned_ability_has_a_forecast_but_cannot_commit() {
     run_frames(&mut app, 3);
     assert_eq!(
         app.world().resource::<UiState>().selected,
-        Some(Choice::Skill(skill))
+        Some(Choice::Ability(index as u8))
     );
     let preview = snapshot
         .preview_action(source, &CombatAction::Skill { skill, target })
@@ -288,29 +289,23 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales() {
         let owner = app
             .world()
             .resource::<LabyrinthView>()
-            .players
+            .company
             .get(5)
             .expect("sixth seat")
             .actor;
         {
             let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-            view.local = false;
+            network_ownership(&mut view);
             view.player = Some(5);
         }
         for count in 0..=MAX_EQUIPPED_ABILITIES {
             {
                 let mut view = app.world_mut().resource_mut::<LabyrinthView>();
-                let actor = view
-                    .combat
-                    .as_mut()
-                    .expect("combat")
-                    .actors
-                    .iter_mut()
-                    .find(|actor| actor.id == owner)
-                    .expect("owned hero");
-                actor.abilities =
-                    AbilityLoadout::new(SkillId::ALL.into_iter().take(count)).expect("loadout");
-                actor.skill_uses.clear();
+                set_legacy_skills(
+                    view.combat.as_mut().expect("combat"),
+                    owner,
+                    &SkillId::ALL.into_iter().take(count).collect::<Vec<_>>(),
+                );
             }
             run_frames(&mut app, 4);
             assert!(find_named(app.world_mut(), &format!("Skill {count}")).is_none());
@@ -345,7 +340,7 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales() {
                 tap_key(&mut app, KeyCode::Enter);
                 assert_eq!(
                     app.world().resource::<UiState>().selected,
-                    Some(Choice::Skill(skill))
+                    Some(Choice::Ability(index as u8))
                 );
                 assert!(app
                     .world()
@@ -355,11 +350,10 @@ fn every_zero_to_eight_loadout_is_keyboard_reachable_at_both_scales() {
                     .contains(skill_definition(skill).name));
             }
             for (index, key) in shortcuts.iter().copied().enumerate().take(count) {
-                let skill = *SkillId::ALL.get(index).expect("equipped catalog entry");
                 tap_key(&mut app, key);
                 assert_eq!(
                     app.world().resource::<UiState>().selected,
-                    Some(Choice::Skill(skill))
+                    Some(Choice::Ability(index as u8))
                 );
             }
             let wait =

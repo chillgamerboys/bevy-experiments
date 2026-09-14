@@ -52,5 +52,10 @@ in the relevant current guide's Decisions section, rather than an archive of pla
 
 Linear is optional. Use connected tools for ordinary issue lookup, updates and PR
 links. Deletion and the live Hex pilot are deferred; no private export setup is needed.
-This repository's existing standalone tracking observer still needs separate credentials;
-its MCP-first replacement remains [open work](plans/workflow-reliability.md).
+Required tracking here uses MCP snapshots through `delivery check
+--tracker-observation FILE`, with exact issue/project/PR identities and a live GitHub
+backlink check. Preserve the actual connector response and use the
+[delivery contract](../plugins/gameskills/references/delivery.md#tracking-observations)
+for normalization, freshness and the boundary between agent-supplied MCP evidence
+and CLI observations. The standalone helper remains opt-in for headless automation;
+its separate credentials are not a prerequisite for the connected workflow.

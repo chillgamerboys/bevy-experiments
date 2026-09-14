@@ -1,0 +1,481 @@
+# Game-owned content; schema/effect primitives are validated by labyrinth-rules.
+schema_version = 1
+revision = "labyrinth-starter-weapons-1"
+
+[[abilities]]
+id = "hurled_scrap"
+name = "Hurled Scrap"
+description = "Deal 2 damage. Supplies, not fighting, are the wagon's purpose."
+source_ranks = 63
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 2 }]
+
+[[abilities]]
+id = "spare_bandage"
+name = "Spare Bandage"
+description = "Restore 3 HP to a standing ally. 2 uses."
+source_ranks = 63
+target_ranks = 63
+target_rule = "AllyStanding"
+effects = [{ Heal = 3 }]
+max_uses = 2
+
+[[abilities]]
+id = "crushing_blow"
+name = "Crushing Blow"
+description = "Reach over the frontline to deal 7 damage to a front or middle target."
+source_ranks = 15
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 7 }]
+
+[[abilities]]
+id = "front_strike"
+name = "Front Strike"
+description = "Deal 7 damage to a front enemy."
+source_ranks = 3
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 7 }]
+
+[[abilities]]
+id = "long_reach"
+name = "Long Reach"
+description = "Deal 5 damage with extended reach."
+source_ranks = 15
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 5 }]
+
+[[abilities]]
+id = "driving_blow"
+name = "Driving Blow"
+description = "Deal 3 damage, then push the surviving target back up to two ranks without splitting a footprint."
+source_ranks = 3
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 3 }, { Move = 2 }]
+
+[[abilities]]
+id = "field_dressing"
+name = "Field Dressing"
+description = "Restore 8 HP to yourself. Does not cleanse bleed. 2 uses."
+source_ranks = 63
+target_ranks = 63
+target_rule = "SelfStanding"
+effects = [{ Heal = 8 }]
+max_uses = 2
+
+[[abilities]]
+id = "bleeding_cut"
+name = "Bleeding Cut"
+description = "Deal 3 damage and apply Bleed: 2 damage at the next 3 turn starts."
+source_ranks = 15
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 3 }, { ApplyStatus = "Bleed" }]
+
+[[abilities]]
+id = "deep_strike"
+name = "Deep Strike"
+description = "Deal 6 damage to a front enemy."
+source_ranks = 15
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 6 }]
+
+[[abilities]]
+id = "thrown_knife"
+name = "Thrown Knife"
+description = "Deal 4 damage to any enemy rank."
+source_ranks = 60
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[abilities]]
+id = "clean_blade"
+name = "Clean Blade"
+description = "Remove your Bleed without healing HP."
+source_ranks = 63
+target_ranks = 63
+target_rule = "SelfStanding"
+effects = [{ Cleanse = "Bleeding" }]
+
+[[abilities]]
+id = "back_rank_shot"
+name = "Back-rank Shot"
+description = "Deal 7 damage to an enemy in rear ranks 5 and 6."
+source_ranks = 60
+target_ranks = 48
+target_rule = "EnemyStanding"
+effects = [{ Damage = 7 }]
+
+[[abilities]]
+id = "snap_shot"
+name = "Snap Shot"
+description = "Deal 4 damage from any rank to any enemy rank."
+source_ranks = 63
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[abilities]]
+id = "hook_shot"
+name = "Hook Shot"
+description = "Deal 3 damage, then pull the surviving target forward one rank."
+source_ranks = 60
+target_ranks = 60
+target_rule = "EnemyStanding"
+effects = [{ Damage = 3 }, { Move = -1 }]
+
+[[abilities]]
+id = "exchange"
+name = "Exchange"
+description = "Swap places with any other ally, including a downed ally."
+source_ranks = 63
+target_ranks = 63
+target_rule = "OtherAlly"
+effects = ["SwapWithSource"]
+
+[[abilities]]
+id = "mend"
+name = "Mend"
+description = "Restore 8 HP to a standing ally. Does not cleanse bleed. 3 uses."
+source_ranks = 60
+target_ranks = 63
+target_rule = "AllyStanding"
+effects = [{ Heal = 8 }]
+max_uses = 3
+
+[[abilities]]
+id = "staunch"
+name = "Staunch"
+description = "Remove Bleed from a standing ally, including yourself."
+source_ranks = 63
+target_ranks = 63
+target_rule = "AllyStanding"
+effects = [{ Cleanse = "Bleeding" }]
+
+[[abilities]]
+id = "staff_strike"
+name = "Staff Strike"
+description = "Deal 3 damage to an enemy in front or middle ranks 1 to 4."
+source_ranks = 63
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 3 }]
+
+[[abilities]]
+id = "rally"
+name = "Rally"
+description = "Rescue a downed ally at 50% maximum HP. 2 uses."
+source_ranks = 63
+target_ranks = 63
+target_rule = "AllyDowned"
+effects = [{ Rescue = 50 }]
+max_uses = 2
+
+[[abilities]]
+id = "brutal_strike"
+name = "Brutal Strike"
+description = "Deal 5 damage to a standing front-rank hero."
+source_ranks = 3
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 5 }]
+
+[[abilities]]
+id = "ragged_cut"
+name = "Ragged Cut"
+description = "Deal 2 damage and apply Bleed."
+source_ranks = 63
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 2 }, { ApplyStatus = "Bleed" }]
+
+[[abilities]]
+id = "hollow_bolt"
+name = "Hollow Bolt"
+description = "Deal 4 damage to any standing hero."
+source_ranks = 63
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[abilities]]
+id = "dagger_stab"
+name = "Dagger Stab"
+description = "Stab one nearby enemy."
+source_ranks = 15
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 5 }]
+
+[[abilities]]
+id = "dagger_throw"
+name = "Dagger Throw"
+description = "Throw at any enemy rank. Unlimited throws; no item or charge is consumed."
+source_ranks = 60
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[abilities]]
+id = "greatsword_cleave"
+name = "Greatsword Cleave"
+description = "Strike distinct eligible occupants of enemy ranks 1–2 once each."
+source_ranks = 3
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 6 }]
+target_pattern = "FrontPair"
+
+[[abilities]]
+id = "greatsword_thrust"
+name = "Greatsword Thrust"
+description = "Drive a focused thrust into one nearby enemy."
+source_ranks = 15
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 8 }]
+
+[[abilities]]
+id = "axe_chop"
+name = "Overhead Chop"
+description = "A powerful single-target two-handed axe attack."
+source_ranks = 3
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 10 }]
+
+[[abilities]]
+id = "spear_thrust"
+name = "Spear Thrust"
+description = "Reach a front or middle enemy."
+source_ranks = 15
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 6 }]
+
+[[abilities]]
+id = "spear_shove"
+name = "Spear Shove"
+description = "Deal light damage and push the target back one rank."
+source_ranks = 15
+target_ranks = 3
+target_rule = "EnemyStanding"
+effects = [{ Damage = 2 }, { Move = 1 }]
+
+[[abilities]]
+id = "bow_aimed_shot"
+name = "Aimed Shot"
+description = "A powerful shot from the back ranks."
+source_ranks = 48
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 7 }]
+
+[[abilities]]
+id = "bow_quick_shot"
+name = "Quick Shot"
+description = "A weaker shot usable from every rank."
+source_ranks = 63
+target_ranks = 63
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[abilities]]
+id = "staff_blow"
+name = "Staff Blow"
+description = "Strike an enemy in the front or middle ranks."
+source_ranks = 63
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 3 }]
+
+[[abilities]]
+id = "staff_push"
+name = "Staff Push"
+description = "Deal light damage and push an enemy back one rank."
+source_ranks = 15
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 2 }, { Move = 1 }]
+
+[[abilities]]
+id = "assassin_feint"
+name = "Assassin Feint"
+description = "A learned strike with extended reach."
+source_ranks = 63
+target_ranks = 15
+target_rule = "EnemyStanding"
+effects = [{ Damage = 4 }]
+
+[[weapons]]
+id = "dagger"
+name = "Dagger"
+description = "A light blade combining close-range stabs with thrown attacks."
+handedness = "One"
+grants = ["dagger_stab", "dagger_throw"]
+
+[[weapons]]
+id = "greatsword"
+name = "Greatsword"
+description = "Cleave across the enemy front ranks or concentrate damage with a single-target thrust."
+handedness = "Two"
+grants = ["greatsword_cleave", "greatsword_thrust"]
+
+[[weapons]]
+id = "two_handed_axe"
+name = "Two-handed Axe"
+description = "Heavy single-target damage for a fighter holding the front ranks."
+handedness = "Two"
+grants = ["axe_chop"]
+
+[[weapons]]
+id = "spear"
+name = "Spear"
+description = "Reach past the frontline and push a nearby opponent backward."
+handedness = "Two"
+grants = ["spear_thrust", "spear_shove"]
+
+[[weapons]]
+id = "bow"
+name = "Bow"
+description = "A strong aimed shot from the rear, with a quick shot for more flexible positioning."
+handedness = "Two"
+grants = ["bow_aimed_shot", "bow_quick_shot"]
+
+[[weapons]]
+id = "staff"
+name = "Staff"
+description = "Strike and push to disrupt the enemy formation."
+handedness = "Two"
+grants = ["staff_blow", "staff_push"]
+
+[[learned_skills]]
+id = "assassin_feint_training"
+name = "Assassin Feint Training"
+description = "Learn an additional active feint."
+provenance = "assassin"
+grants = ["assassin_feint"]
+
+[[learned_skills]]
+id = "assassin_bleeding_dagger"
+name = "Bleeding Dagger Technique"
+description = "Dagger Stab gains Bleed. Requires the stab from any source."
+provenance = "assassin"
+[[learned_skills.upgrades]]
+ability = "dagger_stab"
+operations = [{ AppendEffect = { ApplyStatus = "Bleed" } }]
+
+[[learned_skills]]
+id = "duelist_dagger_power"
+name = "Duelist Dagger Training"
+description = "Dagger Stab gains two direct damage. Requires the stab from any source."
+provenance = "duelist"
+[[learned_skills.upgrades]]
+ability = "dagger_stab"
+operations = [{ AddDamage = { effect_index = 0, amount = 2 } }]
+
+[[actor_presets]]
+id = "gatekeeper"
+name = "Gatekeeper"
+appearance = { Hero = "Gatekeeper" }
+max_hp = 32
+base_speed = 2
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "front_strike", provenance = "gatekeeper" }, { ability = "long_reach", provenance = "gatekeeper" }, { ability = "driving_blow", provenance = "gatekeeper" }, { ability = "field_dressing", provenance = "gatekeeper" }]
+
+[[actor_presets]]
+id = "knifehand"
+name = "Knifehand"
+appearance = { Hero = "Knifehand" }
+max_hp = 26
+base_speed = 5
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "bleeding_cut", provenance = "knifehand" }, { ability = "deep_strike", provenance = "knifehand" }, { ability = "thrown_knife", provenance = "knifehand" }, { ability = "clean_blade", provenance = "knifehand" }]
+
+[[actor_presets]]
+id = "scout"
+name = "Scout"
+appearance = { Hero = "Scout" }
+max_hp = 22
+base_speed = 7
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "back_rank_shot", provenance = "scout" }, { ability = "snap_shot", provenance = "scout" }, { ability = "hook_shot", provenance = "scout" }, { ability = "exchange", provenance = "scout" }]
+
+[[actor_presets]]
+id = "field_medic"
+name = "Field Medic"
+appearance = { Hero = "FieldMedic" }
+max_hp = 24
+base_speed = 4
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "mend", provenance = "field_medic" }, { ability = "staunch", provenance = "field_medic" }, { ability = "staff_strike", provenance = "field_medic" }, { ability = "rally", provenance = "field_medic" }]
+
+[[actor_presets]]
+id = "lantern_wagon"
+name = "Lantern Wagon"
+appearance = { Hero = "LanternWagon" }
+max_hp = 30
+base_speed = 1
+footprint = 2
+[actor_presets.build]
+innate = [{ ability = "hurled_scrap", provenance = "lantern_wagon" }, { ability = "spare_bandage", provenance = "lantern_wagon" }]
+
+[[actor_presets]]
+id = "ash_brute"
+name = "Ash Brute"
+appearance = { Enemy = "AshBrute" }
+max_hp = 20
+base_speed = 2
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "brutal_strike", provenance = "ash_brute" }]
+
+[[actor_presets]]
+id = "iron_brute"
+name = "Iron Brute"
+appearance = { Enemy = "IronBrute" }
+max_hp = 20
+base_speed = 3
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "brutal_strike", provenance = "iron_brute" }]
+
+[[actor_presets]]
+id = "wound_stalker"
+name = "Wound Stalker"
+appearance = { Enemy = "WoundStalker" }
+max_hp = 16
+base_speed = 5
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "ragged_cut", provenance = "wound_stalker" }]
+
+[[actor_presets]]
+id = "hollow_archer"
+name = "Hollow Archer"
+appearance = { Enemy = "HollowArcher" }
+max_hp = 14
+base_speed = 6
+footprint = 1
+[actor_presets.build]
+innate = [{ ability = "hollow_bolt", provenance = "hollow_archer" }]
+
+[[actor_presets]]
+id = "ossuary_hauler"
+name = "Ossuary Hauler"
+appearance = { Enemy = "OssuaryHauler" }
+max_hp = 44
+base_speed = 1
+footprint = 2
+[actor_presets.build]
+innate = [{ ability = "crushing_blow", provenance = "ossuary_hauler" }]

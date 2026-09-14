@@ -85,14 +85,43 @@ pub(super) fn present(
     ui: &mut UiState,
     metrics: ResolvedUiMetrics,
 ) {
+    constructor::refresh(view, ui);
+    if view.mode == ViewMode::Lobby {
+        if let Some(scenario) = &view.scenario {
+            if ui.scenario_seed_source != Some(scenario.seed) {
+                ui.scenario_seed = scenario.seed.to_string();
+                ui.scenario_seed_source = Some(scenario.seed);
+            }
+        }
+    } else {
+        ui.scenario_seed_source = None;
+    }
     // Notices and background discovery updates must not recreate an active
     // admission field, lose its cursor, or reset keyboard focus.
     notices(world, view, ui);
     backdrop(world);
     let lobby_data = (view.mode == ViewMode::Lobby).then_some((
         &view.players,
+        &view.company,
+        &view.scenario,
+        &view.formation,
+        &view.deployment_error,
         &view.invite_labels,
         &view.session_name,
+        (ui.lobby_page, view.setup_revision, view.host, view.local),
+        &ui.constructor,
+        (
+            constructor::compact(metrics),
+            metrics.content_scale,
+            metrics.logical_size,
+        ),
+        world.get_resource::<Assets<Image>>().map(|assets| {
+            let art = world.resource::<crate::scene::SceneAppearance>();
+            [&art.actor_sheet, &art.wagon, &art.hauler]
+                .iter()
+                .filter(|handle| handle.as_ref().is_some_and(|h| assets.get(h).is_some()))
+                .count()
+        }),
     ));
     let listings = (ui.form == Form::Browser).then_some(&view.listings);
     let key = format!(
@@ -143,23 +172,39 @@ pub(super) fn present(
         },
     );
     world.entity_mut(content).insert(GlobalZIndex(2));
-    backdrop(world);
-    label(
-        world,
-        content,
-        "Brand",
-        "L A B Y R I N T H",
-        UiTextRole::Display,
-    );
-    label(
-        world,
-        content,
-        "Subtitle",
-        "Six lanterns. One company. Hold the line together.",
-        UiTextRole::Supporting,
-    );
     if view.mode == ViewMode::Lobby {
-        lobby(world, content, view);
+        if let Some(mut node) = world.get_mut::<Node>(root) {
+            node.overflow = Overflow::clip();
+            node.padding = UiRect::all(Val::Px(16.0));
+            node.row_gap = Val::Px(4.0);
+        }
+        if let Some(mut node) = world.get_mut::<Node>(content) {
+            node.max_width = Val::Percent(100.0);
+            node.flex_grow = 1.0;
+            node.flex_shrink = 1.0;
+            node.min_height = Val::Px(0.0);
+            node.row_gap = Val::Px(8.0);
+        }
+    }
+    backdrop(world);
+    if view.mode != ViewMode::Lobby {
+        label(
+            world,
+            content,
+            "Brand",
+            "L A B Y R I N T H",
+            UiTextRole::Display,
+        );
+        label(
+            world,
+            content,
+            "Subtitle",
+            "Six lanterns. One company. Hold the line together.",
+            UiTextRole::Supporting,
+        );
+    }
+    if view.mode == ViewMode::Lobby {
+        lobby(world, content, view, ui);
     } else {
         match ui.form {
             Form::Menu => menu(world, content),
@@ -171,7 +216,13 @@ pub(super) fn present(
         }
     }
     let notice = label(world, content, "Session Notice", "", UiTextRole::Body);
-    world.entity_mut(notice).insert(ShellNotice);
+    world.entity_mut(notice).insert((
+        ShellNotice,
+        Node {
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ));
     notices(world, view, ui);
     ui.shell_key = Some(key);
 }
@@ -192,7 +243,7 @@ fn surface(world: &mut World, parent: Entity, name: &str) -> Entity {
     entity
 }
 
-fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
+pub(super) fn row(world: &mut World, parent: Entity, name: &str) -> Entity {
     column(
         world,
         parent,

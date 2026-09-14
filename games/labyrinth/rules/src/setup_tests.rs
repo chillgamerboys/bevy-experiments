@@ -222,16 +222,10 @@ fn loadout_and_use_tampering_is_rejected_on_snapshot_ingress() {
             "/actors/0/abilities",
             serde_json::json!(SkillId::ALL.into_iter().take(9).collect::<Vec<_>>()),
         ),
-        ("/actors/0/skill_uses", serde_json::json!({"Mend":1})),
-        ("/actors/0/skill_uses", serde_json::json!({"FrontStrike":1})),
-        (
-            "/actors/0/skill_uses",
-            serde_json::json!({"FieldDressing":0}),
-        ),
-        (
-            "/actors/0/skill_uses",
-            serde_json::json!({"FieldDressing":3}),
-        ),
+        ("/actors/0/skill_uses", serde_json::json!({"63":1})),
+        ("/actors/0/skill_uses", serde_json::json!({"0":1})),
+        ("/actors/0/skill_uses", serde_json::json!({"3":0})),
+        ("/actors/0/skill_uses", serde_json::json!({"3":3})),
         ("/actors/0/id", serde_json::json!(12)),
         ("/actors/0/id", serde_json::json!(101)),
         ("/initiative/0/tie_breaker", serde_json::json!(12)),
@@ -260,7 +254,10 @@ fn loadout_and_use_tampering_is_rejected_on_snapshot_ingress() {
     enemy["max_hp"] = serde_json::json!(max_hp + 1);
     enemy["hp"] = serde_json::json!(max_hp);
     enemy["base_speed"] = serde_json::json!(base_speed);
-    assert!(serde_json::from_value::<CombatSnapshot>(substituted_enemy).is_err());
+    // Visual archetypes now supply defaults, not immutable stat equality.
+    let customized = serde_json::from_value::<CombatSnapshot>(substituted_enemy)
+        .expect("independent enemy stats");
+    assert_eq!(customized.actors.get(6).expect("enemy").max_hp, max_hp + 1);
     let mut missing = valid;
     missing
         .pointer_mut("/actors/0")

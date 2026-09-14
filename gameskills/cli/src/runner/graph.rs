@@ -10,6 +10,8 @@ pub(super) struct Spec {
     pub(super) requires: Vec<String>,
     pub(super) resources: Vec<String>,
     pub(super) timeout_seconds: f64,
+    #[serde(default)]
+    pub(super) git_refs: crate::config::GitRefs,
 }
 pub(super) fn name(value: &str) -> bool {
     !value.is_empty()
@@ -143,6 +145,7 @@ pub(super) fn graph(
                 requires,
                 resources,
                 timeout_seconds,
+                git_refs: crate::config::git_refs(command.get("git_refs"))?,
             },
         );
         order.push(selected.into());

@@ -7,8 +7,10 @@ in the game-owned pure rules package; see [architecture](architecture.md).
 
 One actor has one HP pool, initiative entry, equipped loadout and controller. Targeting
 either occupied rank resolves to the same ID. Source and target reach use intersection
-with any occupied rank. No area attack is introduced yet; future target expansion must
-deduplicate IDs before resolving effects. Reposition swaps adjacent whole occupants;
+with any occupied rank. Greatsword FrontPair cleave captures the distinct eligible
+occupants of target ranks 1–2 before effects. A two-rank actor is hit once; clearing
+a corpse does not retarget a replacement. All captured targets resolve before
+terminal victory checks. Preview and actual resolution share this target expansion. Reposition swaps adjacent whole occupants;
 Exchange swaps whole occupants at any distance. Forced movement measures rank distance
 and crosses only whole neighboring footprints within its distance budget. No wrap.
 Clearing remains compacts the formation; death alone does not.
@@ -40,10 +42,11 @@ Corpses never act and do not prevent victory.
 Local and multiplayer defaults use Gatekeeper, Knifehand, Scout, Field Medic and the
 player-controlled wagon: five unique combatants filling six spaces. The encounter uses
 the Hauler plus Ash Brute, Iron Brute, Wound Stalker and Hollow Archer, also once each.
-Replacing the wagon with a single-rank class opens a sixth player slot. Selecting a
-wagon consumes an unoccupied slot, never an admitted player. Repeated classes remain
-supported as a party choice and explicit six-player test fixture, not the default.
-Every remaining member must connect and ready.
+Participant capacity is always six, independent of actor count or footprint.
+The host assigns zero/one/multiple heroes to each participant, controls unassigned
+heroes and edits enemies. Only assigned controllers must connect and ready;
+spectators never gate Start. Repeated presets and smaller rosters are supported.
+Weapon Comparison, Cleave and Rescue/Status are additional editable stock scenarios.
 The wagon has a 2-damage ranged scrap attack, a limited 3-HP bandage, and universal
 actions. Its eventual supply/navigation utility is intentionally not simulated yet.
 The Hauler occupies ranks 3–4 and reaches over the two frontline Brutes with a

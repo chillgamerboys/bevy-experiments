@@ -6,7 +6,7 @@ Carterfight retain their own composition roots and rules.
 | Layer | Owns | Explicitly excludes |
 |---|---|---|
 | `labyrinth-rules` | Actors, formations, content, statuses, deterministic combat/AI | Bevy entities, peers, sockets, files, animation |
-| Labyrinth session | Up to six reservations within six formation spaces, explicit actor ownership/loadouts, ready/rematch, pause, command watermark | Certificates and discovery provider mechanics |
+| Labyrinth session | Up to six participants independent of formation, explicit actor ownership/builds, ready/rematch, pause, command watermark | Certificates and discovery provider mechanics |
 | Labyrinth network | Wire schema, admission policy, target-specific snapshots, capability composition | Combat legality/effect implementation |
 | Labyrinth UI | Forms, selection, inspection, status summaries and accessible native controls | Mutable authoritative state, sprite artwork |
 | Labyrinth scene | ActorId-keyed sprites, art catalog, camera-aware anchors, environment | Input dispatch, legality, combat timing, networking |
@@ -14,19 +14,16 @@ Carterfight retain their own composition roots and rules.
 
 ## Deterministic battle kernel
 
-`Combat::with_party(seed, Vec<HeroSetup>)` builds the prototype Hauler encounter;
-`Combat::with_rosters` accepts explicitly composed formations on both teams.
-`Combat::with_heroes(seed, [HeroSetup; PARTY_SIZE])` retains the six-single-rank
-fixture API. All constructors create the authority from
-explicit unique actor IDs, class presets, and ability loadouts in front-to-rear
-rank order. `Combat::new(seed, [HeroClass; PARTY_SIZE])` is a convenience using
-default hero IDs and class starter abilities. Repeated classes are legal; class,
-actor identity, owner, and rank are independent. `snapshot()` returns validated
-public state without host RNG; `apply(actor, action)` either commits one legal
-action and automatic boundaries or returns a typed error without changing state
-or consuming RNG. `ai_action()` chooses through the same action/legality surface.
-Actor IDs are stable and independent of mutable formation rank. Player slot ownership
-stays in the application. Do not put Bevy Entity IDs in these models.
+`Combat::from_scenario(&catalog, &scenario)` is the common local/co-op/simulation
+constructor. `Scenario` supplies both formations, explicit unique actor IDs, names,
+stats, footprints, builds, starting conditions, controller policies and seed.
+Legacy `new`/`with_party`/`with_rosters` constructors adapt presets to the same
+frozen resolution path. Class/appearance, identity, owner and rank are independent.
+`snapshot()` returns validated public state without host RNG; `apply(actor, action)`
+commits one legal action and automatic boundaries or returns a typed error without
+mutating state or consuming RNG. `legal_actions()` and `ai_action()` use the same
+boundary. External controllers can drive it without Bevy, sockets or file I/O.
+Player ownership stays in the app; Bevy Entity IDs never enter pure models.
 
 `PARTY_SIZE` fixes this game's current six-rank contract; `HeroClass::ALL` enumerates
 five content presets, not seats. The bounded actors, six-rank masks, formation rules,
@@ -38,21 +35,39 @@ Life states distinguish living HP, dying heroes, independent corpse HP, and remo
 remains. See the [formation and death decision](rules.md)
 for precise clocks, movement, targeting and provisional death-save semantics.
 
-### Ability composition seam
+### Content, builds and scenarios
 
-`AbilityLoadout` is an ordered, duplicate-free, validated list of up to eight
-catalog `SkillId`s on each actor. Empty loadouts still have universal actions.
-Actions, legality, per-instance use limits, AI and UI consume this actual loadout;
-class only supplies base stats/visuals and a starter preset. Same-class actors
-never share uses, statuses, or ownership. Guest snapshots preserve equipped
-abilities through reconnect rather than reconstructing them from class.
+`catalog::ContentCatalog` parses/validates game-owned TOML definitions, indexed by
+stable `ContentId`. Built-in definitions live in `rules/content/catalog.toml`.
+Known effects are data authoring; new semantics require a typed effect and tests.
+`build::ActorBuild` separates name/appearance/stats/footprint from `CharacterBuild`
+(innate grants with provenance, learned-skill IDs and one optional weapon ID).
 
-Future equipment and skill-tree resolvers belong to Labyrinth: resolve their
-grants into this loadout at an explicit authoritative preparation boundary, then
-pass it through validated setup. Resolve duplicate grants/order/limits there;
-do not infer them from presentation. There is deliberately no inventory schema,
-tree model, grant provenance, mid-combat equip command, or shared Gamekit combat
-framework yet. Extend those rules and compatibility together when designed.
+Resolution creates one immutable `ResolvedBuild` per actor. Duplicate move grants
+merge provenance, learned grants precede upgrades, and stable ordering/conflict
+validation prevent file-order behavior. Definitions carry effective effects, reach,
+use limits and grant/upgrade sources. The maximum is 64 resolved moves per actor,
+a validation/wire resource bound; the eight-key shortcut range does not cap moves.
+`CombatAction::Ability { index, target }` names an actor-local frozen move. Legality,
+resolution, uses, AI, preview, UI and history consume that same definition. Legacy
+`SkillId`/`AbilityLoadout` remain convenience adapters, never a second authority.
+
+`scenario::Scenario` is versioned JSON input with no files or peer identities in the
+rules crate. A deployable scenario has 1–6 actors per side occupying at most six
+spaces and at least one standing hero. `validate_preparation` retains content,
+identity, starting-condition and payload checks while allowing an empty side or
+all-down hero draft. It does not authorize combat construction or portable save.
+Host configuration and owned guest edits validate before replacing authority.
+The app handles bounded local save/load. Rematch reuses the
+explicit seed; content, rules and scenario fingerprints identify reproducible input.
+Manual/AI/External controller policy is independent from online participant identity.
+Enemies default to AI; the external policy is a pure driver hook, not a complete gym.
+
+Input JSON is bounded to 128 KiB, combat snapshots to 1 MiB and session snapshots to
+4 MiB. Validation checks resolved payload budgets before accepting setup. Initial
+compatibility requires matching catalog and rules; no mod download or silent migration.
+Inventory storage/acquisition, offhand slots, passives/reactions and skill trees remain
+open designs. A single weapon reference does not establish an inventory schema.
 
 Initiative is rerolled per round using pinned deterministic SplitMix64 sampling.
 Effective Speed + d8 sorts descending, then Speed and a seeded tie-breaker. The
@@ -111,12 +126,78 @@ acknowledged admission authority, but retains its own two-seat policy, handshake
 composition, and game-specific snapshots; Labyrinth's six-seat rules do not leak
 into that adopter.
 
-Every guest request has a per-reservation sequence, encounter and decision boundary.
+Admission and snapshots use separate ordered Replicon channels; their delivery
+order across message types is unspecified. Each guest retains at most one snapshot
+for its current connection attempt until admission arrives. That snapshot stays
+unpublished until the normal peer/recipient validation succeeds, and disconnect,
+refusal, closure or a replacement attempt clears it. An idle host need not change
+its revision merely to repair an initial snapshot that arrived before admission.
+
+Every guest request has a per-reservation sequence, encounter, decision boundary and assignment revision.
 An ordered bounded result cache supports recent idempotent replies; an independent
 live-session high watermark rejects old commands even after cache eviction. Rematch
 changes encounter identity without resetting that reservation's watermark. Only a
 new player reservation gets a fresh sequence space. Host checks ownership by actor
-identity, not formation rank, and applies the same pure reducer used locally.
+identity and rejects obsolete assignment revisions, including assignment away/back.
+Each participant owns zero or more heroes; the host owns unassigned heroes and all
+enemy setup. Guests start as spectators. Only character controllers gate readiness
+or disconnect suspension; dying heroes retain ownership until permanent death.
+Host assignment pause/reassign/resume is explicit and never advances combat resources.
+Setup revision guards drafts, while unchanged actor editor fields retain native
+entities/focus/caret across unrelated participant projections. Mounted edit controls
+refresh ownership eligibility without recreating fields or discarding drafts;
+host-only footprint and choice prerequisites remain separate restrictions.
+
+Preparation uses one facing six-rank board for both teams, with a separate
+`LobbyFormation` recording stable actor positions and hero-rank reservations.
+Removing or moving a character preserves other positions; empty ranks are valid
+construction state. Deployment rejects internal gaps and empty sides without
+silently compacting them. Trailing unused capacity remains legal. Combat continues
+to consume the compact Scenario and keeps its existing movement/death rules.
+
+Typed placement previews and authority share footprint, collision and ownership
+validation. Replacement keeps actor identity/controller and uses the chosen type's
+starting build, clearing the replaced actor's starting HP/status overrides. Removal
+clears references to that actor from other starting-status sources. The host owns
+moving/removing, enemy setup and rank assignment; guests may choose a type in their
+reserved hero places. A multi-rank character must have one owner across its span.
+Moving adopts the destination reservation; removing leaves the reservation intact.
+An empty reservation alone does not make a spectator gate readiness or suspension.
+Pending type/movement proposals retain their revision guards. Inspection instead
+renders the current authoritative place and holds no placement draft: returning
+there after submission does not produce a stale-draft warning. Starting another
+placement or movement captures the current revision; this is not a command receipt.
+
+Valid Scenario submissions clear obsolete local validation feedback so subsequent
+authority errors and save results remain visible. A successful host-only load
+reports its source only after parsing, validation and synchronous authority apply;
+failed loads preserve the current scenario, formation and setup revision.
+
+Portable save remains playable Scenario JSON, with no participant or sparse-draft
+schema. Loading a stock or portable scenario restores compact placement and retains
+owners for matching actor identities. Editing just the seed preserves construction
+positions. Setup and assignment revisions cover these transitions; the v6 wire
+validates the draft/formation/company relationship before projecting it to a guest.
+
+The board keeps selection, type preview, placement and ownership next to their
+spatial context; scenario I/O and invitations are secondary views. All actor
+customization uses one game-owned editor with category-local
+browsing and a single actor draft, source revision and apply/discard lifecycle.
+Inspection is distinct from mutation. Effective comparisons come from the catalog
+resolver, preserving duplicate grants and learned contributions rather than
+recalculating combat behavior in widgets. Prerequisite rejection text names the
+required catalog move and omits authoring paths; the resolver still determines
+eligibility. Character presentation and draft policy
+stay local; the same screen is intended to support later in-game inspection without
+authorizing combat-time editing. Existing prototype battle parameters do not define
+a future attribute/progression system.
+
+The battle action rail retains the subject and effective disclosed loadout actually
+mounted. Selection and confirmation reject an input batch if the current projection
+differs before Present can rebuild those controls. This complements turn/encounter
+and server-side authorization: an old actor-local position must never select a new
+build's move merely because the index remains legal. Mutable HP/uses do not change
+the frozen loadout identity; current action legality is still validated separately.
 
 All cooperative battle state is public, so peers receive full authoritative
 snapshots; only request sequence is recipient-specific. Host RNG, admission secrets
@@ -141,10 +222,14 @@ system, with encounter/actor-scoped subjects and disclosure-filtered content.
 Portrait activation pins a card without changing the selected target; there is no
 separate inspection/initiative drawer. The primary battlefield never scrolls;
 overflowing ability loadouts scroll horizontally and focus brings controls into view.
+Contextual cards reserve the character summaries, HP and command rail. They may
+cover artwork so sparse formations with tall fitted sprites still have room for
+effects, ranks and scrollable explanations; sprite size never limits help height.
+The log retains its height above artwork through a separate game-owned boundary.
 
 Local game/settings/leave pages compose Gamekit's `UiMenuStack` and menu templates.
 They never gate network schedules, pause Bevy time, or change host authority.
-`CombatInterruption` distinguishes missing players, local reconnect admission and
+`CombatInterruption` distinguishes missing controllers, host assignment pause, local reconnect admission and
 halted rules. The validated host snapshot excludes local reconnect/menu state and
 checks its compatibility `paused` flag against the authoritative reason. One player
 returning does not resume combat while another is missing, and reconnection does
@@ -182,7 +267,7 @@ sufficient; game-specific scene/HUD composition stays in Labyrinth.
 
 ## Expansion path
 
-Add another encounter/content catalog before inventing a generic battle engine.
+Extend the game-owned catalog and scenarios before considering a shared battle engine.
 Keep a future maze, expedition progression, resources and encounter transitions in
 Labyrinth. Extract a capability only when another game establishes a reusable
 algorithm/primitive contract; preserve dependency direction from game to capability.

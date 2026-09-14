@@ -270,6 +270,7 @@ struct GuestAttempt {
     attempt: SessionId,
     expected_peer: Option<PeerId>,
     persisted: Option<DeckOffer>,
+    pending_snapshot: Option<DeckSnapshot>,
     started: Instant,
     failed: bool,
 }
@@ -715,6 +716,7 @@ fn begin_guest_connect(
         attempt,
         expected_peer,
         persisted: None,
+        pending_snapshot: None,
         started: Instant::now(),
         failed: false,
     });
@@ -1074,19 +1076,31 @@ fn receive_results(
 
 fn receive_snapshots(
     mut snapshots: MessageReader<DeckSnapshot>,
-    attempt: Option<Res<GuestAttempt>>,
+    mut attempt: Option<ResMut<GuestAttempt>>,
     mut state: ResMut<DeckNetworkState>,
 ) {
-    for snapshot in snapshots.read() {
-        if !state.admitted
-            || !attempt
-                .as_ref()
-                .is_some_and(|attempt| attempt.attempt == snapshot.attempt)
-        {
+    let pending = if state.admitted {
+        attempt
+            .as_mut()
+            .and_then(|attempt| attempt.pending_snapshot.take())
+    } else {
+        None
+    };
+    for envelope in pending.as_ref().into_iter().chain(snapshots.read()) {
+        let Some(attempt) = attempt.as_mut() else {
+            continue;
+        };
+        if attempt.failed || attempt.attempt != envelope.attempt {
             continue;
         }
-        let snapshot = &snapshot.snapshot;
+        let snapshot = &envelope.snapshot;
         if snapshot.recipient != Seat::Guest {
+            continue;
+        }
+        if !state.admitted {
+            // Welcome and snapshot use separate ordered channels. Retain one
+            // matching snapshot until the persisted offer's welcome arrives.
+            attempt.pending_snapshot = Some(envelope.clone());
             continue;
         }
         state.next_request = state.next_request.max(snapshot.next_request);

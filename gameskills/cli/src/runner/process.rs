@@ -420,6 +420,7 @@ mod tests {
             requires: vec![],
             resources: vec![],
             timeout_seconds: 2.0,
+            git_refs: crate::config::GitRefs::All,
         };
         let id = super::super::identifier();
         let record = json!({"schema_version":2,"runtime":"rust","run_id":id,"status":"running","commands":{"where":spec}});

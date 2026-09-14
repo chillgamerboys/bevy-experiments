@@ -10,14 +10,21 @@ use labyrinth_rules::{Effect, StatusKind};
 struct Skillbook;
 
 #[derive(Component, PartialEq, Eq)]
-struct BookContents(Vec<(SkillId, UiTooltipContent)>);
+struct BookContents(Vec<(UiTooltipSubject, UiTooltipContent)>);
 
 fn subject(value: impl Into<String>) -> UiTooltipSubject {
     UiTooltipSubject(format!("labyrinth/{}", value.into()))
 }
 
-pub(super) fn ability_subject(skill: SkillId) -> UiTooltipSubject {
-    subject(format!("ability/{skill:?}"))
+pub(super) fn ability_subject(
+    encounter: u64,
+    actor: ActorId,
+    ability: &labyrinth_rules::catalog::ContentId,
+) -> UiTooltipSubject {
+    subject(format!(
+        "encounter/{encounter}/actor/{}/ability/{ability}",
+        actor.0
+    ))
 }
 
 pub(crate) fn actor_subject(encounter: u64, actor: ActorId) -> UiTooltipSubject {
@@ -32,13 +39,13 @@ fn condition_subject(kind: StatusKind) -> UiTooltipSubject {
     subject(format!("condition/{kind:?}"))
 }
 
-fn ability_content(skill: SkillId) -> UiTooltipContent {
-    let definition = skill_definition(skill);
+fn ability_content(ability: &labyrinth_rules::build::ResolvedAbility) -> UiTooltipContent {
+    let definition = &ability.definition;
     let mut links = vec![UiTooltipLink {
         label: "Formation ranks".to_owned(),
         subject: subject("ranks"),
     }];
-    for effect in definition.effects {
+    for effect in &definition.effects {
         if let Effect::ApplyStatus(kind) = effect {
             links.push(UiTooltipLink {
                 label: status_definition(*kind).name.to_owned(),
@@ -46,17 +53,49 @@ fn ability_content(skill: SkillId) -> UiTooltipContent {
             });
         }
     }
+    let mut facts = vec![
+        crate::presentation::effects_description(&definition.effects),
+        format!("From  {}", rank_diagram(definition.source_ranks)),
+        format!("Target {}", rank_diagram(definition.target_ranks)),
+        definition.max_uses.map_or_else(
+            || "Unlimited uses".to_owned(),
+            |uses| format!("{uses} uses per encounter"),
+        ),
+    ];
+    if definition.target_pattern == labyrinth_rules::catalog::TargetPattern::FrontPair {
+        facts.push("Hits distinct occupants of front ranks 1–2 once each".to_owned());
+    }
+    for grant in &ability.grants {
+        facts.push(format!(
+            "{:?} grant · {} · {}",
+            grant.kind, grant.provenance, grant.definition
+        ));
+    }
+    for upgrade in &ability.upgrades {
+        facts.push(format!(
+            "Learned upgrade · {} · {}",
+            upgrade.source.provenance, upgrade.source.definition
+        ));
+        for operation in &upgrade.upgrade.operations {
+            use labyrinth_rules::catalog::UpgradeOperation;
+            facts.push(match operation {
+                UpgradeOperation::AddDamage { amount, .. } => format!("Effect power +{amount}"),
+                UpgradeOperation::AppendEffect(effect) => {
+                    crate::presentation::effects_description(std::slice::from_ref(effect))
+                }
+                UpgradeOperation::ExtendSourceRanks(mask) => {
+                    format!("Added acting ranks {}", rank_diagram(*mask))
+                }
+                UpgradeOperation::ExtendTargetRanks(mask) => {
+                    format!("Added target ranks {}", rank_diagram(*mask))
+                }
+            });
+        }
+    }
     UiTooltipContent {
-        title: definition.name.to_owned(),
-        facts: vec![
-            crate::presentation::base_description(&CombatAction::Skill {
-                skill,
-                target: ActorId(0),
-            }),
-            format!("From  {}", rank_diagram(definition.source_ranks)),
-            format!("Target {}", rank_diagram(definition.target_ranks)),
-        ],
-        body: definition.description.to_owned(),
+        title: definition.name.clone(),
+        facts,
+        body: definition.description.clone(),
         links,
     }
 }
@@ -80,7 +119,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         .iter(world)
         .next();
     if let Some(host) = host {
-        let bottom = world
+        let bottoms = world
             .query::<&ActorTile>()
             .iter(world)
             .filter_map(|tile| {
@@ -92,14 +131,17 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 let actor = view.combat.as_ref()?.actor(tile.actor)?;
                 let area = node.size() * node.inverse_scale_factor;
                 let bottom = transform.translation.y * node.inverse_scale_factor + area.y * 0.46;
-                // Even before artwork loads, never place help over HP or Confirm.
-                Some(
-                    crate::scene::actor_art_size(world, actor.kind, area)
-                        .map_or(bottom, |art| bottom - art.y - 12.0),
-                )
+                // Reserve HP and commands, but allow help over the artwork.
+                // Sparse formations fit tall actors; restricting help above
+                // their heads can leave only enough height for its title.
+                let history = crate::scene::actor_art_size(world, actor.kind, area)
+                    .map_or(bottom, |art| bottom - art.y - 12.0);
+                Some((bottom - 12.0, history))
             })
-            .reduce(f32::min);
-        if let Some(bottom) = bottom {
+            .reduce(|(help, history), (other_help, other_history)| {
+                (help.min(other_help), history.min(other_history))
+            });
+        if let Some((bottom, history_bottom)) = bottoms {
             let width = world
                 .get::<ComputedNode>(host)
                 .map_or(0.0, |node| node.size().x * node.inverse_scale_factor);
@@ -111,6 +153,12 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
                 if world.get::<bevy_gamekit::ui::UiTooltipBounds>(host) != Some(&bounds) {
                     world.entity_mut(host).insert(bounds);
                 }
+                let history = super::history::HistorySafeBottom(history_bottom);
+                if history_bottom > 100.0
+                    && world.get::<super::history::HistorySafeBottom>(host) != Some(&history)
+                {
+                    world.entity_mut(host).insert(history);
+                }
             }
         }
     }
@@ -121,10 +169,11 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         snapshot,
         world.resource::<crate::presentation::CombatDisclosure>(),
     );
-    let skills = inspection::display_actor(view)
+    let displayed = inspection::display_actor(view);
+    let skills = displayed
         .and_then(|actor| projection.actor(actor.id))
         .and_then(|actor| actor.details.as_known())
-        .map_or_else(Vec::new, |actor| actor.skills.clone());
+        .map_or_else(Vec::new, |actor| actor.abilities.clone());
     let mut entries = BTreeMap::new();
     for actor in &snapshot.actors {
         let Some(facts) = projection.actor(actor.id) else {
@@ -153,7 +202,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         } else {
             view.players
                 .iter()
-                .find(|p| p.actor == actor.id)
+                .find(|p| p.actors.contains(&actor.id))
                 .map_or("Host AI", |p| p.name.as_str())
         };
         let mut rows = vec![format!("{health} · {rank}"), format!("{speed} · {owner}")];
@@ -265,26 +314,29 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
             },
         );
     }
-    let book = skills
-        .iter()
-        .map(|skill| (*skill, ability_content(*skill)))
-        .collect::<Vec<_>>();
-    for (skill, content) in &book {
-        entries.insert(ability_subject(*skill), content.clone());
-    }
-    if !world
-        .resource::<crate::presentation::CombatDisclosure>()
-        .has_unknown()
-    {
-        for event in &view.events {
-            if let CombatEventKind::Action {
-                action: CombatAction::Skill { skill, .. },
-                ..
-            } = event.event.kind
-            {
-                entries
-                    .entry(ability_subject(skill))
-                    .or_insert_with(|| ability_content(skill));
+    let book = displayed.map_or_else(Vec::new, |actor| {
+        skills
+            .iter()
+            .map(|ability| {
+                (
+                    ability_subject(view.encounter, actor.id, &ability.definition.id),
+                    ability_content(ability),
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+    // Frozen cards are actor-scoped: two wielders can have different upgrades to
+    // the same content ID. Revoking disclosure removes history and pinned cards too.
+    for actor in &snapshot.actors {
+        if let Some(details) = projection
+            .actor(actor.id)
+            .and_then(|facts| facts.details.as_known())
+        {
+            for ability in &details.abilities {
+                entries.insert(
+                    ability_subject(view.encounter, actor.id, &ability.definition.id),
+                    ability_content(ability),
+                );
             }
         }
     }
@@ -337,7 +389,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
         );
         world.entity_mut(entity).insert((
             UiTooltipSource(key.clone()),
-            bevy_gamekit::ui::UiTooltipOpen(key),
+            bevy_gamekit::ui::UiTooltipOpen(key.clone()),
         ));
     }
     world
@@ -348,7 +400,7 @@ pub(super) fn refresh(world: &mut World, view: &LabyrinthView, ui: &UiState) {
     skillbook(world, ui.show_skillbook, book);
 }
 
-fn skillbook(world: &mut World, shown: bool, book: Vec<(SkillId, UiTooltipContent)>) {
+fn skillbook(world: &mut World, shown: bool, book: Vec<(UiTooltipSubject, UiTooltipContent)>) {
     let existing = world
         .query_filtered::<Entity, With<Skillbook>>()
         .iter(world)
@@ -421,16 +473,15 @@ fn skillbook(world: &mut World, shown: bool, book: Vec<(SkillId, UiTooltipConten
         Action::ToggleSkillbook,
         false,
     );
-    for (skill, content) in &book {
-        let key = ability_subject(*skill);
+    for (key, content) in &book {
         let entity = world
             .spawn((
                 bevy_gamekit::ui::button(format!("Read {}", content.title)),
                 UiSkin::Control,
                 bevy_gamekit::ui::UiControlMetrics::default(),
-                bevy_gamekit::ui::UiFocusId::new("labyrinth-skillbook", format!("{skill:?}")),
+                bevy_gamekit::ui::UiFocusId::new("labyrinth-skillbook", key.0.clone()),
                 UiTooltipSource(key.clone()),
-                bevy_gamekit::ui::UiTooltipOpen(key),
+                bevy_gamekit::ui::UiTooltipOpen(key.clone()),
                 ChildOf(panel),
             ))
             .id();

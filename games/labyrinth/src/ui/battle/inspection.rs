@@ -5,8 +5,10 @@ use crate::presentation::{CombatDisclosure, ForecastDisplay};
 
 pub(crate) fn select_skill_slot(view: &LabyrinthView, ui: &mut UiState, index: usize) {
     if let Some(actor) = display_actor(view) {
-        if let Some(skill) = actor.skills().get(index) {
-            ui.selected = Some(Choice::Skill(*skill));
+        if let Ok(index) = u8::try_from(index) {
+            if actor.ability(index).is_some() {
+                ui.selected = Some(Choice::Ability(index));
+            }
         }
     }
 }
@@ -20,31 +22,21 @@ pub(crate) fn skills_disclosed(view: &LabyrinthView, disclosure: &CombatDisclosu
 
 pub(super) fn display_actor(view: &LabyrinthView) -> Option<&ActorSnapshot> {
     let snapshot = view.combat.as_ref()?;
-    if view.local {
-        snapshot
-            .active_actor
-            .and_then(|id| snapshot.actor(id))
-            .filter(|actor| actor.team() == Team::Heroes)
-            .or_else(|| {
-                snapshot
-                    .actors
-                    .iter()
-                    .find(|actor| actor.team() == Team::Heroes)
-            })
-    } else {
-        let player = view
-            .players
-            .iter()
-            .find(|player| Some(player.slot) == view.player)?;
-        snapshot
-            .actor(player.actor)
-            .filter(|actor| actor.team() == Team::Heroes)
-    }
+    let player = view.players.iter().find(|p| Some(p.slot) == view.player)?;
+    snapshot
+        .active_actor
+        .and_then(|id| snapshot.actor(id))
+        .filter(|actor| player.actors.contains(&actor.id))
+        .or_else(|| player.actors.iter().find_map(|id| snapshot.actor(*id)))
 }
 
 pub(super) fn action_for(choice: Choice, target: Option<ActorId>) -> Result<CombatAction, String> {
     let target = || target.ok_or_else(|| "Select a character to target.".to_owned());
     Ok(match choice {
+        Choice::Ability(index) => CombatAction::Ability {
+            index,
+            target: target()?,
+        },
         Choice::Skill(skill) => CombatAction::Skill {
             skill,
             target: target()?,
@@ -105,9 +97,14 @@ pub(crate) fn selected_action(
     Ok((actor.id, action))
 }
 
-pub(super) fn choice_title(choice: Option<Choice>) -> &'static str {
+pub(super) fn choice_title(actor: Option<&ActorSnapshot>, choice: Option<Choice>) -> &str {
     match choice {
-        Some(Choice::Skill(skill)) => skill_definition(skill).name,
+        Some(Choice::Ability(index)) => actor
+            .and_then(|a| a.ability(index))
+            .map_or("Unknown move", |d| d.name.as_str()),
+        Some(Choice::Skill(skill)) => actor
+            .and_then(|a| a.skill_index(skill).and_then(|i| a.ability(i)))
+            .map_or(skill_definition(skill).name, |d| d.name.as_str()),
         Some(Choice::Reposition) => "Move · swap with an adjacent ally",
         Some(Choice::Rescue) => "Rescue · revive a downed ally",
         Some(Choice::Defend) => "Guard · reduce direct damage by 2",

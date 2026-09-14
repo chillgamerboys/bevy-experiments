@@ -2,13 +2,31 @@
 
 ## A skill is absent from the session
 
-Run `gameskills status` to inspect the installed pin and package selection. Canonical
-source can be newer than the installed bundle without either being corrupt. Setup
-stages instructions; it does not prove an already-running host loaded them.
-`gameskills native codex --verify` observes native discovery without a model turn;
-Claude launch construction is a separate operation. Use explicit source fallback
-only when needed and identify it as such. Do not claim native activation from reading
-SKILL.md or silently edit installed caches.
+Run `gameskills status`. Bundle validity and `native_clients.codex.registration`
+are separate: `missing`, `outdated` or `conflict` is an actionable host-registration
+gap, even when the pinned bundle is valid. An older installation may have staged
+all files without making them discoverable to an ordinary host. Repair the same pin
+with `gameskills native codex --register --apply`, then observe ordinary discovery
+with `gameskills native codex --verify-project`.
+
+For `conflict`, inspect the reported project setting or interrupted transaction;
+GameSkills will not overwrite a newer local edit or silently enable a disabled
+plugin. Use `native codex --register --recover` for an interrupted targeted repair,
+or `setup --recover` for an interrupted installation. A copied checkout's absolute
+marketplace path is `outdated`; re-register after its pinned bundle is hydrated.
+
+If project registration is present but ordinary discovery fails, check whether the
+project is trusted, the host ignores/overrides project configuration, or its Codex
+version lacks the needed plugin support. GameSkills does not change global trust
+or retry with injected flags. `native codex --verify` uses explicit session overrides
+and can pass while ordinary-host discovery fails. A missing executable is distinct
+from either result. Claude persistent registration is not yet supported.
+
+Start a new Codex/Conductor session or restart its host to load changed registration.
+An already-running session's catalog is a separate observation. Canonical source can
+be newer than the installed bundle without corruption. Explicit source fallback can
+continue useful work, but does not close the registration/discovery defect; reading
+SKILL.md is not native activation. Preserve installed caches and the recorded pin.
 
 ## Local checks pass but delivery is unfinished
 
@@ -23,6 +41,13 @@ Use `gameskills evidence validate RUN_ID` and inspect the named changed inputs.
 Source is only one input: configuration, Git refs, environment, executable and managed
 files can also change. Preserve the old record and rerun affected checks when required;
 do not weaken fingerprints or copy a pass to a new source identity.
+
+If another worker's unrelated branch is the only changed input, commands with
+known Git dependencies can opt into an exact `git_refs` list in project config.
+Keep the review base and any other consumed refs; default/`"all"` dependencies keep
+the whole graph conservative. Use the current development runtime and create new
+evidence after the configuration change. See [declared Git inputs](../cli/README.md#declared-git-inputs-for-command-evidence);
+this does not make an old invalid record valid.
 
 ## A docs pointer resolves incorrectly
 
@@ -42,7 +67,14 @@ run with ordinary process privileges; the CLI is not a sandbox.
 
 ## Linear verification is unavailable
 
-Core-only adoption needs no Linear account or key. Connected MCP can perform normal
-tracking operations; the optional standalone observer has its own authentication.
-A provider error is not proof an issue is absent. Its MCP-first integration remains
-open in the reliability plan. Issue deletion is deferred and is not a completion gate.
+Core-only adoption needs no Linear account or key. Required MCP tracking uses a
+fresh `delivery check --tracker-observation FILE` snapshot from the connected tools.
+Missing/stale snapshots, wrong UUIDs, changed task/source bindings or a missing link
+in either direction stay explicit in the check's reasons. Query the connector again;
+do not retimestamp old evidence. See the [snapshot contract](../plugins/gameskills/references/delivery.md#tracking-observations).
+
+An existing `tracking.observer` argv deliberately retains command mode and its own
+authentication. Change the adopter's configuration to `mode = "mcp"` and remove
+that argv when adopting the connected workflow; mixed modes are rejected. An older
+CLI may reject the new mode/flag and must be updated first. A provider error is not
+proof an issue is absent. Issue deletion is deferred and is not a completion gate.

@@ -9,6 +9,7 @@ Gamekit is optional to an adopter. The [catalog](catalog.md) owns skill boundari
 - `cli/src/config.rs`: project configuration structure and defaults.
 - `cli/src/docs.rs`: read-only documentation discovery, independent of installation.
 - `cli/src/installation/`: bundle verification, atomic setup, native adapters and migration.
+- `cli/src/installation/registration.rs`: project-scoped Codex settings ownership and same-pin repair.
 - `cli/src/workflow/`: revision-guarded work queues; queues do not launch agents.
 - `cli/src/runner/`: configured commands, supervision, resource locks and evidence.
 - `cli/src/delivery.rs`: solo intent and observed PR/tracker delivery.
@@ -19,6 +20,11 @@ These paths are relative to the GameSkills source directory. The modules support
 the executable; they are not a promised stable public Rust library interface.
 
 ## Decisions
+
+Task scope, execution strategy and execution authorization are separate. Recover
+applicable existing authorization across handoffs; a worker limit describes capacity
+and does not by itself grant permission. Durable delivery records carry the endpoint
+for solo and coordinated work alike.
 
 Project configuration owns commands, targets and local workflow choices. Skills
 retain triggers, necessary judgment and completion criteria; current project docs
@@ -37,6 +43,44 @@ The validator names changed input categories without exposing their secret value
 No helper forces an agent to invoke a skill or finish its task. Native discovery,
 model behavior, command success, PR publication and human acceptance are different
 observations. [Contributing](contributing.md) describes their verification.
+
+Codex setup includes project registration, not just immutable file staging. Owned
+marketplace/plugin values are tracked separately from unrelated owner TOML. Setup
+recovers config, lock and registration together; targeted registration recovery
+changes only native settings and their ownership record. Both refuse intervening
+local edits and unsafe paths. Same-pin registration takes the setup lock but does
+not require queues/runs to be inactive; normal evidence identities still observe
+the changed project files, including ignored Codex config, its ownership record and
+an interrupted registration journal. Installation/pin changes retain the stronger exclusions.
+
+Ordinary-project discovery has a separate native probe with no injected enable
+flags. Project trust, host overrides and existing-session reload remain explicit
+boundaries; no global configuration or trust edit is implicit in setup. Claude's
+session-scoped launcher does not establish persistent Claude registration.
+
+Tracking uses the host's connected MCP by default when no command observer is
+configured. Core validates a fresh, task/source-bound normalized issue snapshot
+and the live GitHub backlink; it records the snapshot and digest as caller-supplied
+evidence, not an authenticated MCP invocation. The agent owns the actual connector
+call and raw evidence. This keeps provider credentials out of core and avoids
+requiring an extra helper for a connection the host already supplies. Existing
+observer argv configurations retain command behavior; mixed modes fail explicitly.
+
+## Command ref identity
+
+All refs remain the command default because trusted commands can read arbitrary
+Git state. A per-command `git_refs` list explicitly narrows that dependency to exact
+full refs; selected commands and prerequisites contribute a union. Any default or
+`"all"` policy preserves all-ref behavior for the graph. HEAD and its symbolic branch
+remain unconditional, as do source/index/configuration/executable/environment
+identities. A declared ref's deletion or movement invalidates evidence; unrelated
+branch activity need not invalidate a scoped graph. Missing named refs fail before
+execution. Delivery observations and nested submodule identities stay conservative.
+
+The policy is additive configuration, not a reinterpretation of historical evidence.
+Runtime/normalization/configuration changes require a new observation and preserve
+old records. The [CLI contract](../cli/README.md#declared-git-inputs-for-command-evidence)
+explains selection and development-version compatibility.
 
 ## Documentation discovery
 

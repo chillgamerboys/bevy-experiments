@@ -23,14 +23,23 @@ cargo test --locked -p gameskills-cli --profile ci
 
 | Evidence | Claims | Does not establish |
 |---|---|---|
-| Pure rules tests | Seeded order, rank legality, status boundaries, atomic rollback, complete fights | UI or networking |
-| Session policy tests | Six-player readiness, repeated-class actor ownership, durable replay watermark, pause/rematch | Physical socket behavior |
-| Multi-App socket tests | One host + five encrypted clients, password/direct admission, command convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
+| Pure rules tests | Catalog/build validation, scenario roundtrip, seeded order, transactional cleave/preview parity, statuses and complete fights | UI or networking |
+| Session policy tests | Independent participants/actors, sparse typed construction, rank reservations, compact deployment, owned/stale setup, spectator readiness, reassignment replay guards, exact-seed rematch | Physical socket behavior |
+| Multi-App socket tests | One host + five encrypted clients, password/direct admission, large authored build/save-load commands, spatial reservation/type/gap convergence, dropped-sixth-App recovery, offer/ACK loss | OS process death or cross-machine reachability |
 | Explicit six-process test | Abrupt sixth-seat guest kill, profile lock release, same-peer/actor/class/loadout/status recovery, subsequent completed fight | Cross-machine LAN/Tailscale reachability |
 | Fake discovery tests | Provider-neutral listing/removal/compatibility and encrypted join handoff | Real multicast or Tailscale |
-| UI behavioral/structural tests | Typed intents, focus/modal behavior, target eligibility, viewport control bounds | Visual quality or real pointer hardware |
+| UI behavioral/structural tests | Draft preservation/save ACK, 12+ authored moves via native keyboard/pointer messages, scoped provenance/forecast, focus/modal behavior and bounds | Visual quality or real pointer hardware |
 | Native rendered frames | Static composition at the captured logical sizes | Interactive behavior or six-player correctness |
 | Manual network routes | Behavior on the recorded machines/interfaces/firewalls | Arbitrary networks or future Steam integration |
+
+The delivery-order regressions capture actual host admission/snapshot messages
+after encrypted offer and persistence ACK, then deliver the snapshot first at
+separate receive boundaries. They verify delayed publication, stale-attempt
+isolation and peer validation without waiting for another host revision.
+
+The Scenario UI route covers invalid seed correction and visibility of subsequent
+save/load feedback. The encrypted custom-build/save-load route checks that invalid
+JSON preserves setup and a corrected load replaces its earlier error with success.
 
 Do not call a saved-credential round trip a reconnect test. Recovery tests must
 re-establish the encrypted connection, retain the same peer/hero, compare exact
@@ -46,14 +55,30 @@ cargo run -p labyrinth --example labyrinth_review --profile ci -- \
 
 Repeat for 1280×720, 1920×1080 and 3840×2160, each with `auto` and `200` scaling.
 Routes include `menu`, `host`, `lobby`, `game-menu`, `settings`, `leave`, `history`, `compact`, `combat`, `help`, `effects`, `inspect`, `order` and
-`paused`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
+`paused`, `abilities`, `ability-help`, `editor` and `editor-actions`. Help/effects/inspect use authored presentation fixtures, not input or gameplay claims. The offscreen render
 uses exact logical dimensions rather than the desktop's window-size limit. Check
 actor/rank readability, HP/status duration, action requirements, focus/disabled
 contrast and inspector/activity scrolling. Do not approve from dimensions alone.
 
-For the current description/dock correction, prioritize normal-scale play and
-ordinary window resizing. The 200% option and existing automated regressions remain,
-but a manual 200% review is deferred and is not a release gate for this pass.
+For customization, review lobby, character editor and complete-ability overflow at
+1280×720 and 1920×1080, including 200% scaling. Automatic focus scrolling is part
+of usability; verify controls can be reached beyond the first visible rows.
+Static frames and headless native-input messages remain distinct from a desktop walk.
+
+The spatial preparation routes are `construction`, `construction-picker`,
+`construction-gap`, `construction-enemy` and `construction-owners`. Review the
+facing formation, actual multi-rank art/span, selected destination, type mechanics,
+ownership and blocked-deployment reason at 1280×720 Auto/200% and wide Auto. The
+selected type's useful moves must be visible before placement; large text uses a
+focused list/detail route rather than hiding facts beneath repeated navigation.
+Judge the complete task, including removing a character, choosing another type,
+repairing a gap, assigning control and returning from the one character editor.
+Reachable controls alone do not establish a clear or efficient composition.
+
+`session::tests::spatial` covers construction/authority/snapshot invariants;
+`network::tests::spatial` covers encrypted shared construction and local deployment
+after edits. Local Deploy skips the co-op Ready step atomically, while both modes
+retain complete/compact validation. Keep the ordinary co-op readiness regressions.
 
 The overlay regressions compare all twelve native actor anchors and actual atlas
 sprite transforms across selection, targeting, utilities and detail drawers. They
@@ -69,9 +94,16 @@ Use independent profiles as described in [the game README](../README.md).
 Keep artifacts in a private temporary directory and redact codes and credentials.
 
 - Direct route: both discovery providers disabled, five different invitations,
-  all six ready, correct hero ownership and host-only start/rematch. Pick repeated
-  classes, verify independent actor control and uses, and reject a seventh guest.
-  Changing a class invalidates readiness; six seats do not require six classes.
+  assign zero/one/multiple heroes, then verify controller-only readiness and host-only
+  Start/rematch. Spectators (including host) do not gate Start or pause on disconnect.
+  Verify six participant capacity with a two-rank wagon and reject a seventh guest.
+  Change a build and verify readiness invalidation and rejection of stale drafts.
+- Configure both sides' stats/builds and all six weapon types. Save/load the same
+  Scenario JSON and repeat the exact seed. Verify 12+ moves, upgrades/provenance,
+  unlimited throws and front-pair cleave against distinct and multi-rank occupants.
+- Pause for assignment, move heroes between connected participants and resume.
+  Confirm no combat resource/clock changes and rejection of old commands after
+  assignment away/back. Dying retains ownership for rescue; dead-only owners spectate.
 - Same LAN: host discovery enabled, a passphrase, real guest listing present for
   at least a minute, wrong password rejected and correct password admitted. Check
   occupancy updates and removal when the host closes.
@@ -106,6 +138,10 @@ route and build. Passing deterministic CI is not a substitute for these manual g
   before clipping with no hidden settling frame. Native pointer tests also check
   that a tall actor's own preview cannot intercept the target click. Static
   captures establish presentation only; desktop motion still needs visual review.
+- The fourteen-ability route loads the real atlas with one hero and two enemies
+  at Auto/200%. Effects and ranks must be visible in the first help fold, paging
+  must reach the authored explanation, and cards must leave HP, character
+  summaries and Confirm clear. A visible title alone does not establish usable help.
 - Open host and guest menus/settings during a live encounter: snapshots and peer
   lifecycle processing continue. Only the menu owner's gameplay input is blocked.
   The socket regression uses six real Apps with full UI stacks on host and one
@@ -129,9 +165,12 @@ route and build. Passing deterministic CI is not a substitute for these manual g
   keyboard and resizing. Automated layout tests are not an interactive walk.
 
 The menu pass has static captures under `target/review/menus-*.png`. Native desktop
-inspection currently returns `cgWindowNotFound`, including for the review app
-bundle; a completed interactive walk is not claimed. Cross-machine network routes
-also remain separate manual evidence.
+automation must verify that the target process is active and its window is on
+screen before attributing missing clicks to the game. A cached window-ID capture
+or a successful activation request alone does not establish foreground input. On
+macOS, a normal binary launched through an app wrapper can provide the native
+activation/Accessibility route when an unbundled CLI launch cannot. Record the
+actual binary and observed route; cross-machine network evidence remains separate.
 
 ## Forecast verification
 
@@ -176,6 +215,29 @@ verify that stationary-pointer dismissal does not reveal a new tooltip. Render
 presentation states; those captures freeze timing and do not prove hover duration.
 
 ## Unresolved verification
+
+The unified editor and preparation require decision-information checks as well as
+input/layout checks. Compare a dagger and greatsword at different acting ranks,
+inspect a learned rank/damage upgrade, remove one of several grants, and explain
+the actual added/removed/changed moves before applying. Exercise category changes,
+dirty character switching, discard/reload, server conflicts and source replacement.
+Both teams use the same editor. Do not infer understandable choices from unclipped
+buttons alone; record what is visible separately from observed player comprehension.
+
+`ui::shell::lobby::tests` covers preparation navigation, retained seed drafts and
+the footer at Auto/200%. Its real-atlas pointer fixture selects an occupied actor
+through window cursor and mouse-button events without forced focus or direct
+`UiActivated` injection. The movement regression checks live inspection after an
+accepted projection, then rejection of a newly stale movement proposal.
+Editor lifecycle coverage in `ui/setup_tests.rs` includes permission loss/return
+without remounting fields, retained drafts/carets, and independent footprint/choice
+restrictions. Decision coverage in `ui/setup/tests.rs` verifies that prerequisite
+rejections use catalog move names while resolution still controls eligibility.
+These checks do not replace the native walk. The queued-hotbar regression sends a
+synthetic `UiActivated` batch through production translation before Present, with
+an unchanged positive control and a replaced valid build. It tests source binding,
+not a desktop pointer reproduction. Preserve the baseline wrong-action failure
+and the fixed result in the UI revision evidence.
 
 Historical local reviews did not establish cross-machine LAN/Tailscale behavior,
 all window-resize paths or manual round-six corpse expiry. Deterministic lifecycle

@@ -11,7 +11,9 @@ use labyrinth_rules::{ActorId, CombatAction, CombatSnapshot, Effect, HeroClass, 
 use super::*;
 
 mod budgets;
+mod delivery_order;
 mod process;
+mod spatial;
 
 // This is an acceptance requirement, deliberately not derived from production
 // capacity: accidentally reverting the host to four seats must fail these tests.
@@ -19,7 +21,7 @@ const TEST_PLAYERS: usize = 6;
 const LAST_GUEST: usize = TEST_PLAYERS - 1;
 
 #[test]
-fn real_udp_wagon_consumes_a_space_and_fresh_guest_reclaims_it() {
+fn real_udp_wagon_ownership_reconnects_without_changing_participant_capacity() {
     let directory = tempfile::tempdir().expect("profile directory");
     let path = directory.path().join("wagon.json");
     let mut apps: Vec<_> = (0..5)
@@ -29,18 +31,27 @@ fn real_udp_wagon_consumes_a_space_and_fresh_guest_reclaims_it() {
     for guest in 1..5 {
         let code = hosted_code(app(&mut apps, 0).world(), guest - 1).expect("private invitation");
         start::join_code(app(&mut apps, guest).world_mut(), &code).expect("join starts");
-        assert!(pump_until(&mut apps, Duration::from_secs(10), |apps| app(
-            apps, guest
-        )
-        .world()
-        .resource::<Runtime>()
-        .admitted));
+        assert!(
+            pump_until(&mut apps, Duration::from_secs(10), |apps| app(apps, guest)
+                .world()
+                .resource::<Runtime>()
+                .admitted),
+            "guest {guest} admission did not complete: {}",
+            admission_diagnostics(&apps)
+        );
     }
-    app(&mut apps, 4)
+    app(&mut apps, 0)
         .world_mut()
-        .write_message(LabyrinthIntent::SelectHero(HeroClass::LanternWagon));
+        .write_message(LabyrinthIntent::Assign {
+            actor: ActorId(5),
+            owner: 4,
+        });
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
-        host_snapshot(apps).players.len() == 5 && converged(apps)
+        host_snapshot(apps)
+            .company
+            .iter()
+            .any(|member| member.actor == ActorId(5) && member.owner == 4)
+            && converged(apps)
     }));
     assert_eq!(
         app(&mut apps, 0)
@@ -48,7 +59,7 @@ fn real_udp_wagon_consumes_a_space_and_fresh_guest_reclaims_it() {
             .resource::<Hosted>()
             .metadata
             .player_capacity(),
-        5
+        6
     );
     for app in &mut apps {
         app.world_mut().write_message(LabyrinthIntent::Ready(true));
@@ -56,7 +67,12 @@ fn real_udp_wagon_consumes_a_space_and_fresh_guest_reclaims_it() {
     assert!(pump_until(
         &mut apps,
         Duration::from_secs(5),
-        |apps| host_snapshot(apps).players.iter().all(|p| p.ready) && converged(apps)
+        |apps| host_snapshot(apps)
+            .players
+            .iter()
+            .filter(|p| p.occupied)
+            .all(|p| p.ready)
+            && converged(apps)
     ));
     app(&mut apps, 0)
         .world_mut()
@@ -219,10 +235,12 @@ fn admission_diagnostics(apps: &[App]) -> String {
                 )
             });
             format!(
-                "app {index}: client={:?}, socket_open={socket_open}, credential_pending={}, admitted={}, notice_present={}, host(listening,observed,seen,offered,rejected)={host:?}",
+                "app {index}: client={:?}, socket_open={socket_open}, credential_pending={}, snapshot_pending={}, admitted={}, snapshot_present={}, notice_present={}, host(listening,observed,seen,offered,rejected)={host:?}",
                 world.resource::<State<ClientState>>().get(),
                 runtime.credential.is_some(),
+                runtime.pending_snapshot.is_some(),
                 runtime.admitted,
+                runtime.latest.is_some(),
                 world.resource::<LabyrinthView>().notice.is_some(),
             )
         })
@@ -302,6 +320,11 @@ fn converged(apps: &mut [App]) -> bool {
             .is_some_and(|snapshot| {
                 snapshot.combat == expected.combat
                     && snapshot.players == expected.players
+                    && snapshot.company == expected.company
+                    && snapshot.scenario == expected.scenario
+                    && snapshot.formation == expected.formation
+                    && snapshot.setup_revision == expected.setup_revision
+                    && snapshot.assignment_revision == expected.assignment_revision
                     && snapshot.paused == expected.paused
             })
     })
@@ -347,6 +370,7 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
             && converged(apps)),
         "one host and five clients did not finish real transport admission"
     );
+    assign_six_controllers(apps);
     let slots: BTreeSet<_> = apps
         .iter()
         .filter_map(|app| app.world().resource::<Runtime>().player)
@@ -364,7 +388,7 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
         .collect();
     assert_eq!(peers.len(), LAST_GUEST);
     let actors: BTreeSet<_> = host_snapshot(apps)
-        .players
+        .company
         .iter()
         .map(|player| player.actor)
         .collect();
@@ -382,6 +406,27 @@ fn join_codes(apps: &mut [App]) -> Vec<String> {
         LAST_GUEST
     );
     codes
+}
+
+fn assign_six_controllers(apps: &mut [App]) {
+    // Admission grants a spectator reservation. This fixture deliberately maps
+    // each single-rank hero to one human through the host command path.
+    for owner in 0..TEST_PLAYERS {
+        app(apps, 0)
+            .world_mut()
+            .write_message(LabyrinthIntent::Assign {
+                actor: ActorId(u16::try_from(owner + 1).expect("hero")),
+                owner: u8::try_from(owner).expect("participant"),
+            });
+    }
+    assert!(pump_until(apps, Duration::from_secs(5), |apps| {
+        host_snapshot(apps)
+            .company
+            .iter()
+            .enumerate()
+            .all(|(index, member)| usize::from(member.owner) == index)
+            && converged(apps)
+    }));
 }
 
 fn begin_encounter(apps: &mut [App]) {
@@ -451,11 +496,11 @@ fn actor_owner(apps: &[App], actor: ActorId) -> usize {
         .world()
         .resource::<PartyAuthority>()
         .snapshot(0)
-        .players
+        .company
         .into_iter()
         .find(|player| player.actor == actor)
         .expect("hero has an authoritative owner")
-        .slot;
+        .owner;
     apps.iter()
         .position(|app| app.world().resource::<Runtime>().player == Some(slot))
         .expect("hero has an admitted owner")
@@ -493,6 +538,7 @@ fn send_action(apps: &mut [App], actor: ActorId, action: CombatAction) {
             actor,
             action,
             encounter: presented.encounter,
+            assignment_revision: presented.assignment_revision,
             decision,
         });
     assert!(
@@ -505,19 +551,41 @@ fn send_action(apps: &mut [App], actor: ActorId, action: CombatAction) {
 
 fn aggressive_action(snapshot: &CombatSnapshot, actor: ActorId) -> CombatAction {
     let actions = snapshot.legal_actions(actor);
-    actions.iter().copied().find(|action| matches!(action,
-        CombatAction::Skill { skill, .. } if labyrinth_rules::skill_definition(*skill).effects.iter()
-            .any(|effect| matches!(effect, Effect::Damage(damage) if *damage > 0))))
-        .or_else(|| actions.iter().copied().find(|action| matches!(action, CombatAction::Rescue { .. })))
+    actions
+        .iter()
+        .copied()
+        .find(|action| {
+            snapshot
+                .action_ability(actor, *action)
+                .ok()
+                .flatten()
+                .and_then(|(index, _)| {
+                    snapshot
+                        .actor(actor)
+                        .and_then(|source| source.ability(index))
+                })
+                .is_some_and(|ability| {
+                    ability
+                        .effects
+                        .iter()
+                        .any(|effect| matches!(effect, Effect::Damage(damage) if *damage > 0))
+                })
+        })
+        .or_else(|| {
+            actions
+                .iter()
+                .copied()
+                .find(|action| matches!(action, CombatAction::Rescue { .. }))
+        })
         .unwrap_or(CombatAction::Defend)
 }
 
 fn choose_repeated_sixth_class(apps: &mut [App]) {
     let before = host_snapshot(apps);
     let sixth = before
-        .players
+        .company
         .iter()
-        .find(|player| player.slot == 5)
+        .find(|player| player.owner == 5)
         .expect("sixth reservation");
     let actor = sixth.actor;
     assert_ne!(
@@ -526,16 +594,19 @@ fn choose_repeated_sixth_class(apps: &mut [App]) {
         "fixture exercises a class change"
     );
     assert!(before
-        .players
+        .company
         .iter()
         .any(|player| player.hero == HeroClass::Knifehand));
     app(apps, LAST_GUEST)
         .world_mut()
-        .write_message(LabyrinthIntent::SelectHero(HeroClass::Knifehand));
+        .write_message(LabyrinthIntent::SelectHero {
+            actor,
+            hero: HeroClass::Knifehand,
+        });
     assert!(
         pump_until(apps, Duration::from_secs(5), |apps| {
-            host_snapshot(apps).players.iter().any(|player| {
-                player.slot == 5 && player.actor == actor && player.hero == HeroClass::Knifehand
+            host_snapshot(apps).company.iter().any(|player| {
+                player.owner == 5 && player.actor == actor && player.hero == HeroClass::Knifehand
             }) && converged(apps)
         }),
         "sixth player could not independently choose an already-used class"
@@ -549,7 +620,7 @@ fn repeated_class_players_can_only_command_their_own_hero_instance() {
     join_codes(&mut apps);
     choose_repeated_sixth_class(&mut apps);
     begin_encounter(&mut apps);
-    let players = host_snapshot(&mut apps).players;
+    let players = host_snapshot(&mut apps).company;
     let repeated: Vec<_> = players
         .iter()
         .filter(|player| player.hero == HeroClass::Knifehand)
@@ -578,15 +649,17 @@ fn repeated_class_players_can_only_command_their_own_hero_instance() {
         .iter()
         .find(|player| player.actor != actor)
         .expect("same class, distinct hero instance");
-    assert_ne!(owner.slot, other.slot);
+    assert_ne!(owner.owner, other.owner);
     let wrong = actor_owner(&apps, other.actor);
     let encounter = host_snapshot(&mut apps).encounter;
+    let assignment_revision = host_snapshot(&mut apps).assignment_revision;
     app(&mut apps, wrong)
         .world_mut()
         .write_message(LabyrinthIntent::Combat {
             actor,
             action: CombatAction::Wait,
             encounter,
+            assignment_revision,
             decision: before.turn_id,
         });
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
@@ -711,7 +784,7 @@ fn real_udp_six_players_reject_seventh_and_wrong_ownership_then_finish_encounter
     begin_encounter(&mut apps);
 
     let expected_actors: BTreeSet<_> = host_snapshot(&mut apps)
-        .players
+        .company
         .iter()
         .map(|player| player.actor)
         .collect();
@@ -720,12 +793,14 @@ fn real_udp_six_players_reject_seventh_and_wrong_ownership_then_finish_encounter
     let owner = actor_owner(&apps, actor);
     let wrong = (owner + 1) % apps.len();
     let encounter = host_snapshot(&mut apps).encounter;
+    let assignment_revision = host_snapshot(&mut apps).assignment_revision;
     app(&mut apps, wrong)
         .world_mut()
         .write_message(LabyrinthIntent::Combat {
             actor,
             action: CombatAction::Wait,
             encounter,
+            assignment_revision,
             decision: before.turn_id,
         });
     assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
@@ -781,10 +856,12 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
         .as_ref()
         .expect("visible encounter")
         .encounter;
+    let assignment_revision = host_snapshot(&mut apps).assignment_revision;
     let old_intent = LabyrinthIntent::Combat {
         actor,
         action: CombatAction::Wait,
         encounter,
+        assignment_revision,
         decision: before.turn_id,
     };
     send_action(&mut apps, actor, CombatAction::Defend);
@@ -897,9 +974,9 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
         .player;
     assert_eq!(slot, Some(5));
     let owned = host_snapshot(&mut apps)
-        .players
+        .company
         .into_iter()
-        .find(|player| Some(player.slot) == slot)
+        .find(|player| Some(player.owner) == slot)
         .expect("sixth owned hero");
     let owned_actor = before
         .actor(owned.actor)
@@ -941,9 +1018,9 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
         slot
     );
     let recovered_player = host_snapshot(&mut apps)
-        .players
+        .company
         .into_iter()
-        .find(|player| Some(player.slot) == slot)
+        .find(|player| Some(player.owner) == slot)
         .expect("recovered sixth reservation");
     assert_eq!(
         recovered_player, owned,
@@ -1002,6 +1079,7 @@ fn real_udp_duplicate_and_evicted_replays_never_repeat_an_action() {
     let request = GameRequest {
         sequence: runtime.sequence,
         encounter: snapshot.encounter,
+        assignment_revision: snapshot.assignment_revision,
         decision: before.turn_id,
         command: SessionCommand::Act {
             actor,
@@ -1182,6 +1260,7 @@ fn fake_discovery_hands_five_password_joins_to_real_pinned_transport() {
             .claimed_players(),
         6
     );
+    assign_six_controllers(&mut apps);
     begin_encounter(&mut apps);
     let snapshot = wait_for_hero(&mut apps);
     let actor = snapshot.active_actor.expect("hero decision");
@@ -1313,11 +1392,15 @@ fn real_handshake_offer_and_ack_loss_recover_one_peer_from_code_then_profile() {
     *app(&mut apps, 1) = socket_app(Some(&path));
     start::reconnect(app(&mut apps, 1).world_mut())
         .expect("fresh process-style App uses persisted pending credential");
-    assert!(pump_until(
-        &mut apps,
-        Duration::from_secs(10),
-        |apps| all_admitted(apps) && converged(apps)
-    ));
+    assert!(
+        pump_until(&mut apps, Duration::from_secs(10), |apps| all_admitted(
+            apps
+        ) && converged(
+            apps
+        )),
+        "fresh pending-credential retry did not converge: {}",
+        admission_diagnostics(&apps)
+    );
     assert_eq!(stored(app(&mut apps, 1)).peer_id, peer);
     assert_eq!(
         app(&mut apps, 0)
@@ -1628,4 +1711,287 @@ fn old_attempt_packets_cannot_admit_overwrite_or_disconnect_a_new_reconnect() {
             .revision,
         u64::MAX
     );
+}
+
+#[test]
+fn real_udp_multiple_character_owner_and_spectator_disconnect_have_distinct_effects() {
+    let mut apps: Vec<_> = (0..3).map(|_| socket_app(None)).collect();
+    open_default_host(&mut apps, "");
+    for guest in 1..3 {
+        let code = hosted_code(app(&mut apps, 0).world(), guest - 1).expect("invitation");
+        start::join_code(app(&mut apps, guest).world_mut(), &code).expect("join");
+        assert!(pump_until(&mut apps, Duration::from_secs(10), |apps| app(
+            apps, guest
+        )
+        .world()
+        .resource::<Runtime>()
+        .admitted));
+    }
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        converged(apps)
+    }));
+    assert!(
+        host_snapshot(&mut apps)
+            .player_views()
+            .iter()
+            .filter(|p| p.slot != 0)
+            .all(|p| p.actors.is_empty()),
+        "new admissions are spectators"
+    );
+    for actor in [ActorId(1), ActorId(2)] {
+        app(&mut apps, 0)
+            .world_mut()
+            .write_message(LabyrinthIntent::Assign { actor, owner: 1 });
+    }
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        host_snapshot(apps)
+            .player_views()
+            .iter()
+            .any(|p| p.slot == 1 && p.actors == vec![ActorId(1), ActorId(2)])
+            && converged(apps)
+    }));
+    for app in &mut apps {
+        app.world_mut().write_message(LabyrinthIntent::Ready(true));
+    }
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps)
+            .players
+            .iter()
+            .filter(|p| p.occupied)
+            .all(|p| p.ready)
+            && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).combat.is_some() && converged(apps)
+    ));
+    let mut acted = BTreeSet::new();
+    for _ in 0..24 {
+        let before = wait_for_hero(&mut apps);
+        let actor = before.active_actor.expect("live hero decision");
+        let owner = actor_owner(&apps, actor);
+        if owner == 1 {
+            acted.insert(actor);
+        }
+        send_action(&mut apps, actor, CombatAction::Wait);
+        if acted.len() == 2 {
+            break;
+        }
+    }
+    assert_eq!(
+        acted,
+        BTreeSet::from([ActorId(1), ActorId(2)]),
+        "one admitted player can command both assigned characters"
+    );
+    let before = wait_for_hero(&mut apps);
+    let spectator = stored(app(&mut apps, 2)).peer_id;
+    *app(&mut apps, 2) = socket_app(None);
+    wait_guest_detached(&mut apps, spectator);
+    assert!(!host_snapshot(&mut apps).paused);
+    assert_eq!(combat(&mut apps), before);
+    let controller = stored(app(&mut apps, 1)).peer_id;
+    *app(&mut apps, 1) = socket_app(None);
+    wait_guest_detached(&mut apps, controller);
+    assert!(host_snapshot(&mut apps).paused);
+    assert_eq!(combat(&mut apps), before);
+}
+
+#[test]
+fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
+    use labyrinth_rules::build::InnateGrant;
+    use labyrinth_rules::catalog::ContentId;
+    let directory = tempfile::tempdir().expect("scenario directory");
+    let path = directory.path().join("battle.json");
+    let mut apps = vec![socket_app(None), socket_app(None)];
+    open_default_host(&mut apps, "");
+    let code = hosted_code(app(&mut apps, 0).world(), 0).expect("invite");
+    start::join_code(app(&mut apps, 1).world_mut(), &code).expect("join");
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| all_admitted(apps) && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::Assign {
+            actor: ActorId(1),
+            owner: 1,
+        });
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps)
+            .company
+            .first()
+            .is_some_and(|m| m.owner == 1)
+            && converged(apps)
+    ));
+    let before = host_snapshot(&mut apps);
+    let mut custom = before.scenario.heroes.first().expect("hero").clone();
+    custom.actor.name = "Dagger laboratory".into();
+    custom.actor.base_speed = 100;
+    custom.actor.max_hp = 91;
+    custom.actor.build.innate = before
+        .catalog
+        .definition()
+        .abilities
+        .iter()
+        .map(|a| InnateGrant {
+            ability: a.id.clone(),
+            provenance: ContentId::new("innate").expect("ID"),
+        })
+        .collect();
+    custom.actor.build.weapon = Some(ContentId::new("dagger").expect("ID"));
+    let payload = GameRequest {
+        sequence: 100,
+        encounter: before.encounter,
+        decision: 0,
+        assignment_revision: before.assignment_revision,
+        command: SessionCommand::CustomizeActor {
+            actor: custom.clone(),
+            expected_revision: before.setup_revision,
+        },
+    };
+    let json_bytes = serde_json::to_vec(&payload).expect("encoded command").len();
+    assert!(
+        json_bytes > 1024 && json_bytes < 32768,
+        "representative full build must exercise the expanded bounded command gate"
+    );
+    app(&mut apps, 1)
+        .world_mut()
+        .write_message(LabyrinthIntent::CustomizeActor {
+            actor: custom.clone(),
+            expected_revision: before.setup_revision,
+        });
+    assert!(
+        pump_until(&mut apps, Duration::from_secs(10), |apps| host_snapshot(
+            apps
+        )
+        .scenario
+        .heroes
+        .first()
+            == Some(&custom)
+            && converged(apps)),
+        "large valid custom build failed encrypted admission: {}",
+        admission_diagnostics(&apps)
+    );
+    let saved = host_snapshot(&mut apps).scenario;
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::SaveScenario(
+            path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |_| path.exists()));
+    let catalog = host_snapshot(&mut apps).catalog;
+    assert_eq!(
+        labyrinth_rules::scenario::Scenario::from_json(
+            &std::fs::read_to_string(&path).expect("saved file"),
+            &catalog
+        )
+        .expect("validated reload"),
+        saved
+    );
+    let mut changed = saved.clone();
+    changed.seed = 123456;
+    let revision = host_snapshot(&mut apps).setup_revision;
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::ConfigureBattle {
+            scenario: changed,
+            expected_revision: revision,
+        });
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).scenario.seed == 123456 && converged(apps)
+    ));
+    let before_invalid = host_snapshot(&mut apps);
+    let invalid_path = directory.path().join("invalid.json");
+    std::fs::write(&invalid_path, "{ invalid").expect("invalid scenario fixture");
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::LoadScenario(
+            invalid_path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| {
+        app(apps, 0)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .as_ref()
+            .is_some_and(|notice| notice.starts_with("scenario.json:"))
+    }));
+    let after_invalid = host_snapshot(&mut apps);
+    assert_eq!(after_invalid.scenario, before_invalid.scenario);
+    assert_eq!(after_invalid.formation, before_invalid.formation);
+    assert_eq!(after_invalid.setup_revision, before_invalid.setup_revision);
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::LoadScenario(
+            path.to_string_lossy().into_owned(),
+        ));
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps).scenario == saved && converged(apps)
+    ));
+    assert_eq!(
+        app(&mut apps, 0)
+            .world()
+            .resource::<LabyrinthView>()
+            .notice
+            .as_deref(),
+        Some(format!("Loaded battle configuration from {}.", path.display()).as_str())
+    );
+    for app in &mut apps {
+        app.world_mut().write_message(LabyrinthIntent::Ready(true));
+    }
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(5),
+        |apps| host_snapshot(apps)
+            .players
+            .iter()
+            .filter(|p| p.occupied)
+            .all(|p| p.ready)
+            && converged(apps)
+    ));
+    app(&mut apps, 0)
+        .world_mut()
+        .write_message(LabyrinthIntent::StartEncounter);
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| host_snapshot(apps).combat.is_some() && converged(apps)
+    ));
+    let before = combat(&mut apps);
+    assert_eq!(before.active_actor, Some(ActorId(1)));
+    let source = before.actor(ActorId(1)).expect("custom hero");
+    assert!(source.resolved_abilities().len() > 8);
+    let index = source
+        .ability_index(&ContentId::new("dagger_stab").expect("ID"))
+        .expect("weapon ability");
+    let target = *before.enemy_formation.first().expect("target");
+    assert!(before
+        .legal_actions(ActorId(1))
+        .contains(&CombatAction::Ability { index, target }));
+    send_action(
+        &mut apps,
+        ActorId(1),
+        CombatAction::Ability { index, target },
+    );
+    assert!(pump_until(
+        &mut apps,
+        Duration::from_secs(10),
+        |apps| combat(apps).turn_id > before.turn_id && converged(apps)
+    ));
+    for app in &mut apps {
+        start::close(app.world_mut());
+    }
 }

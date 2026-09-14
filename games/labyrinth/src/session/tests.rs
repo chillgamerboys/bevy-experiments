@@ -1,83 +1,75 @@
 //! Game-owned policy tests. These do not claim transport or process-restart evidence.
 
 use super::*;
-use labyrinth_rules::{CombatOutcome, Team};
+use labyrinth_rules::{CombatOutcome, Team, DEFAULT_HERO_ROSTER};
 
 #[test]
-fn wagon_capacity_preserves_players_and_reconnect_ownership() {
-    let mut a = PartyAuthority::with_roster(42, false, &DEFAULT_HERO_ROSTER)
-        .expect("explicit six-human fixture");
-    let original = a.snapshot(0);
-    assert!(request(
-        &mut a,
-        0,
-        SessionCommand::ChooseHero(HeroClass::LanternWagon)
-    )
-    .rejection
-    .is_none());
-    let selected = a.snapshot(0);
-    selected.validate().expect("valid five-member company");
-    selected
-        .validate_successor(&original)
-        .expect("lobby capacity change");
-    assert_eq!(a.capacity(), 5);
-    assert!(
-        request(&mut a, 0, SessionCommand::ChooseHero(HeroClass::Gatekeeper))
-            .rejection
-            .is_none()
+fn formation_size_never_shrinks_participant_capacity_or_evicts_reservations() {
+    let mut authority = PartyAuthority::new(42, false);
+    assert_eq!(authority.company.len(), 5);
+    assert_eq!(authority.capacity(), 6);
+    for slot in 1..PLAYER_CAPACITY {
+        let identity = peer(slot);
+        assert_eq!(authority.reserve(identity), Ok(slot));
+        authority.connected(identity, true);
+    }
+    let original = authority.snapshot(0);
+    assert!(original
+        .player_views()
+        .iter()
+        .skip(1)
+        .all(|p| p.actors.is_empty()));
+    assert_eq!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ChooseHero {
+                actor: ActorId(5),
+                hero: HeroClass::Gatekeeper,
+            }
+        )
+        .rejection,
+        None
     );
-    let restored = a.snapshot(0);
-    restored.validate().expect("six spaces restored");
+    assert_eq!(authority.capacity(), 6);
+    assert_eq!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::ChooseHero {
+                actor: ActorId(5),
+                hero: HeroClass::LanternWagon,
+            }
+        )
+        .rejection,
+        None
+    );
+    let restored = authority.snapshot(0);
+    assert_eq!(restored.players, original.players);
+    assert_eq!(restored.company, original.company);
+    assert_eq!(restored.validate_successor(&original), Ok(()));
     restored
-        .validate_successor(&selected)
-        .expect("empty seat restored");
-    assert_eq!(a.capacity(), 6);
-    assert!(request(
-        &mut a,
-        0,
-        SessionCommand::ChooseHero(HeroClass::LanternWagon)
-    )
-    .rejection
-    .is_none());
-    for p in 1..5 {
-        let id = peer(p);
-        a.reserve(id).expect("guest fits");
-        a.connected(id, true);
+        .validate()
+        .expect("six participants independent of five heroes");
+    for slot in 0..PLAYER_CAPACITY {
+        assert_eq!(
+            request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
+            None
+        );
     }
-    let before = a.snapshot(1);
-    assert!(request(
-        &mut a,
-        1,
-        SessionCommand::ChooseHero(HeroClass::LanternWagon)
-    )
-    .rejection
-    .is_some());
     assert_eq!(
-        a.snapshot(1).players,
-        before.players,
-        "never evict an admitted player"
+        request(&mut authority, 0, SessionCommand::Start).rejection,
+        None
     );
-    for slot in 0..5 {
-        assert!(request(&mut a, slot, SessionCommand::Ready(true))
-            .rejection
-            .is_none());
-    }
-    assert!(request(&mut a, 0, SessionCommand::Start)
-        .rejection
-        .is_none());
-    let before = a.snapshot(0);
-    before.validate().expect("combat ownership valid");
+    let before = authority.snapshot(0);
     assert_eq!(
-        before.combat.as_ref().expect("combat").ranks(ActorId(1)),
+        before.combat.as_ref().expect("combat").ranks(ActorId(5)),
         Some(5..=6)
     );
-    a.connected(peer(4), false);
-    a.connected(peer(4), true);
-    assert_eq!(
-        a.snapshot(0).combat,
-        before.combat,
-        "reconnection does not move actors or tick effects"
-    );
+    authority.connected(peer(5), false);
+    assert!(!authority.paused(), "spectators do not suspend combat");
+    authority.connected(peer(5), true);
+    assert_eq!(authority.snapshot(0).combat, before.combat);
 }
 
 #[test]
@@ -85,11 +77,11 @@ fn local_prototype_has_four_ordinary_heroes_and_one_weak_wagon() {
     let mut a = PartyAuthority::new(42, true);
     let hosted = PartyAuthority::new(42, false);
     assert_eq!(
-        hosted.players.iter().map(|p| p.hero).collect::<Vec<_>>(),
+        hosted.company.iter().map(|p| p.hero).collect::<Vec<_>>(),
         labyrinth_rules::PROTOTYPE_HERO_ROSTER
     );
     assert_eq!(
-        a.players.iter().map(|p| p.hero).collect::<Vec<_>>(),
+        a.company.iter().map(|p| p.hero).collect::<Vec<_>>(),
         labyrinth_rules::PROTOTYPE_HERO_ROSTER
     );
     assert!(request(&mut a, 0, SessionCommand::Start)
@@ -156,6 +148,7 @@ fn request(authority: &mut PartyAuthority, slot: u8, command: SessionCommand) ->
             sequence: snapshot.next_sequence,
             encounter: snapshot.encounter,
             decision: snapshot.combat.as_ref().map_or(0, |combat| combat.turn_id),
+            assignment_revision: snapshot.assignment_revision,
             command,
         },
     )
@@ -168,7 +161,10 @@ fn admitted_party() -> (PartyAuthority, [PeerId; PARTY_SIZE - 1]) {
         request(
             &mut authority,
             0,
-            SessionCommand::ChooseHero(HeroClass::FieldMedic)
+            SessionCommand::ChooseHero {
+                actor: ActorId(1),
+                hero: HeroClass::FieldMedic
+            }
         )
         .rejection,
         None
@@ -181,6 +177,18 @@ fn admitted_party() -> (PartyAuthority, [PeerId; PARTY_SIZE - 1]) {
             Ok(u8::try_from(index + 1).expect("guest slot"))
         );
         authority.connected(identity, true);
+        assert_eq!(
+            request(
+                &mut authority,
+                0,
+                SessionCommand::Assign {
+                    actor: ActorId(u16::try_from(index + 2).expect("actor")),
+                    owner: u8::try_from(index + 1).expect("slot"),
+                }
+            )
+            .rejection,
+            None
+        );
     }
     (authority, peers)
 }
@@ -206,11 +214,11 @@ fn advance_to_hero(authority: &mut PartyAuthority) -> (ActorId, u8) {
         let active = combat.active_actor.expect("nonterminal encounter");
         if combat.actor(active).expect("active character").team() == Team::Heroes {
             let owner = authority
-                .players
+                .company
                 .iter()
                 .find(|player| player.actor == active)
                 .expect("active hero has one owner")
-                .slot;
+                .owner;
             return (active, owner);
         }
         assert!(authority.advance_enemy());
@@ -291,6 +299,7 @@ fn duplicate_cached_request_and_replay_after_eviction_never_reapply() {
         sequence: 1,
         encounter: 0,
         decision: 0,
+        assignment_revision: 1,
         command: SessionCommand::Ready(false),
     };
     let first = authority.apply(0, original.clone());
@@ -325,15 +334,42 @@ fn duplicate_cached_request_and_replay_after_eviction_never_reapply() {
 fn character_ownership_is_seat_identity_not_current_formation_rank() {
     let (mut authority, _) = admitted_party();
     // Deliberately non-arithmetic IDs and repeated classes make inferred ownership fail.
-    for player in &mut authority.players {
-        player.actor = ActorId(500 + u16::from(player.slot) * 37);
+    let mut scenario = authority.scenario.clone();
+    for (index, actor) in scenario.heroes.iter_mut().enumerate() {
+        actor.id = ActorId(500 + index as u16 * 37);
+    }
+    let revision = authority.setup_revision;
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::ConfigureBattle {
+            scenario,
+            expected_revision: revision
+        }
+    )
+    .rejection
+    .is_none());
+    for slot in 0..PLAYER_CAPACITY {
+        assert!(request(
+            &mut authority,
+            0,
+            SessionCommand::Assign {
+                actor: ActorId(500 + u16::from(slot) * 37),
+                owner: slot
+            }
+        )
+        .rejection
+        .is_none());
     }
     for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
             request(
                 &mut authority,
                 slot,
-                SessionCommand::ChooseHero(HeroClass::Knifehand)
+                SessionCommand::ChooseHero {
+                    actor: ActorId(500 + u16::from(slot) * 37),
+                    hero: HeroClass::Knifehand
+                }
             )
             .rejection,
             None
@@ -363,11 +399,11 @@ fn character_ownership_is_seat_identity_not_current_formation_rank() {
         })
         .expect("adjacent standing ally");
     let wrong_owner = authority
-        .players
+        .company
         .iter()
         .find(|player| player.actor == ally)
         .expect("ally owner")
-        .slot;
+        .owner;
     assert!(request(
         &mut authority,
         wrong_owner,
@@ -398,9 +434,9 @@ fn character_ownership_is_seat_identity_not_current_formation_rank() {
     );
     assert_eq!(
         after
-            .players
+            .company
             .iter()
-            .find(|player| player.slot == slot)
+            .find(|member| member.owner == slot)
             .expect("owner")
             .actor,
         actor
@@ -445,6 +481,7 @@ fn stale_turn_rejection_does_not_mutate_combat_or_replay_old_action() {
             sequence: authority.next_sequence(slot),
             encounter: before.encounter,
             decision: old_turn,
+            assignment_revision: before.assignment_revision,
             command: SessionCommand::Act {
                 actor,
                 action: CombatAction::Wait,
@@ -561,6 +598,7 @@ fn rematch_preserves_identities_watermarks_and_invalidates_prior_encounter_comma
             sequence: guest_next,
             encounter: previous.encounter,
             decision: 0,
+            assignment_revision: previous.assignment_revision,
             command: SessionCommand::Ready(true),
         },
     );
@@ -617,12 +655,30 @@ fn accepted_gameplay_records_typed_monotonic_events_with_bounded_history() {
             authority.advance_enemy();
         } else {
             let slot = authority
-                .players
+                .company
                 .iter()
                 .find(|player| player.actor == actor)
                 .expect("hero owner")
-                .slot;
-            let action = combat.legal_actions(actor).into_iter().find(|action| matches!(action, CombatAction::Skill { skill, .. } if labyrinth_rules::skill_definition(*skill).effects.iter().any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_))))).unwrap_or(CombatAction::Wait);
+                .owner;
+            let action = combat
+                .legal_actions(actor)
+                .into_iter()
+                .find(|action| {
+                    combat
+                        .action_ability(actor, *action)
+                        .ok()
+                        .flatten()
+                        .and_then(|(index, _)| {
+                            combat.actor(actor).and_then(|source| source.ability(index))
+                        })
+                        .is_some_and(|ability| {
+                            ability
+                                .effects
+                                .iter()
+                                .any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_)))
+                        })
+                })
+                .unwrap_or(CombatAction::Wait);
             assert_eq!(
                 request(&mut authority, slot, SessionCommand::Act { actor, action }).rejection,
                 None
@@ -659,7 +715,10 @@ fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readi
         request(
             &mut authority,
             chooser,
-            SessionCommand::ChooseHero(HeroClass::Knifehand)
+            SessionCommand::ChooseHero {
+                actor: ActorId(u16::from(chooser) + 1),
+                hero: HeroClass::Knifehand
+            }
         )
         .rejection,
         None
@@ -671,26 +730,39 @@ fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readi
             .players
             .iter()
             .find(|prior| prior.slot == player.slot)
-            .expect("same player");
-        assert_eq!((player.actor, player.peer), (prior.actor, prior.peer));
-        if player.slot != chooser {
+            .expect("same participant");
+        assert_eq!(player.peer, prior.peer);
+    }
+    for member in &changed.company {
+        let prior = before
+            .company
+            .iter()
+            .find(|prior| prior.actor == member.actor)
+            .expect("same character");
+        assert_eq!(member.owner, prior.owner);
+        if member.owner == chooser {
+            assert_eq!(member.hero, HeroClass::Knifehand);
             assert_eq!(
-                (player.hero, &player.abilities),
-                (prior.hero, &prior.abilities)
+                member.abilities,
+                changed
+                    .scenario
+                    .heroes
+                    .iter()
+                    .find(|a| a.id == member.actor)
+                    .expect("configured actor")
+                    .actor
+                    .resolve(&changed.catalog)
+                    .expect("resolved preset")
             );
         } else {
-            assert_eq!(player.hero, HeroClass::Knifehand);
-            assert_eq!(
-                player.abilities,
-                HeroSetup::preset(player.actor, player.hero).abilities
-            );
+            assert_eq!(member, prior);
         }
     }
     assert!(
         changed
-            .players
+            .company
             .iter()
-            .filter(|player| player.hero == HeroClass::Knifehand)
+            .filter(|member| member.hero == HeroClass::Knifehand)
             .count()
             >= 3
     );
@@ -702,10 +774,32 @@ fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readi
 #[test]
 fn sixth_player_reconnect_preserves_nondefault_actor_loadout_and_live_state() {
     let (mut authority, peers) = admitted_party();
-    let sixth = authority.players.last_mut().expect("sixth player");
-    sixth.actor = ActorId(909);
-    sixth.abilities =
-        AbilityLoadout::new(vec![labyrinth_rules::SkillId::DeepStrike]).expect("instance loadout");
+    let mut scenario = authority.scenario.clone();
+    let sixth = scenario.heroes.last_mut().expect("sixth character");
+    sixth.id = ActorId(909);
+    sixth.actor.build =
+        labyrinth_rules::scenario::legacy_build(&[labyrinth_rules::SkillId::DeepStrike]);
+    let revision = authority.setup_revision;
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::ConfigureBattle {
+            scenario,
+            expected_revision: revision
+        }
+    )
+    .rejection
+    .is_none());
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::Assign {
+            actor: ActorId(909),
+            owner: 5
+        }
+    )
+    .rejection
+    .is_none());
     for slot in 0..PLAYER_CAPACITY {
         assert_eq!(
             request(&mut authority, slot, SessionCommand::Ready(true)).rejection,
@@ -725,6 +819,7 @@ fn sixth_player_reconnect_preserves_nondefault_actor_loadout_and_live_state() {
     authority.connected(identity, true);
     let after = authority.snapshot(PLAYER_CAPACITY - 1);
     assert_eq!(after.players, before.players);
+    assert_eq!(after.company, before.company);
     assert_eq!(after.combat, before.combat);
     assert_eq!(after.next_sequence, before.next_sequence);
     assert_eq!(after.events, before.events);
@@ -756,17 +851,22 @@ fn received_snapshots_validate_six_distinct_owners_even_when_classes_repeat() {
     bad.players.last_mut().expect("guest").slot = first.slot;
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
-    bad.players.last_mut().expect("guest").actor = first.actor;
+    bad.company.last_mut().expect("character").actor =
+        valid.company.first().expect("first character").actor;
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
     bad.players.last_mut().expect("guest").peer = Some(first_peer);
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
-    bad.players.last_mut().expect("guest").hero = HeroClass::Gatekeeper;
+    bad.company.last_mut().expect("character").hero = HeroClass::Gatekeeper;
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
-    bad.players.last_mut().expect("guest").abilities =
-        AbilityLoadout::new(Vec::new()).expect("empty is bounded");
+    bad.company
+        .last_mut()
+        .expect("character")
+        .abilities
+        .abilities
+        .clear();
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
     bad.players.pop();
@@ -782,12 +882,17 @@ fn repeated_class_actors_cannot_be_swapped_between_owners_in_later_snapshots() {
     let before = authority.snapshot(0);
     let mut after = before.clone();
     let mut twins = after
-        .players
+        .company
         .iter_mut()
         .filter(|player| player.hero == HeroClass::Knifehand);
     let first = twins.next().expect("first Knifehand");
     let second = twins.next().expect("second Knifehand");
     std::mem::swap(&mut first.actor, &mut second.actor);
+    for member in &after.company {
+        after
+            .formation
+            .assign_actor(&after.scenario, member.actor, member.owner);
+    }
     assert_eq!(
         after.validate(),
         Ok(()),
@@ -797,7 +902,7 @@ fn repeated_class_actors_cannot_be_swapped_between_owners_in_later_snapshots() {
 }
 
 #[test]
-fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
+fn local_rematch_class_change_redeploys_without_a_readiness_step() {
     let mut authority = PartyAuthority::new(42, true);
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
@@ -812,7 +917,10 @@ fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
         request(
             &mut authority,
             0,
-            SessionCommand::ChooseHero(HeroClass::FieldMedic)
+            SessionCommand::ChooseHero {
+                actor: ActorId(1),
+                hero: HeroClass::FieldMedic
+            }
         )
         .rejection,
         None
@@ -822,31 +930,6 @@ fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
         .players
         .iter()
         .all(|player| !player.ready));
-    assert!(request(&mut authority, 0, SessionCommand::Start)
-        .rejection
-        .is_some());
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
-        None
-    );
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .all(|player| player.ready));
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(false)).rejection,
-        None
-    );
-    assert!(authority
-        .snapshot(0)
-        .players
-        .iter()
-        .all(|player| !player.ready));
-    assert_eq!(
-        request(&mut authority, 0, SessionCommand::Ready(true)).rejection,
-        None
-    );
     assert_eq!(
         request(&mut authority, 0, SessionCommand::Start).rejection,
         None
@@ -856,7 +939,7 @@ fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
     assert!(restarted.encounter > original.encounter);
     assert_eq!(restarted.validate(), Ok(()));
     assert_eq!(
-        restarted.players.first().expect("local controller").hero,
+        restarted.company.first().expect("local character").hero,
         HeroClass::FieldMedic
     );
 
@@ -876,3 +959,602 @@ fn local_rematch_class_change_can_ready_the_entire_locally_controlled_party() {
         "network readiness remains one decision per human"
     );
 }
+
+#[test]
+fn admitted_spectators_and_multiple_owned_heroes_follow_explicit_assignment() {
+    let mut authority = PartyAuthority::new(42, false);
+    authority.reserve(peer(1)).expect("guest");
+    authority.connected(peer(1), true);
+    let initial = authority.snapshot(1);
+    assert_eq!(
+        initial
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 0)
+            .expect("host")
+            .actors
+            .len(),
+        5
+    );
+    assert!(initial
+        .player_views()
+        .iter()
+        .find(|p| p.slot == 1)
+        .expect("guest")
+        .actors
+        .is_empty());
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::ChooseHero {
+            actor: ActorId(1),
+            hero: HeroClass::FieldMedic
+        }
+    )
+    .rejection
+    .is_some());
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::Assign {
+            actor: ActorId(1),
+            owner: 1
+        }
+    )
+    .rejection
+    .is_some());
+    for actor in [ActorId(1), ActorId(2)] {
+        assert_eq!(
+            request(
+                &mut authority,
+                0,
+                SessionCommand::Assign { actor, owner: 1 }
+            )
+            .rejection,
+            None
+        );
+        assert_eq!(
+            request(
+                &mut authority,
+                1,
+                SessionCommand::ChooseHero {
+                    actor,
+                    hero: HeroClass::FieldMedic
+                }
+            )
+            .rejection,
+            None
+        );
+    }
+    let assigned = authority.snapshot(1);
+    assert_eq!(
+        assigned
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 1)
+            .expect("guest")
+            .actors,
+        vec![ActorId(1), ActorId(2)]
+    );
+    assert_eq!(
+        assigned
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 0)
+            .expect("host")
+            .actors
+            .len(),
+        3
+    );
+    assigned
+        .validate()
+        .expect("multiple characters per participant");
+    authority.release(peer(1));
+    assert!(authority
+        .snapshot(0)
+        .company
+        .iter()
+        .all(|member| member.owner == 0));
+    assert_eq!(authority.reserve(peer(2)), Ok(1));
+    authority.connected(peer(2), true);
+    assert!(
+        authority
+            .snapshot(1)
+            .player_views()
+            .iter()
+            .find(|p| p.slot == 1)
+            .expect("new guest")
+            .actors
+            .is_empty(),
+        "a replacement identity does not inherit the former player's characters"
+    );
+}
+
+#[test]
+fn paused_reassignment_preserves_combat_and_rejects_old_generation_after_assignment_back() {
+    let (mut authority, _) = started_party();
+    let (actor, owner) = (0..PARTY_SIZE * 2)
+        .find_map(|_| {
+            let (actor, owner) = advance_to_hero(&mut authority);
+            if owner != 0 {
+                return Some((actor, owner));
+            }
+            assert_eq!(
+                request(
+                    &mut authority,
+                    owner,
+                    SessionCommand::Act {
+                        actor,
+                        action: CombatAction::Wait
+                    }
+                )
+                .rejection,
+                None
+            );
+            None
+        })
+        .expect("bounded progression to a remote owner");
+    assert!(
+        request(&mut authority, owner, SessionCommand::AssignmentPause(true))
+            .rejection
+            .is_some()
+    );
+    let before = authority.snapshot(owner);
+    let stale = GameRequest {
+        sequence: before.next_sequence,
+        encounter: before.encounter,
+        decision: before.combat.as_ref().expect("combat").turn_id,
+        assignment_revision: before.assignment_revision,
+        command: SessionCommand::Act {
+            actor,
+            action: CombatAction::Wait,
+        },
+    };
+    assert!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::Assign { actor, owner: 0 }
+        )
+        .rejection
+        .is_some(),
+        "combat changes require the paused flow"
+    );
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::AssignmentPause(true)).rejection,
+        None
+    );
+    assert!(!authority.advance_enemy());
+    assert_eq!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::Assign { actor, owner: 0 }
+        )
+        .rejection,
+        None
+    );
+    assert_eq!(authority.snapshot(0).combat, before.combat);
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::Assign { actor, owner }).rejection,
+        None
+    );
+    let assigned = authority.snapshot(owner);
+    assert!(assigned.assignment_revision > before.assignment_revision);
+    assert_eq!(assigned.company, before.company);
+    assert_eq!(assigned.combat, before.combat);
+    assert_eq!(assigned.events, before.events);
+    assert_eq!(assigned.interruption, CombatInterruption::Assignments);
+    assigned.validate().expect("paused assignment snapshot");
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::AssignmentPause(false)).rejection,
+        None
+    );
+    assert_eq!(
+        authority.apply(owner, stale).rejection.as_deref(),
+        Some("Character control changed. Refresh before acting.")
+    );
+    assert_eq!(
+        authority.snapshot(owner).combat,
+        before.combat,
+        "rejected old generation never grants another action"
+    );
+    assert_eq!(
+        request(
+            &mut authority,
+            owner,
+            SessionCommand::Act {
+                actor,
+                action: CombatAction::Wait
+            }
+        )
+        .rejection,
+        None
+    );
+}
+
+#[test]
+fn deliberate_reassignment_resumes_a_missing_controller_but_never_clears_a_rules_fault() {
+    let (mut authority, _) = started_party();
+    authority.connected(peer(1), false);
+    let before = authority.snapshot(0).combat;
+    assert!(authority.paused());
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::AssignmentPause(true)).rejection,
+        None
+    );
+    assert_eq!(
+        request(
+            &mut authority,
+            0,
+            SessionCommand::Assign {
+                actor: ActorId(2),
+                owner: 0
+            }
+        )
+        .rejection,
+        None
+    );
+    assert_eq!(
+        request(&mut authority, 0, SessionCommand::AssignmentPause(false)).rejection,
+        None
+    );
+    assert!(
+        !authority.paused(),
+        "a disconnected spectator no longer blocks the encounter"
+    );
+    assert_eq!(authority.snapshot(0).combat, before);
+    authority.connected(peer(1), true);
+    assert!(authority
+        .snapshot(1)
+        .player_views()
+        .iter()
+        .find(|p| p.slot == 1)
+        .expect("reconnected player")
+        .actors
+        .is_empty());
+    authority.faulted = true;
+    assert!(
+        request(&mut authority, 0, SessionCommand::AssignmentPause(false))
+            .rejection
+            .is_some()
+    );
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::Assign {
+            actor: ActorId(2),
+            owner: 1
+        }
+    )
+    .rejection
+    .is_some());
+    assert_eq!(
+        authority.snapshot(0).interruption,
+        CombatInterruption::Halted
+    );
+    assert_eq!(authority.snapshot(0).combat, before);
+}
+
+#[test]
+fn dying_heroes_keep_a_required_controller_while_permanent_death_makes_a_spectator() {
+    let (mut authority, _) = started_party();
+    let mut saw_dying = false;
+    let mut saw_dead = false;
+    for _ in 0..400 {
+        let snapshot = authority.snapshot(0);
+        let combat = snapshot.combat.as_ref().expect("combat");
+        for member in snapshot.company.iter().filter(|member| member.owner != 0) {
+            let actor = combat.actor(member.actor).expect("hero");
+            if actor.standing() {
+                continue;
+            }
+            let view = snapshot
+                .player_views()
+                .into_iter()
+                .find(|p| p.slot == member.owner)
+                .expect("controller");
+            if actor.dying() {
+                assert_eq!(view.actors, vec![actor.id]);
+                authority.connected(peer(member.owner), false);
+                assert!(
+                    authority.paused(),
+                    "a rescueable hero still requires its controller"
+                );
+                authority
+                    .snapshot(0)
+                    .validate()
+                    .expect("disconnected dying controller");
+                authority.connected(peer(member.owner), true);
+                saw_dying = true;
+            } else {
+                assert!(
+                    view.actors.is_empty(),
+                    "permanent death produces spectator behavior"
+                );
+                authority.connected(peer(member.owner), false);
+                assert!(
+                    !authority.paused(),
+                    "a dead hero's disconnected spectator cannot freeze combat"
+                );
+                authority
+                    .snapshot(0)
+                    .validate()
+                    .expect("disconnected spectator");
+                authority.connected(peer(member.owner), true);
+                saw_dead = true;
+            }
+            assert_eq!(authority.snapshot(0).combat, snapshot.combat);
+        }
+        if saw_dying && saw_dead {
+            break;
+        }
+        if combat.outcome.is_some() {
+            break;
+        }
+        let actor = combat.active_actor.expect("live decision");
+        if combat.actor(actor).expect("actor").team() == Team::Enemies {
+            assert!(authority.advance_enemy());
+        } else {
+            let owner = snapshot
+                .company
+                .iter()
+                .find(|m| m.actor == actor)
+                .expect("owner")
+                .owner;
+            assert_eq!(
+                request(
+                    &mut authority,
+                    owner,
+                    SessionCommand::Act {
+                        actor,
+                        action: CombatAction::Wait
+                    }
+                )
+                .rejection,
+                None
+            );
+        }
+    }
+    assert!(saw_dying, "fixture must cross a rescueable Dying boundary");
+    assert!(saw_dead, "fixture must cross a permanent death boundary");
+}
+
+#[test]
+fn configured_both_teams_freeze_stats_builds_and_repeat_the_exact_seed() {
+    let mut authority = PartyAuthority::new(42, true);
+    let mut scenario =
+        Scenario::stock(StockScenario::WeaponComparison, 9001, &authority.catalog).expect("stock");
+    let hero = scenario.heroes.first_mut().expect("hero");
+    hero.actor.name = "Custom cleaver".into();
+    hero.actor.max_hp = 117;
+    hero.actor.base_speed = 73;
+    let enemy = scenario.enemies.last_mut().expect("enemy");
+    enemy.actor.name = "Rear target".into();
+    enemy.actor.max_hp = 211;
+    enemy.actor.base_speed = 2;
+    let revision = authority.setup_revision;
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::ConfigureBattle {
+            scenario: scenario.clone(),
+            expected_revision: revision
+        }
+    )
+    .rejection
+    .is_none());
+    assert!(authority.players.iter().all(|p| !p.ready));
+    assert!(request(&mut authority, 0, SessionCommand::Ready(true))
+        .rejection
+        .is_none());
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let before = authority.snapshot(0);
+    before.validate().expect("configured snapshot");
+    let combat = before.combat.as_ref().expect("combat");
+    assert_eq!(
+        combat.actor(ActorId(1)).expect("hero").name(),
+        "Custom cleaver"
+    );
+    assert_eq!(combat.actor(ActorId(1)).expect("hero").max_hp, 117);
+    assert_eq!(combat.actor(ActorId(106)).expect("enemy").max_hp, 211);
+    assert!(combat
+        .actor(ActorId(1))
+        .expect("hero")
+        .resolved_abilities()
+        .iter()
+        .any(|a| a.definition.id.as_str() == "greatsword_cleave"));
+    assert!(request(&mut authority, 0, SessionCommand::Rematch)
+        .rejection
+        .is_none());
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let restarted = authority.snapshot(0);
+    assert_eq!(
+        restarted.combat, before.combat,
+        "rematch must not silently increment the seed"
+    );
+    assert_eq!(restarted.scenario, scenario);
+}
+
+#[test]
+fn owned_build_edits_cannot_change_enemy_roster_formation_or_a_newer_draft() {
+    let (mut authority, _) = admitted_party();
+    let original = authority.snapshot(1);
+    let mut hero = original.scenario.heroes.get(1).expect("owned hero").clone();
+    hero.actor.max_hp = 77;
+    hero.actor.build.weapon = Some(labyrinth_rules::catalog::ContentId::new("dagger").expect("ID"));
+    hero.actor.build.learned_skills =
+        vec![labyrinth_rules::catalog::ContentId::new("duelist_dagger_power").expect("ID")];
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::CustomizeActor {
+            actor: hero.clone(),
+            expected_revision: original.setup_revision
+        }
+    )
+    .rejection
+    .is_none());
+    assert_eq!(authority.scenario.heroes.get(1), Some(&hero));
+    let changed = authority.snapshot(1);
+    // The retained preset adapter obeys the same authority as authored edits.
+    assert_eq!(
+        request(
+            &mut authority,
+            1,
+            SessionCommand::ChooseHero {
+                actor: hero.id,
+                hero: HeroClass::LanternWagon,
+            }
+        )
+        .rejection
+        .as_deref(),
+        Some("The host assigns formation spaces. Ask the host to change this footprint.")
+    );
+    let sequence = authority.next_sequence(1);
+    assert_eq!(
+        authority
+            .apply(
+                1,
+                GameRequest {
+                    sequence,
+                    encounter: changed.encounter,
+                    decision: 0,
+                    assignment_revision: changed.assignment_revision - 1,
+                    command: SessionCommand::ChooseHero {
+                        actor: hero.id,
+                        hero: HeroClass::Gatekeeper,
+                    },
+                }
+            )
+            .rejection
+            .as_deref(),
+        Some("Character assignments changed. Refresh your draft.")
+    );
+    let mut stale = hero.clone();
+    stale.actor.max_hp = 99;
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::CustomizeActor {
+            actor: stale,
+            expected_revision: original.setup_revision
+        }
+    )
+    .rejection
+    .is_some());
+    let mut wider = hero.clone();
+    wider.actor.footprint = 2;
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::CustomizeActor {
+            actor: wider,
+            expected_revision: changed.setup_revision
+        }
+    )
+    .rejection
+    .is_some());
+    let mut enemy = changed.scenario.enemies.first().expect("enemy").clone();
+    enemy.actor.max_hp = 1;
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::CustomizeActor {
+            actor: enemy,
+            expected_revision: changed.setup_revision
+        }
+    )
+    .rejection
+    .is_some());
+    assert!(request(
+        &mut authority,
+        1,
+        SessionCommand::ConfigureBattle {
+            scenario: changed.scenario.clone(),
+            expected_revision: changed.setup_revision
+        }
+    )
+    .rejection
+    .is_some());
+    assert_eq!(authority.scenario, changed.scenario);
+    assert_eq!(authority.company, changed.company);
+    assert_eq!(authority.setup_revision, changed.setup_revision);
+}
+
+#[test]
+fn invalid_scenario_is_rejected_before_ready_without_partial_setup_mutation() {
+    let mut authority = PartyAuthority::new(42, true);
+    let before = authority.snapshot(0);
+    let mut invalid = before.scenario.clone();
+    invalid.enemies.first_mut().expect("enemy").actor.max_hp = 0;
+    assert!(request(
+        &mut authority,
+        0,
+        SessionCommand::ConfigureBattle {
+            scenario: invalid,
+            expected_revision: before.setup_revision
+        }
+    )
+    .rejection
+    .is_some());
+    assert_eq!(authority.scenario, before.scenario);
+    assert_eq!(authority.players, before.players);
+    assert_eq!(authority.company, before.company);
+    assert_eq!(authority.setup_revision, before.setup_revision);
+    assert!(authority.combat.is_none());
+}
+
+#[test]
+fn spectators_do_not_gate_ready_or_start_even_if_the_host_spectates() {
+    let mut authority = PartyAuthority::new(42, false);
+    let owner = peer(1);
+    authority.reserve(owner).expect("owner");
+    authority.connected(owner, true);
+    let spectator = peer(2);
+    authority.reserve(spectator).expect("spectator");
+    authority.connected(spectator, true);
+    let ids = authority
+        .company
+        .iter()
+        .map(|m| m.actor)
+        .collect::<Vec<_>>();
+    for actor in ids {
+        assert!(request(
+            &mut authority,
+            0,
+            SessionCommand::Assign { actor, owner: 1 }
+        )
+        .rejection
+        .is_none());
+    }
+    assert!(request(&mut authority, 1, SessionCommand::Ready(true))
+        .rejection
+        .is_none());
+    assert!(authority
+        .players
+        .iter()
+        .filter(|p| p.slot != 1)
+        .all(|p| !p.ready));
+    authority.connected(spectator, false);
+    assert!(request(&mut authority, 0, SessionCommand::Start)
+        .rejection
+        .is_none());
+    let snapshot = authority.snapshot(0);
+    snapshot
+        .validate()
+        .expect("host and guest spectators do not pause");
+    assert!(!snapshot.paused);
+    assert!(snapshot
+        .player_views()
+        .first()
+        .expect("host")
+        .actors
+        .is_empty());
+}
+
+mod spatial;

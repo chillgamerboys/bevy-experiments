@@ -9,27 +9,14 @@ use std::collections::BTreeMap;
 use bevy::prelude::Resource;
 use labyrinth_rules::{
     skill_definition, status_definition, ActorId, ActorKind, ActorSnapshot, Boundary, CombatAction,
-    CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, SkillId, StatusInstance,
-    StatusKind, StatusTag,
+    CombatSnapshot, Effect, LifeState, PreviewEvent, RuleError, StatusInstance, StatusKind,
+    StatusTag,
 };
 
-/// Character names belong to the game's presentation, not combat authority.
-/// The encounter roster retains dead/removed actors, so ordering by stable ID
-/// survives formation changes, snapshot serialization and repeated hero classes.
+/// Use the frozen character name, including names authored in battle setup.
 #[must_use]
-pub fn actor_name(snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
-    const HERO_NAMES: [&str; 6] = ["Alden", "Mara", "Rowan", "Iris", "Ember", "Sera"];
-    if matches!(actor.kind, ActorKind::Enemy(_)) {
-        return actor.kind.name().to_owned();
-    }
-    let index = snapshot
-        .actors
-        .iter()
-        .filter(|other| other.team() == actor.team() && other.id < actor.id)
-        .count();
-    HERO_NAMES
-        .get(index)
-        .map_or_else(|| format!("Hero {}", actor.id.0), |name| (*name).to_owned())
+pub fn actor_name(_snapshot: &CombatSnapshot, actor: &ActorSnapshot) -> String {
+    actor.name().to_owned()
 }
 
 /// Include a hero's class when there is room for inspection detail.
@@ -123,9 +110,9 @@ pub struct ActorDetails {
     /// Effective speed, not a predicted initiative roll.
     pub speed: u16,
     /// Equipped catalog abilities.
-    pub skills: Vec<SkillId>,
+    pub abilities: Vec<labyrinth_rules::build::ResolvedAbility>,
     /// Uses already spent, not uses remaining.
-    pub uses: BTreeMap<SkillId, u16>,
+    pub uses: BTreeMap<u8, u16>,
 }
 
 /// Information safe to render in actor controls, inspection and accessibility.
@@ -186,7 +173,7 @@ impl BattlePresentation {
                         details: if policy.details && policy.statuses {
                             Knowledge::Known(ActorDetails {
                                 speed: actor.speed(),
-                                skills: actor.skills().to_vec(),
+                                abilities: actor.resolved_abilities().to_vec(),
                                 uses: actor
                                     .skill_uses
                                     .iter()
@@ -274,29 +261,45 @@ impl ForecastDisplay {
         action: &CombatAction,
     ) -> Result<Self, RuleError> {
         let target = match *action {
-            CombatAction::Skill { target, .. } => target,
+            CombatAction::Skill { target, .. } | CombatAction::Ability { target, .. } => target,
             CombatAction::Reposition { ally } | CombatAction::Rescue { ally } => ally,
             CombatAction::Defend | CombatAction::Wait => actor,
         };
-        let base = base_description(action);
-        snapshot.actor(actor).ok_or(RuleError::UnknownActor)?;
+        let source = snapshot.actor(actor).ok_or(RuleError::UnknownActor)?;
+        let base = if disclosure.actor(actor).details && disclosure.actor(actor).statuses {
+            effective_description(source, action)
+        } else {
+            "Ability details unknown".to_owned()
+        };
         snapshot.actor(target).ok_or(RuleError::UnknownActor)?;
         // Be deliberately conservative: validation and follow-up effects can reveal
         // hidden health, equipment or modifiers too. Do not resolve first and hide later.
-        let known = [actor, target]
-            .into_iter()
+        let index = match *action {
+            CombatAction::Ability { index, .. } => Some(index),
+            CombatAction::Skill { skill, .. } => source.skill_index(skill),
+            _ => None,
+        };
+        let targets = index.map_or_else(
+            || Ok(vec![target]),
+            |index| snapshot.ability_targets(actor, index, target),
+        )?;
+        let known = std::iter::once(actor)
+            .chain(targets.iter().copied())
             .all(|id| disclosure.actor(id) == ActorDisclosure::default());
         if !known {
             return Ok(Self {
                 base,
                 summary: "Outcome uncertain · undisclosed combat details".to_owned(),
-                actors: vec![ActorForecast {
-                    actor: target,
-                    outcome: Knowledge::Unknown,
-                    health: Knowledge::Unknown,
-                    position: None,
-                    summary: "Outcome unknown".to_owned(),
-                }],
+                actors: targets
+                    .iter()
+                    .map(|target| ActorForecast {
+                        actor: *target,
+                        outcome: Knowledge::Unknown,
+                        health: Knowledge::Unknown,
+                        position: None,
+                        summary: "Outcome unknown".to_owned(),
+                    })
+                    .collect(),
                 uncertainty: true,
                 movement: None,
             });
@@ -459,7 +462,7 @@ impl ForecastDisplay {
                         to,
                         footprint: snapshot
                             .actor(change.actor)
-                            .map_or(1, |actor| actor.kind.footprint()),
+                            .map_or(1, |actor| actor.footprint),
                     });
                 if let Some(position) = position {
                     summary.push_str(&format!(" · rank {} → {}", position.from, position.to));
@@ -477,8 +480,14 @@ impl ForecastDisplay {
                 }
             })
             .collect::<Vec<_>>();
-        if let Some(target) = actors.iter().find(|change| change.actor == target) {
-            effects.push(target.summary.clone());
+        for changed in actors
+            .iter()
+            .filter(|change| targets.contains(&change.actor))
+        {
+            let name = snapshot
+                .actor(changed.actor)
+                .map_or_else(String::new, |actor| actor_name(snapshot, actor));
+            effects.push(format!("{name}: {}", changed.summary));
         }
         if let Some(movement) = &movement {
             effects.push(movement.clone());
@@ -551,36 +560,56 @@ pub fn status_description(status: &StatusInstance, life: LifeState) -> String {
     text
 }
 
-/// Public authored effects, before any actor-specific calculation.
+/// Effective authored effects for the acting character, including learned upgrades.
+#[must_use]
+pub fn effective_description(actor: &ActorSnapshot, action: &CombatAction) -> String {
+    let index = match *action {
+        CombatAction::Ability { index, .. } => Some(index),
+        CombatAction::Skill { skill, .. } => actor.skill_index(skill),
+        _ => None,
+    };
+    if let Some(definition) = index.and_then(|index| actor.ability(index)) {
+        return effects_description(&definition.effects);
+    }
+    base_description(action)
+}
+
+/// Describe resolved primitive effects without inferring equipment or authority.
+#[must_use]
+pub fn effects_description(effects: &[Effect]) -> String {
+    effects
+        .iter()
+        .map(|effect| match *effect {
+            Effect::Damage(amount) => format!("{amount} base damage"),
+            Effect::Heal(amount) => format!("{amount} base healing"),
+            Effect::ApplyStatus(kind) => format!("Apply {}", status_definition(kind).name),
+            Effect::Cleanse(tag) => format!(
+                "Cleanse {}",
+                match tag {
+                    StatusTag::Buff => "buffs",
+                    StatusTag::Debuff => "debuffs",
+                    StatusTag::Bleeding => "bleed",
+                }
+            ),
+            Effect::Move(amount) => format!(
+                "Move {} rank {}",
+                amount.unsigned_abs(),
+                if amount < 0 { "forward" } else { "back" }
+            ),
+            Effect::SwapWithSource => "Swap positions".to_owned(),
+            Effect::Rescue(percent) => format!("Rescue to {percent}% HP"),
+            Effect::StatusDamage(_) => "Status damage".to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+/// Legacy static action description. Actor-local moves need [`effective_description`].
 #[must_use]
 pub fn base_description(action: &CombatAction) -> String {
     match action {
-        CombatAction::Skill { skill, .. } => skill_definition(*skill)
-            .effects
-            .iter()
-            .map(|effect| match *effect {
-                Effect::Damage(amount) => format!("{amount} base damage"),
-                Effect::Heal(amount) => format!("{amount} base healing"),
-                Effect::ApplyStatus(kind) => format!("Apply {}", status_definition(kind).name),
-                Effect::Cleanse(tag) => format!(
-                    "Cleanse {}",
-                    match tag {
-                        StatusTag::Buff => "buffs",
-                        StatusTag::Debuff => "debuffs",
-                        StatusTag::Bleeding => "bleed",
-                    }
-                ),
-                Effect::Move(amount) => format!(
-                    "Move {} rank {}",
-                    amount.unsigned_abs(),
-                    if amount < 0 { "forward" } else { "back" }
-                ),
-                Effect::SwapWithSource => "Swap positions".to_owned(),
-                Effect::Rescue(percent) => format!("Rescue to {percent}% HP"),
-                Effect::StatusDamage(_) => "Status damage".to_owned(),
-            })
-            .collect::<Vec<_>>()
-            .join(" · "),
+        CombatAction::Ability { .. } => "Select a character to inspect its move".to_owned(),
+        CombatAction::Skill { skill, .. } => effects_description(skill_definition(*skill).effects),
         CombatAction::Reposition { .. } => "Swap with an adjacent ally".to_owned(),
         CombatAction::Rescue { .. } => "Rescue to 25% HP".to_owned(),
         CombatAction::Defend => status_definition(StatusKind::Brace).description.to_owned(),
@@ -591,7 +620,7 @@ pub fn base_description(action: &CombatAction) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use labyrinth_rules::{Combat, DEFAULT_HERO_ROSTER};
+    use labyrinth_rules::{Combat, SkillId, DEFAULT_HERO_ROSTER};
 
     #[test]
     fn corpse_forecasts_preserve_durability_and_disclosure_through_removal() {

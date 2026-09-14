@@ -42,6 +42,11 @@ after one hour. Pending admission does not authorize gameplay: persist the offer
 credential, acknowledge it, then accept the matching welcome. A storage failure
 cancels joining rather than admitting a guest that cannot recover after restart.
 
+The welcome and private snapshot use separate ordered channels. If the snapshot
+arrives first, the guest holds one matching-attempt snapshot until the persisted
+offer's welcome is accepted. It does not expose that hand before admission, and a
+replacement attempt cannot inherit it.
+
 An established disconnected guest retains its seat/private state; the listing remains
 occupied. A lost initial offer expires and frees the pending reservation. Restart the
 guest and use its saved credential against the still-running host. Do not manually
@@ -53,6 +58,9 @@ Tests distinguish actual encrypted joins/recovery/private gameplay from fake-pro
 listing/handoff. They cover wrong passwords, extra guests, duplicate Hello/ACK, lost
 initial/rotating offers and ACKs, stale-attempt messages and failed persistence. They
 do not establish cross-machine LAN/Tailscale behavior.
+Socket-admission failures retain bounded handshake stages, host connection and
+reservation counts, frame gaps and sanitized disconnect categories to distinguish
+transport failure from game admission without exposing credentials or endpoints.
 
 ## UI evidence
 

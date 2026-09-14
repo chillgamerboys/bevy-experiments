@@ -7,7 +7,7 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
         ui.menus,
         view.paused,
         view.admitted,
-        view.players,
+        (&view.players, &view.company),
         view.interruption,
         (view.mode, view.host, view.local),
         (
@@ -32,6 +32,20 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
     let panel = world
         .spawn((bevy_gamekit::ui::menu_panel("Overlay Panel"), ChildOf(root)))
         .id();
+    if view.host
+        && view.mode == ViewMode::Combat
+        && !view.paused
+        && ui.menus.current() == Some(&MenuPage::Game)
+    {
+        control(
+            world,
+            panel,
+            "Manage Assignments",
+            "Pause and assign characters",
+            Action::AssignmentPause(true),
+            false,
+        );
+    }
     if ui.menus.current() == Some(&MenuPage::Leave) {
         label(
             world,
@@ -73,6 +87,10 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
         );
     } else if view.paused {
         let (title, detail) = match view.interruption {
+            crate::view::CombatInterruption::Assignments => (
+                "CHARACTER ASSIGNMENTS",
+                "Combat is paused. The host can assign surviving characters; character stats, positions and turns remain unchanged.".to_owned(),
+            ),
             crate::view::CombatInterruption::Halted => (
                 "ENCOUNTER HALTED",
                 "A rules error halted the encounter. The host can return the party to the lobby."
@@ -87,11 +105,11 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
                 let missing = view
                     .players
                     .iter()
-                    .filter(|p| p.occupied && !p.connected)
+                    .filter(|p| p.occupied && !p.connected && !p.actors.is_empty())
                     .map(|p| p.name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ");
-                ("THE COMPANY WAITS", format!("Waiting for {missing}. Combat resumes only when all reserved players reconnect."))
+                ("THE COMPANY WAITS", format!("Waiting for {missing}. Reconnect or ask the host to reassign their characters."))
             }
         };
         label(world, panel, "Reconnect Title", title, UiTextRole::Title);
@@ -105,6 +123,28 @@ pub(crate) fn overlays(world: &mut World, view: &LabyrinthView, ui: &mut UiState
                 Action::Reconnect,
                 false,
             );
+        }
+        if view.host && view.interruption != crate::view::CombatInterruption::Halted {
+            if view.interruption == crate::view::CombatInterruption::Assignments {
+                lobby::assignments(world, panel, view);
+                control(
+                    world,
+                    panel,
+                    "Resume After Assignment",
+                    "Resume combat",
+                    Action::AssignmentPause(false),
+                    false,
+                );
+            } else {
+                control(
+                    world,
+                    panel,
+                    "Manage Assignments",
+                    "Pause and assign characters",
+                    Action::AssignmentPause(true),
+                    false,
+                );
+            }
         }
         if view.host {
             control(

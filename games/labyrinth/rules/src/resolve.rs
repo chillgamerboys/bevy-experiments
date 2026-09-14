@@ -2,10 +2,9 @@
 
 use crate::combat::Work;
 use crate::{
-    skill_definition, status_definition, ActorId, ActorSnapshot, CombatAction, CombatEvent,
-    CombatEventKind, CombatOutcome, CombatPhase, CombatSnapshot, DamageKind, DamagePreview, Effect,
-    Reapplication, RemovalReason, RuleError, Stat, StatusInstance, StatusKind, StatusTag, Team,
-    MAX_STATUSES,
+    status_definition, ActorId, ActorSnapshot, CombatAction, CombatEvent, CombatEventKind,
+    CombatOutcome, CombatPhase, CombatSnapshot, DamageKind, DamagePreview, Effect, Reapplication,
+    RemovalReason, RuleError, Stat, StatusInstance, StatusKind, StatusTag, Team, MAX_STATUSES,
 };
 
 pub(super) struct EffectResolver<'a> {
@@ -14,6 +13,7 @@ pub(super) struct EffectResolver<'a> {
     pub next_status: &'a mut u64,
     pub damage: Option<&'a mut Vec<DamagePreview>>,
     pub movement: Option<&'a mut Vec<crate::MovementPreview>>,
+    pub defer_outcome: bool,
 }
 
 impl EffectResolver<'_> {
@@ -54,18 +54,32 @@ impl EffectResolver<'_> {
             work,
         )?;
         match action {
-            CombatAction::Skill { skill, target } => {
-                let definition = skill_definition(skill);
+            CombatAction::Skill { .. } | CombatAction::Ability { .. } => {
+                let (index, anchor) = self
+                    .state
+                    .action_ability(source, action)?
+                    .ok_or(RuleError::UnknownSkill)?;
+                let definition = self
+                    .state
+                    .actor(source)
+                    .and_then(|a| a.ability(index))
+                    .ok_or(RuleError::UnknownSkill)?
+                    .clone();
+                let targets = self.state.ability_targets(source, index, anchor)?;
                 if definition.max_uses.is_some() {
-                    let used = self.actor_mut(source)?.skill_uses.entry(skill).or_default();
+                    let used = self.actor_mut(source)?.skill_uses.entry(index).or_default();
                     *used = used.checked_add(1).ok_or(RuleError::CounterExhausted)?;
                 }
-                for effect in definition.effects {
-                    self.effect(source, target, *effect, 0, events, work)?;
-                    if self.state.outcome.is_some() {
-                        break;
+                self.defer_outcome = true;
+                for target in targets {
+                    for effect in &definition.effects {
+                        self.effect(source, target, *effect, 0, events, work)?;
                     }
                 }
+                self.defer_outcome = false;
+                // Terminal evaluation is deferred until the entire captured target
+                // set resolves; the first lethal hit cannot drop later targets.
+                self.check_outcome(events, work)?;
             }
             CombatAction::Reposition { ally } => self.swap(source, ally, events, work)?,
             CombatAction::Rescue { ally } => {
@@ -285,7 +299,9 @@ impl EffectResolver<'_> {
                     work,
                 )?;
             }
-            self.check_outcome(events, work)?;
+            if !self.defer_outcome {
+                self.check_outcome(events, work)?;
+            }
         }
         Ok(())
     }

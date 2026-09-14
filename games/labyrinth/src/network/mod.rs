@@ -151,6 +151,7 @@ struct Runtime {
     connecting_since: Option<Instant>,
     player: Option<u8>,
     credential: Option<Credential>,
+    pending_snapshot: Option<SnapshotEnvelope>,
     latest: Option<SessionSnapshot>,
     sequence: u64,
     admitted: bool,
@@ -170,6 +171,7 @@ impl Default for Runtime {
             connecting_since: None,
             player: None,
             credential: None,
+            pending_snapshot: None,
             latest: None,
             sequence: 1,
             admitted: false,
@@ -211,7 +213,12 @@ fn fingerprint() -> [u8; 32] {
     // Catalog fingerprint supplied by the pure rules crate; includes wire schema.
     let mut digest = Sha256::new();
     digest.update(SCHEMA.as_bytes());
-    digest.update(labyrinth_rules::rules_fingerprint().as_bytes());
+    digest.update(
+        labyrinth_rules::catalog::ContentCatalog::builtin()
+            .expect("validated authored catalog")
+            .fingerprint()
+            .as_bytes(),
+    );
     digest.finalize().into()
 }
 fn fingerprint_text() -> String {
@@ -246,7 +253,10 @@ fn network_tick(world: &mut World) {
             .is_some_and(|host| host.server == entity)
         {
             start::close(world);
-            notice(world, "Host listener closed; check the UDP port and network interface before hosting again.");
+            notice(
+                world,
+                "Host listener closed; check the UDP port and network interface before hosting again.",
+            );
         }
     }
     start::finish_host(world);
@@ -272,7 +282,10 @@ fn network_tick(world: &mut World) {
         .is_some_and(|at| at.elapsed() > Duration::from_secs(20))
     {
         start::disconnect_guest(world);
-        notice(world, "Connection/admission timed out. Check the host address and UDP firewall, then retry or reconnect.");
+        notice(
+            world,
+            "Connection/admission timed out. Check the host address and UDP firewall, then retry or reconnect.",
+        );
     }
 }
 
@@ -322,7 +335,10 @@ fn receive(world: &mut World) {
             .is_err()
         {
             start::disconnect_guest(world);
-            notice(world, "Could not save reconnect credentials. Admission was not committed; retry after fixing profile storage.");
+            notice(
+                world,
+                "Could not save reconnect credentials. Admission was not committed; retry after fixing profile storage.",
+            );
             continue;
         }
         world.write_message(Persisted {
@@ -367,13 +383,26 @@ fn receive(world: &mut World) {
             notice(world, rejection);
         }
     }
-    for envelope in drain::<SnapshotEnvelope>(world) {
+    let pending = {
+        let mut runtime = world.resource_mut::<Runtime>();
+        runtime
+            .admitted
+            .then(|| runtime.pending_snapshot.take())
+            .flatten()
+    };
+    for envelope in pending.into_iter().chain(drain::<SnapshotEnvelope>(world)) {
         let runtime = world.resource::<Runtime>();
         if runtime.role != Role::Guest
-            || !runtime.admitted
             || runtime.connection.is_none()
             || runtime.attempt != Some(envelope.attempt)
         {
+            continue;
+        }
+        if !runtime.admitted {
+            // Message types use independent ordered channels, so the initial
+            // snapshot may arrive before Admitted. Hold at most one snapshot
+            // for this attempt; validate and expose it only after admission.
+            world.resource_mut::<Runtime>().pending_snapshot = Some(envelope);
             continue;
         }
         let snapshot = envelope.snapshot;
@@ -428,19 +457,7 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             if world.resource::<Runtime>().pending_close.is_some() {
                 return Err("Wait for the previous host to close.".into());
             }
-            let mut authority = PartyAuthority::new(seed, true);
-            let result = authority.apply(
-                0,
-                GameRequest {
-                    sequence: 1,
-                    encounter: 0,
-                    decision: 0,
-                    command: SessionCommand::Start,
-                },
-            );
-            if let Some(error) = result.rejection {
-                return Err(error);
-            }
+            let authority = PartyAuthority::new(seed, true);
             world.insert_resource(authority);
             let mut runtime = world.resource_mut::<Runtime>();
             runtime.role = Role::Local;
@@ -460,7 +477,221 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
         } => start::join_discovered(world, session, std::mem::take(&mut password.0))?,
         LabyrinthIntent::Reconnect => start::reconnect(world)?,
         LabyrinthIntent::Leave => start::close(world),
-        LabyrinthIntent::SelectHero(hero) => submit(world, SessionCommand::ChooseHero(hero))?,
+        LabyrinthIntent::SelectHero { actor, hero } => {
+            submit(world, SessionCommand::ChooseHero { actor, hero })?
+        }
+        LabyrinthIntent::Assign { actor, owner } => {
+            submit(world, SessionCommand::Assign { actor, owner })?
+        }
+        LabyrinthIntent::AssignmentPause(paused) => {
+            submit(world, SessionCommand::AssignmentPause(paused))?
+        }
+        LabyrinthIntent::SetScenarioSeed {
+            seed,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::SetScenarioSeed {
+                seed,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::PlaceScenarioActor {
+            team,
+            rank,
+            preset,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::PlaceScenarioActor {
+                team,
+                rank,
+                preset,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::MoveScenarioActor {
+            actor,
+            rank,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::MoveScenarioActor {
+                actor,
+                rank,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::RemoveScenarioActor {
+            actor,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::RemoveScenarioActor {
+                actor,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::AssignFormationRank {
+            rank,
+            owner,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::AssignFormationRank {
+                rank,
+                owner,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::ConfigureBattle {
+            scenario,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::ConfigureBattle {
+                scenario,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::CustomizeActor {
+            actor,
+            expected_revision,
+        } => submit(
+            world,
+            SessionCommand::CustomizeActor {
+                actor,
+                expected_revision,
+            },
+        )?,
+        LabyrinthIntent::StockScenario(index) => {
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host chooses encounters.")?
+                .snapshot(0);
+            let choice = *labyrinth_rules::scenario::StockScenario::ALL
+                .get(index)
+                .ok_or("Unknown stock encounter.")?;
+            let scenario = labyrinth_rules::scenario::Scenario::stock(
+                choice,
+                snapshot.scenario.seed,
+                &snapshot.catalog,
+            )
+            .map_err(|e| e.to_string())?;
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
+        }
+        LabyrinthIntent::AddScenarioActor(team) => {
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host adds characters.")?
+                .snapshot(0);
+            let mut scenario = snapshot.scenario;
+            let used = scenario
+                .heroes
+                .iter()
+                .chain(&scenario.enemies)
+                .map(|a| a.id.0)
+                .collect::<std::collections::BTreeSet<_>>();
+            let id = (1..=u16::MAX)
+                .find(|id| !used.contains(id))
+                .ok_or("No free character identity.")?;
+            let kind = match team {
+                labyrinth_rules::Team::Heroes => {
+                    labyrinth_rules::ActorKind::Hero(labyrinth_rules::HeroClass::Gatekeeper)
+                }
+                labyrinth_rules::Team::Enemies => {
+                    labyrinth_rules::ActorKind::Enemy(labyrinth_rules::EnemyKind::AshBrute)
+                }
+            };
+            let preset = snapshot
+                .catalog
+                .definition()
+                .actor_presets
+                .iter()
+                .find(|p| p.appearance == kind)
+                .ok_or("Default preset is unavailable.")?;
+            let actor = labyrinth_rules::scenario::ScenarioActor {
+                id: labyrinth_rules::ActorId(id),
+                actor: labyrinth_rules::build::ActorBuild::from_preset(
+                    &snapshot.catalog,
+                    &preset.id,
+                )
+                .map_err(|e| e.to_string())?,
+                controller: if team == labyrinth_rules::Team::Heroes {
+                    labyrinth_rules::scenario::ControllerPolicy::Manual
+                } else {
+                    labyrinth_rules::scenario::ControllerPolicy::Ai
+                },
+                starting_hp: None,
+                starting_statuses: Vec::new(),
+            };
+            if team == labyrinth_rules::Team::Heroes {
+                scenario.heroes.push(actor);
+            } else {
+                scenario.enemies.push(actor);
+            }
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
+        }
+        LabyrinthIntent::SaveScenario(path) => {
+            let view = world.resource::<LabyrinthView>();
+            let scenario = view.scenario.as_ref().ok_or("No battle setup to save.")?;
+            let formation = view.formation.as_ref().ok_or("No formation to save.")?;
+            if let Some(error) = formation.deployment_error(scenario) {
+                return Err(error);
+            }
+            scenario
+                .validate(view.catalog.as_ref().ok_or("No content catalog to save.")?)
+                .map_err(|e| e.to_string())?;
+            let path = if path.trim().is_empty() {
+                "labyrinth-scenario.json"
+            } else {
+                path.trim()
+            };
+            std::fs::write(path, scenario.to_json().map_err(|e| e.to_string())?)
+                .map_err(|e| format!("Cannot save scenario: {e}"))?;
+            notice(world, format!("Saved battle configuration to {path}."));
+        }
+        LabyrinthIntent::LoadScenario(path) => {
+            use std::io::Read as _;
+            let snapshot = world
+                .get_resource::<PartyAuthority>()
+                .ok_or("Only the host loads encounters.")?
+                .snapshot(0);
+            let path = if path.trim().is_empty() {
+                "labyrinth-scenario.json"
+            } else {
+                path.trim()
+            };
+            let mut source = String::new();
+            std::fs::File::open(path)
+                .map_err(|e| format!("Cannot open scenario: {e}"))?
+                .take(labyrinth_rules::scenario::MAX_SCENARIO_BYTES as u64 + 1)
+                .read_to_string(&mut source)
+                .map_err(|e| format!("Cannot read scenario: {e}"))?;
+            let scenario =
+                labyrinth_rules::scenario::Scenario::from_json(&source, &snapshot.catalog)
+                    .map_err(|e| e.to_string())?;
+            submit(
+                world,
+                SessionCommand::ConfigureBattle {
+                    scenario,
+                    expected_revision: snapshot.setup_revision,
+                },
+            )?;
+            notice(world, format!("Loaded battle configuration from {path}."));
+        }
         LabyrinthIntent::Ready(ready) => submit(world, SessionCommand::Ready(ready))?,
         LabyrinthIntent::StartEncounter => submit(world, SessionCommand::Start)?,
         LabyrinthIntent::Rematch => submit(world, SessionCommand::Rematch)?,
@@ -469,10 +700,11 @@ fn handle_intent(world: &mut World, intent: LabyrinthIntent) -> Result<(), Strin
             action,
             encounter,
             decision,
+            assignment_revision,
         } => submit_at(
             world,
             SessionCommand::Act { actor, action },
-            Some((encounter, decision)),
+            Some((encounter, decision, assignment_revision)),
         )?,
         LabyrinthIntent::CopyInvite(index) => {
             let code = hosted_code(world, index).ok_or("No invitation is available.")?;
@@ -498,7 +730,7 @@ fn submit(world: &mut World, command: SessionCommand) -> Result<(), String> {
 fn submit_at(
     world: &mut World,
     command: SessionCommand,
-    boundary: Option<(u64, u64)>,
+    boundary: Option<(u64, u64, u64)>,
 ) -> Result<(), String> {
     let runtime = world.resource::<Runtime>();
     if !runtime.admitted {
@@ -516,16 +748,18 @@ fn submit_at(
     } else {
         runtime.sequence
     };
-    let (encounter, decision) = boundary.unwrap_or_else(|| {
+    let (encounter, decision, assignment_revision) = boundary.unwrap_or_else(|| {
         (
             snapshot.encounter,
             snapshot.combat.as_ref().map_or(0, |combat| combat.turn_id),
+            snapshot.assignment_revision,
         )
     });
     let request = GameRequest {
         sequence,
         encounter,
         decision,
+        assignment_revision,
         command,
     };
     if matches!(role, Role::Host | Role::Local) {
@@ -589,7 +823,14 @@ fn publish(world: &mut World) {
         };
         view.revision = snapshot.revision;
         view.encounter = snapshot.encounter;
-        view.players = snapshot.players.iter().map(|p| p.view()).collect();
+        view.players = snapshot.player_views();
+        view.company = snapshot.company;
+        view.setup_revision = snapshot.setup_revision;
+        view.deployment_error = snapshot.formation.deployment_error(&snapshot.scenario);
+        view.formation = Some(snapshot.formation);
+        view.scenario = Some(snapshot.scenario);
+        view.catalog = Some(snapshot.catalog);
+        view.assignment_revision = snapshot.assignment_revision;
         view.combat = snapshot.combat;
         view.paused = snapshot.paused || !data.2;
         view.interruption = if !data.2 {
@@ -603,6 +844,11 @@ fn publish(world: &mut World) {
         view.mode = ViewMode::Menu;
         view.combat = None;
         view.players.clear();
+        view.company.clear();
+        view.scenario = None;
+        view.formation = None;
+        view.deployment_error = None;
+        view.catalog = None;
         view.events.clear();
         view.paused = false;
         view.interruption = crate::view::CombatInterruption::None;

@@ -7,8 +7,12 @@ description: Design or implement native Bevy/GameKit game UI, including views, t
 
 Read [project context](../../references/project-context.md) and
 [UI contracts](../../references/ui-contracts.md). Preserve the task's creative
-level and accepted player experience. Establish the game-owned view, typed intents,
-semantic regions and control states before wiring presentation to authority.
+level and accepted player experience. For new or materially changed views, apply
+the contracts' interaction, information and visual design guidance before choosing
+controls. Turn the accepted direction into a concrete design with representative
+content/art and a complete task walkthrough before broad production wiring.
+Establish the game-owned view, typed intents, semantic regions and control states
+from that design before wiring presentation to authority.
 
 Inspect the exact Bevy/GameKit source, current plugin composition and style system.
 Keep views, actions and branding in the game. Use existing shared mechanics where
@@ -22,8 +26,10 @@ controls. Load the tooltip portion of the contracts when context help is involve
 follow source/design timings and revoke content when disclosure changes.
 
 At level 1, implement the specified design; level 2 permits refinements within it.
-For level 3/4, compare bounded alternatives against player goals before committing
-to a material direction. Creative latitude does not widen the delivery endpoint.
+An unspecified screen is not a settled design at either level: surface material
+choices with evidence and bounded alternatives through `gameskills:grill` when
+available. Level 3/4 permits wider co-design/exploration within the task. Routine
+decisions need no interview; creative latitude does not widen the endpoint.
 
 Use [UI evidence](../../references/ui-evidence.md) to define structural, rendered
 and native interaction checks. Invoke `gameskills-ui:verify-ui` when verification

@@ -13,12 +13,10 @@ installation and troubleshooting docs. The docs-and-skills refactor is tracked i
 
 ## Remaining work
 
-- Make the connected Linear MCP the primary tracking path. The skill can use the
-  host connection directly; the CLI currently launches a standalone observer instead.
-  This is an implementation choice, not an MCP limitation. Keep the helper optional
-  and distinguish actual host/MCP verification from checks executed by the CLI.
-  Do not require another API key for ordinary tracking. The current required observer
-  remains unaligned; do not report it passed merely because MCP verified the links.
+- The MCP tracking correction is implemented in PR #39: connected tools supply fresh
+  evidence to the delivery checker, while the command observer remains opt-in.
+  Validate the current candidate and observe actual delivery before closing this
+  follow-up; the [workflow guide](../workflow.md#delivery) owns the current contract.
 - Independent skill evaluation moves to the [next-session plan](skill-evaluation.md).
   The user explicitly removed it from PR #38 merge acceptance; keep it discoverable
   without treating the unrun trials as passed.

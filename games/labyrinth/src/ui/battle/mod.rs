@@ -59,7 +59,8 @@ struct BattleNodes {
     heroes: Entity,
     enemies: Entity,
     skills: Entity,
-    loadout: Vec<SkillId>,
+    loadout: Vec<labyrinth_rules::build::ResolvedAbility>,
+    ability_actor: Option<(u64, ActorId)>,
     confirm: Entity,
     rematch: Entity,
     dock: dock::DockNodes,
@@ -67,6 +68,37 @@ struct BattleNodes {
     last_event: Option<u64>,
     was_paused: bool,
     feedback: BTreeMap<ActorId, (String, f64)>,
+}
+
+fn displayed_loadout(
+    view: &LabyrinthView,
+    presentation: &crate::presentation::BattlePresentation,
+) -> (
+    Option<(u64, ActorId)>,
+    Vec<labyrinth_rules::build::ResolvedAbility>,
+) {
+    let actor = inspection::display_actor(view);
+    let subject = actor.map(|actor| (view.encounter, actor.id));
+    let abilities = actor
+        .and_then(|actor| presentation.actor(actor.id))
+        .and_then(|actor| actor.details.as_known())
+        .map_or_else(Vec::new, |details| details.abilities.clone());
+    (subject, abilities)
+}
+
+/// Positional actions are meaningful only for the subject/build actually shown.
+/// Input precedes Present, so reject a queued old button or confirmation while
+/// the current projection is waiting to replace the mounted action controls.
+pub(super) fn input_matches_presented_build(world: &World, view: &LabyrinthView) -> bool {
+    let (Some(nodes), Some(snapshot)) = (world.get_resource::<BattleNodes>(), &view.combat) else {
+        return false;
+    };
+    let presentation = crate::presentation::BattlePresentation::new(
+        snapshot,
+        world.resource::<crate::presentation::CombatDisclosure>(),
+    );
+    let (subject, abilities) = displayed_loadout(view, &presentation);
+    nodes.ability_actor == subject && nodes.loadout == abilities
 }
 
 pub(super) fn clear(world: &mut World) {
@@ -121,19 +153,15 @@ pub(super) fn present(
             snapshot,
             world.resource::<crate::presentation::CombatDisclosure>(),
         );
-        let loadout = inspection::display_actor(view)
-            .and_then(|actor| presentation.actor(actor.id))
-            .and_then(|actor| actor.details.as_known())
-            .map_or_else(Vec::new, |details| details.skills.clone());
-        if nodes.loadout != loadout {
-            dock::mount_skills(world, nodes.skills, &loadout);
+        let displayed = inspection::display_actor(view);
+        let (ability_actor, loadout) = displayed_loadout(view, &presentation);
+        if nodes.loadout != loadout || nodes.ability_actor != ability_actor {
+            dock::mount_skills(world, nodes.skills, view.encounter, displayed, &loadout);
             nodes.loadout = loadout;
-            // A loadout replacement must not leave an unequipped ability selected.
-            if matches!(ui.selected, Some(Choice::Skill(skill)) if !nodes.loadout.contains(&skill))
-            {
-                ui.selected = None;
-                ui.target = None;
-            }
+            nodes.ability_actor = ability_actor;
+            // An actor/index is meaningful only within this frozen build.
+            ui.selected = None;
+            ui.target = None;
         }
         feedback::update(&mut nodes, view, time);
         nodes.viewport = metrics.viewport;

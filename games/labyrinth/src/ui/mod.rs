@@ -2,7 +2,9 @@
 
 mod appearance;
 mod battle;
+mod constructor;
 mod glyphs;
+mod setup;
 mod shell;
 #[cfg(test)]
 mod tests;
@@ -136,6 +138,7 @@ enum MenuPage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Choice {
+    Ability(u8),
     Skill(SkillId),
     Reposition,
     Rescue,
@@ -173,6 +176,12 @@ struct UiState {
     local_notice: Option<String>,
     shell_key: Option<String>,
     overlay_key: Option<String>,
+    editor: Option<setup::ActorEditor>,
+    lobby_page: u8,
+    constructor: constructor::ConstructorState,
+    scenario_path: String,
+    scenario_seed: String,
+    scenario_seed_source: Option<u64>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -191,7 +200,11 @@ enum Action {
     ToggleLan,
     ToggleTailnet,
     Ready(bool),
-    Hero(HeroClass),
+    Assign(ActorId, u8),
+    AssignmentPause(bool),
+    Setup(setup::SetupAction),
+    LobbyPage(u8),
+    Constructor(constructor::ConstructorAction),
     Start,
     Rematch,
     Copy(usize),
@@ -216,6 +229,9 @@ enum Action {
 
 #[derive(Component, Debug, Clone, Copy)]
 enum Field {
+    Build(setup::BuildField),
+    ScenarioPath,
+    ScenarioSeed,
     Name,
     Address,
     Port,
@@ -235,6 +251,9 @@ fn collect_text(
 ) {
     for change in changed.read() {
         match fields.get(change.entity) {
+            Ok(Field::Build(field)) => setup::change_from_field(&mut ui, *field, &change.value),
+            Ok(Field::ScenarioPath) => ui.scenario_path.clone_from(&change.value),
+            Ok(Field::ScenarioSeed) => ui.scenario_seed.clone_from(&change.value),
             Ok(Field::Name) => ui.session_name.clone_from(&change.value),
             Ok(Field::Address) => ui.address.clone_from(&change.value),
             Ok(Field::Port) => ui.port.clone_from(&change.value),
@@ -267,6 +286,37 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     let focus = world.resource::<InputFocus>().get();
+    if world.resource::<UiState>().editor.is_some() {
+        let composing = focus
+            .and_then(|entity| world.get::<bevy::text::EditableText>(entity))
+            .is_some_and(bevy::text::EditableText::is_composing);
+        if !composing && !focus.is_some_and(|entity| world.get::<UiTextField>(entity).is_some()) {
+            let keys = world.resource::<ButtonInput<KeyCode>>();
+            let page = if keys.just_pressed(KeyCode::PageDown) {
+                1
+            } else if keys.just_pressed(KeyCode::PageUp) {
+                -1
+            } else if keys.just_pressed(KeyCode::End) {
+                100
+            } else if keys.just_pressed(KeyCode::Home) {
+                -100
+            } else {
+                0
+            };
+            if page != 0 {
+                setup::scroll_details(world, page);
+                return;
+            }
+        }
+        if !composing
+            && world
+                .resource::<ButtonInput<KeyCode>>()
+                .just_pressed(KeyCode::Escape)
+        {
+            apply_action(world, Action::Setup(setup::SetupAction::Cancel));
+        }
+        return;
+    }
     if focus.is_some_and(|entity| world.get::<UiTextField>(entity).is_some()) {
         return;
     }
@@ -276,6 +326,16 @@ fn keyboard_shortcuts(world: &mut World) {
         return;
     }
     if keys.just_pressed(KeyCode::Escape) {
+        if world.resource::<LabyrinthView>().mode == ViewMode::Lobby
+            && !world.resource::<UiState>().menus.is_open()
+            && world.resource::<UiState>().constructor.selection.is_some()
+        {
+            apply_action(
+                world,
+                Action::Constructor(constructor::ConstructorAction::Close),
+            );
+            return;
+        }
         apply_action(world, Action::Cancel);
         return;
     }
@@ -326,6 +386,13 @@ fn apply_action(world: &mut World, action: Action) {
     let view = world.resource::<LabyrinthView>().clone();
     let seed = world.resource::<LabyrinthUiConfig>().seed;
     world.resource_scope(|world, mut ui: Mut<UiState>| {
+        if matches!(action, Action::SkillSlot(_) | Action::Confirm)
+            && !battle::input_matches_presented_build(world, &view)
+        {
+            ui.selected = None;
+            ui.target = None;
+            return;
+        }
         let intent =
             match action {
                 Action::Form(form) => {
@@ -351,6 +418,12 @@ fn apply_action(world: &mut World, action: Action) {
                         None
                     }
                 }
+                Action::LobbyPage(page) => {
+                    ui.lobby_page = if ui.lobby_page == page { 0 } else { page };
+                    None
+                }
+                Action::Setup(action) => setup::action(&view, &mut ui, action),
+                Action::Constructor(action) => constructor::action(&view, &mut ui, action),
                 Action::StartLocal => Some(LabyrinthIntent::StartLocal(seed)),
                 Action::Host => {
                     let port = if ui.port.is_empty() {
@@ -424,7 +497,8 @@ fn apply_action(world: &mut World, action: Action) {
                     }
                 }
                 Action::Ready(ready) => Some(LabyrinthIntent::Ready(ready)),
-                Action::Hero(hero) => Some(LabyrinthIntent::SelectHero(hero)),
+                Action::Assign(actor, owner) => Some(LabyrinthIntent::Assign { actor, owner }),
+                Action::AssignmentPause(paused) => Some(LabyrinthIntent::AssignmentPause(paused)),
                 Action::Start => Some(LabyrinthIntent::StartEncounter),
                 Action::Rematch => Some(LabyrinthIntent::Rematch),
                 Action::Copy(index) => Some(LabyrinthIntent::CopyInvite(index)),
@@ -466,6 +540,7 @@ fn apply_action(world: &mut World, action: Action) {
                             action,
                             encounter: view.encounter,
                             decision: view.combat.as_ref().map_or(0, |snapshot| snapshot.turn_id),
+                            assignment_revision: view.assignment_revision,
                         })
                 }
                 Action::ToggleSkillbook => {
@@ -555,6 +630,9 @@ fn apply_action(world: &mut World, action: Action) {
                     None
                 }
                 Action::ScrollDetails(direction) => {
+                    if view.mode == ViewMode::Lobby {
+                        constructor::scroll_details(world, direction, ui.lobby_page == 0);
+                    }
                     if ui.log_mode == LogMode::History {
                         battle::scroll_history(world, direction);
                     }
@@ -606,6 +684,7 @@ fn present(world: &mut World) {
             shell::present(world, &view, &mut ui, metrics);
         }
         shell::overlays(world, &view, &mut ui);
+        setup::present(world, &view, &mut ui);
     });
 }
 

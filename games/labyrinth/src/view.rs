@@ -6,6 +6,8 @@ use labyrinth_rules::{ActorId, CombatAction, CombatEvent, CombatSnapshot, HeroCl
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize as _;
 
+pub use crate::session::{CompanyMember, FormationPlacement, LobbyFormation};
+
 /// Owned UI input which redacts diagnostics and clears its allocation on drop.
 #[derive(Clone, Default)]
 pub struct SecretText(pub String);
@@ -41,6 +43,8 @@ pub enum CombatInterruption {
     None,
     /// The host is waiting for reserved players.
     WaitingForPlayers,
+    /// The host is editing character control while the combat state is frozen.
+    Assignments,
     /// This client is recovering admission; never sent as a host pause reason.
     Reconnecting,
     /// A rules failure requires host recovery, not a reconnect.
@@ -52,10 +56,8 @@ pub enum CombatInterruption {
 pub struct PlayerView {
     /// Stable zero-based player slot, never a formation rank.
     pub slot: u8,
-    /// Owned combatant identity, independent of class and formation rank.
-    pub actor: ActorId,
-    /// Selected hero.
-    pub hero: HeroClass,
+    /// Surviving owned characters; empty means spectator. Dying characters remain owned.
+    pub actors: Vec<ActorId>,
     /// Human-readable label.
     pub name: String,
     /// Reserved/admitted slot rather than vacant.
@@ -109,6 +111,20 @@ pub struct LabyrinthView {
     pub encounter: u64,
     /// Current lobby reservations.
     pub players: Vec<PlayerView>,
+    /// Configured heroes and controller assignments, independent of participants.
+    pub company: Vec<CompanyMember>,
+    /// Stale commands must not cross a controller reassignment.
+    pub assignment_revision: u64,
+    /// Configuration generation; stale editor drafts cannot overwrite new setup.
+    pub setup_revision: u64,
+    /// Symmetric editable battle specification, with no participant credentials.
+    pub scenario: Option<labyrinth_rules::scenario::Scenario>,
+    /// Shared one-based construction positions and empty-place ownership.
+    pub formation: Option<LobbyFormation>,
+    /// Explicit reason an incomplete construction cannot be deployed or saved.
+    pub deployment_error: Option<String>,
+    /// Validated authored definitions for build selection and disclosure.
+    pub catalog: Option<labyrinth_rules::catalog::ContentCatalog>,
     /// Read-only pure rules snapshot; never host RNG or authority.
     pub combat: Option<CombatSnapshot>,
     /// Ordered readable combat outcomes.
@@ -174,7 +190,86 @@ pub enum LabyrinthIntent {
     /// Explicitly leave/close the current session.
     Leave,
     /// Choose an available archetype in the lobby.
-    SelectHero(HeroClass),
+    SelectHero {
+        /// Character to customize.
+        actor: ActorId,
+        /// Visual/build preset to choose.
+        hero: HeroClass,
+    },
+    /// Host assigns one hero to an admitted participant.
+    Assign {
+        /// Surviving hero to assign.
+        actor: ActorId,
+        /// Admitted participant slot receiving control.
+        owner: u8,
+    },
+    /// Host enters or leaves the paused assignment flow.
+    AssignmentPause(bool),
+    /// Change the seed while retaining sparse construction positions.
+    SetScenarioSeed {
+        /// Explicit deterministic battle seed.
+        seed: u64,
+        /// Setup generation shown to the player.
+        expected_revision: u64,
+    },
+    /// Commit a previously inspected type at a chosen place, replacing its occupant.
+    PlaceScenarioActor {
+        /// Formation side, independent of appearance.
+        team: labyrinth_rules::Team,
+        /// One-based rank; a covered rank replaces that character at its leading rank.
+        rank: u8,
+        /// Authored preset selected before committing construction.
+        preset: labyrinth_rules::catalog::ContentId,
+        /// Setup generation shown during type inspection.
+        expected_revision: u64,
+    },
+    /// Host moves a complete footprint to unoccupied construction places.
+    MoveScenarioActor {
+        /// Stable character identity.
+        actor: ActorId,
+        /// New one-based leading rank.
+        rank: u8,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
+    /// Host removes a character, retaining empty-place ownership and other ranks.
+    RemoveScenarioActor {
+        /// Stable character identity.
+        actor: ActorId,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
+    /// Host assigns an empty rank or every rank of its occupying character.
+    AssignFormationRank {
+        /// One-based party rank.
+        rank: u8,
+        /// Admitted participant slot; zero means host.
+        owner: u8,
+        /// Setup generation shown during selection.
+        expected_revision: u64,
+    },
+    /// Host replaces the lobby configuration after complete validation.
+    ConfigureBattle {
+        /// Full symmetric encounter input.
+        scenario: labyrinth_rules::scenario::Scenario,
+        /// Generation on which the editor draft was based.
+        expected_revision: u64,
+    },
+    /// Customize one owned actor without changing its team, rank or controller.
+    CustomizeActor {
+        /// Explicit actor configuration.
+        actor: labyrinth_rules::scenario::ScenarioActor,
+        /// Generation on which this edit was based.
+        expected_revision: u64,
+    },
+    /// Choose a stock encounter by its stable menu index.
+    StockScenario(usize),
+    /// Host adds an actor using editable defaults.
+    AddScenarioActor(labyrinth_rules::Team),
+    /// Write only battle configuration to a local file chosen in setup.
+    SaveScenario(String),
+    /// Host loads a bounded validated battle configuration from a local file.
+    LoadScenario(String),
     /// Change local readiness.
     Ready(bool),
     /// Host starts after all six players are ready.
@@ -191,6 +286,8 @@ pub enum LabyrinthIntent {
         encounter: u64,
         /// Decision/turn shown when the user confirmed this action.
         decision: u64,
+        /// Controller generation visible at confirmation.
+        assignment_revision: u64,
     },
     /// Explicit platform clipboard write for one invitation.
     CopyInvite(usize),

@@ -31,9 +31,20 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
         }
         let mut view = fixture();
         view.combat = Some(combat.snapshot());
-        view.players.retain(|p| p.actor.0 <= 5);
-        for p in &mut view.players {
-            p.hero = heroes.get(usize::from(p.slot)).copied().expect("class");
+        view.company.retain(|member| member.actor.0 <= 5);
+        for member in &mut view.company {
+            member.hero = heroes
+                .get(usize::from(member.owner))
+                .copied()
+                .expect("class");
+            member.abilities = resolved_legacy(
+                HeroSetup::preset(member.actor, member.hero)
+                    .abilities
+                    .as_slice(),
+            );
+        }
+        for player in &mut view.players {
+            player.actors.retain(|actor| actor.0 <= 5);
         }
         let mut app = App::new();
         app.add_plugins(HeadlessUiPlugin::new(width, height))
@@ -101,7 +112,10 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow() {
             geometry
         );
         let text = find_named(app.world_mut(), "Actor 5 Summary").expect("HP label");
-        assert_eq!(app.world().get::<Text>(text).expect("text").0, "Ember\n6");
+        assert_eq!(
+            app.world().get::<Text>(text).expect("text").0,
+            "Lantern Wagon\n6"
+        );
         let bar = find_named(app.world_mut(), "Actor 5 HP Bar").expect("corpse bar");
         assert_eq!(
             app.world().get::<Node>(bar).expect("bar").width,

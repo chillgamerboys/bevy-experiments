@@ -1,6 +1,8 @@
 //! Actual adapter regressions for persist-before-ACK admission and attempt isolation.
 
-use super::tests::{pump_until, socket_app};
+mod delivery_order;
+
+use super::tests::pump_until;
 use super::*;
 use bevy::ecs::system::RunSystemOnce as _;
 use bevy_gamekit::multiplayer::{CredentialStoreError, ReconnectCredentialStore};
@@ -8,6 +10,99 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+
+#[derive(Resource, Default, Debug)]
+struct AdmissionTrace {
+    stages: Vec<String>,
+    disconnects: Vec<&'static str>,
+    last_frame: Option<Instant>,
+    max_frame_gap: Duration,
+}
+
+fn socket_app() -> App {
+    let mut app = super::tests::socket_app();
+    app.init_resource::<AdmissionTrace>()
+        .add_systems(Last, record_admission_stage)
+        .add_observer(record_disconnect);
+    app
+}
+
+fn record_admission_stage(world: &mut World) {
+    let stage = stage(world);
+    let mut trace = world.resource_mut::<AdmissionTrace>();
+    let now = Instant::now();
+    if let Some(previous) = trace.last_frame.replace(now) {
+        trace.max_frame_gap = trace.max_frame_gap.max(now.duration_since(previous));
+    }
+    if trace.stages.last() != Some(&stage) && trace.stages.len() < 32 {
+        trace.stages.push(stage);
+    }
+}
+
+fn record_disconnect(event: On<Disconnected>, mut trace: ResMut<AdmissionTrace>) {
+    use aeronet::io::connection::DisconnectReason;
+
+    // Only fixed categories are retained; peer text and backend errors can
+    // contain endpoints or credentials and must not be printed verbatim.
+    let reason = match &event.reason {
+        DisconnectReason::ByUser(reason) | DisconnectReason::ByPeer(reason) => {
+            match reason.as_str() {
+                "admission ended" => "admission-ended",
+                "admission refused" => "admission-refused",
+                "admission timed out" => "admission-timeout",
+                "inbound traffic budget exceeded" => "inbound-budget",
+                _ => "user-or-peer",
+            }
+        }
+        DisconnectReason::ByError(error) => error
+            .chain()
+            .find_map(|cause| match cause.to_string().as_str() {
+                "connection timed out" => Some("transport-timeout"),
+                "frontend closed" => Some("frontend-closed"),
+                "backend closed" => Some("backend-closed"),
+                "server rejected WebTransport session request" => Some("session-rejected"),
+                "endpoint stopping" => Some("endpoint-stopping"),
+                "connection locally closed" => Some("locally-closed"),
+                _ => None,
+            })
+            .unwrap_or("transport-error"),
+    };
+    if trace.disconnects.len() < 16 {
+        trace.disconnects.push(reason);
+    }
+}
+
+fn stage(world: &World) -> String {
+    let state = world.resource::<DeckNetworkState>();
+    let guest = world.get_resource::<GuestConnection>();
+    let host = world.get_resource::<HostedSession>();
+    let socket_open =
+        guest.is_some_and(|guest| world.get::<aeronet::io::Session>(guest.0).is_some());
+    let (connected, authorized) = host.map_or((0, 0), |host| {
+        world
+            .get::<Children>(host.server_entity)
+            .into_iter()
+            .flat_map(|children| children.iter())
+            .fold((0, 0), |(connected, authorized), entity| {
+                (
+                    connected + usize::from(world.get::<ConnectedClient>(entity).is_some()),
+                    authorized + usize::from(world.get::<DeckAuthorized>(entity).is_some()),
+                )
+            })
+    });
+    format!(
+        "client={:?}, connection={}, socket={socket_open}, hello_sent={}, persisted={}, snapshot_pending={}, admitted={}, snapshot={}, host_attempts={}, reserved={}, connected={connected}, authorized={authorized}",
+        world.resource::<State<ClientState>>().get(),
+        guest.is_some(),
+        world.get_resource::<PendingHello>().is_some_and(|hello| hello.sent),
+        world.get_resource::<GuestAttempt>().is_some_and(|attempt| attempt.persisted.is_some()),
+        world.get_resource::<GuestAttempt>().is_some_and(|attempt| attempt.pending_snapshot.is_some()),
+        state.admitted,
+        state.latest.is_some(),
+        host.map_or(0, |host| host.attempts.len()),
+        host.map_or(0, |host| host.security.reserved_peer_count()),
+    )
+}
 
 fn host(password: &str) -> App {
     let mut app = socket_app();
@@ -44,13 +139,14 @@ fn diagnostics(app: &App) -> String {
     let socket_open =
         guest.is_some_and(|guest| world.get::<aeronet::io::Session>(guest.0).is_some());
     format!(
-        "client={:?}, listening={}, connection_present={}, socket_open={socket_open}, admitted={}, snapshot_present={}, notice_present={}",
+        "client={:?}, listening={}, connection_present={}, socket_open={socket_open}, admitted={}, snapshot_present={}, notice_present={}, trace={:?}",
         world.resource::<State<ClientState>>().get(),
         listening(app),
         guest.is_some(),
         state.admitted,
         state.latest.is_some(),
         state.notice.is_some(),
+        world.get_resource::<AdmissionTrace>(),
     )
 }
 

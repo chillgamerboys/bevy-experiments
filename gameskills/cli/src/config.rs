@@ -1,5 +1,6 @@
 //! Read-only configuration validation, independent of installation state.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use toml::{Table, Value};
 
@@ -13,6 +14,49 @@ pub const PACKAGES: [&str; 7] = [
     "gameskills-bevy-contrib",
     "gameskills-linear",
 ];
+
+/// Additional Git refs consumed by a command; HEAD and worktree inputs are unconditional.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum GitRefs {
+    #[default]
+    All,
+    #[serde(untagged)]
+    Selected(Vec<String>),
+}
+
+pub(crate) fn git_refs(value: Option<&serde_json::Value>) -> Result<GitRefs, String> {
+    let Some(value) = value else {
+        return Ok(GitRefs::All);
+    };
+    let mut selection: GitRefs = serde_json::from_value(value.clone())
+        .map_err(|_| "git_refs must be \"all\" or a list of full refs/... names".to_owned())?;
+    if let GitRefs::Selected(refs) = &mut selection {
+        let mut seen = BTreeSet::new();
+        for name in refs.iter() {
+            // Git check-ref-format rules, kept local so standalone config validation
+            // remains read-only and needs neither a repository nor a Git executable.
+            if !name.starts_with("refs/")
+                || name.ends_with('.')
+                || name.contains("..")
+                || name.contains("@{")
+                || name
+                    .bytes()
+                    .any(|b| b <= b' ' || b == 0x7f || b"~^:?*[\\".contains(&b))
+                || name
+                    .split('/')
+                    .any(|part| part.is_empty() || part.starts_with('.') || part.ends_with(".lock"))
+            {
+                return Err(format!("git_refs requires exact full ref names: {name:?}"));
+            }
+            if !seen.insert(name) {
+                return Err("git_refs contains duplicates".into());
+            }
+        }
+        refs.sort();
+    }
+    Ok(selection)
+}
 
 /// Parse and normalize configuration without executing commands or changing files.
 pub fn parse(source: &str) -> Result<Table, String> {
@@ -65,9 +109,9 @@ pub fn parse(source: &str) -> Result<Table, String> {
         let tracking = table(&value, "tracking")?;
         if tracking
             .keys()
-            .any(|s| !["required", "observer"].contains(&s.as_str()))
+            .any(|s| !["required", "mode", "observer"].contains(&s.as_str()))
         {
-            return Err("tracking accepts required and observer only".into());
+            return Err("tracking accepts required, mode and observer only".into());
         }
         if tracking
             .get("required")
@@ -93,10 +137,21 @@ pub fn parse(source: &str) -> Result<Table, String> {
                 return Err("tracking.observer requires nonempty arguments without NUL".into());
             }
         }
-        if tracking.get("required").and_then(Value::as_bool) == Some(true)
-            && !tracking.contains_key("observer")
-        {
-            return Err("required tracking needs an observer command".into());
+        match tracking.get("mode") {
+            None => {} // Existing argv adopters retain command mode; otherwise use MCP.
+            Some(Value::String(mode)) if mode == "mcp" => {
+                if tracking.contains_key("observer") {
+                    return Err(
+                        "tracking.mode mcp cannot also configure an observer command".into(),
+                    );
+                }
+            }
+            Some(Value::String(mode)) if mode == "command" => {
+                if !tracking.contains_key("observer") {
+                    return Err("tracking.mode command needs an observer command".into());
+                }
+            }
+            Some(_) => return Err("tracking.mode must be mcp or command".into()),
         }
     }
     if let Some(docs) = value.get("docs") {
@@ -120,6 +175,12 @@ pub fn parse(source: &str) -> Result<Table, String> {
         let command = command
             .as_table()
             .ok_or_else(|| format!("commands.{name} must be a table"))?;
+        let refs = command
+            .get("git_refs")
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|error| error.to_string())?;
+        git_refs(refs.as_ref()).map_err(|error| format!("commands.{name}.{error}"))?;
         let argv = command
             .get("argv")
             .and_then(Value::as_array)

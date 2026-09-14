@@ -28,6 +28,7 @@ fn ready(sequence: u64, encounter: u64) -> GameRequest {
         sequence,
         encounter,
         decision: 0,
+        assignment_revision: 1,
         command: SessionCommand::Ready(true),
     }
 }
@@ -118,6 +119,15 @@ fn request_bursts_preserve_quiet_progress_and_overflow_reconnect_watermark() {
     .resource::<Runtime>()
     .admitted));
     assert_eq!(stored(app(&mut apps, 1)).peer_id, peer);
+    // Admission ACK and the larger frozen-content snapshot may arrive in
+    // different frames. Observe the restored baseline before its watermark.
+    assert!(pump_until(&mut apps, Duration::from_secs(5), |apps| app(
+        apps, 1
+    )
+    .world()
+    .resource::<Runtime>()
+    .latest
+    .is_some()));
     assert_eq!(
         app(&mut apps, 1).world().resource::<Runtime>().sequence,
         257

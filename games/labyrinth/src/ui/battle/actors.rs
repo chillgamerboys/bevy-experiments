@@ -60,7 +60,7 @@ pub(super) fn mount_actor(world: &mut World, parent: Entity, actor: &ActorSnapsh
             height: Val::Percent(100.0),
             min_width: Val::Px(44.0),
             min_height: Val::Px(0.0),
-            flex_grow: f32::from(actor.kind.footprint()),
+            flex_grow: f32::from(actor.footprint),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(4.0),
             ..default()
@@ -536,7 +536,10 @@ pub(super) fn present(
             )
         };
         let identity = display_name(snapshot, actor);
-        let owner = view.players.iter().find(|player| player.actor == actor.id);
+        let owner = view
+            .players
+            .iter()
+            .find(|player| player.actors.contains(&actor.id));
         let yours = !view.local && owner.is_some_and(|player| Some(player.slot) == view.player);
         let ownership = if actor.team() == Team::Enemies {
             "Host-controlled enemy.".to_owned()
@@ -561,7 +564,7 @@ pub(super) fn present(
             && ui.selected.is_some_and(|choice| {
                 matches!(
                     choice,
-                    Choice::Skill(_) | Choice::Reposition | Choice::Rescue
+                    Choice::Ability(_) | Choice::Skill(_) | Choice::Reposition | Choice::Rescue
                 ) && inspection::display_actor(view).is_some_and(|source| {
                     inspection::action_for(choice, Some(actor.id)).is_ok_and(|action| {
                         snapshot.validate_action_target(source.id, &action).is_ok()
@@ -637,10 +640,21 @@ pub(super) fn present(
             world.entity_mut(control).insert(label);
         }
         let rank = snapshot.rank(actor.id).unwrap_or(0);
+        let source_mask = inspection::display_actor(view)
+            .and_then(|source| match ui.selected {
+                Some(Choice::Ability(index)) => source.ability(index),
+                Some(Choice::Skill(skill)) => source
+                    .skill_index(skill)
+                    .and_then(|index| source.ability(index)),
+                _ => None,
+            })
+            .map(|definition| definition.source_ranks);
         let source_rank = actor.team() == Team::Heroes
-            && matches!(ui.selected,
-            Some(Choice::Skill(skill)) if snapshot.ranks(actor.id).is_some_and(|mut ranks|
-                ranks.any(|rank| skill_definition(skill).source_ranks & (1 << (rank - 1)) != 0)));
+            && source_mask.is_some_and(|mask| {
+                snapshot
+                    .ranks(actor.id)
+                    .is_some_and(|mut ranks| ranks.any(|rank| mask & (1 << (rank - 1)) != 0))
+            });
         if let Some(cue) = world.get::<FormationCue>(entity).map(|cue| cue.0) {
             // Keep position labels literal. Range/selection use the existing
             // footprint emphasis below, not unexplained punctuation.
@@ -857,7 +871,7 @@ fn sync_unknown_status(world: &mut World, parent: Entity, actor: &ActorSnapshot,
 mod tests {
     use super::*;
     use bevy_gamekit::testing::{run_frames, HeadlessUiPlugin};
-    use labyrinth_rules::{Combat, HeroSetup, StatusKind, DEFAULT_HERO_ROSTER};
+    use labyrinth_rules::{Combat, StatusKind, DEFAULT_HERO_ROSTER};
 
     fn status(actor: ActorId, kind: StatusKind, id: u64) -> StatusInstance {
         let definition = status_definition(kind);
@@ -882,13 +896,23 @@ mod tests {
 
     #[test]
     fn character_names_ignore_rank_class_and_snapshot_array_order() {
-        let setup = std::array::from_fn(|index| {
-            HeroSetup::preset(
-                ActorId(11 + u16::try_from(index).expect("six actors") * 7),
-                HeroClass::Knifehand,
-            )
-        });
-        let mut snapshot = Combat::with_heroes(42, setup)
+        let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
+        let mut scenario = labyrinth_rules::scenario::Scenario::stock(
+            labyrinth_rules::scenario::StockScenario::WeaponComparison,
+            42,
+            &catalog,
+        )
+        .expect("scenario");
+        for (index, actor) in scenario.heroes.iter_mut().enumerate() {
+            actor.id = ActorId(11 + u16::try_from(index).expect("six actors") * 7);
+            actor.actor.appearance = ActorKind::Hero(HeroClass::Knifehand);
+            actor.actor.name = if index == 1 {
+                "Mara".to_owned()
+            } else {
+                format!("Hero {index}")
+            };
+        }
+        let mut snapshot = Combat::from_scenario(&catalog, &scenario)
             .expect("explicit IDs")
             .snapshot();
         let names = snapshot
@@ -1138,12 +1162,12 @@ mod tests {
             }
             let mut view = LabyrinthView {
                 local: true,
+                player: Some(0),
                 admitted: true,
                 combat: Some(snapshot),
                 players: vec![crate::view::PlayerView {
                     slot: 0,
-                    actor: ActorId(1),
-                    hero: HeroClass::Gatekeeper,
+                    actors: vec![ActorId(1)],
                     name: "The hero's long player-owned display name".to_owned(),
                     occupied: true,
                     connected: true,

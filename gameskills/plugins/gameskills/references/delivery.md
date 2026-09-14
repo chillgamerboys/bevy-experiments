@@ -74,9 +74,61 @@ repository, remote source and base; merge additionally requires observed remote
 integration. Release acceptance remains with the release skill. Commands and
 external observations do not replace source review or gameplay acceptance.
 
-Optional tracking is a configured executable argv, with no shell interpolation:
-`[tracking] required = true` and `observer = ["gameskills-linear", "observe"]`.
-Bind `--issue UUID --project UUID` on the same task. The observer receives those
-flags plus `--pr URL` and returns JSON with `ok`, `linked`, `issue_id`,
-`project_id` and `pr_url`. All exact identities must agree. Core-only installations
-omit tracking and need no credentials. The separate plugin owns provider setup.
+## Tracking observations
+
+Core-only installations omit tracking. For adopted tracking, connected host MCP is
+the normal path: `[tracking] required = true` with `mode = "mcp"`. Bind
+`--issue UUID --project UUID` on the task. Use the adopted tracker skill and actual
+connected tools to reread the issue, its project and PR attachment, preserving the
+tool response as evidence. No standalone executable or separate API key is needed.
+
+Pass a fresh normalized snapshot to each check:
+
+```text
+gameskills delivery check TASK --evidence RUN_ID --tracker-observation FILE.json
+```
+
+```json
+{
+  "schema_version": 1,
+  "transport": "mcp",
+  "tool": "actual connected issue lookup tool",
+  "evidence_reference": "path or host reference to the actual tool response",
+  "task_id": "TASK",
+  "source_head": "FULL_CURRENT_GIT_HEAD",
+  "observed_at": 1789335177,
+  "issue": {
+    "id": "ISSUE_UUID",
+    "project_id": "PROJECT_UUID",
+    "url": "https://tracker.example/issue/identifier",
+    "attachment_urls": ["https://github.com/OWNER/REPO/pull/NUMBER"]
+  }
+}
+```
+
+Use the actual observation time in Unix seconds and map stable IDs from the tool
+response, not display identifiers. The example timestamp is not reusable evidence.
+The checker requires the same task, source HEAD and bound issue/project/PR, an
+observation no older than 300 seconds and no future timestamp, and a matching issue
+URL in the freshly queried GitHub PR body. Missing one-way links or connector access
+remain verification gaps. Query again after changes or expiry; never retimestamp an
+old response or substitute `ok: true` for observed fields.
+
+The result retains the supplied snapshot and its digest, explicitly labeled as
+caller-supplied MCP evidence. The CLI checks identities and the live GitHub backlink;
+it cannot invoke the host's MCP tools, authenticate that invocation, or independently
+verify the supplied timestamp/reference. Review the actual tool evidence separately.
+Stored `show` output is historical; each `check` requires its explicit snapshot.
+
+For deliberate headless use, `mode = "command"` selects a configured executable
+argv such as `observer = ["gameskills-linear", "observe"]`, with no shell
+interpolation. The observer receives `--issue UUID --project UUID --pr URL` and
+returns JSON with `ok`, `linked`, `issue_id`, `project_id` and `pr_url`. All exact
+identities must agree. Existing argv-only configurations retain command behavior;
+without an argv, omitted mode defaults to MCP. Mixed modes are rejected, and an
+MCP snapshot cannot override command mode. The separate plugin owns provider setup.
+
+When the user extends an existing PR task to merge, retain its record and create a
+separate `--endpoint merge` task with the same bindings. Check PR acceptance before
+merging, then check the merge task after integration from the source checkout. A
+premerge merge check correctly reports that integration has not happened yet.

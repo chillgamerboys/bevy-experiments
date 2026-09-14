@@ -1,5 +1,7 @@
-//! Recoverable two-file installation transactions.
-use super::{archive, files, normalized, sorted_bytes, strings, CONFIG, JOURNAL, LOCK};
+//! Recoverable installation and project registration transactions.
+use super::{
+    archive, files, normalized, registration, sorted_bytes, strings, CONFIG, JOURNAL, LOCK,
+};
 use serde_json::{json, Value};
 use std::{fs::File, path::Path};
 
@@ -133,19 +135,14 @@ fn inactive_runs(directory: &files::Directory) -> Result<Vec<File>, String> {
     Ok(guards)
 }
 
-fn recover(directory: &files::Directory) -> Result<Value, String> {
-    let Some(bytes) = directory.read_optional(JOURNAL)? else {
-        return Ok(json!({"ok":true,"recovered":false}));
-    };
-    // Recovery changes the same managed files as apply and must retain the same
-    // queue/run exclusions while validating and restoring the transaction.
-    let _queue_guard = inactive_history(directory)?;
-    let _run_guards = inactive_runs(directory)?;
-    let transaction = archive::json(&bytes)?;
-    super::exact_keys(&transaction, &[CONFIG, LOCK])?;
-    for name in [CONFIG, LOCK] {
+pub(super) fn restore(
+    directory: &files::Directory,
+    transaction: &Value,
+    names: &[&str],
+) -> Result<(), String> {
+    for name in names {
         let versions = transaction
-            .get(name)
+            .get(*name)
             .ok_or("invalid setup recovery journal")?;
         super::exact_keys(versions, &["before", "after"])?;
         if ["before", "after"]
@@ -162,16 +159,37 @@ fn recover(directory: &files::Directory) -> Result<Value, String> {
             return Err(format!("recovery would overwrite a local edit: {name}"));
         }
     }
-    for name in [CONFIG, LOCK] {
+    for name in names {
         directory.write(
             name,
             transaction
-                .get(name)
+                .get(*name)
                 .and_then(|v| v.get("before"))
                 .and_then(Value::as_str)
                 .map(str::as_bytes),
         )?;
     }
+    Ok(())
+}
+
+fn recover(directory: &files::Directory) -> Result<Value, String> {
+    let Some(bytes) = directory.read_optional(JOURNAL)? else {
+        return Ok(json!({"ok":true,"recovered":false}));
+    };
+    // Recovery changes the same managed files as apply and must retain the same
+    // queue/run exclusions while validating and restoring the transaction.
+    let _queue_guard = inactive_history(directory)?;
+    let _run_guards = inactive_runs(directory)?;
+    let transaction = archive::json(&bytes)?;
+    let names: &[&str] = if transaction.get(registration::CONFIG).is_some()
+        || transaction.get(registration::RECORD).is_some()
+    {
+        &[CONFIG, LOCK, registration::CONFIG, registration::RECORD]
+    } else {
+        &[CONFIG, LOCK]
+    };
+    super::exact_keys(&transaction, names)?;
+    restore(directory, &transaction, names)?;
     directory.remove(JOURNAL)?;
     Ok(json!({"ok":true,"recovered":true,"action":"restored previous configuration and lock"}))
 }
@@ -245,7 +263,14 @@ pub(super) fn execute(root: &Path, args: &[String]) -> Result<Value, String> {
     let lock = json!({"schema_version":2,"runtime":"rust","bundle":relative,"content_sha256":bundle.identity(),"packages":bundle.selected});
     let lock_text = String::from_utf8(sorted_bytes(&lock)?).map_err(|e| e.to_string())?;
     let previous_lock = previous(&directory, LOCK)?;
-    let proposed = json!({"ok":true,"applied":apply,"packages":selected,"clients":configured.get("clients"),"max_workers":configured.pointer("/dispatch/max_workers"),"config_change":existing.as_deref()!=Some(text.as_str()),"lock_change":previous_lock.as_deref()!=Some(lock_text.as_str()),"content_sha256":bundle.identity(),"source_commit":bundle.manifest.get("source_commit"),"destination":root.join(&relative),"native_activation":"explicit client activation still required"});
+    let clients = strings(&configured, "clients")?;
+    let native = registration::prepare(
+        &directory,
+        &bundle,
+        &root.join(&relative),
+        clients.iter().any(|client| client == "codex"),
+    )?;
+    let mut proposed = json!({"ok":true,"applied":apply,"packages":selected,"clients":clients,"max_workers":configured.pointer("/dispatch/max_workers"),"config_change":existing.as_deref()!=Some(text.as_str()),"lock_change":previous_lock.as_deref()!=Some(lock_text.as_str()),"content_sha256":bundle.identity(),"source_commit":bundle.manifest.get("source_commit"),"destination":root.join(&relative),"project_registration_change":native.changed(),"global_configuration_writes":false,"native_activation":"project registration does not establish discovery or existing-session activation"});
     if !apply {
         return Ok(proposed);
     }
@@ -258,6 +283,9 @@ pub(super) fn execute(root: &Path, args: &[String]) -> Result<Value, String> {
     }
     if previous(&directory, CONFIG)? != existing || previous(&directory, LOCK)? != previous_lock {
         return Err("project configuration or lock changed during setup".into());
+    }
+    if !native.unchanged(&directory)? {
+        return Err("project native settings changed during setup".into());
     }
     let bundles = directory.child(".gameskills/bundles", true)?;
     if bundles.child(&identity, false).is_ok() {
@@ -292,12 +320,43 @@ pub(super) fn execute(root: &Path, args: &[String]) -> Result<Value, String> {
     }
     if existing.as_deref() == Some(text.as_str())
         && previous_lock.as_deref() == Some(lock_text.as_str())
+        && !native.changed()
     {
+        proposed
+            .as_object_mut()
+            .ok_or("invalid setup proposal")?
+            .insert(
+                "native_clients".into(),
+                registration::status(root, &bundle, &root.join(&relative), &clients),
+            );
         return Ok(proposed);
     }
-    directory.write(JOURNAL, Some(&sorted_bytes(&json!({CONFIG:{"before":existing,"after":text},LOCK:{"before":previous_lock,"after":lock_text}}))?))?;
+    if !native.unchanged(&directory)? {
+        return Err("project native settings changed during setup".into());
+    }
+    let mut transaction = native.journal();
+    transaction
+        .as_object_mut()
+        .ok_or("invalid setup journal")?
+        .insert(CONFIG.into(), json!({"before":existing,"after":text}));
+    transaction
+        .as_object_mut()
+        .ok_or("invalid setup journal")?
+        .insert(
+            LOCK.into(),
+            json!({"before":previous_lock,"after":lock_text}),
+        );
+    directory.write(JOURNAL, Some(&sorted_bytes(&transaction)?))?;
     directory.write(CONFIG, Some(text.as_bytes()))?;
     directory.write(LOCK, Some(lock_text.as_bytes()))?;
+    native.write(&directory)?;
     directory.remove(JOURNAL)?;
+    proposed
+        .as_object_mut()
+        .ok_or("invalid setup proposal")?
+        .insert(
+            "native_clients".into(),
+            registration::status(root, &bundle, &root.join(&relative), &clients),
+        );
     Ok(proposed)
 }

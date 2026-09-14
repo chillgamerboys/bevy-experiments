@@ -2,12 +2,16 @@
 use super::*;
 use bevy_gamekit::ui::{UiFeedScroll, UiTooltipOpen};
 
+/// The log keeps its compact artwork-aware height independently of help cards.
+#[derive(Component, PartialEq)]
+pub(super) struct HistorySafeBottom(pub f32);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Entry {
     id: u64,
     title: String,
     details: Vec<String>,
-    skill: Option<SkillId>,
+    skill: Option<bevy_gamekit::ui::UiTooltipSubject>,
 }
 
 fn entries(view: &LabyrinthView) -> Vec<Entry> {
@@ -24,19 +28,33 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                 format!(
                     "{} · {}",
                     name(actor),
-                    inspection::choice_title(Some(match action {
-                        CombatAction::Skill { skill, .. } => Choice::Skill(skill),
-                        CombatAction::Reposition { .. } => Choice::Reposition,
-                        CombatAction::Rescue { .. } => Choice::Rescue,
-                        CombatAction::Defend => Choice::Defend,
-                        CombatAction::Wait => Choice::Wait,
-                    }))
+                    inspection::choice_title(
+                        view.combat
+                            .as_ref()
+                            .and_then(|snapshot| snapshot.actor(actor)),
+                        Some(match action {
+                            CombatAction::Ability { index, .. } => Choice::Ability(index),
+                            CombatAction::Skill { skill, .. } => Choice::Skill(skill),
+                            CombatAction::Reposition { .. } => Choice::Reposition,
+                            CombatAction::Rescue { .. } => Choice::Rescue,
+                            CombatAction::Defend => Choice::Defend,
+                            CombatAction::Wait => Choice::Wait,
+                        })
+                    )
                 ),
-                if let CombatAction::Skill { skill, .. } = action {
-                    Some(skill)
-                } else {
-                    None
-                },
+                view.combat
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.actor(actor))
+                    .and_then(|source| {
+                        let index = match action {
+                            CombatAction::Ability { index, .. } => Some(index),
+                            CombatAction::Skill { skill, .. } => source.skill_index(skill),
+                            _ => None,
+                        }?;
+                        source.ability(index).map(|definition| {
+                            tooltips::ability_subject(view.encounter, actor, &definition.id)
+                        })
+                    }),
             )),
             CombatEventKind::TurnStarted { actor, .. } => {
                 Some((format!("{} · turn starts", name(actor)), None))
@@ -347,9 +365,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             .insert((UiFeedScroll::default(), ScrollPosition::default()));
         ui.expanded_log.clear();
     }
-    let safe_bottom = world
-        .get::<bevy_gamekit::ui::UiTooltipBounds>(root)
-        .map_or(330.0, |b| b.0.max.y);
+    let safe_bottom = world.get::<HistorySafeBottom>(root).map_or(330.0, |b| b.0);
     let max_height = (safe_bottom - 138.0).max(70.0);
     if let Some(mut node) = world.get_mut::<Node>(panel) {
         let height = if full {
@@ -487,12 +503,11 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
             );
         }
         if expanded {
-            if let Some(skill) = entry.skill {
-                let subject = tooltips::ability_subject(skill);
+            if let Some(subject) = &entry.skill {
                 if world
                     .resource::<bevy_gamekit::ui::UiTooltipCatalog>()
                     .0
-                    .contains_key(&subject)
+                    .contains_key(subject)
                 {
                     let fonts = world.resource::<UiFonts>().clone();
                     world
@@ -503,7 +518,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
                                 "labyrinth-history",
                                 format!("ability/{}", entry.id),
                             ),
-                            UiTooltipOpen(subject),
+                            UiTooltipOpen(subject.clone()),
                             ChildOf(item),
                         ))
                         .with_child(bevy_gamekit::ui::text(
@@ -588,12 +603,20 @@ mod tests {
             .details
             .first()
             .expect("damage")
-            .contains("Alden → Ash Brute"));
-        assert!(grouped.get(1).expect("action").title.starts_with("Alden ·"));
-        assert!(grouped.get(2).expect("turn").title.starts_with("Mara ·"));
+            .contains("Gatekeeper → Ash Brute"));
+        assert!(grouped
+            .get(1)
+            .expect("action")
+            .title
+            .starts_with("Gatekeeper ·"));
+        assert!(grouped
+            .get(2)
+            .expect("turn")
+            .title
+            .starts_with("Knifehand ·"));
         assert_eq!(
             grouped.get(2).expect("turn").details,
-            ["Alden is downed", "Ash Brute: Bleed triggers"]
+            ["Gatekeeper is downed", "Ash Brute: Bleed triggers"]
         );
         assert!(grouped.first().expect("partial").title.contains("partial"));
         assert_eq!(entries(&view), grouped, "snapshot replay is idempotent");
