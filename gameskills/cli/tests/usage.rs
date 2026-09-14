@@ -547,12 +547,12 @@ fn failed_mark_transition_is_atomic_and_model_changes_remain_unavailable() -> Te
             "--log",
             &log_text,
             "--stage",
-            "verification",
+            "implementation",
             "--role",
             "coordinator",
         ],
     )
-    .expect_err("decreasing counters must not advance state")
+    .expect_err("a duplicate mark with decreasing counters must not advance state")
     .contains("decreased"));
 
     native_log(&log, "model-b", 300, 60, 100, "private-valid")?;
@@ -573,6 +573,18 @@ fn failed_mark_transition_is_atomic_and_model_changes_remain_unavailable() -> Te
     assert_eq!(report["total"]["totals"]["input_tokens"], 200);
     assert_eq!(report["models"]["observed"]["unavailable_receipts"], 1);
     assert!(report["receipts"][0]["observed"].get("model").is_none());
+    assert_eq!(
+        report["open_intervals"],
+        json!([{
+            "stage": "verification",
+            "thread": "thread-native",
+            "attempt": "default"
+        }])
+    );
+    assert_eq!(
+        report["totals_scope"],
+        "completed intervals only; open intervals are excluded"
+    );
     Ok(())
 }
 

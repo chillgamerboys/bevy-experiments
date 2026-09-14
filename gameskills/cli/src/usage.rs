@@ -432,6 +432,31 @@ fn mark_receipts(state: &State) -> Result<Vec<Receipt>, String> {
 }
 
 #[cfg(unix)]
+fn open_intervals(state: &State, task: &str) -> Result<Vec<Value>, String> {
+    let mut intervals = Vec::new();
+    for file in state.marks.entries()? {
+        let record = load_mark(state, &file)?;
+        if record.task != task {
+            continue;
+        }
+        if let Some(active) = record.active {
+            intervals.push((active.stage, record.thread, record.attempt));
+        }
+    }
+    intervals.sort();
+    Ok(intervals
+        .into_iter()
+        .map(|(stage, thread, attempt)| {
+            json!({
+                "stage": stage,
+                "thread": thread,
+                "attempt": attempt,
+            })
+        })
+        .collect())
+}
+
+#[cfg(unix)]
 fn load_task(state: &State, task: &str) -> Result<TaskRecord, String> {
     let file = task_file(task);
     if !state.tasks.entries()?.iter().any(|entry| entry == &file) {
@@ -837,6 +862,7 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
     let total = summarize(receipts.iter())?;
     let estimate = cost(&receipts, rates.as_ref())?;
     let (stages, active_skill_sets) = classified_summaries(&receipts)?;
+    let open_intervals = open_intervals(&state, task)?;
     let first = receipts
         .iter()
         .map(|receipt| receipt.start.at)
@@ -864,6 +890,8 @@ fn report(root: &Path, args: &[OsString]) -> Result<Value, String> {
         "stages": stages,
         "active_skill_sets": active_skill_sets,
         "skill_attribution": "tokens are attributed to the exact active skill set; mixed sets are not split into invented per-skill causation",
+        "open_intervals": open_intervals,
+        "totals_scope": "completed intervals only; open intervals are excluded",
         "total": total,
         "receipt_count": receipts.len(),
         "attempt_count": attempts.len(),
@@ -1356,6 +1384,8 @@ fn mark(root: &Path, args: &[OsString]) -> Result<Value, String> {
     let Some(active) = record.active.clone() else {
         return Err("usage mark attempt is already finished".into());
     };
+    let receipt = receipt_from_active(&record, &active, &observation);
+    validate_receipt(&receipt)?;
     if active.stage == stage && active.active_skills == args.skills {
         return Ok(json!({
             "schema_version": 1,
@@ -1370,8 +1400,6 @@ fn mark(root: &Path, args: &[OsString]) -> Result<Value, String> {
         }));
     }
 
-    let receipt = receipt_from_active(&record, &active, &observation);
-    validate_receipt(&receipt)?;
     for existing in &record.receipts {
         reject_overlap(existing, &receipt)?;
     }
