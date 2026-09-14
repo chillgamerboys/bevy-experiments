@@ -262,7 +262,7 @@ presentation states; those captures freeze timing and do not prove hover duratio
 
 The unified editor and preparation require decision-information checks as well as
 input/layout checks. Compare a dagger and greatsword at different acting ranks,
-inspect a learned rank/damage upgrade, remove one of several grants, and explain
+inspect an Ability that upgrades a Skill’s ranks/damage, remove one of several grants, and explain
 the actual added/removed/changed moves before applying. Exercise category changes,
 dirty character switching, discard/reload, server conflicts and source replacement.
 Both teams use the same editor. Do not infer understandable choices from unclipped

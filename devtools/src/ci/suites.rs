@@ -31,7 +31,7 @@ pub fn get(name: &str) -> Result<Suite, String> {
         "labyrinth-ui-model" => ("labyrinth", &["ui::battle::actors::tests::", "ui::battle::history::tests::"], false, false),
         "labyrinth-session" => ("labyrinth", &["session::tests::"], false, false),
         "labyrinth-profile" => ("labyrinth", &["profile::tests::"], false, false),
-        "labyrinth-presentation" => ("labyrinth", &["presentation::tests::", "ui::tests::abilities::effective_multi_target_forecast_names_every_target_and_conceals_secondary_unknowns"], false, false),
+        "labyrinth-presentation" => ("labyrinth", &["presentation::tests::", "ui::tests::skills::effective_multi_target_forecast_names_every_target_and_conceals_secondary_unknowns"], false, false),
         "labyrinth-scene" => ("labyrinth", &["scene::tests::"], false, false),
         "labyrinth-editor" => ("labyrinth", &["ui::setup::decision_tests::", "ui::setup::tests::"], false, false),
         "labyrinth-lobby" => ("labyrinth", &["ui::shell::lobby::tests::"], false, false),
