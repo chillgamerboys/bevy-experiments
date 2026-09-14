@@ -633,6 +633,38 @@ fn development_scope_defaults_and_runner_evidence_remain_bound() -> Result<(), B
 }
 
 #[test]
+fn promotion_is_explicit_for_gameplay_milestones() -> Result<(), Box<dyn Error>> {
+    let d = fixture()?;
+    let root = d.path();
+    rigor_fixture(root)?;
+    let ordinary = cli(
+        root,
+        &[
+            "delivery", "start", "ordinary", "--goal", "Ship", "--base", "main",
+            "--scope", "session", "--gameplay",
+        ],
+    )?;
+    assert_eq!(ordinary.pointer("/record/promotion"), Some(&json!(false)));
+    assert_eq!(
+        ordinary.pointer("/record/verification/manual_sanity_required"),
+        Some(&json!(false))
+    );
+    let promoted = cli(
+        root,
+        &[
+            "delivery", "start", "promoted", "--goal", "Ship", "--base", "dev",
+            "--level", "release", "--scope", "session", "--gameplay", "--promotion",
+        ],
+    )?;
+    assert_eq!(promoted.pointer("/record/promotion"), Some(&json!(true)));
+    assert_eq!(
+        promoted.pointer("/record/verification/manual_sanity_required"),
+        Some(&json!(true))
+    );
+    Ok(())
+}
+
+#[test]
 fn milestone_requires_actual_candidate_bound_manual_reference() -> Result<(), Box<dyn Error>> {
     let d = fixture()?;
     let root = d.path();
