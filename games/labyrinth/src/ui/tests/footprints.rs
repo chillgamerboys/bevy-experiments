@@ -219,9 +219,9 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow(
             .get(usize::from(member.owner))
             .copied()
             .expect("class");
-        member.abilities = resolved_legacy(
+        member.resolved_build = resolved_legacy(
             HeroSetup::preset(member.actor, member.hero)
-                .abilities
+                .skills
                 .as_slice(),
         );
     }
@@ -305,7 +305,7 @@ fn large_actor_controls_keep_one_identity_and_corpse_health_does_not_reflow(
     );
     apply_action(
         app.world_mut(),
-        Action::Choice(Choice::Skill(SkillId::SnapShot)),
+        Action::Choice(Choice::LegacySkill(SkillId::SnapShot)),
     );
     let control = find_named(app.world_mut(), "Actor 5").expect("corpse");
     assert!(click_action(&mut app, control));

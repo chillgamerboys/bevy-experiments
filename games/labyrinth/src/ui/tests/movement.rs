@@ -41,7 +41,7 @@ fn select(app: &mut App, target: ActorId, keyboard: bool) {
         .and_then(|snapshot| snapshot.actor(ActorId(1)))
         .and_then(|actor| {
             actor
-                .skills()
+                .legacy_skills()
                 .iter()
                 .position(|skill| *skill == SkillId::DrivingBlow)
         })
@@ -132,11 +132,11 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it(
     select(&mut app, ActorId(104), keyboard);
     assert_eq!(
         app.world().resource::<UiState>().selected,
-        Some(Choice::Ability(
+        Some(Choice::Skill(
             snapshot
                 .actor(ActorId(1))
                 .expect("hero")
-                .skill_index(SkillId::DrivingBlow)
+                .legacy_skill_index(SkillId::DrivingBlow)
                 .expect("Driving Blow")
         ))
     );
@@ -145,7 +145,7 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it(
         &snapshot,
         app.world().resource::<CombatDisclosure>(),
         ActorId(1),
-        &CombatAction::Skill {
+        &CombatAction::LegacySkill {
             skill: SkillId::DrivingBlow,
             target: ActorId(104),
         },
@@ -308,11 +308,11 @@ fn movement_preview_is_non_mutating_and_pointer_keyboard_confirm_matches_it(
         actions,
         vec![(
             ActorId(1),
-            CombatAction::Ability {
+            CombatAction::Skill {
                 index: snapshot
                     .actor(ActorId(1))
                     .expect("hero")
-                    .skill_index(SkillId::DrivingBlow)
+                    .legacy_skill_index(SkillId::DrivingBlow)
                     .expect("Driving Blow"),
                 target: ActorId(104)
             }

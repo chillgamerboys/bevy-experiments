@@ -93,7 +93,7 @@ fn local_prototype_has_four_ordinary_heroes_and_one_weak_wagon() {
     let wagon = combat.actor(ActorId(5)).expect("wagon");
     assert_eq!(wagon.kind, ActorKind::Hero(HeroClass::LanternWagon));
     assert_eq!(
-        wagon.skills(),
+        wagon.legacy_skills(),
         &[
             labyrinth_rules::SkillId::HurledScrap,
             labyrinth_rules::SkillId::SpareBandage
@@ -665,14 +665,14 @@ fn accepted_gameplay_records_typed_monotonic_events_with_bounded_history() {
                 .into_iter()
                 .find(|action| {
                     combat
-                        .action_ability(actor, *action)
+                        .action_skill(actor, *action)
                         .ok()
                         .flatten()
                         .and_then(|(index, _)| {
-                            combat.actor(actor).and_then(|source| source.ability(index))
+                            combat.actor(actor).and_then(|source| source.skill(index))
                         })
-                        .is_some_and(|ability| {
-                            ability
+                        .is_some_and(|skill| {
+                            skill
                                 .effects
                                 .iter()
                                 .any(|effect| matches!(effect, labyrinth_rules::Effect::Damage(_)))
@@ -743,7 +743,7 @@ fn repeated_class_selection_keeps_actor_ownership_and_requires_fresh_party_readi
         if member.owner == chooser {
             assert_eq!(member.hero, HeroClass::Knifehand);
             assert_eq!(
-                member.abilities,
+                member.resolved_build,
                 changed
                     .scenario
                     .heroes
@@ -864,8 +864,9 @@ fn received_snapshots_validate_six_distinct_owners_even_when_classes_repeat() {
     bad.company
         .last_mut()
         .expect("character")
-        .abilities
-        .abilities
+        .resolved_build
+        .moveset
+        .skills
         .clear();
     assert_invalid_snapshot(&bad);
     let mut bad = valid.clone();
@@ -1363,7 +1364,7 @@ fn configured_both_teams_freeze_stats_builds_and_repeat_the_exact_seed() {
     assert!(combat
         .actor(ActorId(1))
         .expect("hero")
-        .resolved_abilities()
+        .resolved_skills()
         .iter()
         .any(|a| a.definition.id.as_str() == "greatsword_cleave"));
     assert!(request(&mut authority, 0, SessionCommand::Rematch)
@@ -1387,7 +1388,7 @@ fn owned_build_edits_cannot_change_enemy_roster_formation_or_a_newer_draft() {
     let mut hero = original.scenario.heroes.get(1).expect("owned hero").clone();
     hero.actor.max_hp = 77;
     hero.actor.build.weapon = Some(labyrinth_rules::catalog::ContentId::new("dagger").expect("ID"));
-    hero.actor.build.learned_skills =
+    hero.actor.build.abilities =
         vec![labyrinth_rules::catalog::ContentId::new("duelist_dagger_power").expect("ID")];
     assert!(request(
         &mut authority,

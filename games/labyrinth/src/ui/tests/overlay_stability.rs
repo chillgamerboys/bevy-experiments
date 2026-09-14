@@ -5,7 +5,7 @@ use crate::scene::{SceneActorAnchor, SceneAppearance};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy_gamekit::ui::UiContextHelp;
-use labyrinth_rules::{skill_definition, CombatSnapshot};
+use labyrinth_rules::{legacy_skill_definition, CombatSnapshot};
 use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq)]
@@ -360,13 +360,17 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
         .clone()
         .expect("combat");
     let source = snapshot.active_actor.expect("acting hero");
-    let skills = snapshot.actor(source).expect("hero").skills().to_vec();
+    let skills = snapshot
+        .actor(source)
+        .expect("hero")
+        .legacy_skills()
+        .to_vec();
     let expected = geometry(&mut app);
     for (index, skill) in skills.into_iter().enumerate() {
         keyboard_control(&mut app, &format!("Skill {index}"));
         assert_eq!(
             app.world().resource::<UiState>().selected,
-            Some(Choice::Ability(index as u8))
+            Some(Choice::Skill(index as u8))
         );
         unchanged(
             &mut app,
@@ -381,7 +385,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
                 snapshot
                     .validate_action_target(
                         source,
-                        &CombatAction::Skill {
+                        &CombatAction::LegacySkill {
                             skill,
                             target: actor.id,
                         },
@@ -423,7 +427,7 @@ fn overlay_selection_forecasts_and_drawers_never_move_world_characters(
         }
         keyboard_control(&mut app, "Cancel Combat Selection");
         assert!(app.world().resource::<UiState>().selected.is_none());
-        unchanged(&mut app, &expected, &snapshot, "cancel ability and target");
+        unchanged(&mut app, &expected, &snapshot, "cancel skill and target");
     }
     for (name, choice) in [("Wait", Choice::Wait), ("Defend", Choice::Defend)] {
         keyboard_control(&mut app, name);
@@ -446,7 +450,7 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free_norma
         .as_ref()
         .and_then(|snapshot| snapshot.active_actor)
         .expect("hero");
-    for skills in SkillId::ALL.chunks(MAX_EQUIPPED_ABILITIES) {
+    for skills in SkillId::ALL.chunks(MAX_LEGACY_SKILLS) {
         set_legacy_skills(
             app.world_mut()
                 .resource_mut::<LabyrinthView>()
@@ -458,20 +462,21 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free_norma
         );
         run_frames(&mut app, 5);
         for (index, skill) in skills.iter().enumerate() {
-            let control = find_named(app.world_mut(), &format!("Skill {index}")).expect("ability");
+            let control = find_named(app.world_mut(), &format!("Skill {index}")).expect("skill");
             let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(1920.0, 1080.0));
             hover_control(&mut app, control, viewport);
             let title = find_named(app.world_mut(), "Tooltip Title").expect("hover card");
             assert_eq!(
                 app.world().get::<Text>(title).expect("title").0,
-                skill_definition(*skill).name
+                legacy_skill_definition(*skill).name
             );
             let titles = app
                 .world_mut()
                 .query::<(&Name, &Text)>()
                 .iter(app.world())
                 .filter(|(name, text)| {
-                    name.as_str() == "Tooltip Title" && text.0 == skill_definition(*skill).name
+                    name.as_str() == "Tooltip Title"
+                        && text.0 == legacy_skill_definition(*skill).name
                 })
                 .count();
             assert_eq!(titles, 1);
@@ -485,7 +490,7 @@ fn catalog_cards_are_optional_disclosed_and_keep_the_dock_description_free_norma
         app.world_mut(),
         &format!(
             "Read {}",
-            skill_definition(*SkillId::ALL.last().expect("catalog")).name
+            legacy_skill_definition(*SkillId::ALL.last().expect("catalog")).name
         ),
     )
     .expect("book entry");
@@ -571,9 +576,9 @@ fn hover_preview_appears_and_leaves_in_one_frame_and_lock_keeps_its_geometry(
     run_frames(&mut app, 15);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());
     native_pointer_click(&mut app, Vec2::new(5.0, 5.0));
-    let other = find_named(app.world_mut(), "Skill 1").expect("other ability");
+    let other = find_named(app.world_mut(), "Skill 1").expect("other skill");
     let other_point = visible_control_rect(app.world(), other, viewport)
-        .expect("other ability bounds")
+        .expect("other skill bounds")
         .center();
     hover_at(&mut app, other_point);
     run_frames(&mut app, 15);
@@ -757,7 +762,7 @@ fn opening_a_link_keeps_the_parent_tooltip_visible_compatibility() {
 
 fn opening_a_link_keeps_the_parent_tooltip_visible(width: u32, height: u32, scale: UiScaleMode) {
     let mut app = scene_app(width, height, scale);
-    let source = find_named(app.world_mut(), "Skill 0").expect("ability");
+    let source = find_named(app.world_mut(), "Skill 0").expect("skill");
     assert!(focus_action(app.world_mut(), source));
     tap_key(&mut app, KeyCode::KeyT);
     run_frames(&mut app, 10);
@@ -834,7 +839,7 @@ fn tooltip_pointer_and_native_wheel_do_not_select_underlying_characters(
         .clone()
         .expect("combat");
     let viewport = Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32));
-    let source = find_named(app.world_mut(), "Skill 0").expect("ability");
+    let source = find_named(app.world_mut(), "Skill 0").expect("skill");
     hover_control(&mut app, source, viewport);
     run_frames(&mut app, 8);
     assert!(app.world().resource::<UiTooltipState>().is_pinned());

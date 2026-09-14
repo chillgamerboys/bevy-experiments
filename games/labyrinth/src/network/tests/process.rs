@@ -397,7 +397,7 @@ fn six_native_processes_survive_guest_kill_and_finish_the_fight() {
         .actor(owned.actor)
         .expect("sixth combat actor")
         .clone();
-    assert_eq!(owned_actor.abilities, owned.abilities);
+    assert_eq!(owned_actor.resolved_build, owned.resolved_build);
     assert!(before.actors.iter().any(|actor| actor
         .statuses
         .iter()

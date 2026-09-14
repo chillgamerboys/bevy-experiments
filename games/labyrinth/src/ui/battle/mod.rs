@@ -22,8 +22,8 @@ use layout::mount;
 use super::*;
 use bevy_gamekit::ui::{UiRegionRole, UiViewportClass};
 use labyrinth_rules::{
-    skill_definition, status_definition, ActorKind, ActorSnapshot, CombatEventKind, CombatOutcome,
-    CombatSnapshot, DamageKind, Team,
+    legacy_skill_definition, status_definition, ActorKind, ActorSnapshot, CombatEventKind,
+    CombatOutcome, CombatSnapshot, DamageKind, Team,
 };
 
 #[derive(Component)]
@@ -59,7 +59,7 @@ struct BattleNodes {
     heroes: Entity,
     enemies: Entity,
     skills: Entity,
-    loadout: Vec<labyrinth_rules::build::ResolvedAbility>,
+    loadout: Vec<labyrinth_rules::build::ResolvedSkill>,
     ability_actor: Option<(u64, ActorId)>,
     confirm: Entity,
     rematch: Entity,
@@ -75,15 +75,15 @@ fn displayed_loadout(
     presentation: &crate::presentation::BattlePresentation,
 ) -> (
     Option<(u64, ActorId)>,
-    Vec<labyrinth_rules::build::ResolvedAbility>,
+    Vec<labyrinth_rules::build::ResolvedSkill>,
 ) {
     let actor = inspection::display_actor(view);
     let subject = actor.map(|actor| (view.encounter, actor.id));
-    let abilities = actor
+    let skills = actor
         .and_then(|actor| presentation.actor(actor.id))
         .and_then(|actor| actor.details.as_known())
-        .map_or_else(Vec::new, |details| details.abilities.clone());
-    (subject, abilities)
+        .map_or_else(Vec::new, |details| details.skills.clone());
+    (subject, skills)
 }
 
 /// Positional actions are meaningful only for the subject/build actually shown.
@@ -97,8 +97,8 @@ pub(super) fn input_matches_presented_build(world: &World, view: &LabyrinthView)
         snapshot,
         world.resource::<crate::presentation::CombatDisclosure>(),
     );
-    let (subject, abilities) = displayed_loadout(view, &presentation);
-    nodes.ability_actor == subject && nodes.loadout == abilities
+    let (subject, skills) = displayed_loadout(view, &presentation);
+    nodes.ability_actor == subject && nodes.loadout == skills
 }
 
 pub(super) fn clear(world: &mut World) {

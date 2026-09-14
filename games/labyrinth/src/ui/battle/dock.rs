@@ -256,7 +256,7 @@ pub(super) fn mount(world: &mut World, root: Entity, _stage: Entity) -> DockNode
         "Skillbook Toggle",
         "",
         "Skillbook · K",
-        "Browse equipped abilities and related conditions without selecting an action.",
+        "Browse equipped skills and related conditions without selecting an action.",
         Glyph::Book,
         Action::ToggleSkillbook,
     );
@@ -290,7 +290,7 @@ pub(super) fn mount_skills(
     parent: Entity,
     encounter: u64,
     actor: Option<&ActorSnapshot>,
-    loadout: &[labyrinth_rules::build::ResolvedAbility],
+    loadout: &[labyrinth_rules::build::ResolvedSkill],
 ) {
     let children = world
         .get::<Children>(parent)
@@ -299,8 +299,8 @@ pub(super) fn mount_skills(
     for child in children {
         world.despawn(child);
     }
-    for (index, ability) in loadout.iter().enumerate() {
-        let definition = &ability.definition;
+    for (index, skill) in loadout.iter().enumerate() {
+        let definition = &skill.definition;
         let entity = glyph_control(
             world,
             parent,
@@ -308,7 +308,7 @@ pub(super) fn mount_skills(
             &format!("{}", index + 1),
             &definition.name,
             &definition.description,
-            glyphs::for_ability(definition),
+            glyphs::for_skill(definition),
             Action::SkillSlot(index),
         );
         world
@@ -383,7 +383,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
         let selected = match world.get::<Action>(entity) {
             Some(Action::Choice(choice)) => ui.selected == Some(*choice),
             Some(Action::SkillSlot(index)) => u8::try_from(*index).ok().is_some_and(|index| {
-                ui.selected == Some(Choice::Ability(index)) || matches!(ui.selected, Some(Choice::Skill(skill)) if actor.and_then(|a| a.skill_index(skill)) == Some(index))
+                ui.selected == Some(Choice::Skill(index)) || matches!(ui.selected, Some(Choice::LegacySkill(skill)) if actor.and_then(|a| a.legacy_skill_index(skill)) == Some(index))
             }),
             Some(Action::Confirm) => selected_action(view, ui).is_ok(),
             _ => false,
@@ -395,7 +395,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
         if let Some(Action::SkillSlot(index)) = world.get::<Action>(entity) {
             if let Some((index, definition)) = u8::try_from(*index).ok().and_then(|index| {
                 actor
-                    .and_then(|actor| actor.ability(index))
+                    .and_then(|actor| actor.skill(index))
                     .map(|definition| (index, definition))
             }) {
                 let uses = actor
@@ -405,7 +405,7 @@ pub(super) fn update(world: &mut World, nodes: &DockNodes, view: &LabyrinthView,
                             .actor(actor.id);
                         policy.details && policy.statuses
                     })
-                    .and_then(|actor| actor.remaining_ability_uses(index))
+                    .and_then(|actor| actor.remaining_skill_uses(index))
                     .map_or_else(String::new, |left| format!(" {left} uses remaining."));
                 let title = format!("{}. {}{uses}", index + 1, definition.name);
                 if world.get::<AccessibleLabel>(entity).map(|v| &v.0) != Some(&title) {

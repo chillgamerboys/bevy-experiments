@@ -7,22 +7,24 @@ use bevy_gamekit::testing::{
 };
 use bevy_gamekit::ui::{activation_eligible, UiAction, UiDisabled};
 use labyrinth_rules::{
-    AbilityLoadout, ActorKind, Combat, HeroSetup, StatusInstance, StatusKind, DEFAULT_HERO_ROSTER,
-    MAX_EQUIPPED_ABILITIES,
+    ActorKind, Combat, HeroSetup, LegacySkillLoadout, StatusInstance, StatusKind,
+    DEFAULT_HERO_ROSTER, MAX_LEGACY_SKILLS,
 };
 
-mod abilities;
 mod dock;
 mod footprints;
 mod history;
 mod menus;
 mod movement;
 mod overlay_stability;
+mod skills;
 mod turn_refresh;
 
 fn resolved_legacy(skills: &[SkillId]) -> labyrinth_rules::build::ResolvedBuild {
-    labyrinth_rules::catalog::ContentCatalog::builtin()
-        .expect("catalog")
+    let catalog = labyrinth_rules::catalog::ContentCatalog::builtin().expect("catalog");
+    let catalog = labyrinth_rules::scenario::legacy_catalog(&catalog, [skills])
+        .expect("explicit legacy catalog");
+    catalog
         .resolve_build(&labyrinth_rules::scenario::legacy_build(skills))
         .expect("resolved build")
 }
@@ -33,7 +35,15 @@ fn set_legacy_skills(
     skills: &[SkillId],
 ) {
     let build = labyrinth_rules::scenario::legacy_build(skills);
-    let abilities = snapshot
+    snapshot.catalog = labyrinth_rules::scenario::legacy_catalog(&snapshot.catalog, [skills])
+        .expect("legacy equipment");
+    for actor in &mut snapshot.actors {
+        actor.resolved_build = snapshot
+            .catalog
+            .resolve_build(&actor.build)
+            .expect("updated catalog identity");
+    }
+    let skills = snapshot
         .catalog
         .resolve_build(&build)
         .expect("resolved build");
@@ -43,7 +53,7 @@ fn set_legacy_skills(
         .find(|actor| actor.id == id)
         .expect("actor");
     actor.build = build;
-    actor.abilities = abilities;
+    actor.resolved_build = skills;
     actor.skill_uses.clear();
 }
 
@@ -75,7 +85,9 @@ fn fixture() -> LabyrinthView {
                 crate::session::CompanyMember {
                     actor,
                     hero,
-                    abilities: resolved_legacy(HeroSetup::preset(actor, hero).abilities.as_slice()),
+                    resolved_build: resolved_legacy(
+                        HeroSetup::preset(actor, hero).skills.as_slice(),
+                    ),
                     owner: 0,
                 }
             })
@@ -787,9 +799,9 @@ fn repeated_classes_project_the_explicit_owner_not_the_first_class_or_slot_rank_
         view.player = Some(5);
         for member in &mut view.company {
             member.hero = HeroClass::Gatekeeper;
-            member.abilities = resolved_legacy(
+            member.resolved_build = resolved_legacy(
                 HeroSetup::preset(member.actor, member.hero)
-                    .abilities
+                    .skills
                     .as_slice(),
             );
             // Deliberately not slot+1: character control is independent of seats.
@@ -843,7 +855,7 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
     let heroes = DEFAULT_HERO_ROSTER.map(|class| {
         next_id += 1;
         let mut hero = HeroSetup::preset(ActorId(next_id), class);
-        hero.abilities = AbilityLoadout::new(SkillId::ALL.into_iter().take(MAX_EQUIPPED_ABILITIES))
+        hero.skills = LegacySkillLoadout::new(SkillId::ALL.into_iter().take(MAX_LEGACY_SKILLS))
             .expect("custom loadout");
         hero
     });
@@ -864,7 +876,7 @@ fn ability_controls_follow_equipped_loadouts_with_eight_shortcuts_and_empty_load
     tap_key(&mut app, KeyCode::Digit8);
     assert_eq!(
         app.world().resource::<UiState>().selected,
-        Some(Choice::Ability(7))
+        Some(Choice::Skill(7))
     );
     {
         let mut view = app.world_mut().resource_mut::<LabyrinthView>();
@@ -977,7 +989,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation(
         let actor = snapshot.active_actor.expect("hero decision");
         let source = snapshot.actor(actor).expect("source");
         let (index, _skill, target) = source
-            .skills()
+            .legacy_skills()
             .iter()
             .enumerate()
             .find_map(|(index, skill)| {
@@ -988,7 +1000,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation(
                         snapshot
                             .validate_action(
                                 actor,
-                                &CombatAction::Skill {
+                                &CombatAction::LegacySkill {
                                     skill: *skill,
                                     target: target.id,
                                 },
@@ -997,7 +1009,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation(
                     })
                     .map(|target| (index, *skill, target.id))
             })
-            .expect("legal equipped ability");
+            .expect("legal equipped skill");
         let skill_control = find_named(app.world_mut(), &format!("Skill {index}")).expect("skill");
         let target_control =
             find_named(app.world_mut(), &format!("Actor {}", target.0)).expect("target");
@@ -1039,7 +1051,7 @@ fn ability_and_target_selection_never_commit_without_explicit_confirmation(
                 .count(),
             1
         );
-        assert!(intents.iter().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor: who, action: CombatAction::Ability { index: chosen, target: hit }, .. } if *who == actor && usize::from(*chosen) == index && *hit == target)));
+        assert!(intents.iter().any(|intent| matches!(intent, LabyrinthIntent::Combat { actor: who, action: CombatAction::Skill { index: chosen, target: hit }, .. } if *who == actor && usize::from(*chosen) == index && *hit == target)));
     }
 }
 

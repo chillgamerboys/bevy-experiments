@@ -9,7 +9,7 @@ use bevy_gamekit::testing::{
 };
 use labyrinth_rules::{
     build::CharacterBuild,
-    catalog::{AbilityUpgrade, LearnedSkillDefinition, UpgradeOperation},
+    catalog::{AbilityDefinition, SkillUpgrade, UpgradeOperation},
     scenario::StockScenario,
 };
 fn id(value: &str) -> ContentId {
@@ -35,7 +35,7 @@ fn fixture() -> LabyrinthView {
                 labyrinth_rules::ActorKind::Hero(hero) => hero,
                 _ => panic!("hero"),
             },
-            abilities: a.actor.resolve(&catalog).expect("build"),
+            resolved_build: a.actor.resolve(&catalog).expect("build"),
             owner: 0,
         })
         .collect();
@@ -103,8 +103,8 @@ fn inspection_does_not_edit_and_explicit_equip_preserves_parameter_drafts() {
     inspect(
         &view,
         &mut ui,
-        Category::Learned,
-        Selection::Learned(id("assassin_feint_training")),
+        Category::Abilities,
+        Selection::Ability(id("assassin_feint_training")),
     );
     let editor = ui.editor.as_ref().expect("editor");
     assert_eq!(
@@ -128,8 +128,7 @@ fn rank_restrictions_are_explained_without_removing_granted_moves() {
     let mut ui = edit(&view);
     action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
     let resolved = build(ui.editor.as_ref().expect("editor"), catalog);
-    let throw = resolved
-        .abilities
+    let throw = resolved.moveset.skills
         .iter()
         .find(|a| a.definition.id == id("dagger_throw"))
         .expect("throw remains granted");
@@ -163,99 +162,46 @@ fn rank_restrictions_are_explained_without_removing_granted_moves() {
     assert!(text.contains("Each distinct occupant is hit once"));
 }
 #[test]
-fn learned_prerequisites_upgrades_and_redundant_grant_removal_use_resolver() {
+fn passive_prerequisites_remain_selected_and_equipment_only_skills_stay_readonly() {
     let view = fixture();
     let catalog = view.catalog.as_ref().expect("catalog");
     let mut ui = edit(&view);
-    ui.editor.as_mut().expect("editor").draft.actor.build = CharacterBuild {
-        weapon: Some(id("greatsword")),
-        ..default()
-    };
-    inspect(
-        &view,
-        &mut ui,
-        Category::Learned,
-        Selection::Learned(id("duelist_dagger_power")),
-    );
+    action(&view, &mut ui, SetupAction::Weapon(Some(id("greatsword"))));
+    inspect(&view, &mut ui, Category::Abilities, Selection::Ability(id("duelist_dagger_power")));
     let info = details::inspection(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(info
-        .facts
-        .iter()
-        .any(|s| s.contains("Requires Dagger Stab from any grant source")));
-    assert_eq!(
-        info.changes,
-        vec!["Cannot apply this choice: Requires Dagger Stab in the resulting build."]
-    );
-    assert!(info.apply.expect("action").1);
-    let mut renamed = catalog.definition().clone();
-    renamed
-        .abilities
-        .iter_mut()
-        .find(|a| a.id == id("dagger_stab"))
-        .expect("required move")
-        .name = "Needle Jab".into();
-    let renamed = ContentCatalog::new(renamed).expect("renamed catalog");
-    let renamed_info = details::inspection(ui.editor.as_ref().expect("editor"), &renamed);
-    assert_eq!(
-        renamed_info.changes,
-        vec!["Cannot apply this choice: Requires Needle Jab in the resulting build."]
-    );
-    assert!(renamed_info.apply.expect("still unavailable").1);
+    assert!(info.facts.iter().any(|s| s.contains("Inactive:")));
+    assert!(!info.apply.expect("select inactive ability").1);
     apply(&view, &mut ui);
-    assert!(ui
-        .editor
-        .as_ref()
-        .expect("editor")
-        .draft
-        .actor
-        .build
-        .learned_skills
-        .is_empty());
+    let inactive = build(ui.editor.as_ref().expect("editor"), catalog);
+    assert!(!inactive.abilities[0].active());
     action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
-    apply(&view, &mut ui);
     let improved = build(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(improved
-        .abilities
-        .iter()
-        .find(|a| a.definition.id == id("dagger_stab"))
-        .expect("stab")
-        .definition
-        .effects
-        .contains(&labyrinth_rules::Effect::Damage(7)));
-    action(&view, &mut ui, SetupAction::Innate(id("dagger_stab")));
-    inspect(
-        &view,
-        &mut ui,
-        Category::Innate,
-        Selection::Innate(id("dagger_stab")),
-    );
-    let info = details::inspection(ui.editor.as_ref().expect("editor"), catalog);
-    assert!(info
-        .changes
-        .iter()
-        .any(|s| s.contains("Retained · Dagger Stab")));
-    assert!(!info
-        .changes
-        .iter()
-        .any(|s| s.contains("Removed · Dagger Stab")));
-    apply(&view, &mut ui);
-    assert!(build(ui.editor.as_ref().expect("editor"), catalog)
-        .abilities
-        .iter()
-        .any(|a| a.definition.id == id("dagger_stab")));
+    assert!(improved.moveset.skills.iter().find(|s| s.definition.id == id("dagger_stab")).expect("stab").definition.effects.contains(&labyrinth_rules::Effect::Damage(7)));
+    action(&view, &mut ui, SetupAction::Skill(id("dagger_stab")));
+    assert!(!ui.editor.as_ref().expect("editor").draft.actor.build.skills.iter().any(|grant| grant.skill == id("dagger_stab")));
+    inspect(&view, &mut ui, Category::Skills, Selection::Skill(id("dagger_stab")));
+    assert!(details::inspection(ui.editor.as_ref().expect("editor"), catalog).apply.expect("readonly equipment source").1);
+    action(&view, &mut ui, SetupAction::Weapon(None));
+    let inactive = build(ui.editor.as_ref().expect("editor"), catalog);
+    assert!(inactive.abilities.iter().any(|a| a.definition.id == id("duelist_dagger_power") && !a.active()));
+    assert!(!inactive.moveset.skills.iter().any(|s| s.definition.id == id("dagger_stab")));
+    action(&view, &mut ui, SetupAction::Weapon(Some(id("dagger"))));
+    assert_eq!(build(ui.editor.as_ref().expect("editor"), catalog), improved);
 }
 #[test]
 fn rank_only_upgrade_comparison_names_the_actual_changed_fields() {
     let mut view = fixture();
     let mut definition = view.catalog.as_ref().expect("catalog").definition().clone();
-    definition.learned_skills.push(LearnedSkillDefinition {
+    definition.abilities.push(AbilityDefinition {
         id: id("reach_training"),
         name: "Reach training".into(),
         description: "Extend ranks".into(),
         provenance: id("training"),
-        grants: vec![],
-        upgrades: vec![AbilityUpgrade {
-            ability: id("dagger_stab"),
+        personal_selectable: true,
+        requirements: vec![],
+        effects: vec![],
+        upgrades: vec![SkillUpgrade {
+            skill: id("dagger_stab"),
             operations: vec![
                 UpgradeOperation::ExtendSourceRanks(48),
                 UpgradeOperation::ExtendTargetRanks(60),
@@ -268,8 +214,8 @@ fn rank_only_upgrade_comparison_names_the_actual_changed_fields() {
     inspect(
         &view,
         &mut ui,
-        Category::Learned,
-        Selection::Learned(id("reach_training")),
+        Category::Abilities,
+        Selection::Ability(id("reach_training")),
     );
     let info = details::inspection(
         ui.editor.as_ref().expect("editor"),
@@ -498,7 +444,7 @@ fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_f
 {
     use bevy::text::EditableText;
     let mut app = app(1280, 720, UiScaleMode::Percent200);
-    activate(&mut app, "Category Innate", false);
+    activate(&mut app, "Category Skills", false);
     let last = app
         .world()
         .resource::<LabyrinthView>()
@@ -506,12 +452,12 @@ fn compact_back_retains_browser_position_and_parameter_refresh_preserves_field_f
         .as_ref()
         .expect("catalog")
         .definition()
-        .abilities
+        .skills
         .last()
-        .expect("ability")
+        .expect("skill")
         .id
         .clone();
-    activate(&mut app, &format!("Innate {last}"), false);
+    activate(&mut app, &format!("Skill {last}"), false);
     activate(&mut app, "Back To Choices", false);
     let browser = find_named(app.world_mut(), "Character Browser").expect("browser");
     assert!(

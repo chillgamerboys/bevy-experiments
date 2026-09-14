@@ -11,7 +11,7 @@ pub(super) mod details;
 mod layout;
 
 use super::*;
-use labyrinth_rules::build::{ActorBuild, InnateGrant};
+use labyrinth_rules::build::{ActorBuild, SkillGrant};
 use labyrinth_rules::catalog::{ContentCatalog, ContentId};
 use labyrinth_rules::scenario::{Scenario, ScenarioActor};
 use std::collections::BTreeMap;
@@ -36,8 +36,8 @@ pub(super) enum SetupAction {
     KeepEditing,
     Preset(ContentId),
     Weapon(Option<ContentId>),
-    Innate(ContentId),
-    Learned(ContentId),
+    Skill(ContentId),
+    Ability(ContentId),
     Status(labyrinth_rules::StatusKind),
     Save,
     Cancel,
@@ -52,34 +52,34 @@ pub(super) enum SetupAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Category {
     Equipment,
-    Innate,
-    Learned,
+    Skills,
+    Abilities,
     Parameters,
-    Moves,
+    Moveset,
 }
 impl Category {
     const ALL: [Self; 5] = [
         Self::Equipment,
-        Self::Innate,
-        Self::Learned,
+        Self::Skills,
+        Self::Abilities,
         Self::Parameters,
-        Self::Moves,
+        Self::Moveset,
     ];
     fn name(self) -> &'static str {
         match self {
             Self::Equipment => "Equipment",
-            Self::Innate => "Innate",
-            Self::Learned => "Learned",
+            Self::Skills => "Skills",
+            Self::Abilities => "Abilities",
             Self::Parameters => "Parameters",
-            Self::Moves => "Resulting moves",
+            Self::Moveset => "Moveset",
         }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Selection {
     Weapon(Option<ContentId>),
-    Innate(ContentId),
-    Learned(ContentId),
+    Skill(ContentId),
+    Ability(ContentId),
     Preset(ContentId),
     Move(ContentId),
 }
@@ -168,23 +168,24 @@ impl ActorEditor {
                         .map(|weapon| weapon.id.clone())
                 }),
             )),
-            Category::Innate => catalog
+            Category::Skills => catalog
+                .definition()
+                .skills
+                .first()
+                .map(|a| Selection::Skill(a.id.clone())),
+            Category::Abilities => catalog
                 .definition()
                 .abilities
                 .first()
-                .map(|a| Selection::Innate(a.id.clone())),
-            Category::Learned => catalog
-                .definition()
-                .learned_skills
-                .first()
-                .map(|a| Selection::Learned(a.id.clone())),
+                .map(|a| Selection::Ability(a.id.clone())),
             Category::Parameters => None,
-            Category::Moves => catalog
+            Category::Moveset => catalog
                 .resolve_build(&self.draft.actor.build)
                 .ok()
                 .and_then(|build| {
                     build
-                        .abilities
+                        .moveset
+                        .skills
                         .first()
                         .map(|a| Selection::Move(a.definition.id.clone()))
                 }),
@@ -343,10 +344,10 @@ pub(super) fn action(
             }
             let category = match selection {
                 Selection::Weapon(_) => Category::Equipment,
-                Selection::Innate(_) => Category::Innate,
-                Selection::Learned(_) => Category::Learned,
+                Selection::Skill(_) => Category::Skills,
+                Selection::Ability(_) => Category::Abilities,
                 Selection::Preset(_) => Category::Parameters,
-                Selection::Move(_) => Category::Moves,
+                Selection::Move(_) => Category::Moveset,
             };
             if editor.category != category {
                 return None;
@@ -376,8 +377,8 @@ pub(super) fn action(
             }
             let edit = match selected {
                 Selection::Weapon(id) => SetupAction::Weapon(id),
-                Selection::Innate(id) => SetupAction::Innate(id),
-                Selection::Learned(id) => SetupAction::Learned(id),
+                Selection::Skill(id) => SetupAction::Skill(id),
+                Selection::Ability(id) => SetupAction::Ability(id),
                 Selection::Preset(id) => SetupAction::Preset(id),
                 Selection::Move(_) => return None,
             };
@@ -487,24 +488,30 @@ pub(super) fn action(
             editor.error = None;
             editor.pending_save = false;
         }
-        SetupAction::Innate(id) => {
+        SetupAction::Skill(id) => {
+            if catalog.skill(&id).is_none_or(|s| !s.personal_selectable) {
+                return None;
+            }
             let editor = ui.editor.as_mut()?;
-            let innate = &mut editor.draft.actor.build.innate;
-            if innate.iter().any(|grant| grant.ability == id) {
-                innate.retain(|grant| grant.ability != id);
+            let skills = &mut editor.draft.actor.build.skills;
+            if skills.iter().any(|grant| grant.skill == id) {
+                skills.retain(|grant| grant.skill != id);
             } else {
-                innate.push(InnateGrant {
-                    ability: id,
-                    provenance: ContentId::new("innate").expect("constant ID"),
+                skills.push(SkillGrant {
+                    skill: id,
+                    provenance: ContentId::new("skills").expect("constant ID"),
                 });
             }
             editor.generation += 1;
             editor.error = None;
             editor.pending_save = false;
         }
-        SetupAction::Learned(id) => {
+        SetupAction::Ability(id) => {
+            if catalog.ability(&id).is_none_or(|a| !a.personal_selectable) {
+                return None;
+            }
             let editor = ui.editor.as_mut()?;
-            let learned = &mut editor.draft.actor.build.learned_skills;
+            let learned = &mut editor.draft.actor.build.abilities;
             if learned.contains(&id) {
                 learned.retain(|skill| *skill != id);
             } else {

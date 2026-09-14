@@ -80,7 +80,7 @@ fn game_menu_has_no_tooltip_and_opening_it_clears_locked_inspection(
         let mut app = app(width, height, scale);
         let toolbar = find_named(app.world_mut(), "Battle Settings").expect("game menu");
         assert!(app.world().get::<UiContextHelp>(toolbar).is_none());
-        let source = find_named(app.world_mut(), "Skill 0").expect("ability");
+        let source = find_named(app.world_mut(), "Skill 0").expect("skill");
         assert!(focus_action(app.world_mut(), source));
         tap_key(&mut app, KeyCode::KeyT);
         assert!(app.world().resource::<UiTooltipState>().is_pinned());
@@ -239,7 +239,7 @@ fn expanding_an_action_and_its_ability_is_inspection_not_gameplay_normal_1080() 
     let kinds = [
         labyrinth_rules::CombatEventKind::Action {
             actor: ActorId(105),
-            action: CombatAction::Skill {
+            action: CombatAction::LegacySkill {
                 skill: SkillId::HollowBolt,
                 target: ActorId(4),
             },
@@ -271,14 +271,14 @@ fn expanding_an_action_and_its_ability_is_inspection_not_gameplay_normal_1080() 
     let expand = find_named(app.world_mut(), "History Expand 1").expect("expand outcome");
     assert!(click_action(&mut app, expand));
     run_frames(&mut app, 3);
-    let ability = find_named(app.world_mut(), "History Ability 1").expect("disclosed ability");
+    let skill = find_named(app.world_mut(), "History Ability 1").expect("disclosed skill");
     let subject = app
         .world()
-        .get::<bevy_gamekit::ui::UiTooltipOpen>(ability)
-        .expect("ability link")
+        .get::<bevy_gamekit::ui::UiTooltipOpen>(skill)
+        .expect("skill link")
         .0
         .clone();
-    assert!(click_action(&mut app, ability));
+    assert!(click_action(&mut app, skill));
     run_frames(&mut app, 3);
     assert!(app
         .world()

@@ -97,7 +97,7 @@ fn real_udp_wagon_ownership_reconnects_without_changing_participant_capacity() {
     send_action(
         &mut apps,
         ActorId(5),
-        CombatAction::Skill {
+        CombatAction::LegacySkill {
             skill: labyrinth_rules::SkillId::HurledScrap,
             target: ActorId(101),
         },
@@ -556,16 +556,12 @@ fn aggressive_action(snapshot: &CombatSnapshot, actor: ActorId) -> CombatAction 
         .copied()
         .find(|action| {
             snapshot
-                .action_ability(actor, *action)
+                .action_skill(actor, *action)
                 .ok()
                 .flatten()
-                .and_then(|(index, _)| {
-                    snapshot
-                        .actor(actor)
-                        .and_then(|source| source.ability(index))
-                })
-                .is_some_and(|ability| {
-                    ability
+                .and_then(|(index, _)| snapshot.actor(actor).and_then(|source| source.skill(index)))
+                .is_some_and(|skill| {
+                    skill
                         .effects
                         .iter()
                         .any(|effect| matches!(effect, Effect::Damage(damage) if *damage > 0))
@@ -875,7 +871,7 @@ fn queued_old_ui_intent_cannot_be_reinterpreted_as_the_same_heros_next_turn() {
             .expect("hero while waiting for next original turn");
         let care = [
             CombatAction::Rescue { ally: actor },
-            CombatAction::Skill {
+            CombatAction::LegacySkill {
                 skill: labyrinth_rules::SkillId::Mend,
                 target: actor,
             },
@@ -941,14 +937,9 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
         let action = before
             .legal_actions(actor)
             .into_iter()
-            .find(|action| {
-                matches!(
-                    action,
-                    CombatAction::Skill {
-                        skill: labyrinth_rules::SkillId::BleedingCut,
-                        ..
-                    }
-                )
+            .find(|action| match action {
+                CombatAction::Skill { index, .. } => before.actor(actor).and_then(|source| source.skill(*index)).is_some_and(|skill| skill.id.as_str() == "bleeding_cut"),
+                _ => false,
             })
             .unwrap_or(CombatAction::Wait);
         send_action(&mut apps, actor, action);
@@ -983,7 +974,7 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
         .expect("sixth hero in combat")
         .clone();
     assert_eq!(owned.hero, HeroClass::Knifehand);
-    assert_eq!(owned_actor.abilities, owned.abilities);
+    assert_eq!(owned_actor.resolved_build, owned.resolved_build);
     // Drop the live App without a Leave message or graceful disconnect helper.
     // The host must observe actual transport loss; the replacement knows only its file.
     *app(&mut apps, LAST_GUEST) = socket_app(paths.last().map(std::path::PathBuf::as_path));
@@ -1029,7 +1020,7 @@ fn real_udp_fresh_sixth_guest_restores_actor_class_loadout_and_live_combat() {
     assert_eq!(
         combat(&mut apps).actor(owned.actor),
         Some(&owned_actor),
-        "restart changed sixth hero HP, equipped abilities or status state"
+        "restart changed sixth hero HP, equipped skills or status state"
     );
     assert_eq!(
         combat(&mut apps),
@@ -1804,7 +1795,7 @@ fn real_udp_multiple_character_owner_and_spectator_disconnect_have_distinct_effe
 
 #[test]
 fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
-    use labyrinth_rules::build::InnateGrant;
+    use labyrinth_rules::build::SkillGrant;
     use labyrinth_rules::catalog::ContentId;
     let directory = tempfile::tempdir().expect("scenario directory");
     let path = directory.path().join("battle.json");
@@ -1837,14 +1828,15 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
     custom.actor.name = "Dagger laboratory".into();
     custom.actor.base_speed = 100;
     custom.actor.max_hp = 91;
-    custom.actor.build.innate = before
+    custom.actor.build.skills = before
         .catalog
         .definition()
-        .abilities
+        .skills
         .iter()
-        .map(|a| InnateGrant {
-            ability: a.id.clone(),
-            provenance: ContentId::new("innate").expect("ID"),
+        .filter(|skill| skill.personal_selectable)
+        .map(|a| SkillGrant {
+            skill: a.id.clone(),
+            provenance: ContentId::new("skills").expect("ID"),
         })
         .collect();
     custom.actor.build.weapon = Some(ContentId::new("dagger").expect("ID"));
@@ -1973,19 +1965,15 @@ fn encrypted_custom_build_and_saved_scenario_share_the_live_rules_path() {
     let before = combat(&mut apps);
     assert_eq!(before.active_actor, Some(ActorId(1)));
     let source = before.actor(ActorId(1)).expect("custom hero");
-    assert!(source.resolved_abilities().len() > 8);
+    assert!(source.resolved_skills().len() > 8);
     let index = source
-        .ability_index(&ContentId::new("dagger_stab").expect("ID"))
-        .expect("weapon ability");
+        .skill_index(&ContentId::new("dagger_stab").expect("ID"))
+        .expect("weapon skill");
     let target = *before.enemy_formation.first().expect("target");
     assert!(before
         .legal_actions(ActorId(1))
-        .contains(&CombatAction::Ability { index, target }));
-    send_action(
-        &mut apps,
-        ActorId(1),
-        CombatAction::Ability { index, target },
-    );
+        .contains(&CombatAction::Skill { index, target }));
+    send_action(&mut apps, ActorId(1), CombatAction::Skill { index, target });
     assert!(pump_until(
         &mut apps,
         Duration::from_secs(10),

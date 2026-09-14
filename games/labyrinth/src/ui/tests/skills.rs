@@ -2,10 +2,9 @@
 use super::*;
 use bevy_gamekit::ui::{UiTooltipCatalog, UiTooltipSource};
 use labyrinth_rules::{
-    build::{ActorBuild, CharacterBuild, InnateGrant},
+    build::{ActorBuild, CharacterBuild, SkillGrant},
     catalog::{
-        AbilityUpgrade, ContentCatalog, ContentId, LearnedSkillDefinition, TargetPattern,
-        UpgradeOperation,
+        AbilityDefinition, ContentCatalog, ContentId, SkillUpgrade, TargetPattern, UpgradeOperation,
     },
     scenario::{ControllerPolicy, Scenario, ScenarioActor, SCENARIO_SCHEMA_VERSION},
     Effect,
@@ -18,33 +17,37 @@ fn id(value: &str) -> ContentId {
 fn authored_scenario() -> (ContentCatalog, Scenario) {
     let builtin = ContentCatalog::builtin().expect("catalog");
     let mut definition = builtin.definition().clone();
-    let template = definition.abilities.first().expect("ability").clone();
+    let template = definition.skills.first().expect("skill").clone();
     let mut grants = Vec::new();
     for index in 0..14 {
-        let mut ability = template.clone();
-        ability.id = id(&format!("technique_{index}"));
-        ability.name = format!("Technique {index}");
-        ability.description = format!("Captain's practiced technique {index}.");
-        ability.source_ranks = 63;
-        ability.target_ranks = 3;
-        ability.target_rule = labyrinth_rules::TargetRule::EnemyStanding;
-        ability.target_pattern = TargetPattern::FrontPair;
-        ability.effects = vec![Effect::Damage(2)];
-        ability.max_uses = Some(3);
-        grants.push(InnateGrant {
-            ability: ability.id.clone(),
+        let mut skill = template.clone();
+        skill.id = id(&format!("technique_{index}"));
+        skill.personal_selectable = true;
+        skill.requirements.clear();
+        skill.name = format!("Technique {index}");
+        skill.description = format!("Captain's practiced technique {index}.");
+        skill.source_ranks = 63;
+        skill.target_ranks = 3;
+        skill.target_rule = labyrinth_rules::TargetRule::EnemyStanding;
+        skill.target_pattern = TargetPattern::FrontPair;
+        skill.effects = vec![Effect::Damage(2)];
+        skill.max_uses = Some(3);
+        grants.push(SkillGrant {
+            skill: skill.id.clone(),
             provenance: id("captain_training"),
         });
-        definition.abilities.push(ability);
+        definition.skills.push(skill);
     }
-    definition.learned_skills.push(LearnedSkillDefinition {
+    definition.abilities.push(AbilityDefinition {
         id: id("captain_mastery"),
         name: "Captain mastery".into(),
         description: "Stronger first technique".into(),
         provenance: id("training"),
-        grants: vec![],
-        upgrades: vec![AbilityUpgrade {
-            ability: id("technique_0"),
+        personal_selectable: true,
+        requirements: vec![],
+        effects: vec![],
+        upgrades: vec![SkillUpgrade {
+            skill: id("technique_0"),
             operations: vec![UpgradeOperation::AddDamage {
                 effect_index: 0,
                 amount: 3,
@@ -57,8 +60,8 @@ fn authored_scenario() -> (ContentCatalog, Scenario) {
     hero.base_speed = 100;
     hero.max_hp = 100;
     hero.build = CharacterBuild {
-        innate: grants,
-        learned_skills: vec![id("captain_mastery")],
+        skills: grants,
+        abilities: vec![id("captain_mastery")],
         weapon: None,
     };
     let enemy = |n| {
@@ -145,7 +148,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
     run_frames(&mut app, 5);
     let controls = (0..14)
         .map(|index| {
-            find_named(app.world_mut(), &format!("Skill {index}")).expect("every granted ability")
+            find_named(app.world_mut(), &format!("Skill {index}")).expect("every granted skill")
         })
         .collect::<Vec<_>>();
     assert!(find_named(app.world_mut(), "Skill 14").is_none());
@@ -166,7 +169,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
             control,
             Rect::from_corners(Vec2::ZERO, Vec2::new(width as f32, height as f32)),
         )
-        .expect("visible focused ability");
+        .expect("visible focused skill");
         assert!(
             rect.width() >= 43.5 && rect.height() >= 43.5,
             "{index} {scale:?}: {rect:?}"
@@ -174,7 +177,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
         tap_key(&mut app, KeyCode::Enter);
         assert_eq!(
             app.world().resource::<UiState>().selected,
-            Some(Choice::Ability(index as u8))
+            Some(Choice::Skill(index as u8))
         );
         let subject = app
             .world()
@@ -182,7 +185,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
             .expect("inspectable")
             .0
             .clone();
-        assert!(subject.0.contains("encounter/1/actor/1/ability/technique_"));
+        assert!(subject.0.contains("encounter/1/actor/1/skill/technique_"));
         let content = app
             .world()
             .resource::<UiTooltipCatalog>()
@@ -272,7 +275,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
         assert!(focus_action(app.world_mut(), confirm));
         tap_key(&mut app, KeyCode::Enter);
         let commands = std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0);
-        let action = CombatAction::Ability {
+        let action = CombatAction::Skill {
             index: index as u8,
             target: ActorId(101),
         };
@@ -292,7 +295,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
             app.world().resource::<LabyrinthView>().combat.as_ref(),
             Some(&snapshot)
         );
-        // Restore the previous command focus so the next ability is reached by Tab.
+        // Restore the previous command focus so the next skill is reached by Tab.
         assert!(focus_action(app.world_mut(), control));
     }
     for name in [
@@ -329,7 +332,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
         std::mem::take(&mut app.world_mut().resource_mut::<Commands>().0),
         vec![(
             ActorId(1),
-            CombatAction::Ability {
+            CombatAction::Skill {
                 index: 13,
                 target: ActorId(101)
             }
@@ -341,7 +344,7 @@ fn fourteen_authored_abilities_are_tabbable_inspectable_targetable_and_confirmab
 fn effective_multi_target_forecast_names_every_target_and_conceals_secondary_unknowns() {
     use crate::presentation::{ActorDisclosure, CombatDisclosure, ForecastDisplay, Knowledge};
     let snapshot = authored_combat().snapshot();
-    let action = CombatAction::Ability {
+    let action = CombatAction::Skill {
         index: 0,
         target: ActorId(101),
     };
@@ -414,7 +417,7 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
     let mut apprentice = scenario.heroes.first().expect("captain").clone();
     apprentice.id = ActorId(2);
     apprentice.actor.name = "Apprentice Custom".into();
-    apprentice.actor.build.learned_skills.clear();
+    apprentice.actor.build.abilities.clear();
     scenario.heroes.push(apprentice);
     let snapshot = Combat::from_scenario(&catalog, &scenario)
         .expect("two custom actors")
@@ -431,7 +434,7 @@ fn ability_cards_are_scoped_by_actor_and_encounter_and_history_uses_authored_nam
                 id: 1,
                 kind: labyrinth_rules::CombatEventKind::Action {
                     actor: ActorId(1),
-                    action: CombatAction::Ability {
+                    action: CombatAction::Skill {
                         index: 0,
                         target: ActorId(101),
                     },
@@ -550,7 +553,7 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
         assert!(activation_eligible(app.world_mut(), confirm));
         assert_eq!(
             app.world().resource::<UiState>().selected,
-            Some(Choice::Ability(0))
+            Some(Choice::Skill(0))
         );
         assert!(app
             .world_mut()
@@ -566,7 +569,7 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
                 .expect("first hero")
                 .actor
                 .build
-                .innate
+                .skills
                 .swap(0, 1);
             let replacement = Combat::from_scenario(&catalog, &scenario)
                 .expect("valid reordered build")
@@ -577,13 +580,13 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
                 replacement
                     .actor(ActorId(1))
                     .expect("new actor")
-                    .ability(0)
+                    .skill(0)
                     .expect("new zero")
                     .id,
                 original
                     .actor(ActorId(1))
                     .expect("old actor")
-                    .ability(0)
+                    .skill(0)
                     .expect("old zero")
                     .id
             );
@@ -609,14 +612,14 @@ fn queued_hotbar_confirmation_cannot_retarget_a_replaced_build_before_present(
         if replace_build {
             assert!(
                 commands.is_empty(),
-                "an old button must not confirm the replacement slot's ability: {commands:?}"
+                "an old button must not confirm the replacement slot's skill: {commands:?}"
             );
         } else {
             assert_eq!(
                 commands,
                 vec![(
                     ActorId(1),
-                    CombatAction::Ability {
+                    CombatAction::Skill {
                         index: 0,
                         target: ActorId(101)
                     }

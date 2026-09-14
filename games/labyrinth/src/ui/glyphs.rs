@@ -129,7 +129,7 @@ impl Glyph {
 }
 
 /// Choose a familiar symbol from resolved behavior; authored IDs need no UI enum arm.
-pub(super) fn for_ability(definition: &labyrinth_rules::catalog::AbilityDefinition) -> Glyph {
+pub(super) fn for_skill(definition: &labyrinth_rules::catalog::SkillDefinition) -> Glyph {
     if let Some(skill) = SkillId::ALL
         .into_iter()
         .find(|skill| labyrinth_rules::scenario::legacy_skill_id(*skill) == definition.id)

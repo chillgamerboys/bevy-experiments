@@ -33,8 +33,8 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                             .as_ref()
                             .and_then(|snapshot| snapshot.actor(actor)),
                         Some(match action {
-                            CombatAction::Ability { index, .. } => Choice::Ability(index),
-                            CombatAction::Skill { skill, .. } => Choice::Skill(skill),
+                            CombatAction::Skill { index, .. } => Choice::Skill(index),
+                            CombatAction::LegacySkill { skill, .. } => Choice::LegacySkill(skill),
                             CombatAction::Reposition { .. } => Choice::Reposition,
                             CombatAction::Rescue { .. } => Choice::Rescue,
                             CombatAction::Defend => Choice::Defend,
@@ -47,11 +47,13 @@ fn entries(view: &LabyrinthView) -> Vec<Entry> {
                     .and_then(|snapshot| snapshot.actor(actor))
                     .and_then(|source| {
                         let index = match action {
-                            CombatAction::Ability { index, .. } => Some(index),
-                            CombatAction::Skill { skill, .. } => source.skill_index(skill),
+                            CombatAction::Skill { index, .. } => Some(index),
+                            CombatAction::LegacySkill { skill, .. } => {
+                                source.legacy_skill_index(skill)
+                            }
                             _ => None,
                         }?;
-                        source.ability(index).map(|definition| {
+                        source.skill(index).map(|definition| {
                             tooltips::ability_subject(view.encounter, actor, &definition.id)
                         })
                     }),
@@ -516,7 +518,7 @@ pub(super) fn present(world: &mut World, view: &LabyrinthView, ui: &mut UiState)
                             UiSkin::Control,
                             bevy_gamekit::ui::UiFocusId::new(
                                 "labyrinth-history",
-                                format!("ability/{}", entry.id),
+                                format!("skill/{}", entry.id),
                             ),
                             UiTooltipOpen(subject.clone()),
                             ChildOf(item),
