@@ -265,9 +265,16 @@ fn workspace(root: &Path, revision: &str) -> Result<Workspace, String> {
         {
             return Err("invalid or duplicate workspace package name".into());
         }
-        result.dynamic |= package
-            .get("build")
-            .is_some_and(|value| value.as_bool() != Some(false));
+        // Cargo auto-discovers build.rs beside this package's Cargo.toml only.
+        // A domain module named src/build.rs (or a fixture elsewhere) is ordinary
+        // source, and package.build=false disables even the root build script.
+        result.dynamic |= match package.get("build") {
+            Some(toml::Value::Boolean(false)) => false,
+            Some(_) => true,
+            None => paths
+                .iter()
+                .any(|path| *path == format!("{parent}/build.rs")),
+        };
         manifests.insert(name.to_owned(), manifest);
     }
     if result.packages.is_empty() {
@@ -324,7 +331,6 @@ fn workspace(root: &Path, revision: &str) -> Result<Workspace, String> {
             }
         }
     }
-    result.dynamic |= paths.iter().any(|path| path.ends_with("/build.rs"));
     let candidates = Command::new("git")
         .args(["grep", "-l", "-z", "-e", "include", revision, "--", "*.rs"])
         .current_dir(root)

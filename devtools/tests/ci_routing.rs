@@ -915,3 +915,44 @@ fn explicit_full_scope_retains_changed_test_classification() -> TestResult {
     assert!(error.contains("missing_suite"));
     Ok(())
 }
+
+#[test]
+fn domain_build_module_does_not_turn_every_game_edit_into_full_scope() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.write(
+        "games/labyrinth/rules/src/build.rs",
+        "pub struct ActorBuild;\n",
+    )?;
+    fixture.rebase()?;
+    let rules = fixture.changed(&["games/labyrinth/rules/src/build.rs"])?;
+    assert_packages(&rules, &["labyrinth", "labyrinth-rules"]);
+    fixture.reset()?;
+    let game = fixture.changed(&["games/deckbuilder/src/lib.rs"])?;
+    assert_packages(&game, &["deckbuilder"]);
+    Ok(())
+}
+
+#[test]
+fn nonmember_fixture_build_script_does_not_change_workspace_scope() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.write("fixtures/external/build.rs", "fn main() {}\n")?;
+    fixture.rebase()?;
+    let game = fixture.changed(&["games/deckbuilder/src/lib.rs"])?;
+    assert_packages(&game, &["deckbuilder"]);
+    Ok(())
+}
+
+#[test]
+fn explicitly_disabled_package_build_script_is_not_executed_by_cargo() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.write("games/carterfight/build.rs", "fn main() {}\n")?;
+    fixture.replace(
+        "games/carterfight/Cargo.toml",
+        "[package]",
+        "[package]\nbuild = false",
+    )?;
+    fixture.rebase()?;
+    let docs = fixture.changed(&["docs/existing.md"])?;
+    assert!(!docs.full && !docs.rust && !docs.skills && !docs.policy);
+    Ok(())
+}
