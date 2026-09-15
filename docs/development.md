@@ -22,9 +22,8 @@ verification level are independent. Assets must not depend on the caller's direc
 
 ## Development and milestone delivery
 
-The current default and receiving branch is `main`, which resolves Testing. The
-planned rollout will send feature PRs to `dev` at Development rigor and milestone
-batches to `main`; `dev` has not yet been created. See
+Feature PRs target the existing `dev` branch at Development rigor. Explicitly
+approved milestone batches target `main` at Testing rigor. See
 [rollout status](setup-and-launch.md#current-rollout-state). The project default base
 is configured independently of the current workspace branch. Resolve it with `gameskills verification resolve` and preserve the
 actual receiving base in task/check records. Branch rollout must be observed before

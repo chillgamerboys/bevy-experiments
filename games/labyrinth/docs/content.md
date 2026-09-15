@@ -135,7 +135,7 @@ creation defaults, not permanent classes or a second grant-authorization path.
 
 ## Validation and replay identity
 
-Catalog and scenario schema 2, build resolver v2 and combat rules v5 replace the
+Catalog and scenario schema 2, build resolver v2 and combat rules v6 replace the
 old mixed active-Ability/learned format. Old formats are rejected with a request to
 recreate them; no implicit conversion or overwrite occurs. Network adopters must
 also change their wire protocol and refuse stale peers. This pure rules migration

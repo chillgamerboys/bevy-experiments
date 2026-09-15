@@ -83,7 +83,7 @@ Build a workspace-local CLI; a global installation is optional:
 cargo build --locked -p gameskills-cli --profile ci
 ./target/ci/gameskills --version
 ./target/ci/gameskills status
-./target/ci/gameskills verification resolve --base main
+./target/ci/gameskills verification resolve --base dev
 ```
 
 The executable is `target/ci/gameskills`. Commands written as `gameskills` in the
@@ -105,38 +105,39 @@ a fresh host/session after verified registration, not merely a rebuilt game.
 
 ## Hydrate this repository's retained pin
 
-For a fresh worktree using the current committed lock, the matching prepared archive
-is retained in repository history. From the root, after building the CLI:
+The committed lock matches the checked-in immutable dev.6 archive. After building
+the CLI, inspect and apply the matching installation:
 
 ```sh
-git show f9965bae00be6724f74250bd0ffd006d17ba1dcb:gameskills/cli/bundle/instructions.tar.gz > target/gameskills-pinned-dev3.tar.gz
-./target/ci/gameskills setup --bundle target/gameskills-pinned-dev3.tar.gz
-# After confirming the proposal preserves the recorded content identity:
-./target/ci/gameskills setup --bundle target/gameskills-pinned-dev3.tar.gz --apply
+./target/ci/gameskills setup --bundle gameskills/cli/bundle/instructions.tar.gz
+./target/ci/gameskills setup --bundle gameskills/cli/bundle/instructions.tar.gz --apply
 ./target/ci/gameskills status
+./target/ci/gameskills native codex --verify-project
 ```
 
-The expected content SHA-256 is
-`b069a3108dcb094766b89b3a35ad451f3088608a0e98e02bfdedbebed51c1f99`.
-`lock_change` should be false for this checkout's unchanged lock. A shallow clone
-may need the named commit fetched first. This restores the existing pin and local
-registration; it does not adopt the newer candidate or prove native discovery.
-Do not use this recipe after the committed lock changes: select the archive matching
-that new identity and update this guide during the pin rollout.
+The expected content SHA-256 is recorded in `gameskills.lock.json` and must match
+`gameskills/cli/bundle/bundle.json`; read those identities instead of a copied digest.
+`lock_change` should be false for this checkout's unchanged lock. This restores the
+pin and local registration. Native discovery is checked separately; open a fresh
+host session to use newly registered instructions. Preserve previous bundles and
+local overlays. Update this recipe whenever the committed pin changes.
 
 ## Current rollout state
 
-PR #40 merged the rigor implementation. The remote default and configured delivery
-base remain **`main`**, which resolves Testing on macOS. **`dev` does not yet exist**;
-its Development branch mapping describes the pending rollout, not completed setup.
-Continue targeting `main` until that transition is explicitly completed.
+PR #46 completed the framework rollout into `dev` at
+`d24edcc154a403272fa62114aee6f28bf025ea76`. `dev` is now the GitHub default and
+feature-delivery branch, using Development rigor. `main` remains the explicitly
+approved milestone branch at Testing rigor. Required PR CI passed on macOS; the
+synced merged checkout also passed focused workflow verification and delivery
+observation. The [agent workflow guide](../gameskills/docs/agent-workflow.md) owns
+model routing, usage accounting and prompt feature integration.
 
-The current source CLI and embedded instructions are `0.1.0-dev.4`. The committed
-project lock still retains the earlier `0.1.0-dev.3` instruction content. This is a
-pending adoption step, not a corrupted installation; rebuilding the CLI alone does
-not repin or reload the session. Observe the actual versions and content hashes
-with `status` rather than assuming they match.
+The source CLI and committed instruction pin are `0.1.0-dev.6`. Supported setup
+preserved adopter configuration and local overlays, and an ordinary Codex process
+discovered all selected packages. This does not reload an existing Conductor
+conversation: start a fresh host session to load the revised instructions. Claude
+behavior and broader comparative cost trials remain separate evaluation work.
 
-The [active rigor plan](../gameskills/docs/plans/development-rigor.md) owns the
-remaining branch/default and installation rollout. Update this section, the lock,
-workspace registration and delivery guidance together when that work is completed.
+The [evaluation plan](../gameskills/docs/plans/skill-evaluation.md) retains those
+trials and the measured tooltip-delay pilot. Release publication, additional
+platform/display commitments and linked-adopter migration remain separately scoped.

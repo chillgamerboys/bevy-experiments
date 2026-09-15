@@ -16,7 +16,7 @@ the selected scope is not unfinished acceptance. Stop once relevant checks pass
 unless a new change, failure or unresolved concern justifies more.
 
 Run from the repository root. Cargo's CI profile speeds compilation independently
-of verification rigor; ordinary play uses the default development profile. These
+of verification rigor; the quickstart uses ci, while Cargo defaults to dev when no profile is supplied. These
 commands include broad suites for explicit use; the
 [CI selector](../../../devtools/docs/ci.md) owns focused suite execution.
 
@@ -34,6 +34,27 @@ cargo test --locked -p gameskills-cli --profile ci
 ```
 
 ## Focused suites
+
+`gameskills run labyrinth-mechanics --base dev --scope "labyrinth backend mechanics coverage"`
+executes the public-backend acceptance scenarios. The
+[mechanics coverage matrix](mechanics-coverage.md) maps every built-in Skill,
+Ability and equipment grant to explicit expectations and retained coverage.
+`labyrinth-hook-calibration` selects the single large-blocker Hook Shot scenario.
+`rules-test` includes both this suite and the existing rules tests; do not run both
+as duplicate final gates. Add `labyrinth-session` and `labyrinth-presentation` for
+the affected command/projection and effect-description adapters.
+
+The fixtures serialize and validate explicit Scenario inputs, configure External
+controllers, and commit through `Combat::apply`. A faster source and next-turn
+sentinel control initiative without depending on a lucky seed. Assertions use
+authored constants for HP, ranks, effects and resource changes. Preview/replay
+agreement supplements those assertions; agreement between two calls to the same
+resolver alone cannot prove correct mechanics. Full RL training remains deferred.
+
+The Hook Shot calibration distinguishes a rules change from a defect: the former
+rank-budget restriction was implemented, but the accepted rule now pulls past
+whole occupants. The custom-footprint push regression separately exposes an
+appearance-derived size bug. Keep these separate when measuring rework or results.
 
 `repo-devtools ci suite labyrinth-ui-normal` selects tests ending in `normal_1080`.
 They run the relevant retained assertions at 1920×1080 Auto. Former compound matrix
@@ -223,7 +244,7 @@ not make every route above a manual gate.
   rows have no focus/pointer surface, retained reading state survives, and new
   arrivals never reopen it. Revoking disclosure clears rows and inspection even
   while hidden. Row inspection follows the existing immediate preview,
-  one-second pin, × dismissal and menu suspension lifecycle.
+  two-second pin, × dismissal and menu suspension lifecycle.
 - Review main menu, settings, leave and history at normal scale, with pointer,
   keyboard and resizing. Automated layout tests are not an interactive walk.
 
@@ -270,7 +291,7 @@ resizing when affected. Record missing required interaction/network evidence;
 unselected routes are not pending gates.
 
 Tooltip lifecycle regressions include immediate first-frame preview and departure,
-one-second continuous hover to lock, persistence over empty space and other sources,
+two-second continuous hover to lock, persistence over empty space and other sources,
 explicit keyboard inspection, visible × branch dismissal, and temporary modal suspension.
 Escape belongs to the Game menu; it does not dismiss Labyrinth's pinned cards.
 The native-layout test compares the card rectangle on every frame across locking:

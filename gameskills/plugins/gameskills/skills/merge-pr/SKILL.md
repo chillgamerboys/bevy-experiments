@@ -23,8 +23,9 @@ method and provider; where supported, bind the mutation to the expected HEAD.
 Do not bypass required gates or perform destructive rewrites to force acceptance.
 
 Observe the remote outcome and merge/target revision. After an uncertain response,
-inspect the PR and target before retrying. Run the appropriate combined integration
-checks on the resulting source. Separately record any queue integration observation;
+inspect the PR and target before retrying. Establish combined integration evidence on the resulting source. Reuse applicable
+passing CI after comparing tested and integrated tree/input identities; rerun
+affected checks for different or uncertain inputs. Separately record any queue integration observation;
 the record helper does not perform the Git/provider mutation.
 
 Report the actual merged identity and integration results, or the precise blocker

@@ -133,7 +133,7 @@ effects = [{ Damage = 4 }]
 id = "hook_shot"
 personal_selectable = false
 name = "Hook Shot"
-description = "Deal 3 damage, then pull the surviving target forward one rank."
+description = "Deal 3 damage, then pull the surviving target in front of the preceding occupant, regardless of either creature's size."
 source_ranks = 60
 target_ranks = 60
 target_rule = "EnemyStanding"

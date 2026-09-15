@@ -5,6 +5,11 @@ description: Start or substantially revise a Bevy game, GameKit or GameSkills ta
 
 # Plan and carry the task
 
+For a settled small edit, use the lean path in
+[efficient delivery](../../references/efficient-delivery.md#match-the-workflow-to-the-change):
+one delivery record, focused implementation/checks, concise review and publication.
+A separate plan document, queue or worker is optional, not a prerequisite.
+
 Read [project context](../../references/project-context.md). Recover the user's
 outcome, requested endpoint, accepted choices and current task before planning.
 Read the affected owners' current architecture and Decisions sections; inspect
@@ -18,6 +23,11 @@ no interview. Record the bounded change, preserved/changed constraints, owners,
 steps and relevant verification from the project's development/testing guidance.
 Name unfinished requirements. Substantial work may need a committed active plan;
 routine notes do not require a plan file, queue or ticket.
+
+When the project opts into model routing or usage tracking, use
+[efficient delivery](../../references/efficient-delivery.md). Keep one cohesive
+change in one PR unless independent acceptance warrants a split; worker boundaries
+do not imply PR boundaries. Prefer prompt integration over a growing dependent stack.
 
 For a new or materially changed player-facing workflow, plan from the player's
 goals and frequent tasks before listing controls. Read

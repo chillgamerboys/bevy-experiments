@@ -26,3 +26,9 @@ Owner: GameSkills. Resume when the user selects a product trial or support expan
 For each selected trial, define a bounded outcome, relevant baseline and actual runtime/
 bundle identities. Record behavioral failures and improvements, not just skill counts.
 The current [reliability plan](workflow-reliability.md) owns MCP tracking and delivery gaps.
+
+The Development/Testing/Release implementation and dev/default installation rollout
+are complete through PRs #40 and #46. Future genuine milestone promotions retain
+explicit user approval and applicable developer sanity. Comparative model-cost
+benchmarks, a general test-impact engine, CI cache redesign and extra release
+displays are deferred improvements, not feature-merge gates.

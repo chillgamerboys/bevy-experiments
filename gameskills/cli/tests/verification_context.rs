@@ -37,6 +37,17 @@ fn selection(
     context::resolve(config, Some(base), level, &scope, gameplay)
 }
 
+fn promoted_selection(
+    config: &Value,
+    base: &str,
+    level: Option<&str>,
+    scope: &[&str],
+    gameplay: bool,
+) -> Result<Value, String> {
+    let scope: Vec<_> = scope.iter().map(|item| (*item).into()).collect();
+    context::resolve_with_promotion(config, Some(base), level, &scope, gameplay, true)
+}
+
 fn receipt(selection: &Value) -> Value {
     json!({
         "schema_version": 1,
@@ -66,12 +77,16 @@ fn scope_is_canonical_and_manual_sanity_only_gates_gameplay_milestones(
 
     let tooling = selection(&config, "main", None, &["ci-routing"], false)?;
     assert_eq!(at(&tooling, "/manual_sanity_required"), false);
-    let milestone = selection(&config, "main", None, &["session"], true)?;
+    let ordinary_gameplay = selection(&config, "main", None, &["session"], true)?;
+    assert_eq!(at(&ordinary_gameplay, "/manual_sanity_required"), false);
+    assert_eq!(at(&ordinary_gameplay, "/promotion"), false);
+    let milestone = promoted_selection(&config, "main", None, &["session"], true)?;
     assert_eq!(at(&milestone, "/manual_sanity_required"), true);
+    assert_eq!(at(&milestone, "/promotion"), true);
     assert!(context::manual_observation("milestone", "head", &milestone, None).is_err());
-    let release_on_dev = selection(&config, "dev", Some("release"), &["session"], true)?;
-    assert_eq!(at(&release_on_dev, "/manual_sanity_required"), false);
-    let release_on_main = selection(&config, "main", Some("release"), &["session"], true)?;
+    let release_on_dev = promoted_selection(&config, "dev", Some("release"), &["session"], true)?;
+    assert_eq!(at(&release_on_dev, "/manual_sanity_required"), true);
+    let release_on_main = promoted_selection(&config, "main", Some("release"), &["session"], true)?;
     assert_eq!(at(&release_on_main, "/manual_sanity_required"), true);
 
     for invalid in ["", " ", "line\nbreak", "nul\0byte"] {
@@ -171,7 +186,8 @@ fn changed_policy_and_tampered_context_do_not_validate_as_current() -> Result<()
         ("/policy/platforms", json!(["linux"])),
         ("/scope", json!(["session"])),
         ("/gameplay", json!(false)),
-        ("/manual_sanity_required", json!(false)),
+        ("/manual_sanity_required", json!(true)),
+        ("/promotion", json!(true)),
         ("/selection_digest", json!("other-selection")),
     ] {
         let mut altered = recorded.clone();
@@ -187,7 +203,7 @@ fn changed_policy_and_tampered_context_do_not_validate_as_current() -> Result<()
 fn manual_receipt_is_bound_to_task_candidate_policy_and_selected_journeys(
 ) -> Result<(), Box<dyn Error>> {
     let config = configuration();
-    let milestone = selection(&config, "main", None, &["session"], true)?;
+    let milestone = promoted_selection(&config, "main", None, &["session"], true)?;
     let human = receipt(&milestone);
     let head = at(&human, "/source_head").as_str().ok_or("missing head")?;
     let observed = context::manual_observation("milestone", head, &milestone, Some(&human))?;

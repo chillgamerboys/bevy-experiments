@@ -1,12 +1,18 @@
 # Tests and evidence
 
 Resolve `gameskills verification resolve --base BRANCH` before selecting checks.
-The current receiving branch is `main` (Testing). After the pending branch rollout,
-feature PRs to `dev` use Development and milestone batches to `main` use Testing.
+Feature PRs target `dev` (Development); explicitly approved milestone batches
+target `main` (Testing).
 Both levels run on macOS. Windows/Linux are Release checks. Creative involvement and Cargo's `ci`
 build profile are independent of this policy.
 
-Choose the affected owner suites and relevant build/lint checks. Logic-only changes
+Development requires affected regression tests and necessary compilation, reusing
+test compilation where sufficient. It omits blanket all-target/all-feature builds,
+Clippy and packaging. Shared changes include relevant consumer regressions. Testing
+adds broader affected-component compilation and Clippy for the combined milestone.
+Release owns distributable archives and platform/feature compatibility checks.
+
+Choose the affected owner suites and required compile checks. Logic-only changes
 need no agent screenshots or UI walkthrough. For presentation or interaction changes,
 inspect the changed flow at 1920×1080 Auto. End-to-end checks follow affected journeys
 and boundaries; process recovery or every UI route is not implied by any game edit.

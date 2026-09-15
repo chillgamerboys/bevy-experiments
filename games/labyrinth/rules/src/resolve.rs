@@ -557,8 +557,8 @@ impl EffectResolver<'_> {
             .iter()
             .position(|id| *id == target)
             .ok_or(RuleError::InvalidState)?;
-        // A displacement measures rank distance, not number of occupants. Never
-        // split another footprint or silently turn a one-rank push into two.
+        // Pull steps cross whole occupants regardless of size. Pushes retain a
+        // rank-distance budget and cannot split a neighboring footprint.
         let mut next = previous;
         let mut remaining = offset.unsigned_abs();
         let from = self.state.rank(target).ok_or(RuleError::InvalidState)?;
@@ -577,16 +577,16 @@ impl EffectResolver<'_> {
                 .state
                 .actor(*formation.get(adjacent).ok_or(RuleError::InvalidState)?)
                 .ok_or(RuleError::InvalidState)?
-                .kind
-                .footprint();
-            if remaining < width {
+                .footprint;
+            let cost = if offset < 0 { 1 } else { width };
+            if remaining < cost {
                 limit = Some(crate::MovementLimit::Footprint {
                     actor: *formation.get(adjacent).ok_or(RuleError::InvalidState)?,
                     ranks: width,
                 });
                 break;
             }
-            remaining -= width;
+            remaining -= cost;
             next = adjacent;
         }
         if previous != next {

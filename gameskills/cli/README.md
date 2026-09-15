@@ -1,6 +1,6 @@
 # GameSkills Rust CLI
 
-The unpublished `0.1.0-dev.4` candidate installs immutable GameSkills instructions,
+The unpublished `0.1.0-dev.6` candidate installs immutable GameSkills instructions,
 constructs native Codex/Claude invocations, coordinates durable work queues and
 executes configured command graphs with verifiable evidence. Its 13 core skills
 use `plan` as the default entrypoint; eleven optional skills live in six specialist
@@ -196,7 +196,8 @@ gameskills delivery scope damage-fix --scope rules --gameplay
 ```
 
 `start` records resolved policy and caller-classified scope; `--gameplay` identifies
-game effects for milestone sanity. `scope` explicitly binds or updates that selection,
+game effects; `--promotion` explicitly marks a milestone promotion. Only their
+combination selects configured milestone sanity. `scope` explicitly binds or updates that selection,
 preserves prior selections and the original task/base, and retains the previous level
 when `--level` is omitted. Repeated `--check` options replace the required command
 list while preserving its prior value; omitting them keeps the existing checks. Supplying the complete scope/gameplay classification is the

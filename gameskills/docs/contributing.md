@@ -21,9 +21,11 @@ cargo clippy --locked -p gameskills-cli --all-targets --profile ci -- -D warning
 
 Use the [internal tool commands](../../devtools/README.md) to prepare/check a bundle
 from committed canonical source. Align native/catalog versions and minimum CLI
-compatibility. Then package the CLI and inspect its actual archive. Install from
-that archive into a clean consumer outside this repository, apply core-only and
-selected optional bundles, and verify an update preserves local guidance.
+compatibility. For ordinary Development instruction updates, verify the prepared bundle and the
+affected installation/runtime contracts. Archive construction and clean archive
+consumer trials belong to Release, or changes specifically affecting packaging.
+Those trials apply core-only and selected optional bundles and verify that updates
+preserve local guidance; local source checks do not establish archive acceptance.
 
 For changes to documentation discovery, exercise conventional/custom docs layouts and README-only projects. Verify missing
 or moved headings, owner selection for mixed work, and a docs/code contradiction.

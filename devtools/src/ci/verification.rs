@@ -100,6 +100,20 @@ pub fn runners(selection: &Selection) -> Vec<String> {
         .collect()
 }
 
+/// Known narrative guides; arbitrary Markdown can be compiled input or skill source.
+pub(super) fn narrative_doc(path: &str) -> bool {
+    path == "README.md"
+        || path == "devtools/docs/ci.md"
+        || ["docs/", "gamekit/docs/", "gameskills/docs/"]
+            .iter()
+            .any(|prefix| path.starts_with(prefix) && path.ends_with(".md"))
+        || (["games/", "gamekit/"]
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
+            && path.ends_with("/README.md")
+            && path.split('/').count() == 3)
+}
+
 /// Add receiving-project rigor to the existing committed impact selection.
 pub fn apply(root: &Path, selection: &mut Selection, policy: Value) -> Result<(), String> {
     validate(&policy)?;
@@ -107,7 +121,33 @@ pub fn apply(root: &Path, selection: &mut Selection, policy: Value) -> Result<()
     let Some(level) = level(selection).map(str::to_owned) else {
         return Ok(());
     };
-    if selection.full {
+    let development_ci_only = level == "development"
+        && selection.full
+        && selection.reasons.iter().any(|reason| {
+            reason.starts_with("Conservative fallback: shared configuration or CI input:")
+        })
+        && selection.paths.iter().any(|path| !narrative_doc(path))
+        && selection.paths.iter().all(|path| {
+            narrative_doc(path)
+                || path == ".github/workflows/gamekit.yml"
+                || path.starts_with("devtools/src/ci/")
+                || matches!(
+                    path.as_str(),
+                    "devtools/tests/ci_routing.rs"
+                        | "devtools/tests/ci_checks.rs"
+                        | "devtools/tests/ci_cli.rs"
+                )
+        });
+    if development_ci_only {
+        selection.full = false;
+        selection.packages = vec!["repo-devtools".into()];
+        selection.skills = false;
+        selection.rust = false;
+        selection.policy = true;
+        selection
+            .reasons
+            .push("Development: bounded CI controller and workflow tooling".into());
+    } else if selection.full {
         selection.packages = selector::package_names(root, &selection.head)?;
     }
     // Compatibility/distributable probes are release work. An uncertain diff expands

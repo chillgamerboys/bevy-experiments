@@ -4,8 +4,8 @@
 [The workflow](../../.github/workflows/gamekit.yml) resolves project verification
 policy, then selects affected packages and suites through
 [`repo-devtools ci`](../src/ci/mod.rs). The branch policy maps `dev` to Development and `main` to Testing.
-The repository currently receives PRs on `main`; creating and adopting `dev` is
-[pending rollout](../../docs/setup-and-launch.md#current-rollout-state). Both use macOS for classification, policy, skills, Rust and
+`dev` is the default feature branch; `main` receives explicitly approved milestone
+promotions. Both use macOS for classification, policy, skills, Rust and
 the aggregate gate. Windows/Linux are selected only at Release under this project's
 policy. These are project choices, not GameSkills defaults for other adopters.
 
@@ -17,10 +17,11 @@ Cargo's `--profile ci` only selects the build profile. A lower explicit rigor ca
 weaken the receiving branch's requirement, and Release selection does not publish.
 
 Narrative docs avoid game/runtime jobs. Skill instructions select structural checks
-and affected runtime tests. Game changes select positive owner suites and relevant
-compile/Clippy checks. Shared libraries also select reverse consumers and applicable
-minimal-feature/browser-core or distribution checks. Testing evaluates the combined
-batch's affected components and interactions. Unknown, CI or uncertain dependency
+and affected runtime tests. Development selects positive owner/consumer regression suites and necessary
+compilation, without blanket all-target/all-feature builds or Clippy. Testing adds
+broader compile/lint checks over the combined batch's affected components and
+interactions. Release adds applicable minimal-feature/browser-core, distribution
+and Cargo archive checks. Unknown, CI or uncertain dependency
 inputs broaden component investigation/coverage within the resolved level; they do
 not silently select every OS, display or end-to-end journey.
 
@@ -56,15 +57,15 @@ on failure. Build the controller with `--target-dir target/ci-controller` as the
 workflow does; its Cargo children use the ordinary target directory. This permits
 Windows to rebuild the tested binary without replacing a running executable.
 
-The always-run policy and final gate bootstrap the checked-out repository tool with
+Classification and the final gate bootstrap the checked-out repository tool with
 locked dependencies and the pinned toolchain. Bootstrap failure fails the job; no
 older binary substitutes. `ci gate` reads `CI_SELECTION` and `CI_NEEDS`; malformed
 or duplicate JSON, failed/cancelled/missing jobs and unexpectedly skipped selected
 jobs fail. No Python setup/interpreter is needed. The workflow does not alter branch
 protection. Dispatch takes an explicit `level`; it is not an implicit full release.
 
-CI reports automated results separately from milestone manual acceptance. A Testing
-batch affecting game behavior needs the developer's actual candidate-bound sanity
+CI reports automated results separately from milestone manual acceptance. An explicit
+milestone promotion affecting game behavior needs the developer's actual candidate-bound sanity
 response in delivery/audit. Docs/tooling without game effects do not need gameplay
 sanity. A successful CI job or agent walkthrough cannot supply that human response.
 
@@ -115,3 +116,29 @@ walk. Compatibility sizes/scales are retained for relevant defects or explicit
 Release commitments. Keep captures under `target/review/` through review, then retain
 a concise revision/command/result record. Stop after applicable checks pass unless
 new changes, failures or unresolved concerns justify more verification.
+
+## PR checks and waiting
+
+Development runs once per PR revision, against GitHub's candidate merge tree.
+The receiving `dev` branch requires the aggregate `ci` check and an up-to-date base;
+this protection is a repository setting, not something YAML silently establishes.
+With that requirement active, dev merges do not trigger duplicate push workflows.
+Main push checks and explicit dispatch remain available; a direct dev change outside
+PR delivery needs explicit verification and is not covered by previous PR evidence.
+
+PR concurrency cancels superseded runs. Main push concurrency is per branch.
+Explicit dispatches keep independent run identities. Cancelled runs never establish
+passing evidence. CI routing/gate fixtures run when their owner is affected or rigor
+is Testing/Release, rather than on every isolated game or narrative edit.
+
+Wait for a known run using one persistent process, keeping progress out of model
+context until completion or failure:
+
+```sh
+gh run watch RUN_ID --exit-status --compact --interval 30 > .context/ci-watch.log 2>&1
+```
+
+The host should await process completion without repeated model status turns. If
+that facility is unavailable, report the host limit and use supported nonblocking
+waiting; do not add unrelated work to keep an agent busy. Recheck actual PR/head/base
+and selected results once before merging. No watcher bypasses acceptance.

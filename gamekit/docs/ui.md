@@ -86,7 +86,7 @@ the measured card and every descendant after `UiSystems::Layout` and before
 late `Node` offsets or wait for a later frame to reveal valid geometry. The host
 is a full-target screen root; cards retain native layout and scroll behavior.
 Previews appear immediately and are pointer-transparent. Leaving before the
-configurable `UiTooltipSettings::lock_delay` (1 second by default) dismisses them
+configurable `UiTooltipSettings::lock_delay` (2 seconds by default) dismisses them
 immediately. Continuous hover locks a card. Each pinned card exposes an accessible
 corner × control that closes that branch and its descendants; the configured
 dismiss key closes the deepest linked card first and then the root. Pinned chains
