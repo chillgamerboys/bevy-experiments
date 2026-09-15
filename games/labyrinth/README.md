@@ -306,8 +306,9 @@ which uses the same disclosed Skill content. Neither inspection nor a skillbook
 link spends a turn. The shared timing and key bindings can be changed independently
 of Labyrinth's rules and palette.
 
-See [architecture and extension contracts](docs/architecture.md)
-and [verification](docs/testing.md). The future endless maze should
+See [architecture and extension contracts](docs/architecture.md),
+[verification](docs/testing.md), and the [mechanics coverage matrix](docs/mechanics-coverage.md).
+The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.
 

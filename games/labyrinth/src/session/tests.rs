@@ -3,6 +3,7 @@
 use super::*;
 
 mod history;
+mod mechanics;
 use labyrinth_rules::{CombatOutcome, Team, DEFAULT_HERO_ROSTER};
 
 #[test]

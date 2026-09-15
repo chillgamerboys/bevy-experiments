@@ -316,10 +316,17 @@ impl ForecastDisplay {
                     } else {
                         "Push"
                     };
-                    let mut text = format!(
-                        "{direction} {distance}/{} ranks",
-                        movement.requested.unsigned_abs()
-                    );
+                    let mut text = if movement.requested < 0 {
+                        format!(
+                            "Pull forward {distance} {}",
+                            if distance == 1 { "rank" } else { "ranks" }
+                        )
+                    } else {
+                        format!(
+                            "{direction} {distance}/{} ranks",
+                            movement.requested.unsigned_abs()
+                        )
+                    };
                     match movement.limit {
                         Some(labyrinth_rules::MovementLimit::FormationEdge) => {
                             text.push_str(" · formation edge");
@@ -591,11 +598,15 @@ pub fn effects_description(effects: &[Effect]) -> String {
                     StatusTag::Bleeding => "bleed",
                 }
             ),
-            Effect::Move(amount) => format!(
-                "Move {} rank {}",
-                amount.unsigned_abs(),
-                if amount < 0 { "forward" } else { "back" }
+            Effect::Move(-1) => {
+                "Pull ahead of the preceding occupant, regardless of size".to_owned()
+            }
+            Effect::Move(amount) if amount < 0 => format!(
+                "Pull past {} preceding occupants, regardless of size",
+                amount.unsigned_abs()
             ),
+            Effect::Move(1) => "Push back up to 1 rank".to_owned(),
+            Effect::Move(amount) => format!("Push back up to {amount} ranks"),
             Effect::SwapWithSource => "Swap positions".to_owned(),
             Effect::Rescue(percent) => format!("Rescue to {percent}% HP"),
             Effect::StatusDamage(_) => "Status damage".to_owned(),
@@ -623,6 +634,26 @@ pub fn base_description(action: &CombatAction) -> String {
 mod tests {
     use super::*;
     use labyrinth_rules::{Combat, SkillId, DEFAULT_HERO_ROSTER};
+
+    #[test]
+    fn pull_description_counts_occupants_while_push_counts_ranks() {
+        assert_eq!(
+            effects_description(&[Effect::Move(-1)]),
+            "Pull ahead of the preceding occupant, regardless of size"
+        );
+        assert_eq!(
+            effects_description(&[Effect::Move(-2)]),
+            "Pull past 2 preceding occupants, regardless of size"
+        );
+        assert_eq!(
+            effects_description(&[Effect::Move(1)]),
+            "Push back up to 1 rank"
+        );
+        assert_eq!(
+            effects_description(&[Effect::Move(2)]),
+            "Push back up to 2 ranks"
+        );
+    }
 
     #[test]
     fn corpse_forecasts_preserve_durability_and_disclosure_through_removal() {
