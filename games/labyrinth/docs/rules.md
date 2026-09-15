@@ -11,8 +11,13 @@ with any occupied rank. Greatsword FrontPair cleave captures the distinct eligib
 occupants of target ranks 1–2 before effects. A two-rank actor is hit once; clearing
 a corpse does not retarget a replacement. All captured targets resolve before
 terminal victory checks. Preview and actual resolution share this target expansion. Reposition swaps adjacent whole occupants;
-Exchange swaps whole occupants at any distance. Forced movement measures rank distance
-and crosses only whole neighboring footprints within its distance budget. No wrap.
+Exchange swaps whole occupants at any distance. Pushes measure rank distance
+and cross only whole neighboring footprints within their distance budget. Pulls
+count whole preceding occupants, regardless of either actor's size. Hook Shot's
+one pull step puts its surviving target in front of the previous occupant: pulling
+a one-rank Stalker past a two-rank Hauler shifts the Stalker forward two ranks and
+the Hauler back one. All sizes can be pulled; there is no movement resistance.
+Movement uses configured footprints rather than appearance defaults. No wrap.
 Clearing remains compacts the formation; death alone does not.
 
 ## Skills, Abilities and Moveset
@@ -79,7 +84,7 @@ use their frontline attacks; Stalker and Archer occupy ranks 5 and 6.
 Both are balance fixtures, not balanced release content.
 
 Rules/content fingerprints change; all multiplayer participants must run matching builds.
-Catalog/scenario schema 2 and combat rules v5 reject old saved formats rather than
+Catalog/scenario schema 2 and combat rules v6 reject incompatible saved formats rather than
 silently migrating the changed Skills/Abilities contract. Original files stay intact.
 
 ## Decisions

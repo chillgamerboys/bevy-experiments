@@ -231,7 +231,7 @@ pub const fn legacy_skill_definition(id: SkillId) -> LegacySkillDefinition {
         ),
         SkillId::HookShot => (
             "Hook Shot",
-            "Deal 3 damage, then pull the surviving target forward one rank.",
+            "Deal 3 damage, then pull the surviving target in front of the preceding occupant, regardless of either creature's size.",
             MIDDLE_REAR,
             MIDDLE_REAR,
             TargetRule::EnemyStanding,

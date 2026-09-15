@@ -261,13 +261,16 @@ fn saves_damage_rescue_and_permanent_death_are_distinct() {
 }
 
 #[test]
-fn whole_footprint_displacement_never_exceeds_rank_budget() {
+fn pulls_cross_whole_occupants_and_exchange_keeps_whole_footprints() {
     let mut c = fixture();
     c.move_actor(ActorId(105), -1, &mut Vec::new(), &mut Work(MAX_WORK))
         .expect("valid fixture");
-    assert_eq!(c.state.rank(ActorId(105)), Some(5)); // Cannot cross half a Hauler.
+    assert_eq!(c.state.rank(ActorId(105)), Some(3)); // Emerges in front of the whole Hauler.
+    assert_eq!(c.state.ranks(ActorId(101)), Some(4..=5));
+    let mut c = fixture();
     c.move_actor(ActorId(105), -2, &mut Vec::new(), &mut Work(MAX_WORK))
         .expect("valid fixture");
+    assert_eq!(c.state.rank(ActorId(105)), Some(2)); // Two whole preceding occupants.
     assert_eq!(c.state.ranks(ActorId(101)), Some(4..=5));
     c.resolver()
         .swap(ActorId(5), ActorId(4), &mut Vec::new(), &mut Work(MAX_WORK))

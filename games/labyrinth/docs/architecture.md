@@ -77,7 +77,7 @@ Enemies default to AI; the external policy is a pure driver hook, not a complete
 Input JSON is bounded to 128 KiB, combat snapshots to 1 MiB and session snapshots to
 4 MiB. Validation checks resolved payload budgets before accepting setup. Initial
 compatibility requires matching catalog and rules; no mod download or silent migration.
-Inventory storage/acquisition, offhand slots, passives/reactions and skill trees remain
+Inventory storage/acquisition, offhand slots, general passive reactions and skill trees remain
 open designs. A single weapon reference does not establish an inventory schema.
 
 Initiative is rerolled per round using pinned deterministic SplitMix64 sampling.

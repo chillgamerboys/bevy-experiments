@@ -202,7 +202,7 @@ impl ActionPreview {
 pub enum MovementLimit {
     /// No further occupant exists in the requested direction.
     FormationEdge,
-    /// The remaining distance cannot cross this occupant's whole footprint.
+    /// The remaining push budget cannot cross this occupant's whole footprint.
     Footprint {
         /// Adjacent occupant, not an arbitrary formation index.
         actor: ActorId,
@@ -216,13 +216,13 @@ pub enum MovementLimit {
 pub struct MovementPreview {
     /// Displaced character.
     pub actor: ActorId,
-    /// Signed authored distance: negative is forward, positive is back.
+    /// Negative counts preceding occupants to pull past; positive is a push rank budget.
     pub requested: i8,
     /// Leading rank before movement.
     pub from: u8,
     /// Leading rank after movement.
     pub to: u8,
-    /// Absent when the complete requested distance was covered.
+    /// Absent when all requested pull steps or the full push rank budget completed.
     pub limit: Option<MovementLimit>,
 }
 

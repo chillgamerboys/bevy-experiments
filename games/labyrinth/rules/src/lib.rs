@@ -36,7 +36,7 @@ pub use status::{
 };
 
 /// Algorithm/interpretation revision included with the canonical content fingerprint.
-pub const RULES_VERSION: &str = "labyrinth-combat-v5-skills-abilities-moveset-resilient";
+pub const RULES_VERSION: &str = "labyrinth-combat-v6-whole-occupant-pulls";
 
 /// Maximum human seats and linear rank capacity per team (not a required roster length).
 pub const PARTY_SIZE: usize = 6;
