@@ -18,5 +18,5 @@ Owned guidance:
 
 Active work: [documentation and skills](plans/docs-and-skills.md).
 Current workflow: [model routing and efficient feature delivery](../gameskills/docs/agent-workflow.md).
-Scoped epic: [Labyrinth customization and package quality](plans/labyrinth-customization-epic.md).
+Remaining acceptance: [Labyrinth customization and package quality](plans/labyrinth-customization-epic.md).
 Deferred work: [distribution and repository split](plans/distribution.md).

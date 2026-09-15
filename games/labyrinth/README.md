@@ -313,4 +313,5 @@ be another game-owned model/orchestrator, not a reason to put expedition rules i
 Gamekit or to replace this combat kernel.
 
 Battle UI and character customization landed in PRs #42–45. Current behavior is documented above and in [architecture](docs/architecture.md).
-Earlier foundation and separate acceptance context: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).
+Design constraints: [character editor](docs/character-editor-design.md).
+Outstanding acceptance: [customization follow-up](../../docs/plans/labyrinth-customization-epic.md).

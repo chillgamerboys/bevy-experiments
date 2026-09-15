@@ -221,7 +221,7 @@ evidence, missing information and unnecessary backtracking. Static review can
 establish information availability; actual player comprehension requires a player
 observation. Do not claim the correction works merely because its text exists.
 
-The [research brief](../../../games/labyrinth/docs/plans/builder-ui-research.md)
+The [research brief](https://github.com/chillgamerboys/bevy-experiments/blob/bf42159a8b2872ca293fafe1a5e5a66eb4f1f666/games/labyrinth/docs/plans/builder-ui-research.md)
 contains sources, concrete alternatives and settled answers 7–8: squad preparation
 with one unified character editor, designed for eventual in-game detailed viewing.
 Future character stats belong in that same screen when implemented. Preserve this
@@ -231,7 +231,7 @@ fallback and the immutable installed pin remain unchanged.
 
 The scoped implementation follows the epic:
 [HEX-99](https://linear.app/chillgamerboys/issue/HEX-99/epic-labyrinth-customization-and-configurable-co-op-battles-with),
-with [full child scopes and dependencies](../../../docs/plans/labyrinth-customization-epic.md).
+with [current acceptance and historical scope links](../../../docs/plans/labyrinth-customization-epic.md).
 Implementation ends at observed, reviewable PRs with evaluation findings
 and explicit evidence gaps. GameSkills is tracked in
 [HEX-100](https://linear.app/chillgamerboys/issue/HEX-100/evaluate-and-improve-gameskills-throughout-the-labyrinth-customization); Gamekit in
@@ -296,7 +296,7 @@ were stated back to the user; the earlier individual questions were not explicit
 answered. The user has explicitly settled learned moves/upgrades, unlimited throws
 and the co-op lobby ownership model above. Questions 1–6 have been answered. The
 main scope is settled; routine implementation choices can be proposed in the
-[Labyrinth implementation plan](../../../games/labyrinth/docs/plans/weapons-and-battle-setup.md).
+[Labyrinth implementation plan](https://github.com/chillgamerboys/bevy-experiments/blob/bf42159a8b2872ca293fafe1a5e5a66eb4f1f666/games/labyrinth/docs/plans/weapons-and-battle-setup.md).
 Ask numbered follow-ups starting at 7 only if material uncertainty remains.
 
 BG3 reference check: a [player report on Larian's forum](https://forums.larian.com/ubbthreads.php?Number=883773&ubb=showflat)
@@ -857,7 +857,7 @@ the core package-local [interface design reference](../../plugins/gameskills/ref
 plus build-ui/verify-ui and their UI contracts/evidence references. Entry skills
 route to focused design guidance instead of adding a mandatory questionnaire.
 Keep Gamekit composite quality tied to the same task and visual standards. The
-[Labyrinth design](../../../games/labyrinth/docs/plans/builder-ui-research.md) records
+[Labyrinth design](https://github.com/chillgamerboys/bevy-experiments/blob/bf42159a8b2872ca293fafe1a5e5a66eb4f1f666/games/labyrinth/docs/plans/builder-ui-research.md) records
 answers 9–10 and the required next artifact; future grill numbering starts at 11.
 
 The author performed a bounded critique of three preserved real UI captures from

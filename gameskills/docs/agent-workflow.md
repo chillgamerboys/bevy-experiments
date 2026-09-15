@@ -63,6 +63,9 @@ and open the next. Identical marks and repeated finishes are idempotent. `--atte
 distinguishes attempts on a thread; finish infers the active role. Allowed stages
 are implementation, verification and delivery; repeat `--skill` for the active set.
 These are caller-marked boundaries, not automatic detection of skill invocation.
+Record grill/planning under implementation with their exact active skills; the CLI
+has no separate grill/planning stage. Finish only at the task endpoint. A finished
+attempt cannot reopen; resumed work uses a new attempt and retains the old receipt.
 The first mark is an observed baseline, not a zero baseline: earlier work is outside
 its measurement. Capture fresh workers from their verified first native counters
 when their initial request must be included. Unsupported telemetry remains unavailable.
@@ -164,3 +167,33 @@ The tooltip pilot exposed excessive coordinator reasoning/polling and missed con
 timing fixtures. These changes address those mechanisms; measured savings require a
 new comparable accepted task. A shorter skill file or passing routing fixture alone
 is not a cost result.
+
+## Mechanics trial lessons
+
+The Labyrinth mechanics trial ([PR #49](https://github.com/chillgamerboys/bevy-experiments/pull/49))
+used one observed `gpt-6-astra` / high coordinator and no workers. Recorded intervals
+covered 9,750,936 input tokens (9,501,568 cached) and 64,182 output tokens over
+38m33s, including handoff and CI. The final response/checkpoint tail was outside
+those intervals. The focused Hook Shot calibration used 340,783 input and 1,793
+output tokens over 59s; it is a separate unit from the 209-scenario catalog work.
+These counts are an observed task baseline, not a billed-cost or savings claim.
+
+For the next measured task:
+
+- Start delivery with explicit `--repo OWNER/REPO` and receiving `--base`. The
+  dev.6 binder cannot add a missing repository later; the prior run needed a
+  linked replacement delivery record solely to repair that omission.
+- Read owner indexes once, search scoped paths, and return bounded excerpts.
+  Repeated broad discovery and a long coordinator context inflated input in this
+  trial. Keep worker briefs concrete if independent work warrants delegation.
+- Commit the final source before the final check batch. Carry the same receiving
+  branch, scope and applicable checks into delivery; validate reuse through the
+  runner. Do not reinterpret dev Development evidence as main Testing evidence.
+- Keep one persistent CI watcher and reuse its completion result. Report missing
+  host completion notifications explicitly instead of recurring status queries.
+- Compare equivalent accepted tasks before claiming savings. Docs/promotion,
+  a tooltip constant and catalog-wide mechanics coverage have different scope.
+
+These are current project workflow recommendations. This docs pass does not
+change the installed instruction bundle, add telemetry stages or switch the
+model of an already-running coordinator.
