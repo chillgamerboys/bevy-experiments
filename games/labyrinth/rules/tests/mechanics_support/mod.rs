@@ -126,13 +126,14 @@ pub fn commit(game: &mut Combat, command: CombatAction) -> Vec<labyrinth_rules::
 }
 
 pub fn wait_for(game: &mut Combat, actor: ActorId) {
-    for _ in 0..120 {
+    let reached = (0..120).any(|_| {
         let active = game.snapshot().active_actor.expect("ongoing encounter");
         if active == actor {
-            return;
+            return true;
         }
         game.apply(active, CombatAction::Wait)
             .expect("external driver waits");
-    }
-    panic!("actor must receive a bounded future turn");
+        false
+    });
+    assert!(reached, "actor must receive a bounded future turn");
 }
