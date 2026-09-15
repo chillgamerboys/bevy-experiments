@@ -724,7 +724,7 @@ fn configured_non_release_cannot_restore_artifact_or_distribution_checks() {
         for flag in ["distribution", "minimal", "wasm", "deny"] {
             let mut value = serde_json::to_value(configured(level, &["bevy-gamekit-ui"], &[]))
                 .expect("selection value");
-            value[flag] = json!(true);
+            *value.get_mut(flag).expect("configured selection flag") = json!(true);
             let value = serde_json::from_value(value).expect("typed selection");
             assert!(checks::validate(&value).is_err(), "{level} {flag}");
         }
