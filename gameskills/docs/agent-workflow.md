@@ -194,6 +194,13 @@ For the next measured task:
 - Compare equivalent accepted tasks before claiming savings. Docs/promotion,
   a tooltip constant and catalog-wide mechanics coverage have different scope.
 
+A subsequent docs/promotion trial exposed a telemetry limitation: native cumulative
+counters reset within the same thread, so a mark using the earlier baseline failed
+with `input_tokens decreased between start and end`. Inspect each command's JSON
+`ok` field; a redirected file alone is not evidence of a successful checkpoint.
+Preserve the failed marks, report the discontinuity, and keep separately observed
+monotonic segments explicit instead of estimating a complete total.
+
 These are current project workflow recommendations. This docs pass does not
 change the installed instruction bundle, add telemetry stages or switch the
 model of an already-running coordinator.
