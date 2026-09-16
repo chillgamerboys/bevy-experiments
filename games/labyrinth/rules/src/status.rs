@@ -88,7 +88,8 @@ pub enum Effect {
     ApplyStatus(StatusKind),
     /// Remove all matching tagged statuses.
     Cleanse(StatusTag),
-    /// Move target toward the rear (positive) or front (negative).
+    /// Push by a rank budget (positive) or pull past whole occupants (negative).
+    /// Pulls ignore footprint size; both directions preserve packed formations.
     Move(i8),
     /// Swap the source and ally positions, including downed allies.
     SwapWithSource,

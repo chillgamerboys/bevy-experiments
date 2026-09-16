@@ -444,6 +444,7 @@ fn repository_source_base_and_commit_identity() {
 #[cfg(unix)]
 mod posix {
     use super::*;
+    use sha2::{Digest, Sha256};
     use std::os::unix::fs::{symlink, PermissionsExt};
 
     fn with_verification(config: &Value) -> Value {
@@ -464,6 +465,30 @@ mod posix {
                 }
             }),
         )
+    }
+
+    fn pre_promotion_selection(selection: &mut Value) {
+        selection
+            .as_object_mut()
+            .expect("verification selection")
+            .remove("promotion");
+        let policy = selection.get("policy").expect("verification policy");
+        let mut input = json!({
+            "policy_digest": policy.get("policy_digest"),
+            "base": policy.get("receiving_branch"),
+            "level": policy.get("level"),
+            "scope": selection.get("scope"),
+            "gameplay": selection.get("gameplay")
+        });
+        input.sort_all_objects();
+        let digest = format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&input).expect("digest input"))
+        );
+        selection
+            .as_object_mut()
+            .expect("verification selection")
+            .insert("selection_digest".into(), json!(digest));
     }
 
     #[test]
@@ -547,6 +572,7 @@ mod posix {
             at(&status, "/queue/orders/one/spec/verification"),
             at(&original, "/orders/one/spec/verification")
         );
+        assert_eq!(at(&original, "/plan/verification/promotion"), false);
         assert!(at(&status, "/queue/orders/one/waiting_reasons")
             .to_string()
             .contains("verification policy changed"));
@@ -562,6 +588,27 @@ mod posix {
                 &changed,
             )
         });
+
+        let mut legacy = original.clone();
+        pre_promotion_selection(
+            legacy
+                .pointer_mut("/plan/verification")
+                .expect("plan verification"),
+        );
+        pre_promotion_selection(
+            legacy
+                .pointer_mut("/orders/one/spec/verification")
+                .expect("order verification"),
+        );
+        fs::write(
+            f.path(),
+            serde_json::to_vec(&legacy).expect("legacy fixture"),
+        )
+        .expect("write legacy queue");
+        let legacy_status = f
+            .status(&changed)
+            .expect("pre-promotion selection keeps its historical digest shape");
+        assert!(at(&legacy_status, "/queue/plan/verification/promotion").is_null());
 
         let mut malformed = original;
         *malformed

@@ -1,6 +1,6 @@
 {
-  "bundle": ".gameskills/bundles/b069a3108dcb094766b89b3a35ad451f3088608a0e98e02bfdedbebed51c1f99-ebf958be",
-  "content_sha256": "b069a3108dcb094766b89b3a35ad451f3088608a0e98e02bfdedbebed51c1f99",
+  "bundle": ".gameskills/bundles/038160195274a0bc95ad60368b203899c784d9e3bd5cb8c42d7fc9629d77839f-ebf958be",
+  "content_sha256": "038160195274a0bc95ad60368b203899c784d9e3bd5cb8c42d7fc9629d77839f",
   "packages": [
     "gameskills",
     "gameskills-linear",

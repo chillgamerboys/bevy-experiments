@@ -2,6 +2,7 @@
 //!
 //! These modules support the binary and its tests, not a stable public Rust API.
 
+pub mod agents;
 pub mod cli;
 pub mod config;
 pub mod delivery;
@@ -9,6 +10,7 @@ pub mod docs;
 pub mod installation;
 pub mod platform;
 pub mod runner;
+pub mod usage;
 pub mod verification;
 pub mod verification_context;
 pub mod workflow;

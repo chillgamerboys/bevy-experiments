@@ -4,7 +4,7 @@ Use this guide to adopt a candidate or change an explicit instruction pin.
 
 ## Install a candidate
 
-The current source candidate is unpublished `0.1.0-dev.4`. Source installation requires the
+The current source candidate is unpublished `0.1.0-dev.6`. Source installation requires the
 pinned Rust 1.97.1 toolchain. A verified prebuilt executable requires neither Cargo
 nor Python at runtime. Git is needed for repository operations; native activation
 also needs the selected Codex or Claude CLI.

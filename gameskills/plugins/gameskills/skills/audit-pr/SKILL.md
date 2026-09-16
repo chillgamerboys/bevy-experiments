@@ -20,7 +20,9 @@ results only while their inputs remain valid, and rerun when dependency is uncer
 The runtime's `evidence validate RUN_ID` validates command records; it does not
 supply review, manual interaction, human enjoyment or overall audit acceptance.
 
-Inspect current CI and required review state. Resolve findings with the owning
+Inspect current CI and required review state. For pending CI, use the persistent
+watcher guidance in [efficient delivery](../../references/efficient-delivery.md#wait-and-integrate);
+a wait is not a reason to repeat review, tests or model status queries. Resolve findings with the owning
 implementer, then refresh source identity and affected evidence. Never relabel an
 old record for a new HEAD or count a stopped/skipped command as completed. A docs
 or logic-only change needs no automatic native game walk; a visual/gameplay claim

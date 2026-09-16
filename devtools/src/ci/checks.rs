@@ -74,6 +74,20 @@ pub fn validate(selection: &Selection) -> Result<(), String> {
     if let Some(policy) = &selection.verification {
         verification::validate(policy)?;
     }
+    if matches!(
+        verification::level(selection),
+        Some("development" | "testing")
+    ) && [
+        selection.distribution,
+        selection.minimal,
+        selection.wasm,
+        selection.deny,
+    ]
+    .into_iter()
+    .any(|selected| selected)
+    {
+        return Err("non-release verification selected release-only checks".into());
+    }
     for name in &selection.suites {
         let suite = suites::get(name)?;
         if !selection.packages.iter().any(|p| p == suite.package) {
@@ -188,6 +202,7 @@ fn repository_tests(selection: &Selection) -> Result<Vec<&'static str>, String> 
             ("support", &["inputs"]),
         ] {
             if path == &format!("devtools/src/{source}.rs")
+                || path.starts_with(&format!("devtools/src/{source}/"))
                 || path.starts_with(&format!("devtools/tests/{source}"))
             {
                 targets.extend(tests.iter().copied());
@@ -201,6 +216,70 @@ fn repository_tests(selection: &Selection) -> Result<Vec<&'static str>, String> 
         }
     }
     Ok(targets.into_iter().collect())
+}
+
+fn repository_ci_only(selection: &Selection) -> bool {
+    selection
+        .paths
+        .iter()
+        .any(|path| !verification::narrative_doc(path))
+        && selection.paths.iter().all(|path| {
+            verification::narrative_doc(path)
+                || path == ".github/workflows/gamekit.yml"
+                || path.starts_with("devtools/src/ci/")
+                || matches!(
+                    path.as_str(),
+                    "devtools/tests/ci_routing.rs"
+                        | "devtools/tests/ci_checks.rs"
+                        | "devtools/tests/ci_cli.rs"
+                )
+        })
+}
+
+fn documentation_packages(selection: &Selection) -> Vec<String> {
+    let mut packages = std::collections::BTreeSet::new();
+    for package in &selection.packages {
+        let root = match package.as_str() {
+            "bevy-gamekit" => "gamekit/facade",
+            "bevy-gamekit-discovery" => "gamekit/discovery",
+            "bevy-gamekit-hex" => "gamekit/hex",
+            "bevy-gamekit-multiplayer" => "gamekit/multiplayer",
+            "bevy-gamekit-session" => "gamekit/session",
+            "bevy-gamekit-testing" => "gamekit/testing",
+            "bevy-gamekit-turns" => "gamekit/turns",
+            "bevy-gamekit-ui" => "gamekit/ui",
+            "gameskills-cli" => "gameskills/cli",
+            "gameskills-linear" => "gameskills/linear",
+            "repo-devtools" => "devtools",
+            "labyrinth-rules" => "games/labyrinth/rules",
+            name if suites::game(name) => match name {
+                "labyrinth" => "games/labyrinth",
+                "deckbuilder" => "games/deckbuilder",
+                "carterfight" => "games/carterfight",
+                _ => "",
+            },
+            _ => "",
+        };
+        if root.is_empty() {
+            continue;
+        }
+        let library = format!("{root}/src/lib.rs");
+        let examples = format!("{root}/examples/");
+        let public_library_source = root.starts_with("gamekit/")
+            && selection
+                .paths
+                .iter()
+                .any(|path| path.starts_with(&format!("{root}/src/")) && path.ends_with(".rs"));
+        if public_library_source
+            || selection
+                .paths
+                .iter()
+                .any(|path| path == &library || path.starts_with(&examples))
+        {
+            packages.insert(package.clone());
+        }
+    }
+    packages.into_iter().collect()
 }
 
 /// Build the ordered literal argument vectors for one selected CI job.
@@ -250,20 +329,66 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
             ]));
         }
         Job::Rust if verification::level(selection).is_some() => {
-            // Compile selected consumers, then execute only named game suites.
-            commands.push(package_command(
-                "check",
-                &packages,
-                &["--locked", "--all-targets", "--profile", "ci"],
-            ));
+            let broad = matches!(verification::level(selection), Some("testing" | "release"));
+            if broad {
+                commands.push(package_command(
+                    "check",
+                    &packages,
+                    &[
+                        "--locked",
+                        "--all-targets",
+                        "--all-features",
+                        "--profile",
+                        "ci",
+                    ],
+                ));
+            } else {
+                // Positive suites compile game libraries; check their binaries as consumers.
+                let game_packages: Vec<String> = selection
+                    .packages
+                    .iter()
+                    .filter(|package| suites::game(package))
+                    .flat_map(|package| ["-p".into(), package.clone()])
+                    .collect();
+                if !game_packages.is_empty() {
+                    commands.push(package_command(
+                        "check",
+                        &game_packages,
+                        &["--locked", "--profile", "ci"],
+                    ));
+                }
+            }
             for package in selection.packages.iter().filter(|p| !suites::game(p)) {
                 if package == "gameskills-cli" && selection.skills {
                     continue;
                 }
-                if package == "repo-devtools" && verification::level(selection) != Some("release") {
-                    // Classification already owns CI fixtures. Execute other affected tool
-                    // contracts once, without selecting unrelated Cargo artifact probes.
-                    for target in repository_tests(selection)? {
+                if selection
+                    .suites
+                    .iter()
+                    .filter_map(|name| suites::get(name).ok())
+                    .any(|suite| suite.package == package)
+                {
+                    continue;
+                }
+                if package == "repo-devtools" {
+                    let targets = repository_tests(selection)?;
+                    if targets.is_empty() {
+                        if repository_ci_only(selection) {
+                            // Classification owns all three CI regression targets.
+                            continue;
+                        }
+                        let test_suffix = if broad {
+                            &["--locked", "--all-features", "--profile", "ci"][..]
+                        } else {
+                            &["--locked", "--profile", "ci"][..]
+                        };
+                        commands.push(package_command(
+                            "test",
+                            &["-p".into(), package.clone()],
+                            test_suffix,
+                        ));
+                    }
+                    for target in targets {
                         commands.push(package_command(
                             "test",
                             &["-p".into(), package.clone()],
@@ -271,10 +396,15 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                         ));
                     }
                 } else {
+                    let test_suffix = if broad {
+                        &["--locked", "--all-features", "--profile", "ci"][..]
+                    } else {
+                        &["--locked", "--profile", "ci"][..]
+                    };
                     commands.push(package_command(
                         "test",
                         &["-p".into(), package.clone()],
-                        &["--locked", "--all-features", "--profile", "ci"],
+                        test_suffix,
                     ));
                 }
             }
@@ -286,7 +416,29 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                     name.clone(),
                 ]);
             }
-            if selection.distribution {
+            let documented: Vec<String> = documentation_packages(selection)
+                .into_iter()
+                .filter(|package| {
+                    suites::game(package)
+                        || selection
+                            .suites
+                            .iter()
+                            .filter_map(|name| suites::get(name).ok())
+                            .any(|suite| suite.package == package)
+                        || (package == "gameskills-cli" && selection.skills)
+                        || (package == "repo-devtools" && repository_ci_only(selection))
+                })
+                .flat_map(|package| ["-p".into(), package])
+                .collect();
+            if !documented.is_empty() {
+                let doc_suffix = if broad {
+                    &["--locked", "--doc", "--all-features", "--profile", "ci"][..]
+                } else {
+                    &["--locked", "--doc", "--profile", "ci"][..]
+                };
+                commands.push(package_command("test", &documented, doc_suffix));
+            }
+            if verification::level(selection) == Some("release") && selection.distribution {
                 commands.push(repository_command("distribution", "check"));
                 commands.push(repository_command("distribution", "archives"));
             }
@@ -340,19 +492,21 @@ pub fn commands(selection: &Selection, job: Job) -> Result<Vec<Vec<String>>, Str
                 "2021",
                 "devtools/tests/fixtures/distribution/gamekit_consumer.rs",
             ]));
-            commands.push(package_command(
-                "clippy",
-                &packages,
-                &[
-                    "--all-targets",
-                    "--all-features",
-                    "--profile",
-                    "ci",
-                    "--",
-                    "-D",
-                    "warnings",
-                ],
-            ));
+            if !matches!(verification::level(selection), Some("development")) {
+                commands.push(package_command(
+                    "clippy",
+                    &packages,
+                    &[
+                        "--all-targets",
+                        "--all-features",
+                        "--profile",
+                        "ci",
+                        "--",
+                        "-D",
+                        "warnings",
+                    ],
+                ));
+            }
             if selection.deny {
                 commands.push(argv(&["cargo", "install", "cargo-deny", "--locked"]));
                 commands.push(argv(&["cargo", "deny", "check"]));

@@ -52,7 +52,7 @@ fn shuffled_hero_selection_preserves_ids_and_explicit_linear_formation() {
 fn canonical_content_fingerprint_is_pinned_and_not_just_package_version() {
     assert_eq!(
         crate::rules_fingerprint(),
-        "fe77d7a1266f58f0b5429e478f8b48689417abbdc69375d477a64c5d1f103aef"
+        "3077673301eaa7246f32ebc683b3abd39525aa03daa4ef8f2512a857676ac3ef"
     );
     assert_eq!(crate::rules_fingerprint(), crate::rules_fingerprint());
 }

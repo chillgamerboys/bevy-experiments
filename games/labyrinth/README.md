@@ -160,7 +160,7 @@ The wheel and Page Up/Down or Home/End browse older events. New events and arriv
 pages preserve your reading position; **Latest** returns to the newest entry.
 **×** hides the panel and retains your place; incoming events never reopen it.
 Hover or focus a row to inspect its full text, including long names. The usual
-one-second pin, keyboard reading, × dismissal and menu suspension apply.
+two-second pin, keyboard reading, × dismissal and menu suspension apply.
 
 History uses a complete encounter archive and bounded authenticated pages. Combat
 snapshots still carry only the recent 80 events, while the log mounts at most 32
@@ -290,7 +290,7 @@ targets; a stronger selected-target highlight and actor emphasis distinguish the
 current selection. Exact source/target ranks are listed in Skill tooltips;
 HP forecast segments remain attached to the affected actor.
 
-Hover an Skill or status to see its card immediately. Leaving before 1 second
+Hover an Skill or status to see its card immediately. Leaving before 2 seconds
 hides it immediately; continuous hover locks it with an accent border. Locked
 cards support related terms and stay open while hovering or clicking other
 characters and Skills. Each pinned card has a **×** control that closes that
@@ -306,10 +306,12 @@ which uses the same disclosed Skill content. Neither inspection nor a skillbook
 link spends a turn. The shared timing and key bindings can be changed independently
 of Labyrinth's rules and palette.
 
-See [architecture and extension contracts](docs/architecture.md)
-and [verification](docs/testing.md). The future endless maze should
+See [architecture and extension contracts](docs/architecture.md),
+[verification](docs/testing.md), and the [mechanics coverage matrix](docs/mechanics-coverage.md).
+The future endless maze should
 be another game-owned model/orchestrator, not a reason to put expedition rules in
 Gamekit or to replace this combat kernel.
 
-Active plan: [battle UI corrections and character customization](docs/plans/ui-and-character-builds.md).
-Earlier foundation and separate acceptance context: [weapons, character builds and configurable battles](docs/plans/weapons-and-battle-setup.md).
+Battle UI and character customization landed in PRs #42–45. Current behavior is documented above and in [architecture](docs/architecture.md).
+Design constraints: [character editor](docs/character-editor-design.md).
+Outstanding acceptance: [customization follow-up](../../docs/plans/labyrinth-customization-epic.md).

@@ -6,8 +6,8 @@ Start at `plan` for implementation or use a focused skill for a narrower request
 
 Creative involvement and verification rigor are separate choices. This repository
 maps `dev` to Development and `main` to Testing, with Release only for explicit
-release work. The current default remains `main`; the `dev` rollout is still pending
-as recorded in the [setup guide](../../docs/setup-and-launch.md#current-rollout-state). Development and Testing use
+release work. Feature delivery targets `dev`; the remote-default and candidate adoption observations
+are recorded in the [setup guide](../../docs/setup-and-launch.md#current-rollout-state). Development and Testing use
 macOS; Windows/Linux are release coverage. Changed UI flows use 1920×1080 Auto
 unless a display-specific defect or release support requires another case.
 
@@ -47,7 +47,9 @@ Full contracts and JSON examples live with the portable core:
 
 Queues validate real linked worktrees, ownership and observed integration. They do
 not launch models. `dispatch` uses the host's worker mechanism with actual supported
-model/effort settings. Inherit session defaults unless an authorized mapping exists.
+model/effort settings. The opted-in [model and usage contract](agent-workflow.md) resolves this project's
+small/standard/strong choices against the host and records task costs. Other adopters
+inherit session defaults unless an authorized mapping exists.
 Worker reports remain caller-supplied references, separate from runner observations.
 A passing command alone does not establish visual quality or release readiness.
 Stop verification when applicable checks pass unless changed inputs, failures or
@@ -63,6 +65,14 @@ read the pages for you. Missing conventional docs are diagnostic; broken explici
 mappings must be repaired. Proposed plan text does not replace current contracts.
 
 ## Delivery
+
+Keep one cohesive feature PR and merge it into `dev` once required checks and
+applicable review pass: the user has granted standing feature-merge authorization.
+Worker boundaries do not require separate PRs. Dependent stacks are exceptions.
+Main promotions use ancestry-preserving merge commits and explicit user approval.
+Mark promotions with `delivery start/scope --promotion`; a branch or rigor level
+alone must not introduce the developer sanity gate. The configured merge endpoint
+records intent and does not grant authority for another adopter.
 
 Start or resume the existing `gameskills delivery` task before implementation.
 Preserve its endpoint across interruptions. Bind the actual PR and optional tracker;

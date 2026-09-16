@@ -829,23 +829,27 @@ fn development_policy() -> serde_json::Value {
 }
 
 #[test]
-fn configured_ci_change_broadens_owners_but_retains_macos_and_pure_game_baselines() -> TestResult {
-    let fixture = Fixture::new()?;
+fn configured_ci_change_stays_with_owner_tooling_at_development() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    fixture.add_tool()?;
     let mut value = fixture.changed(&[".github/workflows/gamekit.yml"])?;
     ci::verification::apply(fixture.root(), &mut value, development_policy())?;
-    assert!(value.full);
-    assert!(value.packages.contains(&"labyrinth".into()));
+    assert!(!value.full);
+    assert_eq!(value.packages, ["repo-devtools"]);
+    assert!(!value.rust && !value.skills && value.policy);
     assert_eq!(ci::verification::runners(&value), ["macos-latest"]);
     assert!(!value.distribution && !value.wasm && !value.minimal && !value.deny);
-    assert_eq!(
-        value.suites,
-        [
-            "carterfight-rules",
-            "deckbuilder-domain",
-            "labyrinth-session"
-        ]
-    );
+    assert!(value.suites.is_empty());
     ci::checks::validate(&value)?;
+
+    fixture.reset()?;
+    let mut mixed = fixture.changed(&[
+        ".github/workflows/gamekit.yml",
+        "gameskills/plugins/gameskills/skills/test/SKILL.md",
+    ])?;
+    ci::verification::apply(fixture.root(), &mut mixed, development_policy())?;
+    assert!(mixed.full && mixed.skills && mixed.rust);
+    assert!(mixed.packages.contains(&"labyrinth".into()));
     Ok(())
 }
 
@@ -862,6 +866,28 @@ fn configured_rules_and_ui_changes_select_distinct_journeys() -> TestResult {
     assert!(!ui.suites.iter().any(|name| name.contains("admission")
         || name.contains("process")
         || name.contains("compatibility")));
+    Ok(())
+}
+
+#[test]
+fn configured_tooltip_change_keeps_bounded_owner_and_consumer_regressions() -> TestResult {
+    let fixture = Fixture::new()?;
+    let mut value =
+        fixture.changed(&["gamekit/ui/src/tooltip/view.rs", "gamekit/docs/tooltip.md"])?;
+    ci::verification::apply(fixture.root(), &mut value, development_policy())?;
+    assert_eq!(
+        value.suites,
+        [
+            "deckbuilder-tooltip-consumers",
+            "gamekit-ui-tooltip",
+            "labyrinth-tooltip-consumers",
+        ]
+    );
+    assert!(value.packages.contains(&"bevy-gamekit-ui".into()));
+    assert!(value.packages.contains(&"deckbuilder".into()));
+    assert!(value.packages.contains(&"labyrinth".into()));
+    assert!(value.packages.contains(&"carterfight".into()));
+    ci::checks::validate(&value)?;
     Ok(())
 }
 

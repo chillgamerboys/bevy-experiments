@@ -7,6 +7,8 @@ Gamekit is optional to an adopter. The [catalog](catalog.md) owns skill boundari
 ## Runtime ownership
 
 - `cli/src/config.rs`: project configuration structure and defaults.
+- `cli/src/agents.rs`: opted-in routing against caller-observed host model capabilities; no model launch.
+- `cli/src/usage.rs`: task/thread counter checkpoints, imported intervals and cost reports; no transcript disclosure.
 - `cli/src/verification.rs`: deterministic project rigor and receiving-branch policy resolution.
 - `cli/src/docs.rs`: read-only documentation discovery, independent of installation.
 - `cli/src/installation/`: bundle verification, atomic setup, native adapters and migration.
@@ -124,3 +126,16 @@ invented files. The command returns locations only and performs no network calls
 
 Older configuration remains supported. Mappings require CLI 0.1.0-dev.3 or newer;
 an older CLI rejects the unknown field. Upgrade explicitly before adding mappings.
+
+## Efficient delivery and usage
+
+`agents.routing` is opt-in and validated independently of installation. The
+project owns model IDs and bounded escalation; a supplied host capability snapshot
+must support the selected model and effort. Resolution records requested settings,
+not proof of native execution. Native observations belong to task usage receipts.
+
+Usage is a separate ledger rather than a token field fabricated by the command
+runner. Preserve per-thread attempt intervals and missing counters; sum deltas once
+across coordinator and workers. Optional caller-supplied pricing yields an estimate
+with source/date, never inferred billing. Task telemetry has no merge authority.
+See the [command and data contract](agent-workflow.md).

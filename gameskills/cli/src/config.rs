@@ -93,6 +93,7 @@ pub fn parse(source: &str) -> Result<Table, String> {
             .or_insert_with(|| Value::Table(Table::new()));
         table(&value, name)?;
     }
+    crate::agents::validate_configuration(&Value::Table(value.clone()))?;
     if value.contains_key("project") {
         let project = table(&value, "project")?;
         if let Some(base) = project.get("delivery_base") {

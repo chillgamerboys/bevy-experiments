@@ -35,6 +35,10 @@ not demonstrate that a command ran or a client/package combination was tested.
 Existing `.bevy-gamekit/overlays/` material is local context when migrating an
 adopter; preserve its owner and resolve contradictions instead of overwriting it.
 
+Reuse already-read policy and owner guidance while its source remains current.
+Load only the relevant sections, once per task; lifecycle transitions do not require
+rereading the same documents or rediscovering the executable.
+
 Load only relevant craft context:
 
 - [Bevy craft](bevy-craft.md) for ECS, scheduling, state, assets and test altitude.
